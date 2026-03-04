@@ -331,7 +331,7 @@ export default function App() {
                   onChange={e => setCatSearch(e.target.value)}
                   placeholder="Search…"
                   autoFocus
-                  style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 14 }}
+                  style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16 }}
                 />
               </div>
               <div style={{ maxHeight: 240, overflowY: "auto" }}>
@@ -493,7 +493,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 14,
   padding: "13px 16px",
   color: "var(--text)",
-  fontSize: 15,
+  fontSize: 16,
   outline: "none",
   transition: "border-color 0.2s",
   appearance: "none",
