@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "💸 Expenses",
   description: "Add expenses to Notion",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Expenses" },
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export const viewport: Viewport = {
