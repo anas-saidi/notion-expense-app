@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Category = { id: string; name: string; icon: string | null; type: string[]; defaultAccount: string | null; available: number | null; planned: number | null };
-type Transaction = { id: string; name: string; amount: number; date: string; category: string | null };
+type Transaction = { id: string; name: string; amount: number; date: string; category: string | null; type: string };
 type Account = { id: string; label: string; icon: string; type: string | null };
 
 // ─── Accounts (static — pulled from your Notion) ─────────────────────────
@@ -33,6 +33,7 @@ export default function App() {
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [txType, setTxType] = useState<"Expense" | "Income">("Expense");
   const [errorMsg, setErrorMsg] = useState("");
   const [catSearch, setCatSearch] = useState("");
   const [showCatPicker, setShowCatPicker] = useState(false);
@@ -148,7 +149,7 @@ export default function App() {
       const res = await fetch("/api/expense", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, amount: parseFloat(amount), accountId, categoryId, date }),
+        body: JSON.stringify({ name, amount: parseFloat(amount), accountId, categoryId, date, txType }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
@@ -161,6 +162,7 @@ export default function App() {
         amount: parseFloat(amount),
         date,
         category: categoryId,
+        type: txType,
       }, ...prev.slice(0, 9)]);
 
       setAmount("");
@@ -195,7 +197,22 @@ export default function App() {
                 Notion Finance
               </p>
               <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
-                Add <em style={{ fontStyle: "italic", color: "var(--accent)", transition: "color 0.35s ease" }}>expense</em>
+                Add{" "}
+                <em
+                  onClick={() => setTxType(t => t === "Expense" ? "Income" : "Expense")}
+                  style={{
+                    fontStyle: "italic",
+                    color: txType === "Income" ? "var(--success)" : "var(--accent)",
+                    transition: "color 0.25s ease",
+                    cursor: "pointer",
+                    textDecorationLine: "underline",
+                    textDecorationStyle: "dotted",
+                    textDecorationColor: "currentColor",
+                    textUnderlineOffset: 4,
+                  }}
+                >
+                  {txType === "Income" ? "income" : "expense"}
+                </em>
               </h1>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -472,7 +489,7 @@ export default function App() {
                       <p style={{ fontSize: 13, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</p>
                       <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontFamily: "'DM Mono', monospace" }}>{cat?.name ?? "—"} · {fmtDate(t.date)}</p>
                     </div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "var(--danger)", flexShrink: 0 }}>−{fmt(t.amount)}</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: t.type === "Income" ? "var(--success)" : "var(--danger)", flexShrink: 0 }}>{t.type === "Income" ? "+" : "−"}{fmt(t.amount)}</div>
                   </div>
                 );
               })}

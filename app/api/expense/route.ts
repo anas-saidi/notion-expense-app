@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
-  const { name, amount, accountId, categoryId, date } = await req.json();
+  const { name, amount, accountId, categoryId, date, txType } = await req.json();
 
   if (!name || !amount || !accountId || !categoryId || !date) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
           Date: { date: { start: date } },
           Account: { relation: [{ id: accountId }] },
           Category: { relation: [{ id: categoryId }] },
-          Type: { select: { name: "Expense" } },
+          Type: { select: { name: txType ?? "Expense" } },
         },
       }),
     });
