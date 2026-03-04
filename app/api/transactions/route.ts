@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
       amount: page.properties.Amount?.number ?? 0,
       date: page.properties.Date?.date?.start ?? "",
       category: page.properties.Category?.relation?.[0]?.id ?? null,
-      type: page.properties.Type?.select?.name ?? "Expense",
     }));
 
     return NextResponse.json({ transactions });
