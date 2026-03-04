@@ -37,6 +37,7 @@ export default function App() {
   const [catSearch, setCatSearch] = useState("");
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [lastUsedCatId, setLastUsedCatId] = useState<string>("");
+  const [refreshingTx, setRefreshingTx] = useState(false);
   const catRef = useRef<HTMLDivElement>(null);
 
   // Sync mode to <html> so CSS vars apply to body, body::before, etc.
@@ -82,9 +83,7 @@ export default function App() {
         setAccountId((match ?? accs[0])?.id ?? "");
       });
 
-    fetch("/api/transactions")
-      .then(r => r.json())
-      .then(data => setTransactions(data.transactions ?? []));
+    fetchTransactions();
 
     // Restore last used category from localStorage
     const saved = localStorage.getItem("lastCatId");
@@ -97,6 +96,16 @@ export default function App() {
       setCategoryId(lastUsedCatId);
     }
   }, [lastUsedCatId, categories]);
+
+  const fetchTransactions = async () => {
+    setRefreshingTx(true);
+    try {
+      const data = await fetch("/api/transactions").then(r => r.json());
+      setTransactions(data.transactions ?? []);
+    } finally {
+      setRefreshingTx(false);
+    }
+  };
 
   // Close cat picker on outside click
   useEffect(() => {
@@ -122,9 +131,13 @@ export default function App() {
     setCatSearch("");
   };
 
-  const filteredCats = categories.filter(c =>
-    c.name.toLowerCase().includes(catSearch.toLowerCase())
-  );
+  const filteredCats = categories
+    .filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase()))
+    .sort((a, b) => {
+      if (a.id === lastUsedCatId) return -1;
+      if (b.id === lastUsedCatId) return 1;
+      return 0;
+    });
 
   const submit = async () => {
     if (!amount || !name || !categoryId) return;
@@ -383,7 +396,37 @@ export default function App() {
         {/* ── Recent transactions */}
         {transactions.length > 0 && (
           <div style={{ marginTop: 36, animation: "fadeUp 0.4s 0.2s ease both" }}>
-            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", marginBottom: 14 }}>Recent</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Recent</p>
+              <button
+                onClick={fetchTransactions}
+                disabled={refreshingTx}
+                title="Refresh"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: refreshingTx ? "default" : "pointer",
+                  color: "var(--muted)",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  opacity: refreshingTx ? 0.5 : 1,
+                  transition: "opacity 0.2s, color 0.2s",
+                }}
+                onMouseEnter={e => { if (!refreshingTx) (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
+              >
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ animation: refreshingTx ? "spin 0.7s linear infinite" : "none" }}
+                >
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              </button>
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {transactions.map((t, i) => {
                 const cat = categories.find(c => c.id === t.category);
