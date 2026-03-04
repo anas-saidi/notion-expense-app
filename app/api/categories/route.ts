@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
       icon: page.icon?.emoji ?? null,
       type: page.properties.Type?.multi_select?.map((t: any) => t.name) ?? [],
       defaultAccount: page.properties.Default?.relation?.[0]?.id ?? null,
+      available: page.properties["Available ( this month )"]?.formula?.number ?? null,
+      planned: page.properties.Planned?.number ?? null,
     }));
 
     return NextResponse.json({ categories });

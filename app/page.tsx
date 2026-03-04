@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Category = { id: string; name: string; icon: string | null; type: string[]; defaultAccount: string | null };
+type Category = { id: string; name: string; icon: string | null; type: string[]; defaultAccount: string | null; available: number | null; planned: number | null };
 type Transaction = { id: string; name: string; amount: number; date: string; category: string | null };
 type Account = { id: string; label: string; icon: string; type: string | null };
 
@@ -228,6 +228,23 @@ export default function App() {
           </div>
         </header>
 
+        {/* ── Today's summary */}
+        {(() => {
+          const todayStr = today();
+          const todayTxs = transactions.filter(t => t.date === todayStr);
+          const todayTotal = todayTxs.reduce((s, t) => s + t.amount, 0);
+          if (todayTxs.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.03s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Today</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--text2)" }}>{todayTxs.length} expense{todayTxs.length !== 1 ? "s" : ""}</span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)", fontWeight: 500 }}>−{fmt(todayTotal)} MAD</span>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── Amount */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "20px 20px 18px", marginBottom: 14, animation: "fadeUp 0.4s 0.05s ease both", position: "relative", overflow: "hidden", transition: "background-color 0.35s ease, border-color 0.35s ease" }}>
           {/* Decorative glow blob */}
@@ -294,10 +311,15 @@ export default function App() {
             onClick={() => setShowCatPicker(v => !v)}
             style={{ width: "100%", background: "var(--surface)", border: `1px solid ${showCatPicker ? "var(--accent)" : "var(--border)"}`, borderRadius: 14, padding: "13px 16px", color: selectedCat ? "var(--text)" : "var(--muted)", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", transition: "border-color 0.2s", textAlign: "left" }}
           >
-            <span style={{ fontSize: 14 }}>
+            <span style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               {selectedCat ? `${selectedCat.icon ?? "🏷️"} ${selectedCat.name}` : "Select category…"}
+              {selectedCat && selectedCat.available !== null && (
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: selectedCat.available >= 0 ? "var(--success)" : "var(--danger)", letterSpacing: 0.5, flexShrink: 0 }}>
+                  {selectedCat.available >= 0 ? "+" : ""}{fmt(selectedCat.available)}
+                </span>
+              )}
             </span>
-            <span style={{ color: "var(--muted)", fontSize: 12, transform: showCatPicker ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+            <span style={{ color: "var(--muted)", fontSize: 12, transform: showCatPicker ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>▾</span>
           </button>
 
           {showCatPicker && (
@@ -322,6 +344,11 @@ export default function App() {
                     <span>{cat.icon ?? "🏷️"}</span>
                     <span style={{ flex: 1 }}>{cat.name}</span>
                     {cat.id === lastUsedCatId && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "var(--accent)", letterSpacing: 1 }}>LAST</span>}
+                    {cat.available !== null && (
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: cat.available >= 0 ? "var(--success)" : "var(--danger)", letterSpacing: 0.5 }}>
+                        {cat.available >= 0 ? "+" : ""}{fmt(cat.available)}
+                      </span>
+                    )}
                     {cat.type[0] && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "var(--muted)", letterSpacing: 1 }}>{cat.type[0].toUpperCase()}</span>}
                   </button>
                 ))}
