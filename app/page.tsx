@@ -38,6 +38,8 @@ export default function App() {
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [lastUsedCatId, setLastUsedCatId] = useState<string>("");
   const [refreshingTx, setRefreshingTx] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
   const balanceAnimRef = useRef<number | null>(null);
   const catRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,25 @@ export default function App() {
     } finally {
       setRefreshingTx(false);
     }
+  };
+
+  const deleteTransaction = async (id: string) => {
+    if (deletingId !== id) {
+      // First tap: enter confirm state, auto-reset after 2s
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+      setDeletingId(id);
+      deleteTimerRef.current = setTimeout(() => setDeletingId(null), 2000);
+      return;
+    }
+    // Second tap: confirmed — optimistic remove then archive in Notion
+    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    setDeletingId(null);
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    fetch("/api/transactions", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).then(r => { if (!r.ok) fetchTransactions(); }); // re-fetch if failed
   };
 
   // Sync displayedBalance when selected account or accounts list changes
@@ -502,10 +523,10 @@ export default function App() {
                 return (
                   <div
                     key={t.id}
-                    onClick={() => { setName(t.name); if (t.category) { const c = categories.find(x => x.id === t.category); if (c) selectCategory(c); } }}
-                    style={{ display: "flex", alignItems: "center", padding: "11px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, cursor: "pointer", gap: 12, transition: "border-color 0.15s, background 0.15s", animation: `fadeUp 0.3s ${i * 0.03}s ease both` }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border2)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface)"; }}
+                    onClick={() => { if (deletingId === t.id) return; setName(t.name); if (t.category) { const c = categories.find(x => x.id === t.category); if (c) selectCategory(c); } }}
+                    style={{ display: "flex", alignItems: "center", padding: "11px 14px", background: deletingId === t.id ? "rgba(255,107,107,0.06)" : "var(--surface)", border: `1px solid ${deletingId === t.id ? "var(--danger)" : "var(--border)"}`, borderRadius: 12, cursor: "pointer", gap: 12, transition: "border-color 0.15s, background 0.15s", animation: `fadeUp 0.3s ${i * 0.03}s ease both` }}
+                    onMouseEnter={e => { if (deletingId !== t.id) { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border2)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)"; } }}
+                    onMouseLeave={e => { if (deletingId !== t.id) { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface)"; } }}
                   >
                     <div style={{ width: 34, height: 34, borderRadius: 10, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
                       {cat?.icon ?? "🏷️"}
@@ -514,7 +535,32 @@ export default function App() {
                       <p style={{ fontSize: 13, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</p>
                       <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontFamily: "'DM Mono', monospace" }}>{cat?.name ?? "—"} · {fmtDate(t.date)}</p>
                     </div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "var(--danger)", flexShrink: 0 }}>−{fmt(t.amount)}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "var(--danger)" }}>−{fmt(t.amount)}</div>
+                      <button
+                        onClick={e => { e.stopPropagation(); deleteTransaction(t.id); }}
+                        title={deletingId === t.id ? "Tap again to confirm" : "Delete"}
+                        style={{
+                          background: deletingId === t.id ? "var(--danger)" : "transparent",
+                          border: `1px solid ${deletingId === t.id ? "var(--danger)" : "transparent"}`,
+                          borderRadius: 6,
+                          padding: "4px 5px",
+                          cursor: "pointer",
+                          color: deletingId === t.id ? "#fff" : "var(--muted)",
+                          display: "flex",
+                          alignItems: "center",
+                          transition: "all 0.15s",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          <path d="M10 11v6M14 11v6" />
+                          <path d="M9 6V4h6v2" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
