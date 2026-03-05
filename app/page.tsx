@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Category = { id: string; name: string; icon: string | null; type: string[]; defaultAccount: string | null; available: number | null; planned: number | null };
 type Transaction = { id: string; name: string; amount: number; date: string; category: string | null };
-type Account = { id: string; label: string; icon: string; type: string | null };
+type Account = { id: string; label: string; icon: string; type: string | null; balance: number | null };
 
 // ─── Accounts (static — pulled from your Notion) ─────────────────────────
 const FALLBACK_ACCOUNTS: Account[] = [];
@@ -38,6 +38,8 @@ export default function App() {
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [lastUsedCatId, setLastUsedCatId] = useState<string>("");
   const [refreshingTx, setRefreshingTx] = useState(false);
+  const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
+  const balanceAnimRef = useRef<number | null>(null);
   const catRef = useRef<HTMLDivElement>(null);
 
   // Sync mode to <html> so CSS vars apply to body, body::before, etc.
@@ -107,6 +109,26 @@ export default function App() {
     }
   };
 
+  // Sync displayedBalance when selected account or accounts list changes
+  useEffect(() => {
+    const acct = accounts.find(a => a.id === accountId);
+    if (acct?.balance != null) setDisplayedBalance(acct.balance);
+    else setDisplayedBalance(null);
+  }, [accountId, accounts]);
+
+  const animateBalance = (from: number, to: number) => {
+    if (balanceAnimRef.current) cancelAnimationFrame(balanceAnimRef.current);
+    const duration = 700;
+    const start = performance.now();
+    const step = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setDisplayedBalance(Math.round(from + (to - from) * ease));
+      if (p < 1) balanceAnimRef.current = requestAnimationFrame(step);
+    };
+    balanceAnimRef.current = requestAnimationFrame(step);
+  };
+
   // Close cat picker on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -154,8 +176,11 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || "Failed");
 
       setStatus("success");
-      // Re-fetch from Notion so the list is always accurate
+      // Animate balance countdown then re-fetch real value
+      const expAmt = parseFloat(amount);
+      if (displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
+      fetch("/api/accounts").then(r => r.json()).then(d => setAccounts(d.accounts ?? []));
 
       setAmount("");
       setName("");
@@ -243,7 +268,30 @@ export default function App() {
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "20px 20px 18px", marginBottom: 14, animation: "fadeUp 0.4s 0.05s ease both", position: "relative", overflow: "hidden", transition: "background-color 0.35s ease, border-color 0.35s ease" }}>
           {/* Decorative glow blob */}
           <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, var(--accent-glow), transparent 70%)", pointerEvents: "none", transition: "background 0.4s ease" }} />
-          <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", marginBottom: 12, transition: "color 0.35s ease" }}>Amount</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", transition: "color 0.35s ease" }}>Amount</p>
+            {displayedBalance !== null && (() => {
+              const selectedAcct = accounts.find(a => a.id === accountId);
+              const afterAmount = amount && parseFloat(amount) > 0 ? displayedBalance - parseFloat(amount) : null;
+              const isLow = displayedBalance < 500;
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {selectedAcct && <span style={{ fontSize: 12 }}>{selectedAcct.icon}</span>}
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: isLow ? "var(--danger)" : "var(--text2)", transition: "color 0.3s", letterSpacing: 0.5 }}>
+                    {fmt(displayedBalance)}
+                  </span>
+                  {afterAmount !== null && (
+                    <>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--muted)" }}>→</span>
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: afterAmount < 0 ? "var(--danger)" : afterAmount < 500 ? "var(--danger)" : "var(--success)", transition: "color 0.2s", letterSpacing: 0.5 }}>
+                        {fmt(afterAmount)}
+                      </span>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
             <input
               type="text"

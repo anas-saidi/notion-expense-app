@@ -33,6 +33,10 @@ export async function GET(req: NextRequest) {
       label: page.properties.Name?.title?.[0]?.plain_text ?? "Unnamed",
       icon: page.icon?.emoji ?? "🏦",
       type: page.properties["Account Type"]?.select?.name ?? null,
+      balance: page.properties["Current Balance"]?.formula?.number
+        ?? page.properties["Current Balance"]?.number
+        ?? page.properties["Current Balance"]?.rollup?.number
+        ?? null,
     }));
 
     return NextResponse.json({ accounts });
