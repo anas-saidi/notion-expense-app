@@ -15,9 +15,10 @@ export async function GET(req: NextRequest) {
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json",
       },
+      cache: "no-store",
       body: JSON.stringify({
         sorts: [{ property: "Date", direction: "descending" }],
-        page_size: 10,
+        page_size: 20,
       }),
     });
 

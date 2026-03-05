@@ -154,14 +154,8 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || "Failed");
 
       setStatus("success");
-      // Prepend to local transactions list
-      setTransactions(prev => [{
-        id: data.id,
-        name,
-        amount: parseFloat(amount),
-        date,
-        category: categoryId,
-      }, ...prev.slice(0, 9)]);
+      // Re-fetch from Notion so the list is always accurate
+      fetchTransactions();
 
       setAmount("");
       setName("");
