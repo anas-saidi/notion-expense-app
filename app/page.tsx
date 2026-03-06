@@ -293,7 +293,9 @@ export default function App() {
   );
 
   const categoryUnfunded = !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
-  const canSubmit = amount && parseFloat(amount) > 0 && name.trim() && categoryId && status === "idle" && !categoryUnfunded;
+  const parsedAmount = amount ? parseFloat(amount) : 0;
+  const categoryOverBudget = !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
+  const canSubmit = amount && parsedAmount > 0 && name.trim() && categoryId && status === "idle" && !categoryUnfunded && !categoryOverBudget;
 
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
@@ -585,6 +587,14 @@ export default function App() {
             <span style={{ fontSize: 16 }}>⚠️</span>
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--danger)", lineHeight: 1.4 }}>
               <strong>{selectedCat?.name}</strong> has no available budget — fund it in Notion first.
+            </span>
+          </div>
+        )}
+        {categoryOverBudget && selectedCat && (
+          <div style={{ marginBottom: 10, padding: "11px 14px", borderRadius: 12, background: "color-mix(in srgb, var(--danger) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)", display: "flex", alignItems: "center", gap: 10, animation: "fadeUp 0.25s ease both" }}>
+            <span style={{ fontSize: 16 }}>🚫</span>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--danger)", lineHeight: 1.4 }}>
+              Over budget by <strong>{fmt(parsedAmount - (selectedCat.available ?? 0))} MAD</strong> — only <strong>{fmt(selectedCat.available ?? 0)} MAD</strong> left in <strong>{selectedCat.name}</strong>.
             </span>
           </div>
         )}
