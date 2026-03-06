@@ -55,6 +55,7 @@ export default function App() {
   const [pendingCatSearch, setPendingCatSearch] = useState("");
   const [refreshingPending, setRefreshingPending] = useState(false);
   const pendingCatRef = useRef<HTMLDivElement>(null);
+  const loadedPendingId = useRef<string | null>(null);
 
   // Sync mode to <html> so CSS vars apply to body, body::before, etc.
   useEffect(() => {
@@ -164,6 +165,7 @@ export default function App() {
       const cat = categories.find(c => c.id === item.categoryId);
       if (cat) selectCategory(cat);
     }
+    loadedPendingId.current = item.id;
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -265,6 +267,12 @@ export default function App() {
       if (displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
       fetch("/api/accounts").then(r => r.json()).then(d => setAccounts(d.accounts ?? []));
+
+      // Auto-dismiss the pending item that was loaded into the form
+      if (loadedPendingId.current) {
+        dismissPending(loadedPendingId.current);
+        loadedPendingId.current = null;
+      }
 
       setAmount("");
       setName("");
