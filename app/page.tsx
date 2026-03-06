@@ -292,7 +292,8 @@ export default function App() {
     </div>
   );
 
-  const canSubmit = amount && parseFloat(amount) > 0 && name.trim() && categoryId && status === "idle";
+  const categoryUnfunded = !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
+  const canSubmit = amount && parseFloat(amount) > 0 && name.trim() && categoryId && status === "idle" && !categoryUnfunded;
 
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
@@ -577,6 +578,16 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* ── Unfunded category alert */}
+        {categoryUnfunded && (
+          <div style={{ marginBottom: 10, padding: "11px 14px", borderRadius: 12, background: "color-mix(in srgb, var(--danger) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)", display: "flex", alignItems: "center", gap: 10, animation: "fadeUp 0.25s ease both" }}>
+            <span style={{ fontSize: 16 }}>⚠️</span>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--danger)", lineHeight: 1.4 }}>
+              <strong>{selectedCat?.name}</strong> has no available budget — fund it in Notion first.
+            </span>
+          </div>
+        )}
 
         {/* ── Submit */}
         <button
