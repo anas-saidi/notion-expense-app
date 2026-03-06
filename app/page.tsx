@@ -426,11 +426,13 @@ export default function App() {
         {/* ── Budget bar (shown when category has a plan) */}
         {selectedCat && selectedCat.planned !== null && selectedCat.available !== null && (() => {
           const planned = selectedCat.planned!;
-          const spent = Math.max(0, planned - selectedCat.available!);
+          const available = selectedCat.available!;
+          const spent = Math.max(0, planned - available);
           const expAmt = amount && parseFloat(amount) > 0 ? parseFloat(amount) : 0;
           const spentPct = Math.min((spent / planned) * 100, 100);
           const previewPct = Math.min(((spent + expAmt) / planned) * 100, 100);
-          const isOver = spent + expAmt > planned;
+          const availableAfter = available - expAmt;
+          const isOver = availableAfter < 0;
           const barColor = isOver ? "var(--danger)" : spentPct > 79 ? "#f59e0b" : "var(--accent)";
           const previewColor = isOver ? "rgba(255,107,107,0.35)" : "rgba(200,245,90,0.25)";
           return (
@@ -439,10 +441,10 @@ export default function App() {
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>
                   {selectedCat.icon} {selectedCat.name}
                 </span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: isOver ? "var(--danger)" : "var(--text2)", letterSpacing: 0.5 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: isOver ? "var(--danger)" : available >= 0 ? "var(--success)" : "var(--danger)", letterSpacing: 0.5 }}>
                   {expAmt > 0
-                    ? <>{fmt(spent + expAmt)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>
-                    : <>{fmt(spent)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>}
+                    ? <>{availableAfter >= 0 ? "+" : ""}{fmt(availableAfter)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>
+                    : <>{available >= 0 ? "+" : ""}{fmt(available)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>}
                 </span>
               </div>
               {/* Track */}
