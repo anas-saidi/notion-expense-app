@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       cache: "no-store",
       body: JSON.stringify({
         sorts: [{ property: "Date", direction: "descending" }],
-        page_size: 20,
+        page_size: 10,
       }),
     });
 
