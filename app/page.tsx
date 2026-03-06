@@ -331,19 +331,26 @@ export default function App() {
           </div>
         </header>
 
-        {/* ── Today's summary */}
+        {/* ── Date + Today summary */}
         {(() => {
           const todayStr = today();
+          const isToday = date === todayStr;
           const todayTxs = transactions.filter(t => t.date === todayStr);
           const todayTotal = todayTxs.reduce((s, t) => s + t.amount, 0);
-          if (todayTxs.length === 0) return null;
           return (
-            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.03s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Today</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--text2)" }}>{todayTxs.length} expense{todayTxs.length !== 1 ? "s" : ""}</span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)", fontWeight: 500 }}>−{fmt(todayTotal)} MAD</span>
-              </div>
+            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.03s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, gap: 12 }}>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                style={{ background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16, fontFamily: "'DM Mono', monospace", colorScheme: "dark", cursor: "pointer", padding: 0, flexShrink: 0, letterSpacing: 0.5 }}
+              />
+              {isToday && todayTxs.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--text2)" }}>{todayTxs.length} expense{todayTxs.length !== 1 ? "s" : ""}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)", fontWeight: 500 }}>−{fmt(todayTotal)} MAD</span>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -561,17 +568,6 @@ export default function App() {
               <p style={{ fontSize: 12, color: "var(--muted)" }}>Loading accounts…</p>
             )}
           </div>
-        </div>
-
-        {/* ── Date */}
-        <div style={{ marginBottom: 16, animation: "fadeUp 0.4s 0.16s ease both" }}>
-          <p style={labelStyle}>Date</p>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            style={{ ...inputStyle, colorScheme: "dark", fontSize: 13, width: "auto", minWidth: 160 }}
-          />
         </div>
 
         {/* ── Submit */}
