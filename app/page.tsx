@@ -290,7 +290,7 @@ export default function App() {
           {/* Decorative glow blob */}
           <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, var(--accent-glow), transparent 70%)", pointerEvents: "none", transition: "background 0.4s ease" }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", transition: "color 0.35s ease" }}>Amount</p>
+            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", transition: "color 0.35s ease" }}>Amount</p>
             {displayedBalance !== null && (() => {
               const selectedAcct = accounts.find(a => a.id === accountId);
               const afterAmount = amount && parseFloat(amount) > 0 ? displayedBalance - parseFloat(amount) : null;
@@ -358,6 +358,7 @@ export default function App() {
 
         {/* ── Description */}
         <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.08s ease both" }}>
+          <p style={labelStyle}>Description</p>
           <input
             type="text"
             value={name}
@@ -436,7 +437,7 @@ export default function App() {
           return (
             <div style={{ marginBottom: 14, animation: "budgetBarIn 0.25s ease both", transformOrigin: "left" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>
                   {selectedCat.icon} {selectedCat.name}
                 </span>
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: isOver ? "var(--danger)" : "var(--text2)", letterSpacing: 0.5 }}>
@@ -470,36 +471,36 @@ export default function App() {
           );
         })()}
 
-        {/* ── Account */}
-        <div style={{ marginBottom: 10, animation: "fadeUp 0.4s 0.14s ease both" }}>
-          <p style={labelStyle}>Account</p>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {accounts.map(a => (
-              <button
-                key={a.id}
-                onClick={() => setAccountId(a.id)}
-                title={a.label}
-                style={{ padding: "7px 12px", borderRadius: 10, border: `1px solid ${a.id === accountId ? "var(--accent)" : "var(--border)"}`, background: a.id === accountId ? "var(--accent-dim)" : "var(--surface)", color: a.id === accountId ? "var(--accent)" : "var(--text2)", fontSize: 13, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 5 }}
-              >
-                <span>{a.icon}</span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10 }}>{a.label}</span>
-              </button>
-            ))}
-            {accounts.length === 0 && (
-              <p style={{ fontSize: 12, color: "var(--muted)" }}>Loading accounts…</p>
-            )}
+        {/* ── Account + Date */}
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14, animation: "fadeUp 0.4s 0.14s ease both" }}>
+          <div style={{ flex: 1 }}>
+            <p style={labelStyle}>Account</p>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {accounts.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => setAccountId(a.id)}
+                  title={a.label}
+                  style={{ padding: "7px 12px", borderRadius: 10, border: `1px solid ${a.id === accountId ? "var(--accent)" : "var(--border)"}`, background: a.id === accountId ? "var(--accent-dim)" : "var(--surface)", color: a.id === accountId ? "var(--accent)" : "var(--text2)", fontSize: 13, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 5 }}
+                >
+                  <span>{a.icon}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10 }}>{a.label}</span>
+                </button>
+              ))}
+              {accounts.length === 0 && (
+                <p style={{ fontSize: 12, color: "var(--muted)" }}>Loading accounts…</p>
+              )}
+            </div>
           </div>
-        </div>
-
-        {/* ── Date */}
-        <div style={{ marginBottom: 16, animation: "fadeUp 0.4s 0.16s ease both" }}>
-          <p style={labelStyle}>Date</p>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            style={{ ...inputStyle, colorScheme: "dark", fontSize: 13, width: "auto", minWidth: 160 }}
-          />
+          <div style={{ flexShrink: 0 }}>
+            <p style={labelStyle}>Date</p>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              style={{ ...inputStyle, colorScheme: "dark", fontSize: 16, width: "auto", minWidth: 148, padding: "11px 14px" }}
+            />
+          </div>
         </div>
 
         {/* ── Submit */}
@@ -509,7 +510,7 @@ export default function App() {
           style={{
             width: "100%",
             padding: 17,
-            borderRadius: 16,
+            borderRadius: 20,
             border: "none",
             background: status === "success" ? "var(--success)" : status === "error" ? "var(--danger)" : "var(--accent)",
             color: "#080810",
@@ -590,7 +591,7 @@ export default function App() {
                         style={{
                           background: deletingId === t.id ? "var(--danger)" : "transparent",
                           border: `1px solid ${deletingId === t.id ? "var(--danger)" : "transparent"}`,
-                          borderRadius: 6,
+                          borderRadius: 8,
                           padding: "4px 5px",
                           cursor: "pointer",
                           color: deletingId === t.id ? "#fff" : "var(--muted)",
@@ -630,14 +631,14 @@ const inputStyle: React.CSSProperties = {
   color: "var(--text)",
   fontSize: 16,
   outline: "none",
-  transition: "border-color 0.2s",
+  transition: "border-color 0.2s, box-shadow 0.2s",
   appearance: "none",
   WebkitAppearance: "none",
 };
 
 const labelStyle: React.CSSProperties = {
   fontFamily: "'DM Mono', monospace",
-  fontSize: 9,
+  fontSize: 10,
   letterSpacing: 2,
   textTransform: "uppercase",
   color: "var(--muted)",
