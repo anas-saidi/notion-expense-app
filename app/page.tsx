@@ -432,24 +432,31 @@ export default function App() {
           const spentPct = Math.min((spent / planned) * 100, 100);
           const previewPct = Math.min(((spent + expAmt) / planned) * 100, 100);
           const availableAfter = available - expAmt;
-          const isOver = availableAfter < 0;
-          const barColor = isOver ? "var(--danger)" : spentPct > 79 ? "#f59e0b" : "var(--accent)";
-          const previewColor = isOver ? "rgba(255,107,107,0.35)" : "rgba(200,245,90,0.25)";
+          // Bar color reflects current state only (not what user is typing)
+          const alreadyOver = available < 0;
+          const barColor = alreadyOver ? "var(--danger)" : spentPct > 79 ? "#f59e0b" : "var(--accent)";
+          // Ghost preview turns red only if typing this expense would exceed budget
+          const wouldBeOver = availableAfter < 0;
+          const previewColor = wouldBeOver ? "rgba(255,107,107,0.4)" : "rgba(200,245,90,0.3)";
+          // Label: available remaining — green/accent if positive, red if over
+          const labelColor = expAmt > 0
+            ? (wouldBeOver ? "var(--danger)" : "var(--success)")
+            : (available >= 0 ? "var(--success)" : "var(--danger)");
+          const labelValue = expAmt > 0 ? availableAfter : available;
           return (
             <div style={{ marginBottom: 14, animation: "budgetBarIn 0.25s ease both", transformOrigin: "left" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>
                   {selectedCat.icon} {selectedCat.name}
                 </span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: isOver ? "var(--danger)" : available >= 0 ? "var(--success)" : "var(--danger)", letterSpacing: 0.5 }}>
-                  {expAmt > 0
-                    ? <>{availableAfter >= 0 ? "+" : ""}{fmt(availableAfter)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>
-                    : <>{available >= 0 ? "+" : ""}{fmt(available)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>}
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: labelColor, letterSpacing: 0.5, transition: "color 0.2s" }}>
+                  {labelValue >= 0 ? "+" : ""}{fmt(labelValue)}{" "}
+                  <span style={{ color: "var(--muted)" }}>left of {fmt(planned)}</span>
                 </span>
               </div>
-              {/* Track */}
+              {/* Track: fills left→right showing consumed */}
               <div style={{ height: 5, borderRadius: 99, background: "var(--surface2)", overflow: "hidden", position: "relative" }}>
-                {/* Spent fill */}
+                {/* Spent fill — reflects current reality, color based on current state only */}
                 <div style={{
                   position: "absolute", left: 0, top: 0, height: "100%",
                   width: `${spentPct}%`,
@@ -457,14 +464,14 @@ export default function App() {
                   borderRadius: 99,
                   transition: "width 0.3s ease, background 0.3s ease",
                 }} />
-                {/* Preview ghost fill */}
+                {/* Preview ghost — shows impact of current typed amount */}
                 {expAmt > 0 && previewPct > spentPct && (
                   <div style={{
                     position: "absolute", left: `${spentPct}%`, top: 0, height: "100%",
                     width: `${previewPct - spentPct}%`,
                     background: previewColor,
                     borderRadius: "0 99px 99px 0",
-                    transition: "width 0.15s ease",
+                    transition: "width 0.15s ease, background 0.2s ease",
                   }} />
                 )}
               </div>
