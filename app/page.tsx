@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 type Category = { id: string; name: string; icon: string | null; type: string[]; defaultAccount: string | null; available: number | null; planned: number | null };
 type Transaction = { id: string; name: string; amount: number; date: string; category: string | null };
 type Account = { id: string; label: string; icon: string; type: string | null; balance: number | null };
+type PendingItem = { id: string; name: string; amount: number | null; categoryId: string | null; addedBy: string | null };
 
 // ─── Accounts (static — pulled from your Notion) ─────────────────────────
 const FALLBACK_ACCOUNTS: Account[] = [];
@@ -43,6 +44,16 @@ export default function App() {
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
   const balanceAnimRef = useRef<number | null>(null);
   const catRef = useRef<HTMLDivElement>(null);
+
+  // Pending purchases state
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  const [pendingName, setPendingName] = useState("");
+  const [pendingAmount, setPendingAmount] = useState("");
+  const [pendingCatId, setPendingCatId] = useState("");
+  const [addingPending, setAddingPending] = useState(false);
+  const [showPendingCatPicker, setShowPendingCatPicker] = useState(false);
+  const [pendingCatSearch, setPendingCatSearch] = useState("");
+  const pendingCatRef = useRef<HTMLDivElement>(null);
 
   // Sync mode to <html> so CSS vars apply to body, body::before, etc.
   useEffect(() => {
@@ -88,6 +99,7 @@ export default function App() {
       });
 
     fetchTransactions();
+    fetchPending();
 
     // Restore last used category from localStorage
     const saved = localStorage.getItem("lastCatId");
@@ -109,6 +121,48 @@ export default function App() {
     } finally {
       setRefreshingTx(false);
     }
+  };
+
+  const fetchPending = async () => {
+    const data = await fetch("/api/pending").then(r => r.json());
+    setPendingItems(data.items ?? []);
+  };
+
+  const addPending = async () => {
+    if (!pendingName.trim()) return;
+    setAddingPending(true);
+    const optimistic: PendingItem = { id: `tmp-${Date.now()}`, name: pendingName.trim(), amount: pendingAmount ? parseFloat(pendingAmount) : null, categoryId: pendingCatId || null, addedBy: mode === "wife" ? "Wife" : "Husband" };
+    setPendingItems(prev => [...prev, optimistic]);
+    setPendingName(""); setPendingAmount(""); setPendingCatId("");
+    try {
+      const data = await fetch("/api/pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: optimistic.name, amount: optimistic.amount, categoryId: optimistic.categoryId, addedBy: optimistic.addedBy }),
+      }).then(r => r.json());
+      // Replace optimistic with real id
+      setPendingItems(prev => prev.map(p => p.id === optimistic.id ? { ...p, id: data.id } : p));
+    } catch {
+      setPendingItems(prev => prev.filter(p => p.id !== optimistic.id));
+    } finally {
+      setAddingPending(false);
+    }
+  };
+
+  const loadPending = (item: PendingItem) => {
+    setName(item.name);
+    if (item.amount !== null) setAmount(String(item.amount));
+    if (item.categoryId) {
+      const cat = categories.find(c => c.id === item.categoryId);
+      if (cat) selectCategory(cat);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const dismissPending = async (id: string) => {
+    setPendingItems(prev => prev.filter(p => p.id !== id));
+    fetch("/api/pending", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
+      .then(r => { if (!r.ok) fetchPending(); });
   };
 
   const deleteTransaction = async (id: string) => {
@@ -150,10 +204,11 @@ export default function App() {
     balanceAnimRef.current = requestAnimationFrame(step);
   };
 
-  // Close cat picker on outside click
+  // Close cat pickers on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (catRef.current && !catRef.current.contains(e.target as Node)) setShowCatPicker(false);
+      if (pendingCatRef.current && !pendingCatRef.current.contains(e.target as Node)) setShowPendingCatPicker(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -538,6 +593,113 @@ export default function App() {
           {status === "saving" && <div style={{ width: 17, height: 17, border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#080810", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />}
           {status === "success" ? "✓ Saved to Notion!" : status === "error" ? `✗ ${errorMsg}` : status === "saving" ? "Saving…" : `Save ${amount ? `${fmt(parseFloat(amount))} MAD` : ""} →`}
         </button>
+
+        {/* ── Pending purchases */}
+        <div style={{ marginTop: 36, animation: "fadeUp 0.4s 0.21s ease both" }}>
+          <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Pending</p>
+
+          {/* Quick-add row */}
+          <div style={{ display: "flex", gap: 8, marginBottom: pendingItems.length > 0 ? 10 : 0, alignItems: "stretch" }}>
+            <input
+              type="text"
+              value={pendingName}
+              onChange={e => setPendingName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addPending()}
+              placeholder="Add item…"
+              style={{ ...inputStyle, flex: 1, padding: "10px 14px", fontSize: 14, borderRadius: 12 }}
+            />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={pendingAmount}
+              onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, ""); if ((v.match(/\./g) || []).length <= 1) setPendingAmount(v); }}
+              placeholder="Amount"
+              style={{ ...inputStyle, width: 88, padding: "10px 12px", fontSize: 14, borderRadius: 12, flexShrink: 0 }}
+            />
+            {/* Mini category picker for pending */}
+            <div style={{ position: "relative", flexShrink: 0 }} ref={pendingCatRef}>
+              <button
+                onClick={() => setShowPendingCatPicker(v => !v)}
+                title="Category"
+                style={{ height: "100%", padding: "10px 12px", borderRadius: 12, border: `1px solid ${showPendingCatPicker ? "var(--accent)" : "var(--border)"}`, background: pendingCatId ? "var(--accent-dim)" : "var(--surface)", color: pendingCatId ? "var(--accent)" : "var(--muted)", cursor: "pointer", fontSize: 16, transition: "all 0.15s", display: "flex", alignItems: "center" }}
+              >
+                {pendingCatId ? (categories.find(c => c.id === pendingCatId)?.icon ?? "🏷️") : "🏷️"}
+              </button>
+              {showPendingCatPicker && (
+                <div style={{ position: "absolute", bottom: "calc(100% + 6px)", right: 0, width: 220, background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 12, zIndex: 100, overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,0.5)" }}>
+                  <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
+                    <input type="text" value={pendingCatSearch} onChange={e => setPendingCatSearch(e.target.value)} placeholder="Search…" autoFocus style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16 }} />
+                  </div>
+                  <div style={{ maxHeight: 180, overflowY: "auto" }}>
+                    <button onClick={() => { setPendingCatId(""); setShowPendingCatPicker(false); setPendingCatSearch(""); }} style={{ width: "100%", padding: "9px 12px", background: !pendingCatId ? "var(--accent-dim)" : "transparent", border: "none", borderBottom: "1px solid var(--border)", color: !pendingCatId ? "var(--accent)" : "var(--muted)", fontSize: 13, textAlign: "left", cursor: "pointer" }}>— None</button>
+                    {categories.filter(c => c.name.toLowerCase().includes(pendingCatSearch.toLowerCase())).map(cat => (
+                      <button key={cat.id} onClick={() => { setPendingCatId(cat.id); setShowPendingCatPicker(false); setPendingCatSearch(""); }} style={{ width: "100%", padding: "9px 12px", background: cat.id === pendingCatId ? "var(--accent-dim)" : "transparent", border: "none", borderBottom: "1px solid var(--border)", color: cat.id === pendingCatId ? "var(--accent)" : "var(--text)", fontSize: 13, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                        <span>{cat.icon ?? "🏷️"}</span><span>{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={addPending}
+              disabled={!pendingName.trim() || addingPending}
+              style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid var(--accent)", background: "var(--accent-dim)", color: "var(--accent)", fontSize: 18, cursor: pendingName.trim() ? "pointer" : "not-allowed", opacity: pendingName.trim() ? 1 : 0.35, transition: "all 0.15s", flexShrink: 0, display: "flex", alignItems: "center" }}
+            >
+              {addingPending ? <div style={{ width: 14, height: 14, border: "2px solid var(--accent-dim)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} /> : "+"}
+            </button>
+          </div>
+
+          {/* Pending items list */}
+          {pendingItems.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {pendingItems.map((item, i) => {
+                const cat = categories.find(c => c.id === item.categoryId);
+                return (
+                  <div
+                    key={item.id}
+                    style={{ display: "flex", alignItems: "center", padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, gap: 10, animation: `fadeUp 0.25s ${i * 0.04}s ease both` }}
+                  >
+                    <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
+                      {cat?.icon ?? "🛒"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</p>
+                      {(cat || item.addedBy) && (
+                        <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontFamily: "'DM Mono', monospace" }}>
+                          {[cat?.name, item.addedBy].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    {item.amount !== null && (
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--text2)", flexShrink: 0 }}>{fmt(item.amount)}</span>
+                    )}
+                    {/* Load into form */}
+                    <button
+                      onClick={() => loadPending(item)}
+                      title="Fill form"
+                      style={{ background: "var(--accent-dim)", border: "1px solid transparent", borderRadius: 8, padding: "5px 8px", cursor: "pointer", color: "var(--accent)", fontSize: 13, flexShrink: 0, transition: "all 0.15s" }}
+                    >
+                      ↑
+                    </button>
+                    {/* Dismiss */}
+                    <button
+                      onClick={() => dismissPending(item.id)}
+                      title="Dismiss"
+                      style={{ background: "transparent", border: "1px solid transparent", borderRadius: 8, padding: "5px 6px", cursor: "pointer", color: "var(--muted)", display: "flex", alignItems: "center", flexShrink: 0, transition: "all 0.15s" }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {pendingItems.length === 0 && (
+            <p style={{ fontSize: 12, color: "var(--muted)", fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>Nothing pending — add items above</p>
+          )}
+        </div>
 
         {/* ── Recent transactions */}
         {transactions.length > 0 && (
