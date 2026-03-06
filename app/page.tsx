@@ -53,6 +53,7 @@ export default function App() {
   const [addingPending, setAddingPending] = useState(false);
   const [showPendingCatPicker, setShowPendingCatPicker] = useState(false);
   const [pendingCatSearch, setPendingCatSearch] = useState("");
+  const [refreshingPending, setRefreshingPending] = useState(false);
   const pendingCatRef = useRef<HTMLDivElement>(null);
 
   // Sync mode to <html> so CSS vars apply to body, body::before, etc.
@@ -124,8 +125,15 @@ export default function App() {
   };
 
   const fetchPending = async () => {
-    const data = await fetch("/api/pending").then(r => r.json());
-    setPendingItems(data.items ?? []);
+    setRefreshingPending(true);
+    try {
+      const data = await fetch("/api/pending").then(r => r.json());
+      setPendingItems(data.items ?? []);
+    } catch {
+      // silently keep existing items if fetch fails
+    } finally {
+      setRefreshingPending(false);
+    }
   };
 
   const addPending = async () => {
@@ -596,7 +604,23 @@ export default function App() {
 
         {/* ── Pending purchases */}
         <div style={{ marginTop: 36, animation: "fadeUp 0.4s 0.21s ease both" }}>
-          <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", marginBottom: 12 }}>Pending</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Pending</p>
+            <button
+              onClick={fetchPending}
+              disabled={refreshingPending}
+              title="Refresh"
+              style={{ background: "none", border: "none", cursor: refreshingPending ? "default" : "pointer", color: "var(--muted)", padding: 4, display: "flex", alignItems: "center", opacity: refreshingPending ? 0.5 : 1, transition: "opacity 0.2s, color 0.2s" }}
+              onMouseEnter={e => { if (!refreshingPending) (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshingPending ? "spin 0.7s linear infinite" : "none" }}>
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+          </div>
 
           {/* Quick-add row */}
           <div style={{ display: "flex", gap: 8, marginBottom: pendingItems.length > 0 ? 10 : 0, alignItems: "stretch" }}>

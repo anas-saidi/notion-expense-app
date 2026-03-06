@@ -1,12 +1,11 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 
-const PENDING_DB = process.env.NOTION_PENDING_DB!;
+const PENDING_DB = process.env.NOTION_PENDING_DB ?? "d2db101b-faec-467d-8c57-eee6d8780311";
 const HDR = (token: string) => ({ Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" });
 
 export async function GET() {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
-  if (!PENDING_DB) return NextResponse.json({ error: "NOTION_PENDING_DB not set" }, { status: 500 });
   try {
     const res = await fetch(`https://api.notion.com/v1/databases/${PENDING_DB}/query`, {
       method: "POST", headers: HDR(token), cache: "no-store",
@@ -28,7 +27,6 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
-  if (!PENDING_DB) return NextResponse.json({ error: "NOTION_PENDING_DB not set" }, { status: 500 });
   const { name, amount, categoryId, addedBy } = await req.json();
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
   const properties: any = { Name: { title: [{ text: { content: name } }] } };
