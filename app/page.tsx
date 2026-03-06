@@ -423,6 +423,53 @@ export default function App() {
           )}
         </div>
 
+        {/* ── Budget bar (shown when category has a plan) */}
+        {selectedCat && selectedCat.planned !== null && selectedCat.available !== null && (() => {
+          const planned = selectedCat.planned!;
+          const spent = Math.max(0, planned - selectedCat.available!);
+          const expAmt = amount && parseFloat(amount) > 0 ? parseFloat(amount) : 0;
+          const spentPct = Math.min((spent / planned) * 100, 100);
+          const previewPct = Math.min(((spent + expAmt) / planned) * 100, 100);
+          const isOver = spent + expAmt > planned;
+          const barColor = isOver ? "var(--danger)" : spentPct > 79 ? "#f59e0b" : "var(--accent)";
+          const previewColor = isOver ? "rgba(255,107,107,0.35)" : "rgba(200,245,90,0.25)";
+          return (
+            <div style={{ marginBottom: 14, animation: "budgetBarIn 0.25s ease both", transformOrigin: "left" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>
+                  {selectedCat.icon} {selectedCat.name}
+                </span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: isOver ? "var(--danger)" : "var(--text2)", letterSpacing: 0.5 }}>
+                  {expAmt > 0
+                    ? <>{fmt(spent + expAmt)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>
+                    : <>{fmt(spent)} <span style={{ color: "var(--muted)" }}>/ {fmt(planned)}</span></>}
+                </span>
+              </div>
+              {/* Track */}
+              <div style={{ height: 5, borderRadius: 99, background: "var(--surface2)", overflow: "hidden", position: "relative" }}>
+                {/* Spent fill */}
+                <div style={{
+                  position: "absolute", left: 0, top: 0, height: "100%",
+                  width: `${spentPct}%`,
+                  background: barColor,
+                  borderRadius: 99,
+                  transition: "width 0.3s ease, background 0.3s ease",
+                }} />
+                {/* Preview ghost fill */}
+                {expAmt > 0 && previewPct > spentPct && (
+                  <div style={{
+                    position: "absolute", left: `${spentPct}%`, top: 0, height: "100%",
+                    width: `${previewPct - spentPct}%`,
+                    background: previewColor,
+                    borderRadius: "0 99px 99px 0",
+                    transition: "width 0.15s ease",
+                  }} />
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── Account */}
         <div style={{ marginBottom: 10, animation: "fadeUp 0.4s 0.14s ease both" }}>
           <p style={labelStyle}>Account</p>

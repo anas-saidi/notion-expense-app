@@ -105,6 +105,11 @@ button:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px; 
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes budgetBarIn {
+  from { opacity: 0; transform: scaleX(0.96); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
