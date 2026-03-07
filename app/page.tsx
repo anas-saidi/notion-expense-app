@@ -38,7 +38,7 @@ export default function App() {
   const [catSearch, setCatSearch] = useState("");
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [lastUsedCatId, setLastUsedCatId] = useState<string>("");
-  const [refreshingTx, setRefreshingTx] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
@@ -54,7 +54,6 @@ export default function App() {
   const [showPendingCatPicker, setShowPendingCatPicker] = useState(false);
   const [pendingCatSearch, setPendingCatSearch] = useState("");
   const [pendingDate, setPendingDate] = useState(today());
-  const [refreshingPending, setRefreshingPending] = useState(false);
   const pendingCatRef = useRef<HTMLDivElement>(null);
   const loadedPendingId = useRef<string | null>(null);
 
@@ -117,24 +116,31 @@ export default function App() {
   }, [lastUsedCatId, categories]);
 
   const fetchTransactions = async () => {
-    setRefreshingTx(true);
-    try {
-      const data = await fetch("/api/transactions").then(r => r.json());
-      setTransactions(data.transactions ?? []);
-    } finally {
-      setRefreshingTx(false);
-    }
+    const data = await fetch("/api/transactions").then(r => r.json());
+    setTransactions(data.transactions ?? []);
   };
 
   const fetchPending = async () => {
-    setRefreshingPending(true);
     try {
       const data = await fetch("/api/pending").then(r => r.json());
       setPendingItems(data.items ?? []);
     } catch {
       // silently keep existing items if fetch fails
+    }
+  };
+
+  const refreshAll = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetch("/api/categories").then(r => r.json()).then(d => setCategories(d.categories ?? [])),
+        fetch("/api/accounts").then(r => r.json()).then(d => setAccounts(d.accounts ?? [])),
+        fetch("/api/transactions").then(r => r.json()).then(d => setTransactions(d.transactions ?? [])),
+        fetch("/api/pending").then(r => r.json()).then(d => setPendingItems(d.items ?? [])).catch(() => {}),
+      ]);
     } finally {
-      setRefreshingPending(false);
+      setRefreshing(false);
     }
   };
 
@@ -315,6 +321,21 @@ export default function App() {
               </h1>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Global refresh */}
+              <button
+                onClick={refreshAll}
+                disabled={refreshing}
+                title="Refresh all"
+                style={{ background: "none", border: "none", cursor: refreshing ? "default" : "pointer", color: "var(--muted)", padding: 6, display: "flex", alignItems: "center", opacity: refreshing ? 0.5 : 1, transition: "opacity 0.2s, color 0.2s" }}
+                onMouseEnter={e => { if (!refreshing) (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshing ? "spin 0.7s linear infinite" : "none" }}>
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+              </button>
               {/* Mode toggle */}
               <button
                 onClick={toggleMode}
@@ -633,20 +654,6 @@ export default function App() {
         <div style={{ marginTop: 36, animation: "fadeUp 0.4s 0.21s ease both" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Pending</p>
-            <button
-              onClick={fetchPending}
-              disabled={refreshingPending}
-              title="Refresh"
-              style={{ background: "none", border: "none", cursor: refreshingPending ? "default" : "pointer", color: "var(--muted)", padding: 4, display: "flex", alignItems: "center", opacity: refreshingPending ? 0.5 : 1, transition: "opacity 0.2s, color 0.2s" }}
-              onMouseEnter={e => { if (!refreshingPending) (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshingPending ? "spin 0.7s linear infinite" : "none" }}>
-                <polyline points="23 4 23 10 17 10" />
-                <polyline points="1 20 1 14 7 14" />
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-              </svg>
-            </button>
           </div>
 
           {/* Quick-add row */}
@@ -766,34 +773,6 @@ export default function App() {
           <div style={{ marginTop: 36, animation: "fadeUp 0.4s 0.2s ease both" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Recent</p>
-              <button
-                onClick={fetchTransactions}
-                disabled={refreshingTx}
-                title="Refresh"
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: refreshingTx ? "default" : "pointer",
-                  color: "var(--muted)",
-                  padding: 4,
-                  display: "flex",
-                  alignItems: "center",
-                  opacity: refreshingTx ? 0.5 : 1,
-                  transition: "opacity 0.2s, color 0.2s",
-                }}
-                onMouseEnter={e => { if (!refreshingTx) (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
-              >
-                <svg
-                  width="14" height="14" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ animation: refreshingTx ? "spin 0.7s linear infinite" : "none" }}
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {transactions.map((t, i) => {
