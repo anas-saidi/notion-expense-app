@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 type Category = { id: string; name: string; icon: string | null; type: string[]; defaultAccount: string | null; available: number | null; planned: number | null };
 type Transaction = { id: string; name: string; amount: number; date: string; category: string | null };
 type Account = { id: string; label: string; icon: string; type: string | null; balance: number | null };
-type PendingItem = { id: string; name: string; amount: number | null; categoryId: string | null; addedBy: string | null };
+type PendingItem = { id: string; name: string; amount: number | null; categoryId: string | null; addedBy: string | null; date: string | null };
 
 // ─── Accounts (static — pulled from your Notion) ─────────────────────────
 const FALLBACK_ACCOUNTS: Account[] = [];
@@ -53,6 +53,7 @@ export default function App() {
   const [addingPending, setAddingPending] = useState(false);
   const [showPendingCatPicker, setShowPendingCatPicker] = useState(false);
   const [pendingCatSearch, setPendingCatSearch] = useState("");
+  const [pendingDate, setPendingDate] = useState(today());
   const [refreshingPending, setRefreshingPending] = useState(false);
   const pendingCatRef = useRef<HTMLDivElement>(null);
   const loadedPendingId = useRef<string | null>(null);
@@ -140,14 +141,14 @@ export default function App() {
   const addPending = async () => {
     if (!pendingName.trim()) return;
     setAddingPending(true);
-    const optimistic: PendingItem = { id: `tmp-${Date.now()}`, name: pendingName.trim(), amount: pendingAmount ? parseFloat(pendingAmount) : null, categoryId: pendingCatId || null, addedBy: mode === "wife" ? "Wife" : "Husband" };
+    const optimistic: PendingItem = { id: `tmp-${Date.now()}`, name: pendingName.trim(), amount: pendingAmount ? parseFloat(pendingAmount) : null, categoryId: pendingCatId || null, addedBy: mode === "wife" ? "Wife" : "Husband", date: pendingDate || null };
     setPendingItems(prev => [...prev, optimistic]);
-    setPendingName(""); setPendingAmount(""); setPendingCatId("");
+    setPendingName(""); setPendingAmount(""); setPendingCatId(""); setPendingDate(today());
     try {
       const data = await fetch("/api/pending", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: optimistic.name, amount: optimistic.amount, categoryId: optimistic.categoryId, addedBy: optimistic.addedBy }),
+        body: JSON.stringify({ name: optimistic.name, amount: optimistic.amount, categoryId: optimistic.categoryId, addedBy: optimistic.addedBy, date: optimistic.date }),
       }).then(r => r.json());
       // Replace optimistic with real id
       setPendingItems(prev => prev.map(p => p.id === optimistic.id ? { ...p, id: data.id } : p));
@@ -161,6 +162,7 @@ export default function App() {
   const loadPending = (item: PendingItem) => {
     setName(item.name);
     if (item.amount !== null) setAmount(String(item.amount));
+    if (item.date) setDate(item.date);
     if (item.categoryId) {
       const cat = categories.find(c => c.id === item.categoryId);
       if (cat) selectCategory(cat);
@@ -648,7 +650,8 @@ export default function App() {
           </div>
 
           {/* Quick-add row */}
-          <div style={{ display: "flex", gap: 8, marginBottom: pendingItems.length > 0 ? 10 : 0, alignItems: "stretch" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: pendingItems.length > 0 ? 10 : 0 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
             <input
               type="text"
               value={pendingName}
@@ -698,6 +701,14 @@ export default function App() {
               {addingPending ? <div style={{ width: 14, height: 14, border: "2px solid var(--accent-dim)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} /> : "+"}
             </button>
           </div>
+          <input
+            type="date"
+            value={pendingDate}
+            onChange={e => setPendingDate(e.target.value)}
+            title="Due / planned date"
+            style={{ ...inputStyle, fontSize: 13, padding: "8px 12px", borderRadius: 12, color: "var(--text)", width: "100%" }}
+          />
+          </div>
 
           {/* Pending items list */}
           {pendingItems.length > 0 && (
@@ -714,9 +725,9 @@ export default function App() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</p>
-                      {(cat || item.addedBy) && (
+                      {(cat || item.addedBy || item.date) && (
                         <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, fontFamily: "'DM Mono', monospace" }}>
-                          {[cat?.name, item.addedBy].filter(Boolean).join(" · ")}
+                          {[item.date ? fmtDate(item.date) : null, cat?.name, item.addedBy].filter(Boolean).join(" · ")}
                         </p>
                       )}
                     </div>

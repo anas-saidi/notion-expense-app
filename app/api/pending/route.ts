@@ -19,6 +19,7 @@ export async function GET() {
       amount: page.properties.Amount?.number ?? null,
       categoryId: page.properties.Category?.relation?.[0]?.id ?? null,
       addedBy: page.properties.AddedBy?.select?.name ?? null,
+      date: page.properties.Date?.date?.start ?? null,
     }));
     return NextResponse.json({ items });
   } catch (err: any) { return NextResponse.json({ error: err.message }, { status: 500 }); }
@@ -27,12 +28,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
-  const { name, amount, categoryId, addedBy } = await req.json();
+  const { name, amount, categoryId, addedBy, date } = await req.json();
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
   const properties: any = { Name: { title: [{ text: { content: name } }] } };
   if (amount != null && amount !== "") properties.Amount = { number: parseFloat(String(amount)) };
   if (categoryId) properties.Category = { relation: [{ id: categoryId }] };
   if (addedBy) properties.AddedBy = { select: { name: addedBy } };
+  if (date) properties.Date = { date: { start: date } };
   try {
     const res = await fetch("https://api.notion.com/v1/pages", {
       method: "POST", headers: HDR(token),
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
     });
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
-    return NextResponse.json({ id: data.id, name, amount: amount ? parseFloat(String(amount)) : null, categoryId: categoryId ?? null, addedBy: addedBy ?? null });
+    return NextResponse.json({ id: data.id, name, amount: amount ? parseFloat(String(amount)) : null, categoryId: categoryId ?? null, addedBy: addedBy ?? null, date: date ?? null });
   } catch (err: any) { return NextResponse.json({ error: err.message }, { status: 500 }); }
 }
 
