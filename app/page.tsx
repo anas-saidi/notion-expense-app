@@ -122,8 +122,10 @@ export default function App() {
 
   const fetchPending = async () => {
     try {
-      const data = await fetch("/api/pending").then(r => r.json());
-      setPendingItems(data.items ?? []);
+      const res = await fetch("/api/pending");
+      if (!res.ok) return; // don't wipe items on API error
+      const data = await res.json();
+      if (Array.isArray(data.items)) setPendingItems(data.items);
     } catch {
       // silently keep existing items if fetch fails
     }
@@ -137,7 +139,7 @@ export default function App() {
         fetch("/api/categories").then(r => r.json()).then(d => setCategories(d.categories ?? [])),
         fetch("/api/accounts").then(r => r.json()).then(d => setAccounts(d.accounts ?? [])),
         fetch("/api/transactions").then(r => r.json()).then(d => setTransactions(d.transactions ?? [])),
-        fetch("/api/pending").then(r => r.json()).then(d => setPendingItems(d.items ?? [])).catch(() => {}),
+        fetch("/api/pending").then(r => r.ok ? r.json() : null).then(d => { if (d && Array.isArray(d.items)) setPendingItems(d.items); }).catch(() => {}),
       ]);
     } finally {
       setRefreshing(false);

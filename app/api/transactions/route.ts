@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
       },
       cache: "no-store",
       body: JSON.stringify({
+        filter: { property: "Type", select: { equals: "Expense" } },
         sorts: [{ property: "Date", direction: "descending" }],
         page_size: 10,
       }),
