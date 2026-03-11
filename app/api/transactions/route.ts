@@ -7,6 +7,9 @@ export async function GET(req: NextRequest) {
 
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
+  const { searchParams } = new URL(req.url);
+  const pageSize = Math.min(parseInt(searchParams.get("page_size") ?? "10", 10) || 10, 100);
+
   try {
     const res = await fetch(`https://api.notion.com/v1/databases/${TRANSACTIONS_DB}/query`, {
       method: "POST",
@@ -19,7 +22,7 @@ export async function GET(req: NextRequest) {
       body: JSON.stringify({
         filter: { property: "Type", select: { equals: "Expense" } },
         sorts: [{ property: "Date", direction: "descending" }],
-        page_size: 10,
+        page_size: pageSize,
       }),
     });
 

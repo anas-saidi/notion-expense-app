@@ -10,8 +10,8 @@
   --accent-dim: rgba(200,245,90,0.1);
   --accent-glow: rgba(200,245,90,0.06);
   --text: #ffffff;
-  --text2: #b8b8d8;
-  --muted: #7878a0;
+  --text2: #e8e8ff;
+  --muted: #c0c0e0;
   --danger: #ff6b6b;
   --success: #4ade80;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -52,8 +52,8 @@ html[data-mode="husband"] {
   --border: rgba(255,255,255,0.09);
   --border2: rgba(255,255,255,0.18);
   --text: #ffffff;
-  --text2: #b8b8d8;
-  --muted: #7878a0;
+  --text2: #e8e8ff;
+  --muted: #c0c0e0;
   --danger: #ff6b6b;
 }
 

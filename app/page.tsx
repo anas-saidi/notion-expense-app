@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Fuse from "fuse.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Category = { id: string; name: string; icon: string | null; type: string[]; defaultAccount: string | null; available: number | null; planned: number | null };
@@ -26,6 +27,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"add" | "pending" | "history">("add");
 
   // Form state
   const [amount, setAmount] = useState("");
@@ -56,6 +58,12 @@ export default function App() {
   const [pendingDate, setPendingDate] = useState(today());
   const pendingCatRef = useRef<HTMLDivElement>(null);
   const loadedPendingId = useRef<string | null>(null);
+
+  // Auto-suggest state
+  const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
+  const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
+  const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fuseRef = useRef<Fuse<{ description: string; categoryId: string }> | null>(null);
 
   // Sync mode to <html> so CSS vars apply to body, body::before, etc.
   useEffect(() => {
@@ -103,9 +111,7 @@ export default function App() {
     fetchTransactions();
     fetchPending();
 
-    // Restore last used category from localStorage
-    const saved = localStorage.getItem("lastCatId");
-    if (saved) setLastUsedCatId(saved);
+    // lastUsedCatId is set from API transactions in fetchTransactions
   }, []);
 
   // Set last used category as default when loaded
@@ -115,9 +121,41 @@ export default function App() {
     }
   }, [lastUsedCatId, categories]);
 
+  // Load or seed the auto-suggest corpus
+  useEffect(() => {
+    const raw = localStorage.getItem("expenseCorpus");
+    if (raw) {
+      try { setCorpus(JSON.parse(raw)); } catch {}
+    } else {
+      fetch("/api/transactions?page_size=50")
+        .then(r => r.json())
+        .then(data => {
+          const entries: { description: string; categoryId: string }[] = (data.transactions ?? [])
+            .filter((t: Transaction) => t.name && t.category)
+            .map((t: Transaction) => ({ description: t.name, categoryId: t.category as string }));
+          setCorpus(entries);
+          localStorage.setItem("expenseCorpus", JSON.stringify(entries));
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // Rebuild Fuse index whenever corpus changes
+  useEffect(() => {
+    fuseRef.current = new Fuse(corpus, {
+      keys: ["description"],
+      threshold: 0.35,
+      minMatchCharLength: 3,
+      includeScore: true,
+    });
+  }, [corpus]);
+
   const fetchTransactions = async () => {
     const data = await fetch("/api/transactions").then(r => r.json());
-    setTransactions(data.transactions ?? []);
+    const txns: Transaction[] = data.transactions ?? [];
+    setTransactions(txns);
+    const latestCat = txns[0]?.category;
+    if (latestCat) setLastUsedCatId(latestCat);
   };
 
   const fetchPending = async () => {
@@ -176,7 +214,7 @@ export default function App() {
       if (cat) selectCategory(cat);
     }
     loadedPendingId.current = item.id;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTab("add");
   };
 
   const dismissPending = async (id: string) => {
@@ -240,7 +278,6 @@ export default function App() {
   const selectCategory = (cat: Category) => {
     setCategoryId(cat.id);
     setLastUsedCatId(cat.id);
-    localStorage.setItem("lastCatId", cat.id);
     if (cat.defaultAccount) {
       const acct = accounts.find(a => a.id === cat.defaultAccount);
       if (acct) setAccountId(acct.id);
@@ -257,6 +294,24 @@ export default function App() {
       return 0;
     });
 
+  const suggestCategory = (query: string) => {
+    if (!fuseRef.current || query.length < 3) { setSuggestedCatId(null); return; }
+    const results = fuseRef.current.search(query);
+    if (results.length === 0) { setSuggestedCatId(null); return; }
+    const tally: Record<string, { weight: number; count: number }> = {};
+    for (const r of results) {
+      const catId = r.item.categoryId;
+      const weight = 1 - (r.score ?? 1);
+      if (!tally[catId]) tally[catId] = { weight: 0, count: 0 };
+      tally[catId].weight += weight;
+      tally[catId].count += 1;
+    }
+    const best = Object.entries(tally)
+      .filter(([, v]) => v.count >= 2)
+      .sort((a, b) => b[1].weight - a[1].weight)[0];
+    setSuggestedCatId(best ? best[0] : null);
+  };
+
   const submit = async () => {
     if (!amount || !name || !categoryId) return;
     setStatus("saving");
@@ -272,6 +327,13 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || "Failed");
 
       setStatus("success");
+      // Grow corpus with this entry for future suggestions
+      const newEntry = { description: name.trim(), categoryId };
+      setCorpus(prev => {
+        const updated = [...prev, newEntry].slice(-100);
+        localStorage.setItem("expenseCorpus", JSON.stringify(updated));
+        return updated;
+      });
       // Animate balance countdown then re-fetch real value
       const expAmt = parseFloat(amount);
       if (displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
@@ -286,6 +348,7 @@ export default function App() {
 
       setAmount("");
       setName("");
+      setSuggestedCatId(null);
       setDate(today());
       setTimeout(() => setStatus("idle"), 2000);
     } catch (e: any) {
@@ -309,7 +372,10 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: "calc(var(--safe-top) + 20px) 20px calc(var(--safe-bottom) + 32px)" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "calc(var(--safe-top) + 20px) 20px calc(72px + env(safe-area-inset-bottom, 0px))" }}>
+
+        {/* ── ADD TAB ── */}
+        <div id="panel-add" role="tabpanel" aria-labelledby="tab-add" style={{ display: tab === "add" ? "block" : "none" }}>
 
         {/* ── Header */}
         <header style={{ marginBottom: 28, animation: "fadeUp 0.4s ease both" }}>
@@ -391,6 +457,35 @@ export default function App() {
           );
         })()}
 
+        {/* ── Today category chips */}
+        {(() => {
+          const todayStr = today();
+          if (date !== todayStr) return null;
+          const todayTxs = transactions.filter(t => t.date === todayStr);
+          if (todayTxs.length === 0) return null;
+          const catTotals: Record<string, number> = {};
+          for (const t of todayTxs) {
+            if (t.category) catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+          }
+          const topCats = (Object.entries(catTotals)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([catId]) => categories.find(c => c.id === catId))
+            .filter(Boolean)) as Category[];
+          if (topCats.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.04s ease both", display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {topCats.map(cat => (
+                <span key={cat.id} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", fontSize: 11, color: "var(--text2)", display: "flex", alignItems: "center", gap: 5 }}>
+                  <span>{cat.icon ?? "🏷️"}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10 }}>{cat.name}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--danger)" }}>−{fmt(catTotals[cat.id])}</span>
+                </span>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* ── Amount */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "20px 20px 18px", marginBottom: 14, animation: "fadeUp 0.4s 0.05s ease both", position: "relative", overflow: "hidden", transition: "background-color 0.35s ease, border-color 0.35s ease" }}>
           {/* Decorative glow blob */}
@@ -467,28 +562,94 @@ export default function App() {
           <input
             type="text"
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={e => {
+              setName(e.target.value);
+              if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+              const v = e.target.value.trim();
+              suggestTimerRef.current = setTimeout(() => suggestCategory(v), 200);
+            }}
             onKeyDown={e => e.key === "Enter" && canSubmit && submit()}
             placeholder="Description — what was it for?"
             style={inputStyle}
           />
         </div>
 
+        {/* ── Category suggestion chip */}
+        {suggestedCatId && (() => {
+          const sugCat = categories.find(c => c.id === suggestedCatId);
+          if (!sugCat || suggestedCatId === categoryId) return null;
+          return (
+            <div style={{ marginBottom: 10, animation: "fadeUp 0.2s ease both" }}>
+              <button
+                onClick={() => selectCategory(sugCat)}
+                style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--accent)", background: "var(--accent-dim)", color: "var(--accent)", fontSize: 13, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <span>{sugCat.icon ?? "🏷️"}</span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11 }}>{sugCat.name}</span>
+              </button>
+            </div>
+          );
+        })()}
+
         {/* ── Category picker */}
-        <div style={{ marginBottom: 14, position: "relative", animation: "fadeUp 0.4s 0.11s ease both", zIndex: showCatPicker ? 20 : 1 }} ref={catRef}>
+        <div style={{ marginBottom: 22, position: "relative", animation: "fadeUp 0.4s 0.11s ease both", zIndex: showCatPicker ? 20 : 1 }} ref={catRef}>
           <button
             onClick={() => setShowCatPicker(v => !v)}
             style={{ width: "100%", background: "var(--surface)", border: `1px solid ${showCatPicker ? "var(--accent)" : "var(--border)"}`, borderRadius: 14, padding: "13px 16px", color: selectedCat ? "var(--text)" : "var(--muted)", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", transition: "border-color 0.2s", textAlign: "left" }}
           >
             <span style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               {selectedCat ? `${selectedCat.icon ?? "🏷️"} ${selectedCat.name}` : "Select category…"}
-              {selectedCat && selectedCat.available !== null && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: selectedCat.available >= 0 ? "var(--success)" : "var(--danger)", letterSpacing: 0.5, flexShrink: 0 }}>
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {selectedCat && selectedCat.planned !== null && selectedCat.available !== null && (() => {
+                const planned = selectedCat.planned!;
+                const available = selectedCat.available!;
+                const spent = Math.max(0, planned - available);
+                const expAmt = amount && parseFloat(amount) > 0 ? parseFloat(amount) : 0;
+                const spentPct = Math.min((spent / planned) * 100, 100);
+                const previewPct = Math.min(((spent + expAmt) / planned) * 100, 100);
+                const availableAfter = available - expAmt;
+                const alreadyOver = available < 0;
+                const ringColor = alreadyOver ? "var(--danger)" : spentPct > 79 ? "#f59e0b" : "var(--accent)";
+                const wouldBeOver = availableAfter < 0;
+                const previewStroke = wouldBeOver ? "rgba(255,107,107,0.5)" : "rgba(200,245,90,0.4)";
+                const labelColor = expAmt > 0
+                  ? (wouldBeOver ? "var(--danger)" : "var(--success)")
+                  : (available >= 0 ? "var(--success)" : "var(--danger)");
+                const labelValue = expAmt > 0 ? availableAfter : available;
+                const R = 10; const C = 2 * Math.PI * R; // 62.83
+                const spentDash = (spentPct / 100) * C;
+                const previewDash = ((previewPct - spentPct) / 100) * C;
+                return (
+                  <>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, color: labelColor, transition: "color 0.2s" }}>
+                      {labelValue >= 0 ? "+" : ""}{fmt(labelValue)}
+                    </span>
+                    <svg width="28" height="28" viewBox="0 0 28 28" style={{ flexShrink: 0, transition: "opacity 0.2s" }}>
+                      {/* Track */}
+                      <circle cx="14" cy="14" r={R} fill="none" stroke="var(--border2)" strokeWidth="3" />
+                      {/* Spent arc */}
+                      <circle cx="14" cy="14" r={R} fill="none" stroke={ringColor} strokeWidth="3"
+                        strokeDasharray={`${spentDash} ${C}`} strokeLinecap="round"
+                        transform="rotate(-90 14 14)" style={{ transition: "stroke-dasharray 0.3s ease, stroke 0.3s ease" }} />
+                      {/* Preview ghost arc */}
+                      {expAmt > 0 && previewPct > spentPct && (
+                        <circle cx="14" cy="14" r={R} fill="none" stroke={previewStroke} strokeWidth="3"
+                          strokeDasharray={`${previewDash} ${C}`} strokeDashoffset={-spentDash} strokeLinecap="round"
+                          transform="rotate(-90 14 14)" style={{ transition: "stroke-dasharray 0.15s ease" }} />
+                      )}
+                    </svg>
+                  </>
+                );
+              })()}
+              {/* No budget — just show available balance */}
+              {selectedCat && selectedCat.available !== null && selectedCat.planned === null && (
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, color: selectedCat.available >= 0 ? "var(--success)" : "var(--danger)" }}>
                   {selectedCat.available >= 0 ? "+" : ""}{fmt(selectedCat.available)}
                 </span>
               )}
-            </span>
-            <span style={{ color: "var(--muted)", fontSize: 12, transform: showCatPicker ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>▾</span>
+              <span style={{ color: "var(--muted)", fontSize: 12, transform: showCatPicker ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+            </div>
           </button>
 
           {showCatPicker && (
@@ -529,64 +690,8 @@ export default function App() {
           )}
         </div>
 
-        {/* ── Budget bar (shown when category has a plan) */}
-        {selectedCat && selectedCat.planned !== null && selectedCat.available !== null && (() => {
-          const planned = selectedCat.planned!;
-          const available = selectedCat.available!;
-          const spent = Math.max(0, planned - available);
-          const expAmt = amount && parseFloat(amount) > 0 ? parseFloat(amount) : 0;
-          const spentPct = Math.min((spent / planned) * 100, 100);
-          const previewPct = Math.min(((spent + expAmt) / planned) * 100, 100);
-          const availableAfter = available - expAmt;
-          // Bar color reflects current state only (not what user is typing)
-          const alreadyOver = available < 0;
-          const barColor = alreadyOver ? "var(--danger)" : spentPct > 79 ? "#f59e0b" : "var(--accent)";
-          // Ghost preview turns red only if typing this expense would exceed budget
-          const wouldBeOver = availableAfter < 0;
-          const previewColor = wouldBeOver ? "rgba(255,107,107,0.4)" : "rgba(200,245,90,0.3)";
-          // Label: available remaining — green/accent if positive, red if over
-          const labelColor = expAmt > 0
-            ? (wouldBeOver ? "var(--danger)" : "var(--success)")
-            : (available >= 0 ? "var(--success)" : "var(--danger)");
-          const labelValue = expAmt > 0 ? availableAfter : available;
-          return (
-            <div style={{ marginBottom: 14, animation: "budgetBarIn 0.25s ease both", transformOrigin: "left" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>
-                  {selectedCat.icon} {selectedCat.name}
-                </span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: labelColor, letterSpacing: 0.5, transition: "color 0.2s" }}>
-                  {labelValue >= 0 ? "+" : ""}{fmt(labelValue)}{" "}
-                  <span style={{ color: "var(--muted)" }}>left of {fmt(planned)}</span>
-                </span>
-              </div>
-              {/* Track: fills left→right showing consumed */}
-              <div style={{ height: 5, borderRadius: 99, background: "var(--surface2)", overflow: "hidden", position: "relative" }}>
-                {/* Spent fill — reflects current reality, color based on current state only */}
-                <div style={{
-                  position: "absolute", left: 0, top: 0, height: "100%",
-                  width: `${spentPct}%`,
-                  background: barColor,
-                  borderRadius: 99,
-                  transition: "width 0.3s ease, background 0.3s ease",
-                }} />
-                {/* Preview ghost — shows impact of current typed amount */}
-                {expAmt > 0 && previewPct > spentPct && (
-                  <div style={{
-                    position: "absolute", left: `${spentPct}%`, top: 0, height: "100%",
-                    width: `${previewPct - spentPct}%`,
-                    background: previewColor,
-                    borderRadius: "0 99px 99px 0",
-                    transition: "width 0.15s ease, background 0.2s ease",
-                  }} />
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
         {/* ── Account */}
-        <div style={{ marginBottom: 10, animation: "fadeUp 0.4s 0.14s ease both" }}>
+        <div style={{ marginBottom: 20, animation: "fadeUp 0.4s 0.14s ease both" }}>
           <p style={labelStyle}>Account</p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {accounts.map(a => (
@@ -652,11 +757,32 @@ export default function App() {
           {status === "success" ? "✓ Saved to Notion!" : status === "error" ? `✗ ${errorMsg}` : status === "saving" ? "Saving…" : `Save ${amount ? `${fmt(parseFloat(amount))} MAD` : ""} →`}
         </button>
 
-        {/* ── Pending purchases */}
-        <div style={{ marginTop: 36, animation: "fadeUp 0.4s 0.21s ease both" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Pending</p>
-          </div>
+        </div>{/* ── end ADD TAB ── */}
+
+        {/* ── PENDING TAB ── */}
+        <div id="panel-pending" role="tabpanel" aria-labelledby="tab-pending" style={{ display: tab === "pending" ? "block" : "none" }}>
+          <header style={{ marginBottom: 24, animation: "fadeUp 0.4s ease both" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4 }}>Notion Finance</p>
+                <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
+                  Your <em style={{ fontStyle: "italic", color: "var(--accent)" }}>wishlist</em>
+                </h1>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={toggleMode} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 20, border: "1px solid var(--border2)", background: "var(--surface2)", cursor: "pointer", color: "var(--text2)", fontSize: 13, transition: "all 0.35s ease" }} title={`Switch to ${mode === 'wife' ? 'Husband' : 'Wife'} mode`}>
+                  <span style={{ fontSize: 15 }}>{mode === "wife" ? "🎀" : "👨‍💻"}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>{mode === "wife" ? "Wife" : "Hubby"}</span>
+                </button>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--surface2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+                  {mode === "wife" ? "💎" : "💸"}
+                </div>
+              </div>
+            </div>
+          </header>
+
+        {/* ── Pending items ── */}
+        <div style={{ animation: "fadeUp 0.4s 0.04s ease both" }}>
 
           {/* Quick-add row */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: pendingItems.length > 0 ? 10 : 0 }}>
@@ -769,20 +895,41 @@ export default function App() {
             <p style={{ fontSize: 12, color: "var(--muted)", fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>Nothing pending — add items above</p>
           )}
         </div>
+        </div>{/* ── end PENDING TAB ── */}
+
+        {/* ── HISTORY TAB ── */}
+        <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" style={{ display: tab === "history" ? "block" : "none" }}>
+          <header style={{ marginBottom: 24, animation: "fadeUp 0.4s ease both" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4 }}>Notion Finance</p>
+                <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
+                  Recent <em style={{ fontStyle: "italic", color: "var(--accent)" }}>expenses</em>
+                </h1>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button onClick={toggleMode} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 20, border: "1px solid var(--border2)", background: "var(--surface2)", cursor: "pointer", color: "var(--text2)", fontSize: 13, transition: "all 0.35s ease" }} title={`Switch to ${mode === 'wife' ? 'Husband' : 'Wife'} mode`}>
+                  <span style={{ fontSize: 15 }}>{mode === "wife" ? "🎀" : "👨‍💻"}</span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>{mode === "wife" ? "Wife" : "Hubby"}</span>
+                </button>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--surface2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+                  {mode === "wife" ? "💎" : "💸"}
+                </div>
+              </div>
+            </div>
+          </header>
 
         {/* ── Recent transactions */}
         {transactions.length > 0 && (
-          <div style={{ marginTop: 36, animation: "fadeUp 0.4s 0.2s ease both" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)" }}>Recent</p>
-            </div>
+          <div style={{ animation: "fadeUp 0.4s 0.04s ease both" }}>
+
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {transactions.map((t, i) => {
                 const cat = categories.find(c => c.id === t.category);
                 return (
                   <div
                     key={t.id}
-                    onClick={() => { if (deletingId === t.id) return; setName(t.name); if (t.category) { const c = categories.find(x => x.id === t.category); if (c) selectCategory(c); } }}
+                    onClick={() => { if (deletingId === t.id) return; setName(t.name); if (t.category) { const c = categories.find(x => x.id === t.category); if (c) selectCategory(c); } setTab("add"); }}
                     style={{ display: "flex", alignItems: "center", padding: "11px 14px", background: deletingId === t.id ? "rgba(255,107,107,0.06)" : "var(--surface)", border: `1px solid ${deletingId === t.id ? "var(--danger)" : "var(--border)"}`, borderRadius: 12, cursor: "pointer", gap: 12, transition: "border-color 0.15s, background 0.15s", animation: `fadeUp 0.3s ${i * 0.03}s ease both` }}
                     onMouseEnter={e => { if (deletingId !== t.id) { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border2)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)"; } }}
                     onMouseLeave={e => { if (deletingId !== t.id) { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface)"; } }}
@@ -824,10 +971,63 @@ export default function App() {
                 );
               })}
             </div>
-            <p style={{ marginTop: 10, fontSize: 11, color: "var(--muted)", textAlign: "center" }}>Tap a transaction to reuse it</p>
+            <p style={{ marginTop: 10, fontSize: 11, color: "var(--muted)", textAlign: "center" }}>Tap a transaction to reuse it · switches to Add tab</p>
           </div>
         )}
+        {transactions.length === 0 && (
+          <p style={{ fontSize: 12, color: "var(--muted)", fontFamily: "'DM Mono', monospace", letterSpacing: 0.5, marginTop: 8 }}>No transactions yet</p>
+        )}
+        </div>{/* ── end HISTORY TAB ── */}
+
       </div>
+
+      {/* ── Bottom tab bar ── */}
+      <nav
+        role="tablist"
+        aria-label="App navigation"
+        style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50,
+          background: "var(--surface)",
+          borderTop: "1px solid var(--border)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        <div style={{ display: "flex", maxWidth: 480, margin: "0 auto" }}>
+          {([
+            { key: "add" as const, label: "Add" },
+            { key: "pending" as const, label: "Pending" },
+            { key: "history" as const, label: "History" },
+          ]).map(t => (
+            <button
+              key={t.key}
+              id={`tab-${t.key}`}
+              role="tab"
+              aria-selected={tab === t.key}
+              aria-controls={`panel-${t.key}`}
+              onClick={() => setTab(t.key)}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0 11px", background: "none", border: "none", borderTop: `2px solid ${tab === t.key ? "var(--accent)" : "transparent"}`, cursor: "pointer", color: tab === t.key ? "var(--accent)" : "var(--muted)", transition: "color 0.2s, border-color 0.2s", position: "relative" }}
+            >
+              {t.key === "pending" && pendingItems.length > 0 && (
+                <span style={{ position: "absolute", top: 4, right: "calc(50% - 20px)", minWidth: 16, height: 16, borderRadius: 8, background: "var(--accent)", color: "#080810", fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>
+                  {pendingItems.length}
+                </span>
+              )}
+              {t.key === "add" && (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={tab === "add" ? "2.5" : "2"} strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              )}
+              {t.key === "pending" && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={tab === "pending" ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              )}
+              {t.key === "history" && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={tab === "history" ? "2.5" : "2"} strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              )}
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }
@@ -849,9 +1049,9 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontFamily: "'DM Mono', monospace",
-  fontSize: 9,
+  fontSize: 10,
   letterSpacing: 2,
   textTransform: "uppercase",
   color: "var(--muted)",
-  marginBottom: 8,
+  marginBottom: 12,
 };
