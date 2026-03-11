@@ -58,6 +58,7 @@ export default function App() {
   const [pendingDate, setPendingDate] = useState(today());
   const pendingCatRef = useRef<HTMLDivElement>(null);
   const loadedPendingId = useRef<string | null>(null);
+  const initialCatApplied = useRef(false);
 
   // Auto-suggest state
   const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
@@ -114,12 +115,20 @@ export default function App() {
     // lastUsedCatId is set from API transactions in fetchTransactions
   }, []);
 
-  // Set last used category as default when loaded
+  // Set last used category + its default account on initial load (once, when all data is ready)
   useEffect(() => {
-    if (lastUsedCatId && categories.find(c => c.id === lastUsedCatId)) {
-      setCategoryId(lastUsedCatId);
+    if (initialCatApplied.current) return;
+    if (!lastUsedCatId || !categories.length || !accounts.length) return;
+    const cat = categories.find(c => c.id === lastUsedCatId);
+    if (!cat) return;
+    initialCatApplied.current = true;
+    setCategoryId(cat.id);
+    if (cat.defaultAccount) {
+      const normId = (id: string) => id.replace(/-/g, "").toLowerCase();
+      const acct = accounts.find(a => normId(a.id) === normId(cat.defaultAccount!));
+      if (acct) setAccountId(acct.id);
     }
-  }, [lastUsedCatId, categories]);
+  }, [lastUsedCatId, categories, accounts]);
 
   // Load or seed the auto-suggest corpus
   useEffect(() => {
@@ -279,7 +288,8 @@ export default function App() {
     setCategoryId(cat.id);
     setLastUsedCatId(cat.id);
     if (cat.defaultAccount) {
-      const acct = accounts.find(a => a.id === cat.defaultAccount);
+      const normId = (id: string) => id.replace(/-/g, "").toLowerCase();
+      const acct = accounts.find(a => normId(a.id) === normId(cat.defaultAccount!));
       if (acct) setAccountId(acct.id);
     }
     setShowCatPicker(false);

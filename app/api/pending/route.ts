@@ -1,4 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 
 const PENDING_DB = process.env.NOTION_PENDING_DB ?? "d2db101b-faec-467d-8c57-eee6d8780311";
 const HDR = (token: string) => ({ Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" });
