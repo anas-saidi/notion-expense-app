@@ -267,13 +267,14 @@ export default function App() {
         return updated;
       });
       showToast("Wishlist updated");
-    } catch {
+    } catch (e: unknown) {
       setPendingItems(prev => {
         const updated = prev.filter(p => p.id !== optimistic.id);
         localStorage.setItem("pendingItems", JSON.stringify(updated));
         return updated;
       });
-      showToast("Failed to save — check connection");
+      const msg = e instanceof Error ? e.message : "Failed to save";
+      showToast(`Failed to save — ${msg}`);
     } finally {
       setAddingPending(false);
     }
