@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Add expenses to Notion",
     start_url: "/",
     display: "standalone",
-    background_color: "#080810",
-    theme_color: "#080810",
+    background_color: "#0b0d17",
+    theme_color: "#0b0d17",
     orientation: "portrait",
     categories: ["finance", "productivity"],
     icons: [

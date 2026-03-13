@@ -9,6 +9,20 @@ type Transaction = { id: string; name: string; amount: number; date: string; cat
 type Account = { id: string; label: string; icon: string; type: string | null; balance: number | null };
 type PendingItem = { id: string; name: string; amount: number | null; categoryId: string | null; addedBy: string | null; date: string | null };
 
+const LOADING_LINES = [
+  "Warming up Notion...",
+  "Sorting tiny receipts...",
+  "Polishing your ledger...",
+  "Counting coins quietly...",
+];
+
+const SAVE_LINES = [
+  "Saved. Tiny win unlocked.",
+  "Logged and looking sharp.",
+  "Done. Budget still in control.",
+  "Synced. You are on a roll.",
+];
+
 // ─── Accounts (static — pulled from your Notion) ─────────────────────────
 const FALLBACK_ACCOUNTS: Account[] = [];
 
@@ -37,12 +51,17 @@ export default function App() {
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [loadingLineIdx, setLoadingLineIdx] = useState(0);
+  const [showSaveBurst, setShowSaveBurst] = useState(false);
+  const [microToast, setMicroToast] = useState<string | null>(null);
   const [catSearch, setCatSearch] = useState("");
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [lastUsedCatId, setLastUsedCatId] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
   const balanceAnimRef = useRef<number | null>(null);
   const catRef = useRef<HTMLDivElement>(null);
@@ -70,6 +89,13 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.mode = mode;
   }, [mode]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
+    };
+  }, []);
 
   // Load saved mode
   useEffect(() => {
@@ -159,6 +185,20 @@ export default function App() {
     });
   }, [corpus]);
 
+  useEffect(() => {
+    if (!loading) return;
+    const id = setInterval(() => {
+      setLoadingLineIdx(i => (i + 1) % LOADING_LINES.length);
+    }, 900);
+    return () => clearInterval(id);
+  }, [loading]);
+
+  const showToast = (msg: string, timeout = 1400) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setMicroToast(msg);
+    toastTimerRef.current = setTimeout(() => setMicroToast(null), timeout);
+  };
+
   const fetchTransactions = async () => {
     const data = await fetch("/api/transactions").then(r => r.json());
     const txns: Transaction[] = data.transactions ?? [];
@@ -168,13 +208,24 @@ export default function App() {
   };
 
   const fetchPending = async () => {
+    // Show cached items instantly while the network request is in-flight
+    try {
+      const cached = localStorage.getItem("pendingItems");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) setPendingItems(parsed);
+      }
+    } catch {}
     try {
       const res = await fetch("/api/pending");
-      if (!res.ok) return; // don't wipe items on API error
+      if (!res.ok) return; // keep cached items on API error
       const data = await res.json();
-      if (Array.isArray(data.items)) setPendingItems(data.items);
+      if (Array.isArray(data.items)) {
+        setPendingItems(data.items);
+        localStorage.setItem("pendingItems", JSON.stringify(data.items));
+      }
     } catch {
-      // silently keep existing items if fetch fails
+      // silently keep cached items if fetch fails
     }
   };
 
@@ -204,11 +255,25 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: optimistic.name, amount: optimistic.amount, categoryId: optimistic.categoryId, addedBy: optimistic.addedBy, date: optimistic.date }),
-      }).then(r => r.json());
-      // Replace optimistic with real id
-      setPendingItems(prev => prev.map(p => p.id === optimistic.id ? { ...p, id: data.id } : p));
+      }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error || "Failed to save");
+        return json;
+      });
+      // Replace optimistic with real Notion id and persist to localStorage
+      setPendingItems(prev => {
+        const updated = prev.map(p => p.id === optimistic.id ? { ...p, id: data.id } : p);
+        localStorage.setItem("pendingItems", JSON.stringify(updated));
+        return updated;
+      });
+      showToast("Wishlist updated");
     } catch {
-      setPendingItems(prev => prev.filter(p => p.id !== optimistic.id));
+      setPendingItems(prev => {
+        const updated = prev.filter(p => p.id !== optimistic.id);
+        localStorage.setItem("pendingItems", JSON.stringify(updated));
+        return updated;
+      });
+      showToast("Failed to save — check connection");
     } finally {
       setAddingPending(false);
     }
@@ -224,10 +289,15 @@ export default function App() {
     }
     loadedPendingId.current = item.id;
     setTab("add");
+    showToast("Loaded into Add form", 1200);
   };
 
   const dismissPending = async (id: string) => {
-    setPendingItems(prev => prev.filter(p => p.id !== id));
+    setPendingItems(prev => {
+      const updated = prev.filter(p => p.id !== id);
+      localStorage.setItem("pendingItems", JSON.stringify(updated));
+      return updated;
+    });
     fetch("/api/pending", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
       .then(r => { if (!r.ok) fetchPending(); });
   };
@@ -337,6 +407,10 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || "Failed");
 
       setStatus("success");
+      setShowSaveBurst(true);
+      if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
+      burstTimerRef.current = setTimeout(() => setShowSaveBurst(false), 850);
+      showToast(SAVE_LINES[Math.floor(Math.random() * SAVE_LINES.length)], 1500);
       // Grow corpus with this entry for future suggestions
       const newEntry = { description: name.trim(), categoryId };
       setCorpus(prev => {
@@ -361,8 +435,8 @@ export default function App() {
       setSuggestedCatId(null);
       setDate(today());
       setTimeout(() => setStatus("idle"), 2000);
-    } catch (e: any) {
-      setErrorMsg(e.message);
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "Failed");
       setStatus("error");
       setTimeout(() => setStatus("idle"), 3000);
     }
@@ -371,7 +445,12 @@ export default function App() {
   // ── Loading
   if (loading) return (
     <div data-mode={mode} style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
-      <div style={{ width: 28, height: 28, border: "2px solid var(--border2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 28, height: 28, border: "2px solid var(--border2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <p style={{ fontSize: 11, letterSpacing: 0.2, color: "var(--muted)", fontWeight: 600, animation: "fadeUp 0.2s ease both" }}>
+          {LOADING_LINES[loadingLineIdx]}
+        </p>
+      </div>
     </div>
   );
 
@@ -388,13 +467,16 @@ export default function App() {
         <div id="panel-add" role="tabpanel" aria-labelledby="tab-add" style={{ display: tab === "add" ? "block" : "none" }}>
 
         {/* ── Header */}
-        <header style={{ marginBottom: 28, animation: "fadeUp 0.4s ease both" }}>
+        <header style={{ marginBottom: 30, animation: "fadeUp 0.4s ease both" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4, transition: "color 0.35s ease" }}>
+            <div style={{ position: "relative" }}>
+              <div style={{ position: "absolute", top: -10, left: -6, transform: "rotate(-7deg)", padding: "3px 8px", borderRadius: 999, background: "var(--accent)", color: "var(--ink-strong)", fontSize: 9, fontWeight: 800, letterSpacing: 0.9, textTransform: "uppercase", boxShadow: "0 8px 20px color-mix(in srgb, var(--accent) 38%, transparent)" }}>
+                Quick Log
+              </div>
+              <p style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4, fontWeight: 700, transition: "color 0.35s ease" }}>
                 Notion Finance
               </p>
-              <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
+              <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: "clamp(35px, 10vw, 48px)", lineHeight: 0.95, color: "var(--text)", letterSpacing: -0.5 }}>
                 Add <em style={{ fontStyle: "italic", color: "var(--accent)", transition: "color 0.35s ease" }}>expense</em>
               </h1>
             </div>
@@ -403,8 +485,9 @@ export default function App() {
               <button
                 onClick={refreshAll}
                 disabled={refreshing}
+                aria-label="Refresh all data"
                 title="Refresh all"
-                style={{ background: "none", border: "none", cursor: refreshing ? "default" : "pointer", color: "var(--muted)", padding: 6, display: "flex", alignItems: "center", opacity: refreshing ? 0.5 : 1, transition: "opacity 0.2s, color 0.2s" }}
+                style={{ background: "none", border: "none", cursor: refreshing ? "default" : "pointer", color: "var(--muted)", width: 40, height: 40, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", opacity: refreshing ? 0.5 : 1, transition: "opacity 0.2s, color 0.2s" }}
                 onMouseEnter={e => { if (!refreshing) (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
               >
@@ -432,7 +515,7 @@ export default function App() {
                 title={`Switch to ${mode === 'wife' ? 'Husband' : 'Wife'} mode`}
               >
                 <span style={{ fontSize: 15 }}>{mode === "wife" ? "🎀" : "👨‍💻"}</span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>
+                <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>
                   {mode === "wife" ? "Wife" : "Hubby"}
                 </span>
               </button>
@@ -450,16 +533,16 @@ export default function App() {
           const todayTxs = transactions.filter(t => t.date === todayStr);
           const todayTotal = todayTxs.reduce((s, t) => s + t.amount, 0);
           return (
-            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.03s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, gap: 12 }}>
+            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.03s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 2px", borderBottom: "1px solid var(--border)", gap: 12 }}>
               <input
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                style={{ background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16, fontFamily: "'DM Mono', monospace", colorScheme: "dark", cursor: "pointer", padding: 0, flexShrink: 0, letterSpacing: 0.5 }}
+                style={{ background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16, fontFamily: "'DM Mono', monospace", colorScheme: mode === "wife" ? "light" : "dark", cursor: "pointer", padding: 0, flexShrink: 0, letterSpacing: 0.5 }}
               />
               {isToday && todayTxs.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--text2)" }}>{todayTxs.length} expense{todayTxs.length !== 1 ? "s" : ""}</span>
+                  <span style={{ fontSize: 11, color: "var(--text2)", fontWeight: 600 }}>{todayTxs.length} expense{todayTxs.length !== 1 ? "s" : ""}</span>
                   <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)", fontWeight: 500 }}>−{fmt(todayTotal)} MAD</span>
                 </div>
               )}
@@ -485,23 +568,27 @@ export default function App() {
           if (topCats.length === 0) return null;
           return (
             <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.04s ease both", display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {topCats.map(cat => (
-                <span key={cat.id} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", fontSize: 11, color: "var(--text2)", display: "flex", alignItems: "center", gap: 5 }}>
+              {topCats.map((cat, idx) => {
+                const chipBg = idx === 0 ? "var(--accent-dim)" : idx === 1 ? "var(--info-dim)" : "var(--warning-dim)";
+                const chipFg = idx === 0 ? "var(--accent)" : idx === 1 ? "var(--info)" : "var(--warning)";
+                return (
+                <span key={cat.id} style={{ padding: "5px 10px", borderRadius: 999, background: chipBg, border: "1px solid transparent", fontSize: 11, color: chipFg, display: "flex", alignItems: "center", gap: 5 }}>
                   <span>{cat.icon ?? "🏷️"}</span>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10 }}>{cat.name}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600 }}>{cat.name}</span>
                   <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--danger)" }}>−{fmt(catTotals[cat.id])}</span>
                 </span>
-              ))}
+                );
+              })}
             </div>
           );
         })()}
 
         {/* ── Amount */}
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "20px 20px 18px", marginBottom: 14, animation: "fadeUp 0.4s 0.05s ease both", position: "relative", overflow: "hidden", transition: "background-color 0.35s ease, border-color 0.35s ease" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 26, padding: "22px 22px 20px", marginBottom: 18, marginLeft: -8, marginRight: -8, animation: "fadeUp 0.4s 0.05s ease both", position: "relative", overflow: "hidden", transition: "background-color 0.35s ease, border-color 0.35s ease", boxShadow: "0 24px 34px color-mix(in srgb, var(--accent) 14%, transparent)" }}>
           {/* Decorative glow blob */}
-          <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, var(--accent-glow), transparent 70%)", pointerEvents: "none", transition: "background 0.4s ease" }} />
+          <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "var(--accent-glow)", pointerEvents: "none", transition: "background 0.4s ease" }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--muted)", transition: "color 0.35s ease" }}>Amount</p>
+            <p style={{ fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)", fontWeight: 700, transition: "color 0.35s ease" }}>Amount</p>
             {displayedBalance !== null && (() => {
               const selectedAcct = accounts.find(a => a.id === accountId);
               const afterAmount = amount && parseFloat(amount) > 0 ? displayedBalance - parseFloat(amount) : null;
@@ -538,8 +625,8 @@ export default function App() {
               autoFocus
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "clamp(42px, 14vw, 68px)",
-                fontWeight: 300,
+                fontSize: "clamp(52px, 16vw, 82px)",
+                fontWeight: 250,
                 lineHeight: 1,
                 color: amount ? "var(--text)" : "var(--muted)",
                 background: "transparent",
@@ -620,9 +707,9 @@ export default function App() {
                 const previewPct = Math.min(((spent + expAmt) / planned) * 100, 100);
                 const availableAfter = available - expAmt;
                 const alreadyOver = available < 0;
-                const ringColor = alreadyOver ? "var(--danger)" : spentPct > 79 ? "#f59e0b" : "var(--accent)";
+                const ringColor = alreadyOver ? "var(--danger)" : spentPct > 79 ? "var(--warning)" : "var(--accent)";
                 const wouldBeOver = availableAfter < 0;
-                const previewStroke = wouldBeOver ? "rgba(255,107,107,0.5)" : "rgba(200,245,90,0.4)";
+                const previewStroke = wouldBeOver ? "color-mix(in srgb, var(--danger) 65%, transparent)" : "color-mix(in srgb, var(--accent) 55%, transparent)";
                 const labelColor = expAmt > 0
                   ? (wouldBeOver ? "var(--danger)" : "var(--success)")
                   : (available >= 0 ? "var(--success)" : "var(--danger)");
@@ -709,10 +796,10 @@ export default function App() {
                 key={a.id}
                 onClick={() => setAccountId(a.id)}
                 title={a.label}
-                style={{ padding: "7px 12px", borderRadius: 10, border: `1px solid ${a.id === accountId ? "var(--accent)" : "var(--border)"}`, background: a.id === accountId ? "var(--accent-dim)" : "var(--surface)", color: a.id === accountId ? "var(--accent)" : "var(--text2)", fontSize: 13, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 5 }}
+                style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${a.id === accountId ? "var(--accent)" : "transparent"}`, background: a.id === accountId ? "var(--accent-dim)" : "var(--surface2)", color: a.id === accountId ? "var(--accent)" : "var(--text2)", fontSize: 13, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 5 }}
               >
                 <span>{a.icon}</span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10 }}>{a.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 600 }}>{a.label}</span>
               </button>
             ))}
             {accounts.length === 0 && (
@@ -740,32 +827,57 @@ export default function App() {
         )}
 
         {/* ── Submit */}
-        <button
-          onClick={submit}
-          disabled={!canSubmit}
-          style={{
-            width: "100%",
-            padding: 17,
-            borderRadius: 16,
-            border: "none",
-            background: status === "success" ? "var(--success)" : status === "error" ? "var(--danger)" : "var(--accent)",
-            color: "#080810",
-            fontWeight: 600,
-            fontSize: 16,
-            cursor: canSubmit ? "pointer" : "not-allowed",
-            opacity: canSubmit || status !== "idle" ? 1 : 0.35,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            transition: "all 0.2s",
-            animation: "fadeUp 0.4s 0.19s ease both",
-            transform: "translateY(0)",
-          }}
-        >
-          {status === "saving" && <div style={{ width: 17, height: 17, border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#080810", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />}
-          {status === "success" ? "✓ Saved to Notion!" : status === "error" ? `✗ ${errorMsg}` : status === "saving" ? "Saving…" : `Save ${amount ? `${fmt(parseFloat(amount))} MAD` : ""} →`}
-        </button>
+        <div style={{ position: "relative" }}>
+          {showSaveBurst && (
+            <>
+              <span className="save-burst" style={{ ["--x" as any]: "-46px", ["--y" as any]: "-30px", ["--d" as any]: "0ms" }}>✨</span>
+              <span className="save-burst" style={{ ["--x" as any]: "-12px", ["--y" as any]: "-38px", ["--d" as any]: "20ms" }}>✦</span>
+              <span className="save-burst" style={{ ["--x" as any]: "22px", ["--y" as any]: "-32px", ["--d" as any]: "40ms" }}>✨</span>
+              <span className="save-burst" style={{ ["--x" as any]: "48px", ["--y" as any]: "-18px", ["--d" as any]: "60ms" }}>✦</span>
+              <span className="save-burst" style={{ ["--x" as any]: "-44px", ["--y" as any]: "16px", ["--d" as any]: "80ms" }}>✧</span>
+              <span className="save-burst" style={{ ["--x" as any]: "-8px", ["--y" as any]: "22px", ["--d" as any]: "100ms" }}>✨</span>
+              <span className="save-burst" style={{ ["--x" as any]: "26px", ["--y" as any]: "18px", ["--d" as any]: "120ms" }}>✧</span>
+              <span className="save-burst" style={{ ["--x" as any]: "42px", ["--y" as any]: "8px", ["--d" as any]: "140ms" }}>✨</span>
+            </>
+          )}
+          <button
+            onClick={submit}
+            disabled={!canSubmit}
+            className="pressable cta-save"
+            style={{
+              width: "100%",
+              padding: "19px 18px",
+              borderRadius: 20,
+              border: "1.5px solid color-mix(in srgb, var(--accent) 45%, transparent)",
+              background: status === "success"
+                ? "var(--success)"
+                : status === "error"
+                  ? "var(--danger)"
+                  : (mode === "wife" ? "color-mix(in srgb, var(--accent) 82%, white)" : "var(--accent)"),
+              color: mode === "wife" ? "#1f0612" : "#0d1117",
+              fontWeight: 800,
+              fontSize: 18,
+              letterSpacing: 0.3,
+              cursor: canSubmit ? "pointer" : "not-allowed",
+              opacity: canSubmit || status !== "idle" ? 1 : 0.42,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+              boxShadow: status === "idle" ? "0 16px 28px color-mix(in srgb, var(--accent) 32%, transparent)" : "none",
+              animation: "fadeUp 0.4s 0.19s ease both",
+            }}
+          >
+            {status === "saving" && <div style={{ width: 17, height: 17, border: "2px solid color-mix(in srgb, var(--ink-strong) 25%, transparent)", borderTopColor: "var(--ink-strong)", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />}
+            {status === "success" ? "✓ Saved to Notion!" : status === "error" ? `✗ ${errorMsg}` : status === "saving" ? "Saving…" : (
+              <>
+                <span>Save {amount ? `${fmt(parseFloat(amount))} MAD` : ""}</span>
+                <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1, marginLeft: 2 }}>→</span>
+              </>
+            )}
+          </button>
+        </div>
 
         </div>{/* ── end ADD TAB ── */}
 
@@ -774,15 +886,15 @@ export default function App() {
           <header style={{ marginBottom: 24, animation: "fadeUp 0.4s ease both" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4 }}>Notion Finance</p>
+                <p style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4, fontWeight: 700 }}>Notion Finance</p>
                 <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
-                  Your <em style={{ fontStyle: "italic", color: "var(--accent)" }}>wishlist</em>
+                  Your <em style={{ fontStyle: "italic", color: "var(--warning)" }}>wishlist</em>
                 </h1>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button onClick={toggleMode} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 20, border: "1px solid var(--border2)", background: "var(--surface2)", cursor: "pointer", color: "var(--text2)", fontSize: 13, transition: "all 0.35s ease" }} title={`Switch to ${mode === 'wife' ? 'Husband' : 'Wife'} mode`}>
                   <span style={{ fontSize: 15 }}>{mode === "wife" ? "🎀" : "👨‍💻"}</span>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>{mode === "wife" ? "Wife" : "Hubby"}</span>
+                  <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>{mode === "wife" ? "Wife" : "Hubby"}</span>
                 </button>
                 <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--surface2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
                   {mode === "wife" ? "💎" : "💸"}
@@ -817,8 +929,9 @@ export default function App() {
             <div style={{ position: "relative", flexShrink: 0 }} ref={pendingCatRef}>
               <button
                 onClick={() => setShowPendingCatPicker(v => !v)}
+                aria-label="Pick pending category"
                 title="Category"
-                style={{ height: "100%", padding: "10px 12px", borderRadius: 12, border: `1px solid ${showPendingCatPicker ? "var(--accent)" : "var(--border)"}`, background: pendingCatId ? "var(--accent-dim)" : "var(--surface)", color: pendingCatId ? "var(--accent)" : "var(--muted)", cursor: "pointer", fontSize: 16, transition: "all 0.15s", display: "flex", alignItems: "center" }}
+                style={{ minWidth: 44, minHeight: 44, padding: "10px 12px", borderRadius: 12, border: `1px solid ${showPendingCatPicker ? "var(--accent)" : "var(--border)"}`, background: pendingCatId ? "var(--accent-dim)" : "var(--surface)", color: pendingCatId ? "var(--accent)" : "var(--muted)", cursor: "pointer", fontSize: 16, transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
                 {pendingCatId ? (categories.find(c => c.id === pendingCatId)?.icon ?? "🏷️") : "🏷️"}
               </button>
@@ -841,9 +954,10 @@ export default function App() {
             <button
               onClick={addPending}
               disabled={!pendingName.trim() || addingPending}
-              style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid var(--accent)", background: "var(--accent-dim)", color: "var(--accent)", fontSize: 18, cursor: pendingName.trim() ? "pointer" : "not-allowed", opacity: pendingName.trim() ? 1 : 0.35, transition: "all 0.15s", flexShrink: 0, display: "flex", alignItems: "center" }}
+              aria-label="Add pending item"
+              style={{ minWidth: 44, minHeight: 44, padding: "10px 14px", borderRadius: 12, border: "1px solid var(--warning)", background: "var(--warning-dim)", color: "var(--warning)", fontSize: 18, cursor: pendingName.trim() ? "pointer" : "not-allowed", opacity: pendingName.trim() ? 1 : 0.35, transition: "all 0.15s", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
             >
-              {addingPending ? <div style={{ width: 14, height: 14, border: "2px solid var(--accent-dim)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} /> : "+"}
+              {addingPending ? <div style={{ width: 14, height: 14, border: "2px solid var(--warning-dim)", borderTopColor: "var(--warning)", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} /> : "+"}
             </button>
           </div>
           <input
@@ -882,16 +996,18 @@ export default function App() {
                     {/* Load into form */}
                     <button
                       onClick={() => loadPending(item)}
+                      aria-label="Load pending item into add form"
                       title="Fill form"
-                      style={{ background: "var(--accent-dim)", border: "1px solid transparent", borderRadius: 8, padding: "5px 8px", cursor: "pointer", color: "var(--accent)", fontSize: 13, flexShrink: 0, transition: "all 0.15s" }}
+                      style={{ background: "var(--accent-dim)", border: "1px solid transparent", borderRadius: 8, minWidth: 32, minHeight: 32, padding: "5px 8px", cursor: "pointer", color: "var(--accent)", fontSize: 13, flexShrink: 0, transition: "all 0.15s" }}
                     >
                       ↑
                     </button>
                     {/* Dismiss */}
                     <button
                       onClick={() => dismissPending(item.id)}
+                      aria-label="Dismiss pending item"
                       title="Dismiss"
-                      style={{ background: "transparent", border: "1px solid transparent", borderRadius: 8, padding: "5px 6px", cursor: "pointer", color: "var(--muted)", display: "flex", alignItems: "center", flexShrink: 0, transition: "all 0.15s" }}
+                      style={{ background: "transparent", border: "1px solid transparent", borderRadius: 8, minWidth: 32, minHeight: 32, padding: "5px 6px", cursor: "pointer", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
@@ -902,7 +1018,9 @@ export default function App() {
           )}
 
           {pendingItems.length === 0 && (
-            <p style={{ fontSize: 12, color: "var(--muted)", fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>Nothing pending — add items above</p>
+            <p style={{ fontSize: 12, color: "var(--muted)", fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
+              Nothing pending. Future-you says thanks.
+            </p>
           )}
         </div>
         </div>{/* ── end PENDING TAB ── */}
@@ -912,15 +1030,15 @@ export default function App() {
           <header style={{ marginBottom: 24, animation: "fadeUp 0.4s ease both" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 3, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4 }}>Notion Finance</p>
+                <p style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4, fontWeight: 700 }}>Notion Finance</p>
                 <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
-                  Recent <em style={{ fontStyle: "italic", color: "var(--accent)" }}>expenses</em>
+                  Recent <em style={{ fontStyle: "italic", color: "var(--info)" }}>expenses</em>
                 </h1>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button onClick={toggleMode} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 20, border: "1px solid var(--border2)", background: "var(--surface2)", cursor: "pointer", color: "var(--text2)", fontSize: 13, transition: "all 0.35s ease" }} title={`Switch to ${mode === 'wife' ? 'Husband' : 'Wife'} mode`}>
                   <span style={{ fontSize: 15 }}>{mode === "wife" ? "🎀" : "👨‍💻"}</span>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>{mode === "wife" ? "Wife" : "Hubby"}</span>
+                  <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>{mode === "wife" ? "Wife" : "Hubby"}</span>
                 </button>
                 <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--surface2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
                   {mode === "wife" ? "💎" : "💸"}
@@ -955,16 +1073,20 @@ export default function App() {
                       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "var(--danger)" }}>−{fmt(t.amount)}</div>
                       <button
                         onClick={e => { e.stopPropagation(); deleteTransaction(t.id); }}
+                        aria-label={deletingId === t.id ? "Confirm delete transaction" : "Delete transaction"}
                         title={deletingId === t.id ? "Tap again to confirm" : "Delete"}
                         style={{
                           background: deletingId === t.id ? "var(--danger)" : "transparent",
                           border: `1px solid ${deletingId === t.id ? "var(--danger)" : "transparent"}`,
                           borderRadius: 6,
+                          minWidth: 32,
+                          minHeight: 32,
                           padding: "4px 5px",
                           cursor: "pointer",
-                          color: deletingId === t.id ? "#fff" : "var(--muted)",
+                          color: deletingId === t.id ? "var(--surface)" : "var(--muted)",
                           display: "flex",
                           alignItems: "center",
+                          justifyContent: "center",
                           transition: "all 0.15s",
                           flexShrink: 0,
                         }}
@@ -999,8 +1121,7 @@ export default function App() {
           position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50,
           background: "var(--surface)",
           borderTop: "1px solid var(--border)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
+          boxShadow: "0 -6px 18px rgba(0,0,0,0.14)",
           paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
@@ -1009,7 +1130,9 @@ export default function App() {
             { key: "add" as const, label: "Add" },
             { key: "pending" as const, label: "Pending" },
             { key: "history" as const, label: "History" },
-          ]).map(t => (
+          ]).map(t => {
+            const activeColor = t.key === "add" ? "var(--accent)" : t.key === "pending" ? "var(--warning)" : "var(--info)";
+            return (
             <button
               key={t.key}
               id={`tab-${t.key}`}
@@ -1017,10 +1140,10 @@ export default function App() {
               aria-selected={tab === t.key}
               aria-controls={`panel-${t.key}`}
               onClick={() => setTab(t.key)}
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0 11px", background: "none", border: "none", borderTop: `2px solid ${tab === t.key ? "var(--accent)" : "transparent"}`, cursor: "pointer", color: tab === t.key ? "var(--accent)" : "var(--muted)", transition: "color 0.2s, border-color 0.2s", position: "relative" }}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0 11px", background: "none", border: "none", borderTop: `2px solid ${tab === t.key ? activeColor : "transparent"}`, cursor: "pointer", color: tab === t.key ? activeColor : "var(--muted)", transition: "color 0.2s, border-color 0.2s", position: "relative" }}
             >
               {t.key === "pending" && pendingItems.length > 0 && (
-                <span style={{ position: "absolute", top: 4, right: "calc(50% - 20px)", minWidth: 16, height: 16, borderRadius: 8, background: "var(--accent)", color: "#080810", fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>
+                <span style={{ position: "absolute", top: 4, right: "calc(50% - 20px)", minWidth: 16, height: 16, borderRadius: 8, background: "var(--warning)", color: "var(--ink-strong)", fontSize: 9, fontFamily: "'DM Mono', monospace", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>
                   {pendingItems.length}
                 </span>
               )}
@@ -1033,11 +1156,38 @@ export default function App() {
               {t.key === "history" && (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={tab === "history" ? "2.5" : "2"} strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
               )}
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, letterSpacing: 1, textTransform: "uppercase" }}>{t.label}</span>
+              <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>{t.label}</span>
             </button>
-          ))}
+          );
+          })}
         </div>
       </nav>
+
+      {microToast && (
+        <div
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
+            transform: "translateX(-50%)",
+            zIndex: 80,
+            background: "var(--surface2)",
+            border: "1px solid var(--border2)",
+            color: "var(--text)",
+            borderRadius: 999,
+            padding: "8px 12px",
+            fontSize: 12,
+            fontFamily: "'DM Mono', monospace",
+            letterSpacing: 0.4,
+            boxShadow: "0 8px 24px color-mix(in srgb, var(--ink-strong) 25%, transparent)",
+            animation: "toastIn 0.2s ease both",
+            pointerEvents: "none",
+          }}
+        >
+          {microToast}
+        </div>
+      )}
     </div>
   );
 }
@@ -1052,15 +1202,15 @@ const inputStyle: React.CSSProperties = {
   color: "var(--text)",
   fontSize: 16,
   outline: "none",
-  transition: "border-color 0.2s",
+  transition: "border-color 0.2s, box-shadow 0.2s",
   appearance: "none",
   WebkitAppearance: "none",
 };
 
 const labelStyle: React.CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
   fontSize: 10,
-  letterSpacing: 2,
+  fontWeight: 700,
+  letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
   marginBottom: 12,
