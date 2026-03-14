@@ -66,6 +66,7 @@ export default function App() {
   const balanceAnimRef = useRef<number | null>(null);
   const catRef = useRef<HTMLDivElement>(null);
 
+  const initialAcctApplied = useRef(false);
   // Pending purchases state
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [pendingName, setPendingName] = useState("");
@@ -141,20 +142,27 @@ export default function App() {
     // lastUsedCatId is set from API transactions in fetchTransactions
   }, []);
 
-  // Set last used category + its default account on initial load (once, when all data is ready)
+  // Set last used category on initial load (as soon as categories + transactions are ready)
   useEffect(() => {
     if (initialCatApplied.current) return;
-    if (!lastUsedCatId || !categories.length || !accounts.length) return;
+    if (!lastUsedCatId || !categories.length) return;
     const cat = categories.find(c => c.id === lastUsedCatId);
     if (!cat) return;
     initialCatApplied.current = true;
     setCategoryId(cat.id);
-    if (cat.defaultAccount) {
-      const normId = (id: string) => id.replace(/-/g, "").toLowerCase();
-      const acct = accounts.find(a => normId(a.id) === normId(cat.defaultAccount!));
-      if (acct) setAccountId(acct.id);
-    }
-  }, [lastUsedCatId, categories, accounts]);
+  }, [lastUsedCatId, categories]);
+
+  // Apply the selected category's default account once accounts are ready (initial load only)
+  useEffect(() => {
+    if (initialAcctApplied.current) return;
+    if (!accounts.length || !categories.length || !categoryId) return;
+    const cat = categories.find(c => c.id === categoryId);
+    if (!cat?.defaultAccount) { initialAcctApplied.current = true; return; }
+    const normId = (id: string) => id.replace(/-/g, "").toLowerCase();
+    const acct = accounts.find(a => normId(a.id) === normId(cat.defaultAccount!));
+    if (acct) setAccountId(acct.id);
+    initialAcctApplied.current = true;
+  }, [categoryId, categories, accounts]);
 
   // Load or seed the auto-suggest corpus
   useEffect(() => {
@@ -471,9 +479,6 @@ export default function App() {
         <header style={{ marginBottom: 30, animation: "fadeUp 0.4s ease both" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ position: "relative" }}>
-              <div style={{ position: "absolute", top: -10, left: -6, transform: "rotate(-7deg)", padding: "3px 8px", borderRadius: 999, background: "var(--accent)", color: "var(--ink-strong)", fontSize: 9, fontWeight: 800, letterSpacing: 0.9, textTransform: "uppercase", boxShadow: "0 8px 20px color-mix(in srgb, var(--accent) 38%, transparent)" }}>
-                Quick Log
-              </div>
               <p style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4, fontWeight: 700, transition: "color 0.35s ease" }}>
                 Notion Finance
               </p>
