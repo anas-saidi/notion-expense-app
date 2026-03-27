@@ -1,24 +1,24 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0b0d17;
-  --surface: #111625;
-  --surface2: #171d2f;
-  --border: rgba(255,255,255,0.09);
-  --border2: rgba(255,255,255,0.18);
-  --accent: #bfe95a;
-  --accent-dim: rgba(191,233,90,0.15);
-  --accent-glow: rgba(191,233,90,0.14);
-  --warning: #f3b159;
-  --warning-dim: rgba(243,177,89,0.18);
-  --info: #70c6dd;
-  --info-dim: rgba(112,198,221,0.18);
-  --ink-strong: #111318;
-  --text: #ffffff;
-  --text2: #e8eeff;
-  --muted: #c4cdea;
-  --danger: #ff6f78;
-  --success: #4ade80;
+  --bg: #f3ece1;
+  --surface: #fbf6ef;
+  --surface2: #efe4d4;
+  --border: rgba(120, 93, 63, 0.12);
+  --border2: rgba(120, 93, 63, 0.22);
+  --accent: #95ab68;
+  --accent-dim: rgba(149,171,104,0.15);
+  --accent-glow: rgba(149,171,104,0.14);
+  --warning: #d89e58;
+  --warning-dim: rgba(216,158,88,0.18);
+  --info: #6f9d93;
+  --info-dim: rgba(111,157,147,0.18);
+  --ink-strong: #2c241b;
+  --text: #2f261d;
+  --text2: #6e5a49;
+  --muted: #8d7664;
+  --danger: #c96968;
+  --success: #4e8d64;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -47,23 +47,23 @@ html[data-mode="wife"] {
 
 /* ── Husband mode (explicit, same as :root defaults) */
 html[data-mode="husband"] {
-  --accent: #bfe95a;
-  --accent-dim: rgba(191,233,90,0.15);
-  --accent-glow: rgba(191,233,90,0.09);
-  --warning: #f3b159;
-  --warning-dim: rgba(243,177,89,0.18);
-  --info: #70c6dd;
-  --info-dim: rgba(112,198,221,0.18);
-  --ink-strong: #111318;
-  --bg: #0b0d17;
-  --surface: #111625;
-  --surface2: #171d2f;
-  --border: rgba(255,255,255,0.09);
-  --border2: rgba(255,255,255,0.18);
-  --text: #ffffff;
-  --text2: #e8eeff;
-  --muted: #c4cdea;
-  --danger: #ff6f78;
+  --accent: #95ab68;
+  --accent-dim: rgba(149,171,104,0.15);
+  --accent-glow: rgba(149,171,104,0.11);
+  --warning: #d89e58;
+  --warning-dim: rgba(216,158,88,0.18);
+  --info: #6f9d93;
+  --info-dim: rgba(111,157,147,0.18);
+  --ink-strong: #2c241b;
+  --bg: #f3ece1;
+  --surface: #fbf6ef;
+  --surface2: #efe4d4;
+  --border: rgba(120, 93, 63, 0.12);
+  --border2: rgba(120, 93, 63, 0.22);
+  --text: #2f261d;
+  --text2: #6e5a49;
+  --muted: #8d7664;
+  --danger: #c96968;
 }
 
 html { height: 100%; }

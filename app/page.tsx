@@ -27,6 +27,11 @@ const SAVE_LINES = [
 const FALLBACK_ACCOUNTS: Account[] = [];
 
 const today = () => new Date().toISOString().split("T")[0];
+const shiftDate = (dateStr: string, days: number) => {
+  const date = new Date(`${dateStr}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split("T")[0];
+};
 const fmt = (n: number) => n.toLocaleString("fr-MA");
 const fmtDate = (d: string) => {
   if (!d) return "";
@@ -41,7 +46,9 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"add" | "pending" | "history">("add");
+  const [tab, setTab] = useState<"home" | "pending" | "history">("home");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [homeSearch, setHomeSearch] = useState("");
 
   // Form state
   const [amount, setAmount] = useState("");
@@ -49,6 +56,9 @@ export default function App() {
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState(today());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+  const [accountSearch, setAccountSearch] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [loadingLineIdx, setLoadingLineIdx] = useState(0);
@@ -64,7 +74,9 @@ export default function App() {
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
   const balanceAnimRef = useRef<number | null>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
   const catRef = useRef<HTMLDivElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   const initialAcctApplied = useRef(false);
   // Pending purchases state
@@ -297,7 +309,7 @@ export default function App() {
       if (cat) selectCategory(cat);
     }
     loadedPendingId.current = item.id;
-    setTab("add");
+    setShowAddModal(true);
     showToast("Loaded into Add form", 1200);
   };
 
@@ -353,7 +365,9 @@ export default function App() {
   // Close cat pickers on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      if (dateRef.current && !dateRef.current.contains(e.target as Node)) setShowDatePicker(false);
       if (catRef.current && !catRef.current.contains(e.target as Node)) setShowCatPicker(false);
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setShowAccountPicker(false);
       if (pendingCatRef.current && !pendingCatRef.current.contains(e.target as Node)) setShowPendingCatPicker(false);
     };
     document.addEventListener("mousedown", handler);
@@ -382,6 +396,33 @@ export default function App() {
       if (b.id === lastUsedCatId) return 1;
       return 0;
     });
+
+  const filteredAccounts = accounts.filter(a => {
+    const q = accountSearch.toLowerCase();
+    return !q || a.label.toLowerCase().includes(q) || (a.type ?? "").toLowerCase().includes(q);
+  });
+
+  const homeCategories = categories
+    .filter(c => {
+      const q = homeSearch.toLowerCase();
+      return !q || c.name.toLowerCase().includes(q) || c.type.some(t => t.toLowerCase().includes(q));
+    })
+    .sort((a, b) => {
+      if (a.id === lastUsedCatId) return -1;
+      if (b.id === lastUsedCatId) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+  const selectedDateLabel =
+    date === today() ? "Today" :
+    date === shiftDate(today(), -1) ? "Yesterday" :
+    date === shiftDate(today(), 1) ? "Tomorrow" :
+    fmtDate(date);
+  const selectedAccount = accounts.find(a => a.id === accountId) ?? null;
+  const amountAfterBalance =
+    displayedBalance !== null && amount && parseFloat(amount) > 0
+      ? displayedBalance - parseFloat(amount)
+      : null;
 
   const suggestCategory = (query: string) => {
     if (!fuseRef.current || query.length < 3) { setSuggestedCatId(null); return; }
@@ -467,155 +508,149 @@ export default function App() {
   const parsedAmount = amount ? parseFloat(amount) : 0;
   const categoryOverBudget = !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
   const canSubmit = amount && parsedAmount > 0 && name.trim() && categoryId && status === "idle" && !categoryUnfunded && !categoryOverBudget;
+  const totalPlanned = categories.reduce((sum, c) => sum + (c.planned ?? 0), 0);
+  const totalAvailable = categories.reduce((sum, c) => sum + (c.available ?? 0), 0);
 
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
       <div style={{ maxWidth: 480, margin: "0 auto", padding: "calc(var(--safe-top) + 20px) 20px calc(72px + env(safe-area-inset-bottom, 0px))" }}>
 
-        {/* ── ADD TAB ── */}
-        <div id="panel-add" role="tabpanel" aria-labelledby="tab-add" style={{ display: tab === "add" ? "block" : "none" }}>
-
-        {/* ── Header */}
-        <header style={{ marginBottom: 30, animation: "fadeUp 0.4s ease both" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ position: "relative" }}>
-              <p style={{ fontSize: 11, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--accent)", marginBottom: 4, fontWeight: 700, transition: "color 0.35s ease" }}>
-                Notion Finance
-              </p>
-              <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: "clamp(35px, 10vw, 48px)", lineHeight: 0.95, color: "var(--text)", letterSpacing: -0.5 }}>
-                Add <em style={{ fontStyle: "italic", color: "var(--accent)", transition: "color 0.35s ease" }}>expense</em>
-              </h1>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {/* Global refresh */}
-              <button
-                onClick={refreshAll}
-                disabled={refreshing}
-                aria-label="Refresh all data"
-                title="Refresh all"
-                style={{ background: "none", border: "none", cursor: refreshing ? "default" : "pointer", color: "var(--muted)", width: 40, height: 40, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", opacity: refreshing ? 0.5 : 1, transition: "opacity 0.2s, color 0.2s" }}
-                onMouseEnter={e => { if (!refreshing) (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: refreshing ? "spin 0.7s linear infinite" : "none" }}>
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-              </button>
-              {/* Mode toggle */}
-              <button
-                onClick={toggleMode}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "7px 12px",
-                  borderRadius: 20,
-                  border: "1px solid var(--border2)",
-                  background: "var(--surface2)",
-                  cursor: "pointer",
-                  color: "var(--text2)",
-                  fontSize: 13,
-                  transition: "all 0.35s ease",
-                  animation: "modeIn 0.3s ease both",
-                }}
-                title={`Switch to ${mode === 'wife' ? 'Husband' : 'Wife'} mode`}
-              >
-                <span style={{ fontSize: 15 }}>{mode === "wife" ? "🎀" : "👨‍💻"}</span>
-                <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>
-                  {mode === "wife" ? "Wife" : "Hubby"}
-                </span>
-              </button>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--surface2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
-                {mode === "wife" ? "💎" : "💸"}
+        <div id="panel-home" role="tabpanel" aria-labelledby="tab-home" style={{ display: tab === "home" ? "block" : "none" }}>
+          <header style={{ marginBottom: 24, animation: "fadeUp 0.4s ease both" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
+                  Home
+                </h1>
+                <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
+                  All your Notion categories in one place.
+                </p>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: 16, background: "var(--surface)", border: "1px solid var(--border)", minWidth: 124 }}>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)" }}>
+                  Overview
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text)", marginTop: 6, fontWeight: 700 }}>
+                  {categories.length} categories
+                </div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: totalAvailable >= 0 ? "var(--success)" : "var(--danger)", marginTop: 4 }}>
+                  {fmt(totalAvailable)} available
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {/* ── Date + Today summary */}
-        {(() => {
-          const todayStr = today();
-          const isToday = date === todayStr;
-          const todayTxs = transactions.filter(t => t.date === todayStr);
-          const todayTotal = todayTxs.reduce((s, t) => s + t.amount, 0);
-          return (
-            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.03s ease both", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 2px", borderBottom: "1px solid var(--border)", gap: 12 }}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 14, animation: "fadeUp 0.35s 0.04s ease both" }}>
               <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                style={{ background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16, fontFamily: "'DM Mono', monospace", colorScheme: mode === "wife" ? "light" : "dark", cursor: "pointer", padding: 0, flexShrink: 0, letterSpacing: 0.5 }}
+                type="text"
+                value={homeSearch}
+                onChange={e => setHomeSearch(e.target.value)}
+                placeholder="Search categories"
+                style={{ ...inputStyle, background: "transparent", padding: 0, border: "none", borderRadius: 0, fontSize: 16 }}
               />
-              {isToday && todayTxs.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 11, color: "var(--text2)", fontWeight: 600 }}>{todayTxs.length} expense{todayTxs.length !== 1 ? "s" : ""}</span>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)", fontWeight: 500 }}>−{fmt(todayTotal)} MAD</span>
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {homeCategories.map((cat, i) => (
+                <button
+                  key={cat.id}
+                  onClick={() => { selectCategory(cat); setShowAddModal(true); }}
+                  style={{ textAlign: "left", width: "100%", padding: "14px 16px", background: "var(--surface)", border: `1px solid ${cat.id === categoryId ? "var(--accent)" : "var(--border)"}`, borderRadius: 18, cursor: "pointer", display: "flex", alignItems: "center", gap: 12, animation: `fadeUp 0.28s ${i * 0.03}s ease both` }}
+                >
+                  <div style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                    {cat.icon ?? "🏷️"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {cat.name}
+                    </div>
+                    <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
+                      {(cat.type[0] ?? "Category").toUpperCase()} · Planned {fmt(cat.planned ?? 0)}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: (cat.available ?? 0) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                      {(cat.available ?? 0) > 0 ? "+" : ""}{fmt(cat.available ?? 0)}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+                      available
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {homeCategories.length === 0 && (
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: "18px 16px", color: "var(--muted)", fontSize: 14 }}>
+                No categories match that search.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {showAddModal && (
+          <div role="dialog" aria-modal="true" aria-label="Add transaction" style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(26, 19, 12, 0.14)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "24px 14px calc(88px + env(safe-area-inset-bottom, 0px))" }}>
+            <div onClick={() => setShowAddModal(false)} style={{ position: "absolute", inset: 0 }} />
+            <div style={{ position: "relative", width: "min(100%, 480px)", maxHeight: "calc(100dvh - 32px)", overflow: "visible", borderRadius: 28, background: "var(--bg)", border: "1px solid color-mix(in srgb, var(--border) 82%, transparent)", boxShadow: "0 18px 38px rgba(48, 36, 23, 0.10)", padding: "18px 18px 22px", animation: "fadeUp 0.24s ease both" }}>
+              <div style={{ width: 44, height: 5, borderRadius: 999, background: "color-mix(in srgb, var(--border2) 78%, transparent)", margin: "0 auto 14px" }} />
+              <button onClick={() => setShowAddModal(false)} aria-label="Close add transaction" style={{ position: "absolute", top: 16, right: 16, width: 36, height: 36, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 78%, transparent)", background: "color-mix(in srgb, var(--surface) 90%, white)", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
+                ×
+              </button>
+              <div id="panel-add" style={{ maxHeight: "calc(100dvh - 88px)", overflowY: "auto", paddingRight: 2 }}>
+                {/* Modal Header */}
+                <header style={{ marginBottom: 16, paddingRight: 52, animation: "fadeUp 0.4s ease both" }}>
+                  <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 30, lineHeight: 1, color: "var(--text)", letterSpacing: -0.25 }}>
+                    Add Transaction
+                  </h1>
+                </header>
+
+        <div style={{ background: "color-mix(in srgb, var(--surface) 97%, white)", border: "1px solid color-mix(in srgb, var(--border2) 56%, transparent)", borderRadius: 24, padding: "16px 18px 13px", marginBottom: 10, animation: "fadeUp 0.4s 0.05s ease both", position: "relative", zIndex: showAccountPicker ? 12 : 1, overflow: "visible", transition: "background-color 0.35s ease, border-color 0.35s ease" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <p style={{ fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)", fontWeight: 700, transition: "color 0.35s ease" }}>Amount</p>
+            <div style={{ position: "relative", zIndex: showAccountPicker ? 20 : 2 }} ref={accountRef}>
+              <button
+                onClick={() => { setShowAccountPicker(v => !v); setShowDatePicker(false); setShowCatPicker(false); }}
+                style={{ minHeight: 34, maxWidth: 172, padding: "0 10px", borderRadius: 999, border: `1px solid ${showAccountPicker ? "color-mix(in srgb, var(--accent) 22%, transparent)" : "color-mix(in srgb, var(--border2) 48%, transparent)"}`, background: "color-mix(in srgb, var(--surface) 86%, white)", color: accountId ? "var(--text)" : "var(--text2)", fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}
+              >
+                <span style={{ fontSize: 13, lineHeight: 1, opacity: 0.92 }}>{selectedAccount?.icon ?? "🏦"}</span>
+                <span style={{ fontWeight: 550, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {selectedAccount?.label ?? "Account"}
+                </span>
+                <span style={{ color: "var(--muted)", fontSize: 9 }}>▾</span>
+              </button>
+              {showAccountPicker && (
+                <div style={{ position: "absolute", top: "calc(100% + 10px)", right: 0, width: "min(296px, calc(100vw - 72px))", maxWidth: "calc(100vw - 72px)", background: "color-mix(in srgb, var(--surface) 99%, white)", border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)", borderRadius: 18, overflow: "hidden", boxShadow: "0 10px 20px rgba(47,36,25,0.09)", zIndex: 120 }}>
+                  <div style={{ maxHeight: 248, overflowY: "auto", padding: 8 }}>
+                    <div style={{ display: "grid", gap: 2 }}>
+                      {filteredAccounts.map(acct => (
+                        <button
+                          key={acct.id}
+                          onClick={() => { setAccountId(acct.id); setShowAccountPicker(false); setAccountSearch(""); }}
+                          style={{ width: "100%", minHeight: 46, padding: "10px 12px", background: "transparent", border: "none", borderRadius: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, textAlign: "left" }}
+                        >
+                          <div style={{ width: 32, height: 32, borderRadius: 11, background: "color-mix(in srgb, var(--surface2) 72%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 15 }}>
+                            {acct.icon ?? "•"}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: acct.id === accountId ? 600 : 550, color: acct.id === accountId ? "var(--accent)" : "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acct.label}</div>
+                            {acct.type && <div style={{ marginTop: 2, fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acct.type.toUpperCase()}</div>}
+                          </div>
+                          {acct.balance !== null && (
+                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: acct.balance >= 0 ? "var(--success)" : "var(--danger)", flexShrink: 0 }}>
+                              {fmt(acct.balance)}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                      {filteredAccounts.length === 0 && (
+                        <p style={{ padding: 18, color: "var(--muted)", fontSize: 14, textAlign: "center" }}>No accounts found</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-          );
-        })()}
-
-        {/* ── Today category chips */}
-        {(() => {
-          const todayStr = today();
-          if (date !== todayStr) return null;
-          const todayTxs = transactions.filter(t => t.date === todayStr);
-          if (todayTxs.length === 0) return null;
-          const catTotals: Record<string, number> = {};
-          for (const t of todayTxs) {
-            if (t.category) catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
-          }
-          const topCats = (Object.entries(catTotals)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([catId]) => categories.find(c => c.id === catId))
-            .filter(Boolean)) as Category[];
-          if (topCats.length === 0) return null;
-          return (
-            <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.04s ease both", display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {topCats.map((cat, idx) => {
-                const chipBg = idx === 0 ? "var(--accent-dim)" : idx === 1 ? "var(--info-dim)" : "var(--warning-dim)";
-                const chipFg = idx === 0 ? "var(--accent)" : idx === 1 ? "var(--info)" : "var(--warning)";
-                return (
-                <span key={cat.id} style={{ padding: "5px 10px", borderRadius: 999, background: chipBg, border: "1px solid transparent", fontSize: 11, color: chipFg, display: "flex", alignItems: "center", gap: 5 }}>
-                  <span>{cat.icon ?? "🏷️"}</span>
-                  <span style={{ fontSize: 10, fontWeight: 600 }}>{cat.name}</span>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--danger)" }}>−{fmt(catTotals[cat.id])}</span>
-                </span>
-                );
-              })}
-            </div>
-          );
-        })()}
-
-        {/* ── Amount */}
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border2)", borderRadius: 26, padding: "22px 22px 20px", marginBottom: 18, marginLeft: -8, marginRight: -8, animation: "fadeUp 0.4s 0.05s ease both", position: "relative", overflow: "hidden", transition: "background-color 0.35s ease, border-color 0.35s ease", boxShadow: "0 24px 34px color-mix(in srgb, var(--accent) 14%, transparent)" }}>
-          {/* Decorative glow blob */}
-          <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "var(--accent-glow)", pointerEvents: "none", transition: "background 0.4s ease" }} />
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <p style={{ fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)", fontWeight: 700, transition: "color 0.35s ease" }}>Amount</p>
-            {displayedBalance !== null && (() => {
-              const selectedAcct = accounts.find(a => a.id === accountId);
-              const afterAmount = amount && parseFloat(amount) > 0 ? displayedBalance - parseFloat(amount) : null;
-              const isLow = displayedBalance < 500;
-              return (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {selectedAcct && <span style={{ fontSize: 12 }}>{selectedAcct.icon}</span>}
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: isLow ? "var(--danger)" : "var(--text2)", transition: "color 0.3s", letterSpacing: 0.5 }}>
-                    {fmt(displayedBalance)}
-                  </span>
-                  {afterAmount !== null && (
-                    <>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--muted)" }}>→</span>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: afterAmount < 0 ? "var(--danger)" : afterAmount < 500 ? "var(--danger)" : "var(--success)", transition: "color 0.2s", letterSpacing: 0.5 }}>
-                        {fmt(afterAmount)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              );
-            })()}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
             <input
@@ -643,207 +678,185 @@ export default function App() {
                 letterSpacing: "-0.03em",
               }}
             />
-            <span style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: 13,
-              color: "var(--muted)",
-              paddingBottom: 10,
-              flexShrink: 0,
-              letterSpacing: 1,
-              transition: "color 0.35s ease",
-            }}>MAD</span>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "var(--muted)", paddingBottom: 10, flexShrink: 0, letterSpacing: 1, transition: "color 0.35s ease" }}>MAD</span>
           </div>
-          {amount && parseFloat(amount) > 0 && (
-            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--accent)", marginTop: 6, letterSpacing: 1, transition: "color 0.35s ease" }}>
-              {fmt(parseFloat(amount))} MAD
-            </p>
-          )}
-        </div>
-
-        {/* ── Description */}
-        <div style={{ marginBottom: 14, animation: "fadeUp 0.4s 0.08s ease both" }}>
-          <input
-            type="text"
-            value={name}
-            onChange={e => {
-              setName(e.target.value);
-              if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
-              const v = e.target.value.trim();
-              suggestTimerRef.current = setTimeout(() => suggestCategory(v), 200);
-            }}
-            onKeyDown={e => e.key === "Enter" && canSubmit && submit()}
-            placeholder="Description — what was it for?"
-            style={inputStyle}
-          />
-        </div>
-
-        {/* ── Category suggestion chip */}
-        {suggestedCatId && (() => {
-          const sugCat = categories.find(c => c.id === suggestedCatId);
-          if (!sugCat || suggestedCatId === categoryId) return null;
-          return (
-            <div style={{ marginBottom: 10, animation: "fadeUp 0.2s ease both" }}>
-              <button
-                onClick={() => selectCategory(sugCat)}
-                style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--accent)", background: "var(--accent-dim)", color: "var(--accent)", fontSize: 13, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <span>{sugCat.icon ?? "🏷️"}</span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11 }}>{sugCat.name}</span>
-              </button>
-            </div>
-          );
-        })()}
-
-        {/* ── Category picker */}
-        <div style={{ marginBottom: 22, position: "relative", animation: "fadeUp 0.4s 0.11s ease both", zIndex: showCatPicker ? 20 : 1 }} ref={catRef}>
-          <button
-            onClick={() => setShowCatPicker(v => !v)}
-            style={{ width: "100%", background: "var(--surface)", border: `1px solid ${showCatPicker ? "var(--accent)" : "var(--border)"}`, borderRadius: 14, padding: "13px 16px", color: selectedCat ? "var(--text)" : "var(--muted)", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", transition: "border-color 0.2s", textAlign: "left" }}
-          >
-            <span style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-              {selectedCat ? `${selectedCat.icon ?? "🏷️"} ${selectedCat.name}` : "Select category…"}
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              {selectedCat && selectedCat.planned !== null && selectedCat.available !== null && (() => {
-                const planned = selectedCat.planned!;
-                const available = selectedCat.available!;
-                const spent = Math.max(0, planned - available);
-                const expAmt = amount && parseFloat(amount) > 0 ? parseFloat(amount) : 0;
-                const spentPct = Math.min((spent / planned) * 100, 100);
-                const previewPct = Math.min(((spent + expAmt) / planned) * 100, 100);
-                const availableAfter = available - expAmt;
-                const alreadyOver = available < 0;
-                const ringColor = alreadyOver ? "var(--danger)" : spentPct > 79 ? "var(--warning)" : "var(--accent)";
-                const wouldBeOver = availableAfter < 0;
-                const previewStroke = wouldBeOver ? "color-mix(in srgb, var(--danger) 65%, transparent)" : "color-mix(in srgb, var(--accent) 55%, transparent)";
-                const labelColor = expAmt > 0
-                  ? (wouldBeOver ? "var(--danger)" : "var(--success)")
-                  : (available >= 0 ? "var(--success)" : "var(--danger)");
-                const labelValue = expAmt > 0 ? availableAfter : available;
-                const R = 10; const C = 2 * Math.PI * R; // 62.83
-                const spentDash = (spentPct / 100) * C;
-                const previewDash = ((previewPct - spentPct) / 100) * C;
-                return (
-                  <>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, color: labelColor, transition: "color 0.2s" }}>
-                      {labelValue >= 0 ? "+" : ""}{fmt(labelValue)}
-                    </span>
-                    <svg width="28" height="28" viewBox="0 0 28 28" style={{ flexShrink: 0, transition: "opacity 0.2s" }}>
-                      {/* Track */}
-                      <circle cx="14" cy="14" r={R} fill="none" stroke="var(--border2)" strokeWidth="3" />
-                      {/* Spent arc */}
-                      <circle cx="14" cy="14" r={R} fill="none" stroke={ringColor} strokeWidth="3"
-                        strokeDasharray={`${spentDash} ${C}`} strokeLinecap="round"
-                        transform="rotate(-90 14 14)" style={{ transition: "stroke-dasharray 0.3s ease, stroke 0.3s ease" }} />
-                      {/* Preview ghost arc */}
-                      {expAmt > 0 && previewPct > spentPct && (
-                        <circle cx="14" cy="14" r={R} fill="none" stroke={previewStroke} strokeWidth="3"
-                          strokeDasharray={`${previewDash} ${C}`} strokeDashoffset={-spentDash} strokeLinecap="round"
-                          transform="rotate(-90 14 14)" style={{ transition: "stroke-dasharray 0.15s ease" }} />
-                      )}
-                    </svg>
-                  </>
-                );
-              })()}
-              {/* No budget — just show available balance */}
-              {selectedCat && selectedCat.available !== null && selectedCat.planned === null && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, color: selectedCat.available >= 0 ? "var(--success)" : "var(--danger)" }}>
-                  {selectedCat.available >= 0 ? "+" : ""}{fmt(selectedCat.available)}
+          {(displayedBalance !== null || amountAfterBalance !== null) && (
+            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+              {displayedBalance !== null && (
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: displayedBalance < 500 ? "var(--danger)" : "var(--muted)", letterSpacing: 0.4 }}>
+                  Balance {fmt(displayedBalance)}
                 </span>
               )}
-              <span style={{ color: "var(--muted)", fontSize: 12, transform: showCatPicker ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
-            </div>
-          </button>
-
-          {showCatPicker && (
-            <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "var(--surface2)", border: "1px solid var(--border2)", borderRadius: 14, zIndex: 100, overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,0.5)" }}>
-              <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-                <input
-                  type="text"
-                  value={catSearch}
-                  onChange={e => setCatSearch(e.target.value)}
-                  placeholder="Search…"
-                  autoFocus
-                  style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "var(--text)", fontSize: 16 }}
-                />
-              </div>
-              <div style={{ maxHeight: 240, overflowY: "auto" }}>
-                {filteredCats.map((cat, i) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => selectCategory(cat)}
-                    style={{ width: "100%", padding: "11px 16px", background: cat.id === categoryId ? "var(--accent-dim)" : "transparent", border: "none", borderBottom: "1px solid var(--border)", color: cat.id === categoryId ? "var(--accent)" : "var(--text)", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, textAlign: "left" }}
-                  >
-                    <span>{cat.icon ?? "🏷️"}</span>
-                    <span style={{ flex: 1 }}>{cat.name}</span>
-                    {cat.id === lastUsedCatId && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "var(--accent)", letterSpacing: 1 }}>LAST</span>}
-                    {cat.available !== null && (
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: cat.available >= 0 ? "var(--success)" : "var(--danger)", letterSpacing: 0.5 }}>
-                        {cat.available >= 0 ? "+" : ""}{fmt(cat.available)}
-                      </span>
-                    )}
-                    {cat.type[0] && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "var(--muted)", letterSpacing: 1 }}>{cat.type[0].toUpperCase()}</span>}
-                  </button>
-                ))}
-                {filteredCats.length === 0 && (
-                  <p style={{ padding: 16, color: "var(--muted)", fontSize: 13, textAlign: "center" }}>No categories found</p>
-                )}
-              </div>
+              {amountAfterBalance !== null && (
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: amountAfterBalance < 0 ? "var(--danger)" : amountAfterBalance < 500 ? "var(--danger)" : "var(--success)", letterSpacing: 0.4 }}>
+                  After {fmt(amountAfterBalance)}
+                </span>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── Account */}
-        <div style={{ marginBottom: 20, animation: "fadeUp 0.4s 0.14s ease both" }}>
-          <p style={labelStyle}>Account</p>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {accounts.map(a => (
+
+        <div style={{ marginBottom: 12, marginTop: 0, animation: "fadeUp 0.4s 0.08s ease both" }}>
+          <div style={{ background: "color-mix(in srgb, var(--surface) 96%, white)", border: "1px solid color-mix(in srgb, var(--border) 64%, transparent)", borderRadius: 22, padding: "15px 16px 13px" }}>
+            <input
+              type="text"
+              value={name}
+              onChange={e => {
+                setName(e.target.value);
+                if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
+                const v = e.target.value.trim();
+                suggestTimerRef.current = setTimeout(() => suggestCategory(v), 200);
+              }}
+              onKeyDown={e => e.key === "Enter" && canSubmit && submit()}
+              placeholder="What was it for?"
+              style={{ ...inputStyle, background: "transparent", border: "none", padding: 0, borderRadius: 0, fontSize: 20, color: "var(--text)" }}
+            />
+
+            <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ position: "relative" }} ref={catRef}>
+                <button
+                  onClick={() => { setShowCatPicker(v => !v); setShowDatePicker(false); setShowAccountPicker(false); }}
+                  style={{ minHeight: 26, padding: "0 7px", borderRadius: 999, border: `1px solid ${showCatPicker ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "color-mix(in srgb, var(--border) 22%, transparent)"}`, background: "transparent", color: selectedCat ? "var(--text2)" : "var(--muted)", fontSize: 11.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, maxWidth: "100%" }}
+                >
+                  <span style={{ fontSize: 14, lineHeight: 1, opacity: 0.92 }}>{selectedCat?.icon ?? "🏷️"}</span>
+                  <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>
+                    {selectedCat?.name ?? "Category"}
+                  </span>
+                  <span style={{ color: "var(--muted)", fontSize: 9 }}>▾</span>
+                </button>
+                {showCatPicker && (
+                  <div style={{ position: "absolute", bottom: "calc(100% + 12px)", left: 0, width: "min(318px, calc(100vw - 72px))", maxWidth: "calc(100vw - 72px)", background: "color-mix(in srgb, var(--surface) 99%, white)", border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)", borderRadius: 18, overflow: "hidden", boxShadow: "0 10px 20px rgba(47,36,25,0.09)", zIndex: 80 }}>
+                    <div style={{ maxHeight: 216, overflowY: "auto", padding: 8 }}>
+                      <div style={{ display: "grid", gap: 2 }}>
+                        {filteredCats.map(cat => {
+                          const meta = [cat.type[0] ?? null, cat.id === lastUsedCatId ? "Last used" : null].filter(Boolean).join(" · ");
+                          return (
+                            <button
+                              key={cat.id}
+                              onClick={() => selectCategory(cat)}
+                              style={{ width: "100%", minHeight: 46, padding: "10px 12px", background: "transparent", border: "none", borderRadius: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", fontSize: 14, textAlign: "left" }}
+                            >
+                              <div style={{ width: 32, height: 32, borderRadius: 11, background: "color-mix(in srgb, var(--surface2) 72%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 15 }}>
+                                {cat.icon ?? "•"}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 550, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
+                                {meta && <div style={{ marginTop: 2, fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meta}</div>}
+                              </div>
+                              {cat.available !== null && (
+                                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: cat.available >= 0 ? "var(--success)" : "var(--danger)", flexShrink: 0 }}>
+                                  {cat.available >= 0 ? "+" : ""}{fmt(cat.available)}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                        {filteredCats.length === 0 && (
+                          <p style={{ padding: 18, color: "var(--muted)", fontSize: 14, textAlign: "center" }}>No categories found</p>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ padding: "12px 14px", borderTop: "1px solid var(--border)", background: "color-mix(in srgb, var(--surface2) 14%, transparent)" }}>
+                      <input
+                        type="text"
+                        value={catSearch}
+                        onChange={e => setCatSearch(e.target.value)}
+                        placeholder="Search categories"
+                        autoFocus
+                        style={{ ...inputStyle, background: "transparent", border: "none", padding: 0, borderRadius: 0, fontSize: 16 }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ position: "relative" }} ref={dateRef}>
               <button
-                key={a.id}
-                onClick={() => setAccountId(a.id)}
-                title={a.label}
-                style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${a.id === accountId ? "var(--accent)" : "transparent"}`, background: a.id === accountId ? "var(--accent-dim)" : "var(--surface2)", color: a.id === accountId ? "var(--accent)" : "var(--text2)", fontSize: 13, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 5 }}
+                onClick={() => { setShowDatePicker(v => !v); setShowCatPicker(false); setShowAccountPicker(false); }}
+                style={{ minHeight: 28, padding: 0, border: "none", background: "transparent", color: date === today() ? "var(--muted)" : "color-mix(in srgb, var(--accent) 80%, var(--text2))", fontSize: 11.5, fontWeight: date === today() ? 450 : 550, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, opacity: date === today() ? 0.82 : 1 }}
               >
-                <span>{a.icon}</span>
-                <span style={{ fontSize: 11, fontWeight: 600 }}>{a.label}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+                <span>{selectedDateLabel}</span>
               </button>
-            ))}
-            {accounts.length === 0 && (
-              <p style={{ fontSize: 12, color: "var(--muted)" }}>Loading accounts…</p>
+              {showDatePicker && (
+                <div style={{ position: "absolute", bottom: "calc(100% + 12px)", left: 0, width: "min(220px, calc(100vw - 72px))", maxWidth: "calc(100vw - 72px)", background: "color-mix(in srgb, var(--surface) 99%, white)", border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)", borderRadius: 18, overflow: "hidden", boxShadow: "0 10px 20px rgba(47,36,25,0.09)", zIndex: 80 }}>
+                  <div style={{ display: "grid", gap: 2, padding: 8 }}>
+                    {[
+                      { label: "Today", value: today() },
+                      { label: "Yesterday", value: shiftDate(today(), -1) },
+                      { label: "Tomorrow", value: shiftDate(today(), 1) },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => { setDate(option.value); setShowDatePicker(false); }}
+                        style={{ width: "100%", minHeight: 44, padding: "10px 12px", background: option.value === date ? "color-mix(in srgb, var(--accent) 14%, white)" : "transparent", border: "none", borderRadius: 12, color: option.value === date ? "var(--accent)" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontSize: 14, textAlign: "left" }}
+                      >
+                        <span style={{ fontWeight: option.value === date ? 700 : 550 }}>{option.label}</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: option.value === date ? "color-mix(in srgb, var(--accent) 78%, var(--text2))" : "var(--muted)" }}>{fmtDate(option.value)}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ padding: "10px 12px", borderTop: "1px solid color-mix(in srgb, var(--accent) 14%, var(--border))", background: "color-mix(in srgb, var(--accent) 5%, var(--surface2))" }}>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={e => { setDate(e.target.value); setShowDatePicker(false); }}
+                      style={{ ...inputStyle, background: "transparent", border: "none", padding: 0, borderRadius: 0, colorScheme: "light", fontSize: 16, color: "var(--text)" }}
+                    />
+                  </div>
+                </div>
+              )}
+              </div>
+              </div>
+            {(suggestedCatId || categoryUnfunded || categoryOverBudget) && (
+              <div style={{ marginTop: 10, display: "grid", gap: 7 }}>
+                {suggestedCatId && (() => {
+                  const sugCat = categories.find(c => c.id === suggestedCatId);
+                  if (!sugCat || suggestedCatId === categoryId) return null;
+                  return (
+                    <button
+                      onClick={() => selectCategory(sugCat)}
+                      style={{ minHeight: 32, padding: "0 2px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 12.5, cursor: "pointer", transition: "all 0.15s", display: "inline-flex", alignItems: "center", gap: 8, justifySelf: "start" }}
+                    >
+                      <span style={{ fontSize: 14, opacity: 0.85 }}>{sugCat.icon ?? "🏷️"}</span>
+                      <span>Try <strong style={{ fontWeight: 600 }}>{sugCat.name}</strong></span>
+                    </button>
+                  );
+                })()}
+
+                {categoryUnfunded && (
+                  <div style={{ padding: "0 2px", display: "flex", alignItems: "flex-start", gap: 7, animation: "fadeUp 0.25s ease both" }}>
+                    <span style={{ fontSize: 12, opacity: 0.62, marginTop: 2 }}>⚠</span>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "color-mix(in srgb, var(--danger) 54%, var(--text2))", lineHeight: 1.45 }}>
+                      <strong>{selectedCat?.name}</strong> has no available budget — fund it in Notion first.
+                    </span>
+                  </div>
+                )}
+                {categoryOverBudget && selectedCat && (
+                  <div style={{ padding: "0 2px", display: "flex", alignItems: "flex-start", gap: 7, animation: "fadeUp 0.25s ease both" }}>
+                    <span style={{ fontSize: 12, opacity: 0.62, marginTop: 2 }}>⚠</span>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "color-mix(in srgb, var(--danger) 54%, var(--text2))", lineHeight: 1.45 }}>
+                      Over budget by <strong>{fmt(parsedAmount - (selectedCat.available ?? 0))} MAD</strong> — only <strong>{fmt(selectedCat.available ?? 0)} MAD</strong> left in <strong>{selectedCat.name}</strong>.
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
-
-        {/* ── Unfunded category alert */}
-        {categoryUnfunded && (
-          <div style={{ marginBottom: 10, padding: "11px 14px", borderRadius: 12, background: "color-mix(in srgb, var(--danger) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)", display: "flex", alignItems: "center", gap: 10, animation: "fadeUp 0.25s ease both" }}>
-            <span style={{ fontSize: 16 }}>⚠️</span>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--danger)", lineHeight: 1.4 }}>
-              <strong>{selectedCat?.name}</strong> has no available budget — fund it in Notion first.
-            </span>
-          </div>
-        )}
-        {categoryOverBudget && selectedCat && (
-          <div style={{ marginBottom: 10, padding: "11px 14px", borderRadius: 12, background: "color-mix(in srgb, var(--danger) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)", display: "flex", alignItems: "center", gap: 10, animation: "fadeUp 0.25s ease both" }}>
-            <span style={{ fontSize: 16 }}>🚫</span>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--danger)", lineHeight: 1.4 }}>
-              Over budget by <strong>{fmt(parsedAmount - (selectedCat.available ?? 0))} MAD</strong> — only <strong>{fmt(selectedCat.available ?? 0)} MAD</strong> left in <strong>{selectedCat.name}</strong>.
-            </span>
-          </div>
-        )}
 
         {/* ── Submit */}
         <div style={{ position: "relative" }}>
           {showSaveBurst && (
             <>
-              <span className="save-burst" style={{ ["--x" as any]: "-46px", ["--y" as any]: "-30px", ["--d" as any]: "0ms" }}>✨</span>
+              <span className="save-burst" style={{ ["--x" as any]: "-46px", ["--y" as any]: "-30px", ["--d" as any]: "0ms" }}>✦</span>
               <span className="save-burst" style={{ ["--x" as any]: "-12px", ["--y" as any]: "-38px", ["--d" as any]: "20ms" }}>✦</span>
-              <span className="save-burst" style={{ ["--x" as any]: "22px", ["--y" as any]: "-32px", ["--d" as any]: "40ms" }}>✨</span>
+              <span className="save-burst" style={{ ["--x" as any]: "22px", ["--y" as any]: "-32px", ["--d" as any]: "40ms" }}>✦</span>
               <span className="save-burst" style={{ ["--x" as any]: "48px", ["--y" as any]: "-18px", ["--d" as any]: "60ms" }}>✦</span>
-              <span className="save-burst" style={{ ["--x" as any]: "-44px", ["--y" as any]: "16px", ["--d" as any]: "80ms" }}>✧</span>
-              <span className="save-burst" style={{ ["--x" as any]: "-8px", ["--y" as any]: "22px", ["--d" as any]: "100ms" }}>✨</span>
-              <span className="save-burst" style={{ ["--x" as any]: "26px", ["--y" as any]: "18px", ["--d" as any]: "120ms" }}>✧</span>
-              <span className="save-burst" style={{ ["--x" as any]: "42px", ["--y" as any]: "8px", ["--d" as any]: "140ms" }}>✨</span>
+              <span className="save-burst" style={{ ["--x" as any]: "-44px", ["--y" as any]: "16px", ["--d" as any]: "80ms" }}>✦</span>
+              <span className="save-burst" style={{ ["--x" as any]: "-8px", ["--y" as any]: "22px", ["--d" as any]: "100ms" }}>✦</span>
+              <span className="save-burst" style={{ ["--x" as any]: "26px", ["--y" as any]: "18px", ["--d" as any]: "120ms" }}>✦</span>
+              <span className="save-burst" style={{ ["--x" as any]: "42px", ["--y" as any]: "8px", ["--d" as any]: "140ms" }}>✦</span>
             </>
           )}
           <button
@@ -871,21 +884,24 @@ export default function App() {
               justifyContent: "center",
               gap: 10,
               transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
-              boxShadow: status === "idle" ? "0 16px 28px color-mix(in srgb, var(--accent) 32%, transparent)" : "none",
+              boxShadow: status === "idle" ? "0 10px 18px color-mix(in srgb, var(--accent) 18%, transparent)" : "none",
               animation: "fadeUp 0.4s 0.19s ease both",
             }}
           >
             {status === "saving" && <div style={{ width: 17, height: 17, border: "2px solid color-mix(in srgb, var(--ink-strong) 25%, transparent)", borderTopColor: "var(--ink-strong)", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />}
             {status === "success" ? "✓ Saved to Notion!" : status === "error" ? `✗ ${errorMsg}` : status === "saving" ? "Saving…" : (
               <>
-                <span>Save {amount ? `${fmt(parseFloat(amount))} MAD` : ""}</span>
+                <span>Save {amount ? `${fmt(parseFloat(amount))} MAD` : "expense"}</span>
                 <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1, marginLeft: 2 }}>→</span>
               </>
             )}
           </button>
         </div>
 
-        </div>{/* ── end ADD TAB ── */}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── PENDING TAB ── */}
         <div id="panel-pending" role="tabpanel" aria-labelledby="tab-pending" style={{ display: tab === "pending" ? "block" : "none" }}>
@@ -1063,7 +1079,7 @@ export default function App() {
                 return (
                   <div
                     key={t.id}
-                    onClick={() => { if (deletingId === t.id) return; setName(t.name); if (t.category) { const c = categories.find(x => x.id === t.category); if (c) selectCategory(c); } setTab("add"); }}
+                    onClick={() => { if (deletingId === t.id) return; setName(t.name); if (t.category) { const c = categories.find(x => x.id === t.category); if (c) selectCategory(c); } setShowAddModal(true); }}
                     style={{ display: "flex", alignItems: "center", padding: "11px 14px", background: deletingId === t.id ? "rgba(255,107,107,0.06)" : "var(--surface)", border: `1px solid ${deletingId === t.id ? "var(--danger)" : "var(--border)"}`, borderRadius: 12, cursor: "pointer", gap: 12, transition: "border-color 0.15s, background 0.15s", animation: `fadeUp 0.3s ${i * 0.03}s ease both` }}
                     onMouseEnter={e => { if (deletingId !== t.id) { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border2)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)"; } }}
                     onMouseLeave={e => { if (deletingId !== t.id) { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.background = "var(--surface)"; } }}
@@ -1109,7 +1125,7 @@ export default function App() {
                 );
               })}
             </div>
-            <p style={{ marginTop: 10, fontSize: 11, color: "var(--muted)", textAlign: "center" }}>Tap a transaction to reuse it · switches to Add tab</p>
+            <p style={{ marginTop: 10, fontSize: 11, color: "var(--muted)", textAlign: "center" }}>Tap a transaction to reuse it · opens the Add modal</p>
           </div>
         )}
         {transactions.length === 0 && (
@@ -1133,11 +1149,11 @@ export default function App() {
       >
         <div style={{ display: "flex", maxWidth: 480, margin: "0 auto" }}>
           {([
-            { key: "add" as const, label: "Add" },
+            { key: "home" as const, label: "Home" },
             { key: "pending" as const, label: "Pending" },
             { key: "history" as const, label: "History" },
           ]).map(t => {
-            const activeColor = t.key === "add" ? "var(--accent)" : t.key === "pending" ? "var(--warning)" : "var(--info)";
+            const activeColor = t.key === "home" ? "var(--accent)" : t.key === "pending" ? "var(--warning)" : "var(--info)";
             return (
             <button
               key={t.key}
@@ -1153,8 +1169,8 @@ export default function App() {
                   {pendingItems.length}
                 </span>
               )}
-              {t.key === "add" && (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={tab === "add" ? "2.5" : "2"} strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              {t.key === "home" && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={tab === "home" ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
               )}
               {t.key === "pending" && (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={tab === "pending" ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -1168,6 +1184,14 @@ export default function App() {
           })}
         </div>
       </nav>
+
+      <button
+        onClick={() => setShowAddModal(true)}
+        aria-label="Open add expense"
+        style={{ position: "fixed", right: "max(18px, calc(50% - 222px))", bottom: "calc(76px + env(safe-area-inset-bottom, 0px))", zIndex: 60, width: 58, height: 58, borderRadius: "50%", border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)", background: mode === "wife" ? "color-mix(in srgb, var(--accent) 82%, white)" : "var(--accent)", color: mode === "wife" ? "#1f0612" : "#0d1117", boxShadow: "0 18px 28px color-mix(in srgb, var(--accent) 30%, transparent)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
 
       {microToast && (
         <div
@@ -1221,3 +1245,4 @@ const labelStyle: React.CSSProperties = {
   color: "var(--muted)",
   marginBottom: 12,
 };
+
