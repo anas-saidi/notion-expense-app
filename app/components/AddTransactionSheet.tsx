@@ -48,17 +48,17 @@ type AddTransactionSheetProps = {
 };
 
 const shellSurface: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 97%, white)",
-  border: "1px solid color-mix(in srgb, var(--border) 62%, transparent)",
-  borderRadius: 28,
+  background: "color-mix(in srgb, var(--surface) 96%, white)",
+  border: "1px solid color-mix(in srgb, var(--border) 46%, transparent)",
+  borderRadius: 26,
 };
 
 const chipButtonStyle: CSSProperties = {
   minHeight: 40,
-  padding: "0 13px",
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 42%, transparent)",
-  background: "color-mix(in srgb, var(--surface) 92%, white)",
+  padding: "0 8px",
+  borderRadius: 10,
+  border: "1px solid transparent",
+  background: "transparent",
   color: "var(--text2)",
   fontSize: 12,
   cursor: "pointer",
@@ -82,6 +82,7 @@ const pickerRowStyle: CSSProperties = {
   fontSize: 14,
   textAlign: "left",
   transition: "background 0.18s ease, transform 0.18s ease",
+  boxSizing: "border-box",
 };
 
 function ChevronDownIcon({ open }: { open: boolean }) {
@@ -113,22 +114,32 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const todayValue = today();
   const yesterdayValue = shiftDate(todayValue, -1);
   const tomorrowValue = shiftDate(todayValue, 1);
+  const anyPickerOpen = props.showAccountPicker || props.showCatPicker || props.showDatePicker;
+  const visibleBalance = props.amountAfterBalance ?? props.displayedBalance;
+  const amountInputWidth = `${Math.max((props.amount || "0.00").length, 4) * 0.7 + 0.8}ch`;
+  const balanceTone =
+    visibleBalance !== null && visibleBalance > 0
+      ? {
+          color: "var(--success)",
+          background: "color-mix(in srgb, var(--success) 10%, white)",
+        }
+      : {
+          color: "var(--danger)",
+          background: "color-mix(in srgb, var(--danger) 10%, white)",
+        };
 
   const dateOptions = [
     {
       label: "Today",
       value: todayValue,
-      hint: "Use today's date",
     },
     {
       label: "Yesterday",
       value: yesterdayValue,
-      hint: "Backdate by one day",
     },
     {
       label: "Tomorrow",
       value: tomorrowValue,
-      hint: "Plan it for tomorrow",
     },
   ];
 
@@ -141,12 +152,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         position: "fixed",
         inset: 0,
         zIndex: 70,
-        background: "rgba(39, 24, 19, 0.12)",
+        background: "rgba(39, 24, 19, 0.08)",
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",
         padding: "20px 14px calc(88px + env(safe-area-inset-bottom, 0px))",
-        overflow: "hidden",
+        overflow: "visible",
       }}
     >
       <div onClick={props.onClose} style={{ position: "absolute", inset: 0 }} />
@@ -157,10 +168,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           maxHeight: "calc(100dvh - 20px)",
           overflow: "visible",
           overflowX: "clip",
-          borderRadius: 32,
-          background: "var(--bg)",
-          border: "1px solid color-mix(in srgb, var(--border) 82%, transparent)",
-          boxShadow: "0 18px 38px rgba(48, 36, 23, 0.10)",
+          borderRadius: 0,
+          background: "transparent",
+          border: "none",
+          boxShadow: "none",
           padding: 0,
           animation: "fadeUp 0.24s ease both",
           display: "flex",
@@ -169,269 +180,122 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       >
         <div
           style={{
-            width: 44,
-            height: 5,
-            borderRadius: 999,
-            background: "color-mix(in srgb, var(--accent) 22%, white)",
-            margin: "16px auto 12px auto",
-          }}
-        />
-        <button
-          onClick={props.onClose}
-          aria-label="Close add transaction"
-          style={{
-            position: "absolute",
-            top: 16,
-            right: 16,
-            width: 40,
-            height: 40,
-            borderRadius: 999,
-            border: "1px solid color-mix(in srgb, var(--border) 78%, transparent)",
-            background: "color-mix(in srgb, var(--surface) 96%, white)",
-            color: "var(--text2)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 2,
+            flex: 1,
+            overflow: "visible",
+            overflowX: "hidden",
+            padding: "0 10px 10px",
+            paddingTop: 0,
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-
-        <div style={{ flex: 1, minHeight: 0, maxHeight: "calc(100dvh - 160px)", overflowY: "auto", overflowX: "hidden", padding: "0 20px 18px", paddingTop: 0, paddingRight: 8 }}>
-          <header style={{ marginBottom: 18, paddingRight: 56, animation: "fadeUp 0.4s ease both" }}>
-            <h1
-              style={{
-                fontFamily: "'Instrument Serif', serif",
-                fontSize: "clamp(2rem, 5vw, 3rem)",
-                lineHeight: 0.96,
-                color: "var(--text)",
-                letterSpacing: -0.6,
-              }}
-            >
-              Add Transaction
-            </h1>
-          </header>
-
           <div
             style={{
               ...shellSurface,
-              padding: "18px 18px 16px",
-              marginBottom: 14,
+              padding: "18px 18px 18px",
+              marginBottom: 8,
               animation: "fadeUp 0.4s 0.05s ease both",
               position: "relative",
-              zIndex: props.showAccountPicker ? 12 : 1,
+              zIndex: anyPickerOpen ? 16 : 1,
               overflow: "visible",
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-              <p style={{ fontSize: 11, letterSpacing: 0.8, textTransform: "uppercase", color: "color-mix(in srgb, var(--accent) 70%, var(--muted))", fontWeight: 800 }}>
-                Amount
-              </p>
-              <div style={{ position: "relative", zIndex: props.showAccountPicker ? 20 : 2 }} ref={props.accountRef}>
-                <button
-                  onClick={props.onToggleAccountPicker}
-                  aria-haspopup="dialog"
-                  aria-expanded={props.showAccountPicker}
-                  aria-controls="account-picker"
-                  style={{
-                    ...chipButtonStyle,
-                    minHeight: 40,
-                    maxWidth: 220,
-                    padding: "0 13px",
-                    borderColor: props.showAccountPicker
-                      ? "color-mix(in srgb, var(--accent) 22%, transparent)"
-                      : "color-mix(in srgb, var(--border2) 48%, transparent)",
-                    boxShadow: props.showAccountPicker ? "0 6px 14px color-mix(in srgb, var(--accent) 10%, transparent)" : "none",
-                  }}
-                >
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+              <button
+                onClick={props.onClose}
+                aria-label="Close add transaction"
+                style={{
+                  width: 44,
+                  height: 44,
+                  padding: 10,
+                  borderRadius: 0,
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--text2)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ minHeight: 24, display: "flex", alignItems: "center" }}>
                   <span
                     style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 999,
-                      background: "color-mix(in srgb, var(--surface2) 24%, white)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      display: "inline-block",
+                      fontFamily: "'DM Mono', monospace",
                       fontSize: 11,
-                      lineHeight: 1,
-                      opacity: 0.96,
+                      letterSpacing: 0.5,
+                      color: "var(--muted)",
+                    }}
+                  >
+                    MAD
+                  </span>
+                </div>
+              </div>
+
+              {visibleBalance !== null && (
+                <div style={{ minHeight: 24, display: "flex", alignItems: "center", flexShrink: 0 }}>
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: 11,
+                      color: balanceTone.color,
+                      letterSpacing: 0.4,
+                      padding: "6px 9px",
+                      borderRadius: 999,
+                      background: balanceTone.background,
+                      whiteSpace: "nowrap",
                       flexShrink: 0,
                     }}
                   >
-                    {props.selectedAccount?.icon ?? "$"}
+                    Balance {fmt(visibleBalance)}
                   </span>
-                  <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {props.selectedAccount?.label ?? "Account"}
-                  </span>
-                  <span style={{ color: "var(--muted)", marginLeft: 2, display: "inline-flex", alignItems: "center" }}>
-                    <ChevronDownIcon open={props.showAccountPicker} />
-                  </span>
-                </button>
-
-                <PickerPopover open={props.showAccountPicker} align="right" width="min(304px, calc(100vw - 40px))" zIndex={120}>
-                  <div id="account-picker" style={{ maxHeight: 256, overflowY: "auto", padding: 10 }}>
-                    <div style={{ display: "grid", gap: 2 }}>
-                      {props.filteredAccounts.map((acct) => (
-                        <button
-                          key={acct.id}
-                          onClick={() => props.onSelectAccount(acct.id)}
-                          style={{
-                            ...pickerRowStyle,
-                            background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, white)" : "transparent",
-                            boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 34,
-                              height: 34,
-                              borderRadius: 12,
-                              background: acct.id === props.selectedAccount?.id
-                                ? "color-mix(in srgb, var(--accent) 12%, white)"
-                                : "color-mix(in srgb, var(--surface2) 72%, transparent)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                              fontSize: 15,
-                            }}
-                          >
-                            {acct.icon ?? "$"}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: acct.id === props.selectedAccount?.id ? 650 : 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {acct.label}
-                            </div>
-                            {acct.type && (
-                              <div
-                                style={{
-                                  marginTop: 3,
-                                  fontFamily: "'DM Mono', monospace",
-                                  fontSize: 11,
-                                  color: "var(--muted)",
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {acct.type}
-                              </div>
-                            )}
-                          </div>
-                          {acct.balance !== null && (
-                            <span
-                                style={{
-                                  fontFamily: "'DM Mono', monospace",
-                                  fontSize: 12,
-                                  color: acct.balance < 0 ? "var(--danger)" : "var(--muted)",
-                                  flexShrink: 0,
-                                  paddingLeft: 8,
-                                }}
-                              >
-                                {fmt(acct.balance)}
-                              </span>
-                            )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </PickerPopover>
-              </div>
+                </div>
+              )}
             </div>
-
             <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={props.amount}
-                onChange={(e) => props.onAmountChange(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
-                placeholder="0.00"
-                style={{
-                  width: "100%",
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  color: "var(--text)",
-                  outline: "none",
-                  fontSize: "clamp(3rem, 9vw, 4.4rem)",
-                  fontWeight: 700,
-                  lineHeight: 0.95,
-                  letterSpacing: -1.4,
-                }}
-              />
-              <span
-                style={{
-                  paddingBottom: 10,
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: 11,
-                  letterSpacing: 0.6,
-                  color: "var(--muted)",
-                }}
-              >
-                MAD
-              </span>
-            </div>
-
-            {(props.displayedBalance !== null || props.amountAfterBalance !== null) && (
-              <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                {props.displayedBalance !== null && (
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: 11,
-                      color: props.displayedBalance < 500 ? "var(--danger)" : "var(--muted)",
-                      letterSpacing: 0.4,
-                      padding: "7px 10px",
-                      borderRadius: 999,
-                      background: "color-mix(in srgb, var(--surface2) 32%, white)",
-                    }}
-                  >
-                    Balance {fmt(props.displayedBalance)}
-                  </span>
-                )}
-                {props.amountAfterBalance !== null && (
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: 11,
-                      color:
-                        props.amountAfterBalance < 0
-                          ? "var(--danger)"
-                          : props.amountAfterBalance < 500
-                            ? "var(--danger)"
-                            : "var(--success)",
-                      letterSpacing: 0.4,
-                      padding: "7px 10px",
-                      borderRadius: 999,
-                      background:
-                        props.amountAfterBalance < 0
-                          ? "color-mix(in srgb, var(--danger) 10%, white)"
-                          : "color-mix(in srgb, var(--success) 10%, white)",
-                    }}
-                  >
-                    After {fmt(props.amountAfterBalance)}
-                  </span>
-                )}
+              <div style={{ display: "inline-flex", alignItems: "flex-end", gap: 10, minWidth: 0, maxWidth: "100%" }}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={props.amount}
+                  onChange={(e) => props.onAmountChange(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
+                  placeholder="0.00"
+                  aria-label="Amount"
+                  style={{
+                    width: amountInputWidth,
+                    maxWidth: "100%",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    color: "var(--text)",
+                    outline: "none",
+                    fontSize: "clamp(2.8rem, 8vw, 4rem)",
+                    fontWeight: 680,
+                    lineHeight: 0.95,
+                    letterSpacing: -1.1,
+                    minWidth: "3.8ch",
+                    flex: "0 1 auto",
+                  }}
+                />
               </div>
-            )}
-          </div>
-
-          <div
-            style={{
-              marginBottom: 10,
-              animation: "fadeUp 0.4s 0.08s ease both",
-              position: "relative",
-              zIndex: props.showCatPicker || props.showDatePicker ? 16 : 2,
-            }}
-          >
-            <div style={{ ...shellSurface, padding: "18px 18px 16px", position: "relative", overflow: "visible" }}>
+            </div>
+            <div
+              style={{
+                marginTop: 20,
+                display: "grid",
+                gap: 12,
+              }}
+            >
               <input
                 type="text"
                 value={props.name}
@@ -445,14 +309,125 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   padding: 0,
                   color: "var(--text)",
                   outline: "none",
-                  fontSize: 18,
-                  lineHeight: 1.3,
-                  fontWeight: 500,
-                }}
-              />
+                    fontSize: 18,
+                    lineHeight: 1.25,
+                    fontWeight: 450,
+                  }}
+                />
 
-              <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <div style={{ position: "relative" }} ref={props.catRef}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ position: "relative", zIndex: props.showAccountPicker ? 24 : 1 }} ref={props.accountRef}>
+                  <button
+                    onClick={props.onToggleAccountPicker}
+                    aria-haspopup="dialog"
+                    aria-expanded={props.showAccountPicker}
+                    aria-controls="account-picker"
+                    style={{
+                      ...chipButtonStyle,
+                      minHeight: 40,
+                      maxWidth: 188,
+                      padding: "0 8px",
+                      borderColor: props.showAccountPicker
+                        ? "color-mix(in srgb, var(--border) 24%, transparent)"
+                        : "transparent",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 999,
+                        background: "color-mix(in srgb, var(--surface2) 24%, white)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 11,
+                        lineHeight: 1,
+                        opacity: 0.96,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {props.selectedAccount?.icon ?? "$"}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {props.selectedAccount?.label ?? ""}
+                    </span>
+                    <span style={{ color: "var(--muted)", marginLeft: 2, display: "inline-flex", alignItems: "center" }}>
+                      <ChevronDownIcon open={props.showAccountPicker} />
+                    </span>
+                  </button>
+
+                  <PickerPopover open={props.showAccountPicker} align="left" placement="top" width="min(292px, calc(100vw - 28px))" zIndex={140} anchorRef={props.accountRef}>
+                    <div id="account-picker" style={{ maxHeight: 236, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
+                      <div style={{ display: "grid", gap: 2 }}>
+                        {props.filteredAccounts.map((acct) => (
+                          <button
+                            key={acct.id}
+                            onClick={() => props.onSelectAccount(acct.id)}
+                            style={{
+                              ...pickerRowStyle,
+                              background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, white)" : "transparent",
+                              boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 12,
+                                background: acct.id === props.selectedAccount?.id
+                                  ? "color-mix(in srgb, var(--accent) 12%, white)"
+                                  : "color-mix(in srgb, var(--surface2) 72%, transparent)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                fontSize: 15,
+                              }}
+                            >
+                              {acct.icon ?? "$"}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: acct.id === props.selectedAccount?.id ? 650 : 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {acct.label}
+                              </div>
+                              {acct.type && (
+                                <div
+                                  style={{
+                                    marginTop: 3,
+                                    fontFamily: "'DM Mono', monospace",
+                                    fontSize: 11,
+                                    color: "var(--muted)",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {acct.type}
+                                </div>
+                              )}
+                            </div>
+                            {acct.balance !== null && (
+                              <span
+                                style={{
+                                  fontFamily: "'DM Mono', monospace",
+                                  fontSize: 12,
+                                  color: acct.balance < 0 ? "var(--danger)" : "var(--muted)",
+                                  flexShrink: 0,
+                                  paddingLeft: 8,
+                                }}
+                              >
+                                {fmt(acct.balance)}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </PickerPopover>
+                </div>
+                <div style={{ position: "relative", zIndex: props.showCatPicker ? 24 : 1 }} ref={props.catRef}>
                   <button
                     onClick={props.onToggleCatPicker}
                     aria-haspopup="dialog"
@@ -461,13 +436,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     style={{
                       ...chipButtonStyle,
                       minHeight: 40,
-                      padding: "0 13px",
-                      borderRadius: 999,
-                      border: `1px solid ${props.showCatPicker ? "color-mix(in srgb, var(--accent) 14%, transparent)" : "color-mix(in srgb, var(--border) 28%, transparent)"}`,
-                      background: "color-mix(in srgb, var(--surface2) 10%, transparent)",
+                      padding: "0 8px",
+                      border: `1px solid ${props.showCatPicker ? "color-mix(in srgb, var(--border) 24%, transparent)" : "transparent"}`,
+                      background: "transparent",
                       color: props.selectedCat ? "var(--text2)" : "var(--muted)",
                       maxWidth: "100%",
-                      boxShadow: props.showCatPicker ? "0 6px 14px color-mix(in srgb, var(--accent) 8%, transparent)" : "none",
+                      boxShadow: "none",
                     }}
                   >
                     <span
@@ -495,9 +469,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     </span>
                   </button>
 
-                  <PickerPopover open={props.showCatPicker} align="left" placement="top" width="min(320px, calc(100vw - 40px))" zIndex={100}>
-                    <div id="category-picker">
-                      <div style={{ maxHeight: 232, overflowY: "auto", padding: 10 }}>
+                  <PickerPopover open={props.showCatPicker} align="left" placement="top" width="min(300px, calc(100vw - 28px))" zIndex={140} anchorRef={props.catRef}>
+                    <div id="category-picker" style={{ width: "100%", boxSizing: "border-box" }}>
+                      <div style={{ maxHeight: 228, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
                         <div style={{ display: "grid", gap: 2 }}>
                           {props.filteredCats.map((cat) => {
                             const meta = [cat.type[0] ?? null, cat.id === props.lastUsedCatId ? "Last used" : null].filter(Boolean).join(" / ");
@@ -553,12 +527,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                     style={{
                                       fontFamily: "'DM Mono', monospace",
                                       fontSize: 12,
-                                      color: cat.available >= 0 ? "var(--success)" : "var(--danger)",
+                                      color: cat.available > 0 ? "var(--success)" : "var(--danger)",
                                       flexShrink: 0,
                                       paddingLeft: 8,
                                     }}
                                   >
-                                    {cat.available >= 0 ? "+" : ""}
+                                    {cat.available > 0 ? "+" : ""}
                                     {fmt(cat.available)}
                                   </span>
                                 )}
@@ -574,7 +548,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       </div>
                       <div
                         style={{
-                          padding: "12px 12px 13px",
+                          padding: "10px 10px 11px",
                           borderTop: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
                           background: "color-mix(in srgb, var(--surface2) 10%, white)",
                         }}
@@ -615,7 +589,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     </div>
                   </PickerPopover>
                 </div>
-                <div style={{ position: "relative" }} ref={props.dateRef}>
+                <div style={{ position: "relative", zIndex: props.showDatePicker ? 24 : 1 }} ref={props.dateRef}>
                   <button
                     onClick={props.onToggleDatePicker}
                     aria-haspopup="dialog"
@@ -624,17 +598,17 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     style={{
                       ...chipButtonStyle,
                       minHeight: 40,
-                      padding: "0 13px",
-                      border: `1px solid ${props.showDatePicker ? "color-mix(in srgb, var(--accent) 18%, transparent)" : "color-mix(in srgb, var(--border) 28%, transparent)"}`,
+                      padding: "0 8px",
+                      border: `1px solid ${props.showDatePicker ? "color-mix(in srgb, var(--border) 24%, transparent)" : "transparent"}`,
                       background: props.showDatePicker
-                        ? "color-mix(in srgb, var(--accent) 8%, white)"
-                        : "color-mix(in srgb, var(--surface2) 10%, transparent)",
-                      color: props.showDatePicker ? "color-mix(in srgb, var(--accent) 80%, var(--text2))" : "var(--text2)",
+                        ? "color-mix(in srgb, var(--surface2) 10%, white)"
+                        : "transparent",
+                      color: "var(--text2)",
                       fontSize: 12,
                       fontWeight: 600,
                       gap: 7,
                       opacity: 1,
-                      boxShadow: props.showDatePicker ? "0 6px 14px color-mix(in srgb, var(--accent) 8%, transparent)" : "none",
+                      boxShadow: "none",
                     }}
                   >
                     <span
@@ -643,7 +617,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                         height: 20,
                         borderRadius: 999,
                         background: props.showDatePicker
-                          ? "color-mix(in srgb, var(--accent) 8%, white)"
+                          ? "color-mix(in srgb, var(--surface2) 18%, white)"
                           : "color-mix(in srgb, var(--surface2) 22%, white)",
                         display: "inline-flex",
                         alignItems: "center",
@@ -662,9 +636,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     </span>
                   </button>
 
-                  <PickerPopover open={props.showDatePicker} align="left" placement="top" width="min(252px, calc(100vw - 40px))">
-                    <div id="date-picker">
-                      <div style={{ display: "grid", gap: 2, padding: 10 }}>
+                  <PickerPopover open={props.showDatePicker} align="right" placement="top" width="min(236px, calc(100vw - 28px))" zIndex={140} anchorRef={props.dateRef}>
+                    <div id="date-picker" style={{ width: "100%", boxSizing: "border-box" }}>
+                      <div style={{ display: "grid", gap: 2, padding: 8, boxSizing: "border-box" }}>
                         {dateOptions.map((option) => {
                           const selected = option.value === props.date;
                           return (
@@ -673,22 +647,22 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                               onClick={() => props.onSelectDate(option.value)}
                               style={{
                                 width: "100%",
-                                minHeight: 50,
-                                padding: "12px 13px",
-                                background: selected ? "color-mix(in srgb, var(--accent) 10%, white)" : "color-mix(in srgb, var(--surface) 72%, transparent)",
+                                minHeight: 42,
+                                padding: "9px 12px",
+                                background: selected ? "color-mix(in srgb, var(--accent) 10%, white)" : "transparent",
                                 border: "none",
-                                borderRadius: 16,
+                                borderRadius: 10,
                                 color: selected ? "color-mix(in srgb, var(--accent) 76%, var(--text2))" : "var(--text)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "space-between",
-                                gap: 12,
+                                gap: 10,
                                 cursor: "pointer",
                                 fontSize: 14,
                                 textAlign: "left",
                                 boxShadow: selected
                                   ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)"
-                                  : "inset 0 0 0 1px color-mix(in srgb, var(--border) 22%, transparent)",
+                                  : "none",
                               }}
                             >
                               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
@@ -713,17 +687,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                     <path d="M20 6 9 17l-5-5" />
                                   </svg>
                                 </span>
-                                <div style={{ display: "grid", gap: 3, minWidth: 0 }}>
-                                  <span style={{ fontWeight: selected ? 650 : 600 }}>{option.label}</span>
-                                  <span
-                                    style={{
-                                      fontSize: 11,
-                                      color: selected ? "color-mix(in srgb, var(--accent) 62%, var(--text2))" : "var(--muted)",
-                                    }}
-                                  >
-                                    {option.hint}
-                                  </span>
-                                </div>
+                                <span style={{ fontWeight: selected ? 650 : 600, minWidth: 0 }}>{option.label}</span>
                               </div>
                               <span
                                 style={{
@@ -741,7 +705,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       </div>
                       <div
                         style={{
-                          padding: "12px 12px 13px",
+                          padding: "10px 10px 11px",
                           borderTop: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
                           background: "color-mix(in srgb, var(--surface2) 10%, white)",
                         }}
@@ -777,6 +741,88 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     </div>
                   </PickerPopover>
                 </div>
+                <button
+                  onClick={props.onSubmit}
+                  disabled={!props.canSubmit}
+                  aria-label={
+                    props.status === "saving"
+                      ? "Saving transaction"
+                      : props.status === "success"
+                        ? "Transaction saved"
+                        : props.status === "error"
+                          ? `Save failed: ${props.errorMsg}`
+                          : "Save transaction"
+                  }
+                  title={
+                    props.status === "saving"
+                      ? "Saving..."
+                      : props.status === "success"
+                        ? "Saved"
+                        : props.status === "error"
+                          ? `Error: ${props.errorMsg}`
+                          : "Save"
+                  }
+                  className="pressable"
+                  style={{
+                    minWidth: 40,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    border:
+                      props.status === "success"
+                        ? "1px solid color-mix(in srgb, var(--success) 18%, transparent)"
+                        : props.status === "error"
+                          ? "1px solid color-mix(in srgb, var(--danger) 18%, transparent)"
+                          : "1px solid transparent",
+                    background:
+                      props.status === "success"
+                        ? "color-mix(in srgb, var(--success) 8%, white)"
+                        : props.status === "error"
+                          ? "color-mix(in srgb, var(--danger) 8%, white)"
+                          : "transparent",
+                    color:
+                      props.status === "success"
+                        ? "var(--success)"
+                        : props.status === "error"
+                          ? "var(--danger)"
+                          : "color-mix(in srgb, var(--accent) 76%, var(--text2))",
+                    cursor: props.canSubmit ? "pointer" : "not-allowed",
+                    opacity: props.canSubmit || props.status !== "idle" ? 1 : 0.45,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    boxShadow: "none",
+                    transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  {props.status === "saving" ? (
+                    <span
+                      style={{
+                        width: 15,
+                        height: 15,
+                        border: "2px solid color-mix(in srgb, currentColor 26%, transparent)",
+                        borderTopColor: "currentColor",
+                        borderRadius: "50%",
+                        animation: "spin 0.6s linear infinite",
+                      }}
+                    />
+                  ) : props.status === "success" ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  ) : props.status === "error" ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 19V5" />
+                      <path d="m5 12 7-7 7 7" />
+                    </svg>
+                  )}
+                </button>
               </div>
 
               {(props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
@@ -839,103 +885,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               )}
             </div>
           </div>
-        </div>
-        <div
-          style={{
-            position: "relative",
-            padding: "16px 20px calc(20px + env(safe-area-inset-bottom, 0px))",
-            borderTop: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
-            background: "linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, transparent) 0%, var(--bg) 18%, var(--bg) 100%)",
-          }}
-        >
-          {props.showSaveBurst && (
-            <>
-              {[
-                { x: "-46px", y: "-30px", d: "0ms" },
-                { x: "-12px", y: "-38px", d: "20ms" },
-                { x: "22px", y: "-32px", d: "40ms" },
-                { x: "48px", y: "-18px", d: "60ms" },
-                { x: "-44px", y: "16px", d: "80ms" },
-                { x: "-8px", y: "22px", d: "100ms" },
-                { x: "26px", y: "18px", d: "120ms" },
-                { x: "42px", y: "8px", d: "140ms" },
-              ].map((sparkle, index) => (
-                <span
-                  key={index}
-                  className="save-burst"
-                  style={{
-                    ["--x" as never]: sparkle.x,
-                    ["--y" as never]: sparkle.y,
-                    ["--d" as never]: sparkle.d,
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    background: "color-mix(in srgb, var(--accent) 70%, white)",
-                  }}
-                />
-              ))}
-            </>
-          )}
-          <button
-            onClick={props.onSubmit}
-            disabled={!props.canSubmit}
-            className="pressable cta-save"
-            style={{
-              width: "100%",
-              minHeight: 68,
-              padding: "18px 20px",
-              borderRadius: 22,
-              border: "1px solid color-mix(in srgb, var(--accent) 38%, transparent)",
-              background:
-                props.status === "success"
-                  ? "var(--success)"
-                  : props.status === "error"
-                    ? "var(--danger)"
-                    : props.mode === "wife"
-                      ? "color-mix(in srgb, var(--accent) 82%, white)"
-                      : "var(--accent)",
-              color: props.mode === "wife" ? "#1f0612" : "#0d1117",
-              fontWeight: 780,
-              fontSize: 17,
-              letterSpacing: 0,
-              cursor: props.canSubmit ? "pointer" : "not-allowed",
-              opacity: props.canSubmit || props.status !== "idle" ? 1 : 0.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
-              boxShadow: props.status === "idle" ? "0 14px 24px color-mix(in srgb, var(--accent) 20%, transparent)" : "none",
-              animation: "fadeUp 0.4s 0.19s ease both",
-            }}
-          >
-            {props.status === "saving" && (
-              <div
-                style={{
-                  width: 17,
-                  height: 17,
-                  border: "2px solid color-mix(in srgb, var(--ink-strong) 25%, transparent)",
-                  borderTopColor: "var(--ink-strong)",
-                  borderRadius: "50%",
-                  animation: "spin 0.6s linear infinite",
-                }}
-              />
-            )}
-            {props.status === "success" ? (
-              "Saved to Notion"
-            ) : props.status === "error" ? (
-              `Error - ${props.errorMsg}`
-            ) : props.status === "saving" ? (
-              "Saving..."
-            ) : (
-              <>
-                <span>Save {props.amount ? `${fmt(parseFloat(props.amount))} MAD` : "expense"}</span>
-                <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1, marginLeft: 2 }}>
-                  -{">"}
-                </span>
-              </>
-            )}
-          </button>
         </div>
       </div>
     </div>
