@@ -250,6 +250,8 @@ export default function App() {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-picker-popover="true"]')) return;
       if (dateRef.current && !dateRef.current.contains(e.target as Node)) setShowDatePicker(false);
       if (catRef.current && !catRef.current.contains(e.target as Node)) setShowCatPicker(false);
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) setShowAccountPicker(false);

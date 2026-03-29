@@ -13,9 +13,9 @@ const navStyle: CSSProperties = {
   left: 0,
   right: 0,
   zIndex: 50,
-  background: "var(--surface)",
-  borderTop: "1px solid var(--border)",
-  boxShadow: "0 -6px 18px rgba(0,0,0,0.14)",
+  background: "color-mix(in srgb, var(--bg) 82%, var(--surface))",
+  borderTop: "1px solid color-mix(in srgb, var(--border2) 56%, transparent)",
+  boxShadow: "0 -4px 12px color-mix(in srgb, var(--ink-strong) 8%, transparent)",
   paddingBottom: "env(safe-area-inset-bottom)",
 };
 
@@ -51,7 +51,7 @@ export function BottomNav({ tab, pendingCount, onTabChange }: BottomNavProps) {
                 padding: "10px 0 11px",
                 background: "none",
                 border: "none",
-                borderTop: `2px solid ${tab === item.key ? activeColor : "transparent"}`,
+                borderTop: "2px solid transparent",
                 cursor: "pointer",
                 color: tab === item.key ? activeColor : "var(--muted)",
                 transition: "color 0.2s, border-color 0.2s",

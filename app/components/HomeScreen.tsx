@@ -22,7 +22,7 @@ export function HomeScreen({
 }: HomeScreenProps) {
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
-      <header style={{ marginBottom: 24, animation: "fadeUp 0.4s ease both" }}>
+      <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div>
             <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
@@ -32,7 +32,7 @@ export function HomeScreen({
               All your Notion categories in one place.
             </p>
           </div>
-          <div style={{ padding: "10px 12px", borderRadius: 16, background: "var(--surface)", border: "1px solid var(--border)", minWidth: 124 }}>
+          <div style={{ minWidth: 124, paddingTop: 3, textAlign: "right" }}>
             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)" }}>
               Overview
             </div>
@@ -46,28 +46,34 @@ export function HomeScreen({
         </div>
       </header>
 
-      <div style={{ display: "grid", gap: 12 }}>
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: 14, animation: "fadeUp 0.35s 0.04s ease both" }}>
+      <div style={{ display: "grid", gap: 18 }}>
+        <div
+          style={{
+            paddingBottom: 10,
+            borderBottom: "1px solid color-mix(in srgb, var(--border2) 62%, transparent)",
+            animation: "fadeUp 0.35s 0.04s ease both",
+          }}
+        >
           <input
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search categories"
-            style={{ width: "100%", background: "transparent", padding: 0, border: "none", borderRadius: 0, fontSize: 16, color: "var(--text)", outline: "none" }}
+            style={{
+              width: "100%",
+              background: "transparent",
+              padding: 0,
+              border: "none",
+              borderRadius: 0,
+              fontSize: 16,
+              color: "var(--text)",
+              outline: "none",
+            }}
           />
         </div>
 
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 22,
-            padding: "14px 14px 10px",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+        <section style={{ display: "grid", gap: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, paddingBottom: 12 }}>
             <div>
               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)" }}>
                 Categories
@@ -102,10 +108,11 @@ export function HomeScreen({
               style={{
                 textAlign: "left",
                 width: "100%",
-                padding: "14px 16px",
-                background: cat.id === selectedCategoryId ? "color-mix(in srgb, var(--accent-dim) 58%, white)" : "transparent",
-                border: `1px solid ${cat.id === selectedCategoryId ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "var(--border)"}`,
-                borderRadius: 18,
+                padding: "14px 0",
+                background: "transparent",
+                border: "none",
+                borderTop: i === 0 ? "1px solid color-mix(in srgb, var(--border) 76%, transparent)" : "none",
+                borderBottom: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -113,11 +120,33 @@ export function HomeScreen({
                 animation: `fadeUp 0.28s ${i * 0.03}s ease both`,
               }}
             >
-              <div style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                {cat.icon ?? "🏷️"}
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 14,
+                  background: cat.id === selectedCategoryId ? "color-mix(in srgb, var(--accent-dim) 42%, white)" : "var(--surface2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 18,
+                  flexShrink: 0,
+                  transition: "background-color 0.2s ease",
+                }}
+              >
+                {cat.icon ?? "#"}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: cat.id === selectedCategoryId ? 700 : 650,
+                    color: "var(--text)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
                   {cat.name}
                 </div>
                 <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
@@ -125,7 +154,14 @@ export function HomeScreen({
                 </p>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: (cat.available ?? 0) >= 0 ? "var(--success)" : "var(--danger)" }}>
+                <div
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: 12,
+                    color: (cat.available ?? 0) >= 0 ? "var(--success)" : "var(--danger)",
+                    fontWeight: cat.id === selectedCategoryId ? 700 : 500,
+                  }}
+                >
                   {(cat.available ?? 0) > 0 ? "+" : ""}
                   {fmt(cat.available ?? 0)}
                 </div>
@@ -135,11 +171,11 @@ export function HomeScreen({
           ))}
 
           {categories.length === 0 && (
-            <div style={{ borderRadius: 16, padding: "18px 16px", color: "var(--muted)", fontSize: 14 }}>
+            <div style={{ padding: "18px 0", color: "var(--muted)", fontSize: 14 }}>
               No categories match that search.
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   );

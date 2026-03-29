@@ -665,30 +665,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                   : "none",
                               }}
                             >
-                              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-                                <span
-                                  aria-hidden="true"
-                                  style={{
-                                    width: 18,
-                                    height: 18,
-                                    borderRadius: 999,
-                                    flexShrink: 0,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    border: selected
-                                      ? "1px solid color-mix(in srgb, var(--accent) 18%, transparent)"
-                                      : "1px solid color-mix(in srgb, var(--border2) 44%, transparent)",
-                                    background: selected ? "color-mix(in srgb, var(--accent) 10%, white)" : "transparent",
-                                    color: selected ? "color-mix(in srgb, var(--accent) 76%, var(--text2))" : "transparent",
-                                  }}
-                                >
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M20 6 9 17l-5-5" />
-                                  </svg>
-                                </span>
-                                <span style={{ fontWeight: selected ? 650 : 600, minWidth: 0 }}>{option.label}</span>
-                              </div>
+                              <span style={{ fontWeight: selected ? 650 : 600, minWidth: 0, flex: 1 }}>
+                                {option.label}
+                              </span>
                               <span
                                 style={{
                                   fontFamily: "'DM Mono', monospace",

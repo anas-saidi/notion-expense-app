@@ -85,6 +85,7 @@ export function PickerPopover({
   return createPortal(
     <div
       ref={popoverRef}
+      data-picker-popover="true"
       style={{
         ...positionStyle,
         width,
