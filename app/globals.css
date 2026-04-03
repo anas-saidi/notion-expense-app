@@ -211,6 +211,62 @@ textarea:focus-visible {
   animation-delay: var(--d, 0ms);
 }
 
+.review-summary {
+  transition: border-color 0.25s ease, background-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.review-summary--almost {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent) !important;
+  background: color-mix(in srgb, var(--warning-dim) 30%, var(--surface)) !important;
+}
+
+.review-summary--ready {
+  border-color: color-mix(in srgb, var(--success) 40%, transparent) !important;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface)) !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: reviewSettle 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.review-left-assign {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.review-check svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: reviewCheckDraw 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes reviewSettle {
+  from { transform: scale(0.985); }
+  to { transform: scale(1); }
+}
+
+@keyframes reviewCheckDraw {
+  to { stroke-dashoffset: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   button,
   .save-burst,
@@ -221,6 +277,13 @@ textarea:focus-visible {
     animation: none !important;
     transition: none !important;
     transform: none !important;
+  }
+
+  .review-summary,
+  .review-summary--ready,
+  .review-check svg {
+    animation: none !important;
+    transition: none !important;
   }
 }
 

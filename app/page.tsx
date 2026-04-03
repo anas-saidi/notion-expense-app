@@ -4,10 +4,12 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import Fuse from "fuse.js";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
+import { MonthlyPlanningFlow } from "./components/MonthlyPlanningFlow";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
+import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
-import type { Account, Category, PendingItem, Transaction } from "./components/app-types";
-import { fmt, fmtDate, shiftDate, today } from "./components/app-utils";
+import type { Account, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
+import { fmtDate, monthBounds, shiftDate, today } from "./components/app-utils";
 
 const LOADING_LINES = [
   "Warming up Notion...",
@@ -24,6 +26,26 @@ const SAVE_LINES = [
 ];
 
 const FALLBACK_ACCOUNTS: Account[] = [];
+
+const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
+
+const isSavingsAccount = (account: Account) => {
+  const value = account.type?.toLowerCase() ?? "";
+  return value.includes("saving");
+};
+
+const isHouseholdCategory = (category: Category) => {
+  return category.type.some((value) => {
+    const normalized = value.toLowerCase();
+    return normalized.includes("team") || normalized.includes("household");
+  });
+};
+
+const isSavingsCategory = (category: Category) => {
+  const types = category.type.map((value) => value.toLowerCase());
+  if (types.some((value) => value.includes("team") || value.includes("household"))) return false;
+  return types.some((value) => value.includes("saving") || value.includes("sinking") || value.includes("goal") || value.includes("fund"));
+};
 
 function SectionHeader({
   title,
@@ -53,8 +75,18 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  const [monthlySummary, setMonthlySummary] = useState<MonthlySummary>({
+    start: "",
+    end: "",
+    totalAssigned: 0,
+    totalSpent: 0,
+    assignedByCategory: [],
+    spentByCategory: [],
+  });
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"home" | "pending" | "history">("home");
+  const [tab, setTab] = useState<"home" | "plan" | "pending" | "history">("home");
+  const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
+  const [plannerSummaryReady, setPlannerSummaryReady] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [homeSearch, setHomeSearch] = useState("");
 
@@ -87,6 +119,7 @@ export default function App() {
 
   const initialAcctApplied = useRef(false);
   const initialCatApplied = useRef(false);
+  const plannerMonthHydrated = useRef(false);
   const loadedPendingId = useRef<string | null>(null);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,6 +177,30 @@ export default function App() {
     if (latestCat) setLastUsedCatId(latestCat);
   };
 
+  const fetchMonthlySummary = async () => {
+    try {
+      const { start, end } = monthBounds(today());
+      const data = await fetch(`/api/monthly-summary?start=${start}&end=${end}`).then((r) => r.json());
+      setMonthlySummary({
+        start,
+        end,
+        totalAssigned: data.summary?.totalAssigned ?? 0,
+        totalSpent: data.summary?.totalSpent ?? 0,
+        assignedByCategory: data.summary?.assignedByCategory ?? [],
+        spentByCategory: data.summary?.spentByCategory ?? [],
+      });
+    } catch {
+      setMonthlySummary({
+        start: "",
+        end: "",
+        totalAssigned: 0,
+        totalSpent: 0,
+        assignedByCategory: [],
+        spentByCategory: [],
+      });
+    }
+  };
+
   const fetchPending = async () => {
     try {
       const cached = localStorage.getItem("pendingItems");
@@ -182,6 +239,7 @@ export default function App() {
 
     fetchTransactions();
     fetchPending();
+    fetchMonthlySummary();
   }, []);
 
   useEffect(() => {
@@ -192,6 +250,34 @@ export default function App() {
     initialCatApplied.current = true;
     setCategoryId(cat.id);
   }, [lastUsedCatId, categories]);
+
+  useEffect(() => {
+    if (plannerMonthHydrated.current) return;
+    if (!monthlySummary.start) return;
+    setPlannerMonth(formatMonthInput(monthlySummary.start));
+    plannerMonthHydrated.current = true;
+  }, [monthlySummary.start]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!plannerMonth) return;
+    setPlannerSummaryReady(false);
+    const { start, end } = monthBounds(`${plannerMonth}-01`);
+
+    fetch(`/api/monthly-summary?start=${start}&end=${end}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to load planner summary");
+        await res.json();
+        if (!cancelled) setPlannerSummaryReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setPlannerSummaryReady(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [plannerMonth]);
 
   useEffect(() => {
     if (initialAcctApplied.current) return;
@@ -352,12 +438,18 @@ export default function App() {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
     fetch("/api/transactions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
       .then((r) => {
-        if (!r.ok) fetchTransactions();
+        if (!r.ok) {
+          fetchTransactions();
+          return;
+        }
+        fetchMonthlySummary();
       });
   };
 
   const selectedCat = categories.find((c) => c.id === categoryId);
   const selectedAccount = accounts.find((a) => a.id === accountId) ?? null;
+  const plannerUsesFallbackData =
+    !plannerSummaryReady || plannerMonth !== formatMonthInput(today());
 
   const selectCategory = (cat: Category) => {
     setCategoryId(cat.id);
@@ -453,6 +545,7 @@ export default function App() {
       const expAmt = parseFloat(amount);
       if (displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
+      fetchMonthlySummary();
       fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
 
       if (loadedPendingId.current) {
@@ -489,20 +582,27 @@ export default function App() {
   const categoryUnfunded = !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
   const categoryOverBudget = !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
   const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && categoryId && status === "idle" && !categoryUnfunded && !categoryOverBudget);
-  const totalAvailable = categories.reduce((sum, c) => sum + (c.available ?? 0), 0);
   const suggestedCategory = suggestedCatId ? categories.find((c) => c.id === suggestedCatId) : undefined;
 
   const modeButton = (
     <button onClick={toggleMode} style={modeButtonStyle}>
-      <span style={{ fontSize: 14 }}>{mode === "wife" ? "W" : "H"}</span>
       <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>
-        {mode === "wife" ? "Wife" : "Hubby"}
+        {mode === "wife" ? "Wifey" : "Hubby"}
       </span>
     </button>
   );
 
   return (
-    <AppShell tab={tab} pendingCount={pendingItems.length} onTabChange={setTab} onOpenAdd={() => setShowAddModal(true)} toast={microToast} mode={mode}>
+    <AppShell
+      tab={tab}
+      pendingCount={pendingItems.length}
+      onTabChange={setTab}
+      onOpenAdd={() => setShowAddModal(true)}
+      toast={microToast}
+      mode={mode}
+      showAddButton={tab !== "plan"}
+      immersive={tab === "plan"}
+    >
       {tab === "home" && (
         <HomeScreen
           categories={homeCategories}
@@ -511,7 +611,29 @@ export default function App() {
           onSearchChange={setHomeSearch}
           onSelectCategory={selectCategory}
           onOpenAdd={() => setShowAddModal(true)}
-          totalAvailable={totalAvailable}
+          onOpenPlan={() => setTab("plan")}
+          totalAssigned={monthlySummary.totalAssigned}
+          totalSpent={monthlySummary.totalSpent}
+          assignedByCategory={monthlySummary.assignedByCategory}
+          spentByCategory={monthlySummary.spentByCategory}
+        />
+      )}
+
+      {tab === "plan" && (
+        <MonthlyPlanningFlow
+          selectedMonth={plannerMonth}
+          onSelectedMonthChange={setPlannerMonth}
+          onCancel={() => setTab("home")}
+          onOpenAddTransaction={({ accountId: nextAccountId, amount: nextAmount, name: nextName }) => {
+            setAccountId(nextAccountId);
+            setAmount(String(nextAmount));
+            setName(nextName ?? "");
+            setDate(today());
+            setShowAddModal(true);
+          }}
+          accounts={accounts}
+          categories={categories}
+          isUsingFallbackData={plannerUsesFallbackData}
         />
       )}
 
@@ -563,7 +685,11 @@ export default function App() {
                         {[item.date ? fmtDate(item.date) : null, cat?.name, item.addedBy].filter(Boolean).join(" / ")}
                       </div>
                     </div>
-                    {item.amount !== null && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--text2)" }}>{fmt(item.amount)}</span>}
+                    {item.amount !== null && (
+                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--text2)" }}>
+                        <Money value={item.amount} />
+                      </span>
+                    )}
                     <button onClick={() => loadPending(item)} style={ghostActionStyle}>Fill</button>
                     <button onClick={() => dismissPending(item.id)} style={ghostActionStyle}>x</button>
                   </div>
@@ -605,7 +731,9 @@ export default function App() {
                       {[cat?.name ?? "Unsorted", fmtDate(t.date)].join(" / ")}
                     </div>
                   </div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)" }}>-{fmt(t.amount)}</div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)" }}>
+                    -<Money value={t.amount} absolute />
+                  </div>
                   <button onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }} style={{ ...ghostActionStyle, color: deletingId === t.id ? "var(--surface)" : "var(--muted)", background: deletingId === t.id ? "var(--danger)" : "transparent" }}>
                     Del
                   </button>
@@ -713,8 +841,8 @@ const surfaceStyle: CSSProperties = {
 const modeButtonStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 6,
-  padding: "8px 12px",
+  gap: 0,
+  padding: "8px 14px",
   borderRadius: 20,
   border: "1px solid var(--border2)",
   background: "var(--surface)",

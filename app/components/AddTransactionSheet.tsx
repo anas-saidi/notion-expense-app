@@ -2,7 +2,8 @@
 
 import type { CSSProperties, RefObject } from "react";
 import type { Account, Category } from "./app-types";
-import { fmt, fmtDate, shiftDate, today } from "./app-utils";
+import { fmtDate, shiftDate, today } from "./app-utils";
+import { Money } from "./Money";
 import { PickerPopover } from "./PickerPopover";
 
 type AddTransactionSheetProps = {
@@ -256,7 +257,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       flexShrink: 0,
                     }}
                   >
-                    Balance {fmt(visibleBalance)}
+                    Balance <Money value={visibleBalance} />
                   </span>
                 </div>
               )}
@@ -418,7 +419,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                   paddingLeft: 8,
                                 }}
                               >
-                                {fmt(acct.balance)}
+                                <Money value={acct.balance} />
                               </span>
                             )}
                           </button>
@@ -533,7 +534,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                     }}
                                   >
                                     {cat.available > 0 ? "+" : ""}
-                                    {fmt(cat.available)}
+                                    <Money value={cat.available} />
                                   </span>
                                 )}
                               </button>
@@ -855,8 +856,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                           lineHeight: 1.5,
                         }}
                       >
-                        Over budget by <strong>{fmt(props.parsedAmount - (props.selectedCat.available ?? 0))} MAD</strong>. Only{" "}
-                        <strong>{fmt(props.selectedCat.available ?? 0)} MAD</strong> left in <strong>{props.selectedCat.name}</strong>.
+                        Over budget by <strong><Money value={props.parsedAmount - (props.selectedCat.available ?? 0)} /></strong>. Only{" "}
+                        <strong><Money value={props.selectedCat.available ?? 0} /></strong> left in <strong>{props.selectedCat.name}</strong>.
                       </span>
                     </div>
                   )}

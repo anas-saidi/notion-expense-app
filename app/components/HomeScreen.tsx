@@ -1,5 +1,6 @@
-import type { Category } from "./app-types";
-import { fmt } from "./app-utils";
+import type { Category, MonthlyCategoryTotal } from "./app-types";
+import { HomeOverview } from "./HomeOverview";
+import { Money } from "./Money";
 
 type HomeScreenProps = {
   categories: Category[];
@@ -8,7 +9,11 @@ type HomeScreenProps = {
   onSearchChange: (value: string) => void;
   onSelectCategory: (category: Category) => void;
   onOpenAdd: () => void;
-  totalAvailable: number;
+  onOpenPlan: () => void;
+  totalAssigned: number;
+  totalSpent: number;
+  assignedByCategory: MonthlyCategoryTotal[];
+  spentByCategory: MonthlyCategoryTotal[];
 };
 
 export function HomeScreen({
@@ -18,35 +23,35 @@ export function HomeScreen({
   onSearchChange,
   onSelectCategory,
   onOpenAdd,
-  totalAvailable,
+  onOpenPlan,
+  totalAssigned,
+  totalSpent,
+  assignedByCategory,
+  spentByCategory,
 }: HomeScreenProps) {
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
       <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-          <div>
-            <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
-              Home
-            </h1>
-            <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
-              All your Notion categories in one place.
-            </p>
-          </div>
-          <div style={{ minWidth: 124, paddingTop: 3, textAlign: "right" }}>
-            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)" }}>
-              Overview
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text)", marginTop: 6, fontWeight: 700 }}>
-              {categories.length} categories
-            </div>
-            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: totalAvailable >= 0 ? "var(--success)" : "var(--danger)", marginTop: 4 }}>
-              {fmt(totalAvailable)} available
-            </div>
-          </div>
+        <div>
+          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
+            Home
+          </h1>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
+            All your Notion categories in one place.
+          </p>
         </div>
       </header>
 
       <div style={{ display: "grid", gap: 18 }}>
+        <HomeOverview
+          categories={categories}
+          onOpenPlan={onOpenPlan}
+          totalAssigned={totalAssigned}
+          totalSpent={totalSpent}
+          assignedByCategory={assignedByCategory}
+          spentByCategory={spentByCategory}
+        />
+
         <div
           style={{
             paddingBottom: 10,
@@ -73,29 +78,13 @@ export function HomeScreen({
         </div>
 
         <section style={{ display: "grid", gap: 0 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, paddingBottom: 12 }}>
+          <div style={{ paddingBottom: 12 }}>
             <div>
               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)" }}>
                 Categories
               </div>
               <p style={{ marginTop: 6, fontSize: 14, color: "var(--text2)" }}>Tap one to jump into the add sheet.</p>
             </div>
-            <button
-              onClick={onOpenAdd}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                color: "var(--accent)",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 0.3,
-                textTransform: "uppercase",
-              }}
-            >
-              Quick add
-            </button>
           </div>
 
           {categories.map((cat, i) => (
@@ -150,7 +139,7 @@ export function HomeScreen({
                   {cat.name}
                 </div>
                 <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
-                  {(cat.type[0] ?? "Category").toUpperCase()} · Planned {fmt(cat.planned ?? 0)}
+                  {(cat.type[0] ?? "Category").toUpperCase()} · Planned <Money value={cat.planned ?? 0} />
                 </p>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -163,7 +152,7 @@ export function HomeScreen({
                   }}
                 >
                   {(cat.available ?? 0) > 0 ? "+" : ""}
-                  {fmt(cat.available ?? 0)}
+                  <Money value={cat.available ?? 0} />
                 </div>
                 <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>available</div>
               </div>

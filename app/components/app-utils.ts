@@ -13,10 +13,22 @@ export const shiftDate = (dateStr: string, days: number) => {
   return toLocalDateString(date);
 };
 
+export const MONEY_CURRENCY = "MAD";
+
 export const fmt = (n: number) => n.toLocaleString("fr-MA");
+
+export const fmtMoney = (n: number) => `${fmt(n)} ${MONEY_CURRENCY}`;
 
 export const fmtDate = (d: string) => {
   if (!d) return "";
   const dt = new Date(`${d}T00:00:00`);
   return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+};
+
+export const monthBounds = (dateStr: string) => {
+  const [year, month] = dateStr.split("-").map(Number);
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endDate = new Date(year, month, 0);
+  const end = toLocalDateString(endDate);
+  return { start, end };
 };
