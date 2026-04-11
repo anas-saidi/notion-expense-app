@@ -94,7 +94,7 @@ export function PickerPopover({
         border: "1px solid color-mix(in srgb, var(--border2) 64%, transparent)",
         borderRadius: 18,
         overflow: "hidden",
-        boxShadow: "0 12px 22px rgba(47,36,25,0.10)",
+        boxShadow: "0 0 0 1px color-mix(in srgb, var(--ink-strong) 8%, transparent)",
         boxSizing: "border-box",
         zIndex,
       }}

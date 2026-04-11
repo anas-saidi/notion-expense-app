@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Fuse from "fuse.js";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
@@ -60,7 +60,7 @@ function SectionHeader({
     <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>{title}</h1>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 0.95, fontWeight: 800, color: "var(--text)" }}>{title}</h1>
           <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>{subtitle}</p>
         </div>
         {action}
@@ -116,6 +116,12 @@ export default function App() {
   const [pendingCatSearch, setPendingCatSearch] = useState("");
   const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
+  const [plannedByCategory, setPlannedByCategory] = useState<Record<string, number>>({});
+  const [readyToAssignOffset, setReadyToAssignOffset] = useState<{ household: number; wife: number; husband: number }>({
+    household: 0,
+    wife: 0,
+    husband: 0,
+  });
 
   const initialAcctApplied = useRef(false);
   const initialCatApplied = useRef(false);
@@ -125,6 +131,7 @@ export default function App() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const planUpdateTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const balanceAnimRef = useRef<number | null>(null);
   const fuseRef = useRef<Fuse<{ description: string; categoryId: string }> | null>(null);
   const dateRef = useRef<HTMLDivElement>(null);
@@ -170,7 +177,7 @@ export default function App() {
   };
 
   const fetchTransactions = async () => {
-    const data = await fetch("/api/transactions").then((r) => r.json());
+    const data = await fetch("/api/transactions?page_size=100").then((r) => r.json());
     const txns: Transaction[] = data.transactions ?? [];
     setTransactions(txns);
     const latestCat = txns[0]?.category;
@@ -451,6 +458,110 @@ export default function App() {
   const plannerUsesFallbackData =
     !plannerSummaryReady || plannerMonth !== formatMonthInput(today());
 
+  const readyToAssignPool = useMemo(
+    () =>
+      accounts.reduce((sum, account) => {
+        if (isSavingsAccount(account)) return sum;
+        return sum + (account.readyToAssign ?? 0);
+      }, 0),
+    [accounts],
+  );
+
+  const readyToAssignByScope = useMemo(() => {
+    const norm = (value: string) => value.toLowerCase();
+    const applyJointDue = (account: Account) => {
+      const base = account.readyToAssign ?? 0;
+      const jointDue = account.jointDue ?? 0;
+      if (jointDue <= 0) return base;
+      return base - jointDue;
+    };
+    const wifeTotal = accounts.reduce((sum, account) => {
+      if (isSavingsAccount(account)) return sum;
+      if (!norm(account.label).includes("wife")) return sum;
+      return sum + applyJointDue(account);
+    }, 0);
+    const husbandTotal = accounts.reduce((sum, account) => {
+      if (isSavingsAccount(account)) return sum;
+      if (!norm(account.label).includes("hubb")) return sum;
+      return sum + applyJointDue(account);
+    }, 0);
+
+    return {
+      household: readyToAssignPool + readyToAssignOffset.household,
+      wife: Math.max(0, wifeTotal + readyToAssignOffset.wife),
+      husband: Math.max(0, husbandTotal + readyToAssignOffset.husband),
+    };
+  }, [accounts, readyToAssignOffset, readyToAssignPool]);
+
+  const contributionDueByScope = useMemo(() => {
+    const norm = (value: string) => value.toLowerCase();
+    let wifeDue = 0;
+    let husbandDue = 0;
+
+    for (const account of accounts) {
+      if (isSavingsAccount(account)) continue;
+      const label = norm(account.label);
+      const due = Math.max(0, account.jointDue ?? 0);
+      if (!due) continue;
+      if (label.includes("wife")) wifeDue += due;
+      if (label.includes("hubb")) husbandDue += due;
+    }
+
+    return {
+      wife: wifeDue,
+      husband: husbandDue,
+      total: wifeDue + husbandDue,
+    };
+  }, [accounts]);
+
+  const householdSpentByPartner = useMemo(() => {
+    const householdCategoryIds = new Set(
+      categories.filter((category) => category.isTeamFund).map((category) => category.id),
+    );
+    const accountLabelById = new Map(
+      accounts.map((account) => [account.id, account.label.toLowerCase()]),
+    );
+    const bounds = monthlySummary.start && monthlySummary.end
+      ? { start: monthlySummary.start, end: monthlySummary.end }
+      : monthBounds(today());
+    const startDate = new Date(bounds.start);
+    const endDate = new Date(bounds.end);
+
+    let wife = 0;
+    let husband = 0;
+    let other = 0;
+
+    for (const txn of transactions) {
+      if (!txn.category || !householdCategoryIds.has(txn.category)) continue;
+      if (!txn.date) continue;
+      const txnDate = new Date(txn.date);
+      if (txnDate < startDate || txnDate > endDate) continue;
+      const amount = txn.amount ?? 0;
+      const label = txn.accountId ? accountLabelById.get(txn.accountId) ?? "" : "";
+      if (label.includes("wife")) {
+        wife += amount;
+      } else if (label.includes("hubb")) {
+        husband += amount;
+      } else {
+        other += amount;
+      }
+    }
+
+    return {
+      wife,
+      husband,
+      other,
+      total: wife + husband + other,
+    };
+  }, [accounts, categories, monthlySummary.end, monthlySummary.start, transactions]);
+
+  const totalPlanned = useMemo(
+    () => categories.reduce((sum, category) => sum + (category.planned ?? 0), 0),
+    [categories],
+  );
+
+  const poolRemaining = Math.max(0, readyToAssignPool - totalPlanned);
+
   const selectCategory = (cat: Category) => {
     setCategoryId(cat.id);
     setLastUsedCatId(cat.id);
@@ -514,6 +625,85 @@ export default function App() {
     }
     const best = Object.entries(tally).filter(([, value]) => value.count >= 2).sort((a, b) => b[1].weight - a[1].weight)[0];
     setSuggestedCatId(best ? best[0] : null);
+  };
+
+  const resolveCategoryScope = (category: Category): "household" | "wife" | "husband" => {
+    if (category.isTeamFund) return "household";
+    const owner = category.owner?.toLowerCase() ?? "";
+    if (owner.includes("salma")) return "wife";
+    if (owner.includes("anas")) return "husband";
+    return "household";
+  };
+
+  const handlePlannedChange = (categoryId: string, nextPlanned: number) => {
+    const category = categories.find((item) => item.id === categoryId);
+    if (!category) return;
+    const currentPlanned = plannedByCategory[categoryId] ?? category.planned ?? 0;
+    if (nextPlanned === currentPlanned) return;
+    const delta = nextPlanned - currentPlanned;
+    const scope = resolveCategoryScope(category);
+
+    const spent = monthlySummary.spentByCategory.find((item) => item.categoryId === categoryId)?.total ?? 0;
+
+    setPlannedByCategory((prev) => ({
+      ...prev,
+      [categoryId]: nextPlanned,
+    }));
+
+    setCategories((prev) =>
+      prev.map((item) => {
+        if (item.id !== categoryId) return item;
+        const nextAvailable = typeof item.available === "number"
+          ? Math.max(0, nextPlanned - spent)
+          : item.available;
+        return { ...item, planned: nextPlanned, available: nextAvailable };
+      }),
+    );
+
+    setMonthlySummary((prev) => {
+      const nextAssignedByCategory = [...prev.assignedByCategory];
+      const entryIndex = nextAssignedByCategory.findIndex((item) => item.categoryId === categoryId);
+      if (entryIndex >= 0) {
+        nextAssignedByCategory[entryIndex] = { ...nextAssignedByCategory[entryIndex], total: nextPlanned };
+      } else {
+        nextAssignedByCategory.push({ categoryId, total: nextPlanned });
+      }
+      const nextTotalAssigned = nextAssignedByCategory.reduce((sum, item) => sum + item.total, 0);
+      return {
+        ...prev,
+        totalAssigned: nextTotalAssigned,
+        assignedByCategory: nextAssignedByCategory,
+      };
+    });
+
+    setReadyToAssignOffset((prev) => ({
+      ...prev,
+      [scope]: prev[scope] - delta,
+    }));
+
+    if (!/^\d{4}-\d{2}$/.test(plannerMonth)) return;
+    if (planUpdateTimersRef.current[categoryId]) {
+      clearTimeout(planUpdateTimersRef.current[categoryId]);
+    }
+
+    planUpdateTimersRef.current[categoryId] = setTimeout(() => {
+      const reverse = delta < 0;
+      const planned = Math.abs(delta);
+      if (planned === 0) return;
+      fetch("/api/monthly-planning/funds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          month: plannerMonth,
+          categoryId,
+          planned,
+          accountId: category.defaultAccount ?? null,
+          reverse,
+        }),
+      })
+        .then((res) => res.json())
+        .catch(() => null);
+    }, 450);
   };
 
   const submit = async () => {
@@ -612,10 +802,11 @@ export default function App() {
           onSelectCategory={selectCategory}
           onOpenAdd={() => setShowAddModal(true)}
           onOpenPlan={() => setTab("plan")}
-          totalAssigned={monthlySummary.totalAssigned}
-          totalSpent={monthlySummary.totalSpent}
-          assignedByCategory={monthlySummary.assignedByCategory}
-          spentByCategory={monthlySummary.spentByCategory}
+          monthlySummary={monthlySummary}
+          onPlannedChange={handlePlannedChange}
+          readyToAssignByScope={readyToAssignByScope}
+          contributionDueByScope={contributionDueByScope}
+          householdSpentByPartner={householdSpentByPartner}
         />
       )}
 
@@ -814,6 +1005,7 @@ export default function App() {
         catRef={catRef}
         accountRef={accountRef}
       />
+
     </AppShell>
   );
 }
@@ -821,7 +1013,7 @@ export default function App() {
 const inputStyle: CSSProperties = {
   width: "100%",
   background: "var(--surface)",
-  border: "1px solid var(--border)",
+  border: "1px solid transparent",
   borderRadius: 14,
   padding: "13px 16px",
   color: "var(--text)",
@@ -833,8 +1025,9 @@ const inputStyle: CSSProperties = {
 
 const surfaceStyle: CSSProperties = {
   background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 20,
+  border: "1px solid var(--card-border)",
+  borderRadius: "var(--card-radius)",
+  boxShadow: "var(--card-shadow)",
   padding: 16,
 };
 
@@ -881,10 +1074,10 @@ const pickerListButtonStyle: CSSProperties = {
 const ctaSmallStyle: CSSProperties = {
   minHeight: 44,
   padding: "0 14px",
-  borderRadius: 14,
+  borderRadius: 999,
   border: "1px solid color-mix(in srgb, var(--accent) 38%, transparent)",
   background: "var(--accent)",
-  color: "#0d1117",
+  color: "var(--accent-ink)",
   fontWeight: 700,
   cursor: "pointer",
 };

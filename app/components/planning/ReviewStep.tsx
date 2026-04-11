@@ -93,7 +93,7 @@ const rowStyle = {
   justifyContent: "space-between",
   gap: 12,
   padding: "12px 0",
-  borderBottom: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
 };
 
 const rowLabelStyle = {
@@ -104,6 +104,8 @@ const rowLabelStyle = {
 const rowValueStyle = {
   color: "var(--text)",
   fontSize: 14,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
 };
 
 const noteStyle = {
@@ -117,8 +119,8 @@ const summaryNoteStyle = {
   gap: 4,
   padding: "10px 12px",
   borderRadius: 16,
-  border: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
-  background: "color-mix(in srgb, var(--surface) 94%, white)",
+  border: "1px solid transparent",
+  background: "color-mix(in srgb, var(--surface2) 50%, white)",
 };
 
 const summaryTitleStyle = {

@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
     const readyKey = pickByTypeAndAliases(props, "formula", ["Ready to Assign", "Ready To Assign", "Available to Assign"])
       ?? pickByTypeAndAliases(props, "number", ["Ready to Assign", "Ready To Assign", "Available to Assign"])
       ?? pickByTypeAndAliases(props, "rollup", ["Ready to Assign", "Ready To Assign", "Available to Assign"]);
+    const jointDueKey = pickByTypeAndAliases(props, "formula", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"])
+      ?? pickByTypeAndAliases(props, "number", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"])
+      ?? pickByTypeAndAliases(props, "rollup", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"]);
 
     const queryBody: Record<string, unknown> = {
       page_size: 50,
@@ -68,6 +71,7 @@ export async function GET(req: NextRequest) {
       const typeProp = typeKey ? properties[typeKey] : null;
       const balanceProp = balanceKey ? properties[balanceKey] : null;
       const readyProp = readyKey ? properties[readyKey] : null;
+      const jointDueProp = jointDueKey ? properties[jointDueKey] : null;
 
       return {
         id: page.id,
@@ -76,6 +80,7 @@ export async function GET(req: NextRequest) {
         type: typeProp?.select?.name ?? null,
         balance: readNumber(balanceProp),
         readyToAssign: readNumber(readyProp),
+        jointDue: readNumber(jointDueProp),
       };
     });
 

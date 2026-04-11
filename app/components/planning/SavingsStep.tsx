@@ -64,6 +64,11 @@ const summaryValueStyle = {
   color: "var(--text)",
   fontSize: 22,
   lineHeight: 1,
+  fontFamily: "var(--font-display)",
+  fontWeight: 800,
+  letterSpacing: -0.5,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
 };
 
 const rowStyle = {
@@ -72,7 +77,7 @@ const rowStyle = {
   gap: 12,
   alignItems: "center",
   padding: "12px 0",
-  borderBottom: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
 };
 
 const metaStyle = {
@@ -85,10 +90,12 @@ const amountInputStyle = {
   width: "100%",
   minHeight: 42,
   borderRadius: 12,
-  border: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+  border: "1px solid transparent",
   background: "transparent",
   color: "var(--text)",
   padding: "0 10px",
   fontSize: 16,
   textAlign: "right" as const,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
 };

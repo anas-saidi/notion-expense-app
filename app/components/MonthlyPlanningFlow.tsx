@@ -116,12 +116,18 @@ const isSavingsCategory = (category: Category) => {
   return types.some((value) => savingsTypeHints.some((hint) => value.includes(hint)));
 };
 
+const isFallbackHouseholdCategory = (category: Category) =>
+  !isHouseholdCategory(category) &&
+  !isSavingsCategory(category) &&
+  !isWifeCategory(category) &&
+  !isHusbandCategory(category);
+
 function toAllocationItem(category: Category): PlanningAllocationItem {
   return {
     categoryId: category.id,
     name: category.name,
     icon: category.icon,
-    amount: 0,
+    amount: category.available ?? 0,
     available: category.available,
     lastMonthSpent: category.lastMonthSpent,
   };
@@ -146,15 +152,13 @@ export function MonthlyPlanningFlow({
   const [wifeItems, setWifeItems] = useState<PlanningAllocationItem[]>([]);
   const [husbandItems, setHusbandItems] = useState<PlanningAllocationItem[]>([]);
   const [savingsItems, setSavingsItems] = useState<PlanningAllocationItem[]>([]);
-  const [fundByCategoryId, setFundByCategoryId] = useState<Record<string, { id: string; planned: number }>>({});
+  const [fundByCategoryId, setFundByCategoryId] = useState<Record<string, boolean>>({});
   const fundUpdateTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const fundsHydratedRef = useRef(false);
   const [isCompact, setIsCompact] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    fundsHydratedRef.current = false;
     setActiveStep("close");
     setCompletedSteps(buildStepState());
     setCloseStepState(initialCloseStepState);
@@ -186,25 +190,11 @@ export function MonthlyPlanningFlow({
       .then((res) => res.json())
       .then((data) => {
         if (!data?.funds) return;
-        const nextMap: Record<string, { id: string; planned: number }> = {};
-        for (const fund of data.funds as Array<{ id: string; categoryId: string; planned: number }>) {
-          nextMap[fund.categoryId] = { id: fund.id, planned: fund.planned };
+        const nextMap: Record<string, boolean> = {};
+        for (const fund of data.funds as Array<{ id: string; categoryId: string }>) {
+          nextMap[fund.categoryId] = true;
         }
         setFundByCategoryId(nextMap);
-
-        if (!fundsHydratedRef.current) {
-          const applyFunds = (items: PlanningAllocationItem[]) =>
-            items.map((item) =>
-              nextMap[item.categoryId]
-                ? { ...item, amount: nextMap[item.categoryId].planned }
-                : item,
-            );
-          setHouseholdItems((current) => applyFunds(current));
-          setWifeItems((current) => applyFunds(current));
-          setHusbandItems((current) => applyFunds(current));
-          setSavingsItems((current) => applyFunds(current));
-          fundsHydratedRef.current = true;
-        }
       })
       .catch(() => null);
   }, [selectedMonth]);
@@ -261,13 +251,17 @@ export function MonthlyPlanningFlow({
     () => savingsItems.reduce((sum, item) => sum + item.amount, 0),
     [savingsItems],
   );
-  const fundedTotal = useMemo(
-    () => Object.values(fundByCategoryId).reduce((sum, fund) => sum + (fund.planned ?? 0), 0),
-    [fundByCategoryId],
-  );
   const availablePool = baseAccountPool;
-  const assignedTotal = assignedHousehold + assignedSavings;
-  const leftToAssign = readyToAssignPool - (assignedTotal - fundedTotal);
+  const deltaTotal = useMemo(
+    () =>
+      [...householdItems, ...wifeItems, ...husbandItems, ...savingsItems].reduce((sum, item) => {
+        const currentAvailable = item.available ?? 0;
+        const targetAvailable = Number.isFinite(item.amount) ? item.amount : 0;
+        return sum + (targetAvailable - currentAvailable);
+      }, 0),
+    [householdItems, husbandItems, savingsItems, wifeItems],
+  );
+  const leftToAssign = readyToAssignPool - deltaTotal;
   const snapshot: MonthlyPlanningSnapshot = {
     availablePool,
     assignedHousehold,
@@ -288,32 +282,63 @@ export function MonthlyPlanningFlow({
   }, [activeStep, closeStepState.reviewed, householdItems.length, husbandItems.length, incomeMeta.ready, savingsItems.length, wifeItems.length]);
 
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+  const availableByCategoryId = useMemo(() => {
+    const entries: Array<[string, number]> = [...householdItems, ...wifeItems, ...husbandItems, ...savingsItems].map((item) => [
+      item.categoryId,
+      item.available ?? 0,
+    ]);
+    return new Map(entries);
+  }, [householdItems, husbandItems, savingsItems, wifeItems]);
 
-  const handleFundUpdate = (categoryId: string, amount: number) => {
+  const householdAvailable = useMemo(() => {
+    const candidates = categories.filter((category) => isHouseholdCategory(category) || isFallbackHouseholdCategory(category));
+    return candidates;
+  }, [categories, householdItems]);
+
+  const wifeAvailable = useMemo(() => {
+    const candidates = categories.filter(isWifeCategory);
+    return candidates;
+  }, [categories, wifeItems]);
+
+  const husbandAvailable = useMemo(() => {
+    const candidates = categories.filter(isHusbandCategory);
+    return candidates;
+  }, [categories, husbandItems]);
+
+  const savingsAvailable = useMemo(() => {
+    const candidates = categories.filter(isSavingsCategory);
+    return candidates;
+  }, [categories, savingsItems]);
+
+  const handleFundUpdate = (categoryId: string, targetAvailable: number) => {
     if (!/^\d{4}-\d{2}$/.test(selectedMonth)) return;
     if (fundUpdateTimersRef.current[categoryId]) {
       clearTimeout(fundUpdateTimersRef.current[categoryId]);
     }
 
+    const currentAvailable = availableByCategoryId.get(categoryId) ?? 0;
+    const delta = targetAvailable - currentAvailable;
+
     fundUpdateTimersRef.current[categoryId] = setTimeout(() => {
       const category = categoryById.get(categoryId);
+      const reverse = delta < 0;
+      const planned = Math.abs(delta);
+      if (planned === 0) return;
       fetch("/api/monthly-planning/funds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           month: selectedMonth,
           categoryId,
-          planned: amount,
+          planned,
           accountId: category?.defaultAccount ?? null,
+          reverse,
         }),
       })
         .then((res) => res.json())
         .then((data) => {
           if (!data?.fund?.id) return;
-          setFundByCategoryId((current) => ({
-            ...current,
-            [categoryId]: { id: data.fund.id, planned: data.fund.planned },
-          }));
+          setFundByCategoryId((current) => ({ ...current, [categoryId]: true }));
         })
         .catch(() => null);
     }, 450);
@@ -383,6 +408,10 @@ export function MonthlyPlanningFlow({
             wifeItems={wifeItems}
             husbandItems={husbandItems}
             savingsItems={savingsItems}
+            availableHouseholdCategories={householdAvailable}
+            availableWifeCategories={wifeAvailable}
+            availableHusbandCategories={husbandAvailable}
+            availableSavingsCategories={savingsAvailable}
             fundByCategoryId={fundByCategoryId}
             onHouseholdChange={setHouseholdItems}
             onWifeChange={setWifeItems}
@@ -499,7 +528,7 @@ export function MonthlyPlanningFlow({
                 style={{
                   ...continueButtonStyle,
                   background: canAdvanceFromActiveStep && saveState !== "saving" ? "var(--accent)" : "var(--surface2)",
-                  color: canAdvanceFromActiveStep && saveState !== "saving" ? "#11150f" : "var(--muted)",
+                  color: canAdvanceFromActiveStep && saveState !== "saving" ? "var(--accent-ink)" : "var(--muted)",
                   cursor: canAdvanceFromActiveStep && saveState !== "saving" ? "pointer" : "not-allowed",
                 }}
               >
@@ -515,7 +544,7 @@ export function MonthlyPlanningFlow({
 
 const shellStyle: CSSProperties = {
   minHeight: "100dvh",
-  background: "linear-gradient(180deg, color-mix(in srgb, var(--bg) 94%, white), color-mix(in srgb, var(--surface) 64%, white))",
+  background: "var(--bg)",
   padding: "calc(var(--safe-top) + 14px) 14px calc(88px + env(safe-area-inset-bottom, 0px))",
 };
 
@@ -528,7 +557,9 @@ const contentWrapStyle: CSSProperties = {
 
 const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 96%, white)",
-  borderRadius: 26,
+  borderRadius: "var(--card-radius)",
+  border: "1px solid var(--card-border)",
+  boxShadow: "var(--card-shadow)",
   padding: "18px 18px 14px",
   display: "grid",
   gap: 14,
@@ -651,9 +682,9 @@ const closeButtonStyle: CSSProperties = {
   width: 36,
   height: 36,
   padding: 8,
-  borderRadius: 0,
+  borderRadius: 999,
   border: "none",
-  background: "transparent",
+  background: "color-mix(in srgb, var(--surface2) 52%, white)",
   color: "var(--text2)",
   cursor: "pointer",
   display: "flex",
@@ -664,7 +695,7 @@ const closeButtonStyle: CSSProperties = {
 
 const cancelButtonStyle: CSSProperties = {
   minHeight: 48,
-  borderRadius: 16,
+  borderRadius: 999,
   border: "none",
   background: "color-mix(in srgb, var(--surface2) 54%, white)",
   color: "var(--text)",
@@ -674,7 +705,7 @@ const cancelButtonStyle: CSSProperties = {
 
 const continueButtonStyle: CSSProperties = {
   minHeight: 48,
-  borderRadius: 16,
+  borderRadius: 999,
   border: "none",
   fontSize: 13,
   fontWeight: 600,

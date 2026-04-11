@@ -17,6 +17,7 @@ export type Transaction = {
   amount: number;
   date: string;
   category: string | null;
+  accountId: string | null;
 };
 
 export type Account = {
@@ -26,6 +27,7 @@ export type Account = {
   type: string | null;
   balance: number | null;
   readyToAssign: number | null;
+  jointDue?: number | null;
 };
 
 export type PendingItem = {
@@ -52,7 +54,7 @@ export type MonthlySummary = {
   spentByCategory: MonthlyCategoryTotal[];
 };
 
-export type PlanningStep = "close" | "income" | "budget" | "review";
+export type PlanningStep = "close" | "income" | "budget" | "savings" | "review";
 
 export type MonthlyPlanningSnapshot = {
   availablePool: number;

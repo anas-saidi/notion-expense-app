@@ -136,6 +136,11 @@ const summaryValueStyle: CSSProperties = {
   color: "var(--text)",
   fontSize: 24,
   lineHeight: 1,
+  fontFamily: "var(--font-display)",
+  fontWeight: 800,
+  letterSpacing: -0.5,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
 };
 
 const panelStyle: CSSProperties = {
@@ -163,10 +168,12 @@ const amountInputStyle: CSSProperties = {
   width: "100%",
   minHeight: 42,
   borderRadius: 12,
-  border: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+  border: "1px solid transparent",
   background: "transparent",
   color: "var(--text)",
   padding: "0 10px",
   fontSize: 16,
   textAlign: "right",
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
 };

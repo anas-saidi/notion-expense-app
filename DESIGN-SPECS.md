@@ -1,143 +1,227 @@
-# Design Specs for Notion Expense Redesign
+# Household Stats Card Design Spec
 
-## 1. Home / Budgets Dashboard
+## Overview
 
-### Layout
-- **Header:**
-  - App logo/name left, user/account switcher right (if needed).
-- **Main Chart:**
-  - Large donut or bar chart at the top.
-  - Shows total "Planned vs Spent" for the current month.
-  - Tappable: toggles to breakdown by category (pie or stacked bar).
-- **Budgets List:**
-  - Each row: category icon (emoji), name, planned, spent, remaining, horizontal progress bar.
-  - Remaining amount color-coded (green = safe, yellow = low, red = over/frozen).
-  - Tap row → open Budget Details modal/screen.
-- **Frozen Budgets:**
-  - Collapsible section at bottom of list.
-  - Each frozen budget: "Revive" button (opens fund modal).
-- **Ready to Assign:**
-  - Section only visible if unassigned funds exist.
-  - Shows available amount, "Assign" button.
-- **FAB:**
-  - Floating action button, bottom right, for "Add Transaction".
+This spec defines a calm, tap-to-switch stats card for a shared household finance app.
 
-### Interactions
-- Tap chart to toggle view.
-- Tap budget row for details.
-- Tap "Revive" to fund frozen budget.
-- Tap FAB to add transaction.
+The card should show:
+- `planned vs spent vs remaining`
+- scope switching between `Household`, `Wife`, and `Husband`
+- subtle animation with low visual noise
 
----
+The interaction should feel quiet, elegant, and easy to scan on mobile.
 
-## 2. Add Transaction Modal
+## Design Direction
 
-### Layout
-- **Fields:**
-  - Amount (large, numeric input)
-  - Description (text input)
-  - Category picker (dropdown or chips, shows icon + name + remaining)
-  - Account picker (dropdown, shows icon + name + balance)
-  - Date picker (defaults to today)
-- **Budget Impact:**
-  - Shows remaining after transaction (color-coded)
-  - If insufficient funds, show "Revive" prompt inline
-- **Actions:**
-  - Save (primary), Cancel (secondary)
+Use a blended design approach:
+- `Notion` as the visual base for warmth, spacing, thin borders, and calm surfaces
+- `Wise` for financial hierarchy and budget readability
+- `Linear` only for subtle motion behavior
 
-### Interactions
-- Autofocus on amount.
-- Category/account pickers filterable.
-- "Revive" prompt opens fund modal (choose source: Ready to Assign or another category).
+Avoid loud fintech styling, dense KPI grids, or overt tab bars.
 
----
+## Component
 
-## 3. Budget Details Modal/Screen
+`HouseholdStatCard`
 
-### Layout
-- **Header:**
-  - Category icon, name, planned vs spent chart (mini donut/bar).
-- **Details:**
-  - Planned, spent, remaining (numbers, color-coded)
-  - List of recent transactions for this budget
-  - Assignment history (Funds DB records)
-- **Actions:**
-  - "Fund" (from Ready to Assign or another category)
-  - "Move Funds" (transfer to another budget)
-  - Edit budget (planned amount)
+Purpose:
+A single card that shows `planned vs spent vs remaining`, while letting the user tap the main number to cycle between `Household`, `Wife`, and `Husband`.
 
-### Interactions
-- Tap transaction to view details.
-- Tap fund/move to open modal.
+## Content Structure
 
----
+Top left:
+- Eyebrow: `This month`
 
-## 4. Pending Tab
+Main area:
+- Active scope label: `Household` / `Wife` / `Husband`
+- Main number: default to `spent so far`
+- Secondary line: `of {planned} planned`
+- Tertiary line: `{remaining} remaining` or `{over} over plan`
 
-### Layout
-- **Quick Add:**
-  - Name, amount, category, due date, owner (inline or modal)
-- **List:**
-  - Each item: name, amount, category, due date, owner
-  - Actions: mark as paid, edit, dismiss
+Bottom:
+- Progress bar
+- Small status text: `On track`, `Near limit`, or `Over budget`
 
----
+Optional micro hint:
+- `Tap amount to switch`
+- Show only on first visits, then hide permanently
 
-## 5. History Tab
+## Default State
 
-### Layout
-- **Filters:**
-  - Date range, category, account (dropdowns)
-  - Search bar (top)
-- **List:**
-  - All transactions, grouped by date
-  - Each: name, amount, category, account, date
-  - Action: reuse (prefill add form)
+Start on `Household`.
 
----
+Reason:
+- it matches the shared nature of the app
+- it gives the clearest monthly overview
+- partner views feel like drill-down, not competing top-level dashboards
 
-## 6. Accounts
-- **Picker:**
-  - Icon, name, type, balance
-  - Used in add transaction and fund assignment
+## Tap Behavior
 
----
+Tap target:
+- the whole number block, not just the digits
 
-## 7. Micro-interactions
-- **Toasts:**
-  - For success, error, and important actions
-- **Save Bursts:**
-  - Subtle animation on save
-- **Loading Lines:**
-  - Playful loading feedback
+Cycle order:
+- `Household -> Wife -> Husband -> Household`
 
----
+On each tap, update:
+- scope label
+- main amount
+- planned amount in supporting line
+- remaining or over text
+- progress bar value
+- status text
 
-## Visual Style
-- Playful, friendly, and modern
-- Use Notion page icons for categories/accounts
-- Responsive, touch-friendly
-- Color-coded for clarity (safe, warning, danger)
-- Consistent spacing, rounded corners, clear hierarchy
+Do not change:
+- card size
+- layout
+- typography scale
+- surrounding chrome
 
----
+## Visual Hierarchy
 
-## Navigation
-- **Bottom Tab Bar:**
-  - Home (Budgets) | Pending | History
-- **FAB:**
-  - Always visible for "Add Transaction"
+Style direction:
+- Notion-like calm base
+- Wise-like emphasis on money numbers
 
----
+Suggested hierarchy:
+- Eyebrow: 12px-13px, medium, muted
+- Scope label: 14px, semibold
+- Main number: 36px-44px, semibold or bold
+- Supporting lines: 14px-15px, muted
+- Status line: 12px-13px, medium
 
-## Accessibility
-- Sufficient color contrast
-- Keyboard navigation for all actions
-- ARIA labels for interactive elements
+## Color System
 
----
+Background:
+- warm off-white
 
-## Notes
-- All data is sourced from Notion DBs as specified in SPECS.md
-- "Ready to Assign" and fund flows must be visually distinct and easy to access
-- Budget impact and warnings should be clear and immediate
+Card:
+- white with whisper border
+
+Text:
+- near-black for primary
+- warm gray for secondary
+
+Accent:
+- one accent only
+- muted green is best for this use case
+
+Status colors:
+- `On track`: green
+- `Near limit`: amber
+- `Over budget`: red
+
+Keep fills soft, not saturated.
+
+## Progress Bar
+
+Track:
+- thin, around 8px high
+- warm neutral background
+
+Fill:
+- green under 85%
+- amber from 85% to 100%
+- red above 100%
+
+Bar behavior:
+- width animates between states
+- no bouncing
+- no striped effects
+- no gradient needed
+
+## Motion
+
+Animation should feel almost invisible.
+
+Timing:
+- `180ms` to `220ms`
+
+Easing:
+- `ease-out`
+
+Transitions:
+- scope label crossfade
+- number swaps with slight vertical motion
+- supporting text crossfades
+- progress bar width animates smoothly
+
+Suggested motion:
+- outgoing number: opacity `1 -> 0`, translateY `-4px`
+- incoming number: opacity `0 -> 1`, translateY `4px -> 0`
+
+Respect reduced motion:
+- if reduced motion is enabled, use fade only
+
+## Discoverability
+
+Because tabs are removed, keep one subtle clue:
+- scope label always visible above the number
+- optional 3 tiny dots below the number block
+- active dot matches current scope
+
+Example:
+- filled dot = current
+- two faded dots = other views
+
+That is enough to imply multiple states without clutter.
+
+## Example Copy
+
+Household:
+- `Household`
+- `2,340 MAD`
+- `of 3,200 MAD planned`
+- `860 MAD remaining`
+- `On track`
+
+Wife:
+- `Wife`
+- `1,180 MAD`
+- `of 1,600 MAD planned`
+- `420 MAD remaining`
+
+Husband:
+- `Husband`
+- `1,160 MAD`
+- `of 1,600 MAD planned`
+- `440 MAD remaining`
+
+If over:
+- `180 MAD over plan`
+- status becomes `Over budget`
+
+## Mobile Behavior
+
+On mobile:
+- full-width card
+- keep the same single-card model
+- do not split partner stats side-by-side
+- center the number block or left-align consistently, but keep it stable across states
+
+## Implementation Notes
+
+State shape:
+
+```ts
+type Scope = "household" | "wife" | "husband";
+
+type StatView = {
+  spent: number;
+  planned: number;
+  remaining: number;
+  progress: number;
+  status: "on-track" | "near-limit" | "over-budget";
+};
+```
+
+Derived logic:
+- `remaining = planned - spent`
+- `progress = spent / planned`
+- if `remaining < 0`, show over-budget copy with absolute value
+
+## Reference Files
+
+- [Notion Design](C:/Users/HP/Downloads/awesome-design-md-main/awesome-design-md-main/design-md/notion/DESIGN.md)
+- [Wise Design](C:/Users/HP/Downloads/awesome-design-md-main/awesome-design-md-main/design-md/wise/DESIGN.md)
+- [Linear Design](C:/Users/HP/Downloads/awesome-design-md-main/awesome-design-md-main/design-md/linear.app/DESIGN.md)

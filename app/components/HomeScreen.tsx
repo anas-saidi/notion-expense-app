@@ -1,5 +1,7 @@
-import type { Category, MonthlyCategoryTotal } from "./app-types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Category, MonthlySummary } from "./app-types";
 import { HomeOverview } from "./HomeOverview";
+import type { Scope } from "./HouseholdStatCard";
 import { Money } from "./Money";
 
 type HomeScreenProps = {
@@ -10,10 +12,11 @@ type HomeScreenProps = {
   onSelectCategory: (category: Category) => void;
   onOpenAdd: () => void;
   onOpenPlan: () => void;
-  totalAssigned: number;
-  totalSpent: number;
-  assignedByCategory: MonthlyCategoryTotal[];
-  spentByCategory: MonthlyCategoryTotal[];
+  monthlySummary: MonthlySummary;
+  onPlannedChange: (categoryId: string, nextPlanned: number) => void;
+  readyToAssignByScope: Record<Scope, number>;
+  contributionDueByScope: { wife: number; husband: number; total: number };
+  householdSpentByPartner: { wife: number; husband: number; other: number; total: number };
 };
 
 export function HomeScreen({
@@ -22,18 +25,77 @@ export function HomeScreen({
   search,
   onSearchChange,
   onSelectCategory,
-  onOpenAdd,
-  onOpenPlan,
-  totalAssigned,
-  totalSpent,
-  assignedByCategory,
-  spentByCategory,
-}: HomeScreenProps) {
+      <div style={heroBackgroundWrapStyle}>
+        <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
+          <div>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 0.95, fontWeight: 800, color: "var(--text)" }}>
+              Home
+            </h1>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
+              All your Notion categories in one place.
+            </p>
+          </div>
+        </header>
+
+        <div style={{ display: "grid", gap: 18 }}>
+          <div style={stickyHeaderWrapStyle}>
+            <HomeOverview
+              onOpenPlan={onOpenPlan}
+              categories={categories}
+              monthlySummary={monthlySummary}
+              scope={scope}
+              onScopeChange={setScope}
+              readyToAssignByScope={readyToAssignByScope}
+              contributionDueByScope={contributionDueByScope}
+              householdSpentByPartner={householdSpentByPartner}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          paddingBottom: 10,
+          borderBottom: "none",
+          animation: "fadeUp 0.35s 0.04s ease both",
+        }}
+      >
+    const spent = spentByCategory.get(categoryId) ?? 0;
+    const nextPlanned = Math.max(0, spent + numericValue);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    setSaveCategoryId(categoryId);
+    setSaveState("saving");
+    onPlannedChange(categoryId, nextPlanned);
+    setEditingCategoryId(null);
+    setDraftAvailable("");
+    saveTimerRef.current = setTimeout(() => {
+      setSaveState("saved");
+      savedTimerRef.current = setTimeout(() => {
+        setSaveState("idle");
+        setSaveCategoryId(null);
+      }, 1200);
+    }, 300);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
+
+  const visibleCategories = useMemo(() => {
+    if (scope === "household") return categories.filter((category) => category.isTeamFund);
+    if (scope === "wife") return categories.filter(isWifeCategory);
+    return categories.filter(isHusbandCategory);
+  }, [categories, scope]);
+
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
       <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
         <div>
-          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, lineHeight: 1, color: "var(--text)" }}>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 0.95, fontWeight: 800, color: "var(--text)" }}>
             Home
           </h1>
           <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
@@ -43,19 +105,23 @@ export function HomeScreen({
       </header>
 
       <div style={{ display: "grid", gap: 18 }}>
-        <HomeOverview
-          categories={categories}
-          onOpenPlan={onOpenPlan}
-          totalAssigned={totalAssigned}
-          totalSpent={totalSpent}
-          assignedByCategory={assignedByCategory}
-          spentByCategory={spentByCategory}
-        />
+        <div style={stickyHeaderWrapStyle}>
+          <HomeOverview
+            onOpenPlan={onOpenPlan}
+            categories={categories}
+            monthlySummary={monthlySummary}
+            scope={scope}
+            onScopeChange={setScope}
+            readyToAssignByScope={readyToAssignByScope}
+            contributionDueByScope={contributionDueByScope}
+            householdSpentByPartner={householdSpentByPartner}
+          />
+        </div>
 
         <div
           style={{
             paddingBottom: 10,
-            borderBottom: "1px solid color-mix(in srgb, var(--border2) 62%, transparent)",
+            borderBottom: "none",
             animation: "fadeUp 0.35s 0.04s ease both",
           }}
         >
@@ -77,7 +143,7 @@ export function HomeScreen({
           />
         </div>
 
-        <section style={{ display: "grid", gap: 0 }}>
+        <section style={{ display: "grid", gap: 0, paddingBottom: 72 }}>
           <div style={{ paddingBottom: 12 }}>
             <div>
               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)" }}>
@@ -87,77 +153,116 @@ export function HomeScreen({
             </div>
           </div>
 
-          {categories.map((cat, i) => (
-            <button
-              key={cat.id}
-              onClick={() => {
-                onSelectCategory(cat);
-                onOpenAdd();
-              }}
-              style={{
-                textAlign: "left",
-                width: "100%",
-                padding: "14px 0",
-                background: "transparent",
-                border: "none",
-                borderTop: i === 0 ? "1px solid color-mix(in srgb, var(--border) 76%, transparent)" : "none",
-                borderBottom: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                animation: `fadeUp 0.28s ${i * 0.03}s ease both`,
-              }}
-            >
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 14,
-                  background: cat.id === selectedCategoryId ? "color-mix(in srgb, var(--accent-dim) 42%, white)" : "var(--surface2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 18,
-                  flexShrink: 0,
-                  transition: "background-color 0.2s ease",
-                }}
-              >
-                {cat.icon ?? "#"}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
+          {visibleCategories.map((cat, i) => {
+            const planned = cat.planned ?? 0;
+            const spent = spentByCategory.get(cat.id) ?? 0;
+            const available = cat.available ?? 0;
+            const isEditing = editingCategoryId === cat.id;
+            const spentPct = Math.min(100, (Math.max(0, spent) / Math.max(1, planned)) * 100);
+            const spentTone = spent > planned
+              ? "color-mix(in srgb, var(--danger) 65%, #f6e1c9)"
+              : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
+
+            return (
+              <div key={cat.id} style={categoryRowWrapStyle}>
+                <button
+                  onClick={() => {
+                    onSelectCategory(cat);
+                    onOpenAdd();
+                  }}
                   style={{
-                    fontSize: 16,
-                    fontWeight: cat.id === selectedCategoryId ? 700 : 650,
-                    color: "var(--text)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    ...categoryRowStyle,
+                    animation: `fadeUp 0.28s ${i * 0.03}s ease both`,
                   }}
                 >
-                  {cat.name}
-                </div>
-                <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
-                  {(cat.type[0] ?? "Category").toUpperCase()} · Planned <Money value={cat.planned ?? 0} />
-                </p>
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 14,
+                      background: cat.id === selectedCategoryId ? "color-mix(in srgb, var(--accent-dim) 42%, white)" : "var(--surface2)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 18,
+                      flexShrink: 0,
+                      transition: "background-color 0.2s ease",
+                    }}
+                  >
+                    {cat.icon ?? "#"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 16,
+                        fontWeight: cat.id === selectedCategoryId ? 700 : 650,
+                        color: "var(--text)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {cat.name}
+                    </div>
+                    <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
+                      {(cat.type[0] ?? "Category").toUpperCase()} · Planned <Money value={planned} />
+                    </p>
+                    <div style={spentBarTrackStyle} aria-hidden="true">
+                      <div style={{ ...spentBarFillStyle, width: `${spentPct}%`, background: spentTone }} />
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0, display: "grid", gap: 6, justifyItems: "end" }}>
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setEditingCategoryId(cat.id);
+                          setDraftAvailable(String(available));
+                        }}
+                        style={availableButtonStyle}
+                      >
+                        <span style={availableLabelStyle}>Available</span>
+                        <Money value={available} />
+                      </button>
+                    )}
+                    {isEditing && (
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={draftAvailable}
+                        onChange={(event) => {
+                          const cleaned = event.target.value.replace(/[^0-9.\-]/g, "");
+                          const normalized = cleaned.replace(/(?!^)-/g, "");
+                          if ((normalized.match(/\./g) || []).length <= 1) {
+                            setDraftAvailable(normalized);
+                          }
+                        }}
+                        onBlur={() => commitAvailable(cat.id, draftAvailable)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            commitAvailable(cat.id, draftAvailable);
+                          }
+                          if (event.key === "Escape") {
+                            setEditingCategoryId(null);
+                            setDraftAvailable("");
+                          }
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`Available amount for ${cat.name}`}
+                        style={availableInputStyle}
+                      />
+                    )}
+                    {saveCategoryId === cat.id && saveState !== "idle" && (
+                      <span style={saveBadgeStyle}>
+                        {saveState === "saving" ? "Saving..." : "Saved"}
+                      </span>
+                    )}
+                  </div>
+                </button>
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div
-                  style={{
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: 12,
-                    color: (cat.available ?? 0) >= 0 ? "var(--success)" : "var(--danger)",
-                    fontWeight: cat.id === selectedCategoryId ? 700 : 500,
-                  }}
-                >
-                  {(cat.available ?? 0) > 0 ? "+" : ""}
-                  <Money value={cat.available ?? 0} />
-                </div>
-                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>available</div>
-              </div>
-            </button>
-          ))}
+            );
+          })}
 
           {categories.length === 0 && (
             <div style={{ padding: "18px 0", color: "var(--muted)", fontSize: 14 }}>
@@ -169,3 +274,108 @@ export function HomeScreen({
     </div>
   );
 }
+
+function isWifeCategory(category: Category) {
+  return !category.isTeamFund && (category.owner?.toLowerCase().includes("salma") ?? false);
+}
+
+function isHusbandCategory(category: Category) {
+  return !category.isTeamFund && (category.owner?.toLowerCase().includes("anas") ?? false);
+}
+
+const categoryRowWrapStyle = {
+  display: "grid",
+  gap: 8,
+  padding: "14px 0",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
+};
+
+const stickyHeaderWrapStyle = {
+  position: "sticky" as const,
+  top: "calc(var(--safe-top) + 8px)",
+  zIndex: 10,
+  background: "transparent",
+  paddingBottom: 8,
+};
+
+const heroBackgroundWrapStyle = {
+  background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, var(--bg)) 0%, transparent 70%)",
+  marginTop: -24,
+  paddingTop: 24,
+  paddingBottom: 20,
+};
+
+const saveBadgeStyle = {
+  fontSize: 10,
+  letterSpacing: 0.4,
+  textTransform: "uppercase" as const,
+  fontFamily: "'DM Mono', monospace",
+  color: "color-mix(in srgb, var(--muted) 78%, transparent)",
+};
+
+const spentBarTrackStyle = {
+  width: "100%",
+  height: 6,
+  borderRadius: 999,
+  background: "color-mix(in srgb, var(--surface2) 65%, white)",
+  overflow: "hidden",
+  marginTop: 6,
+  boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 45%, transparent)",
+};
+
+const spentBarFillStyle = {
+  height: "100%",
+  borderRadius: 999,
+  background: "color-mix(in srgb, var(--accent) 55%, #f6e1c9)",
+  transition: "width 0.18s ease",
+};
+
+const categoryRowStyle = {
+  textAlign: "left" as const,
+  width: "100%",
+  padding: 0,
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+};
+
+const availableButtonStyle = {
+  display: "inline-flex",
+  flexDirection: "column" as const,
+  alignItems: "flex-end",
+  gap: 4,
+  border: "none",
+  background: "transparent",
+  padding: 0,
+  cursor: "pointer",
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 12,
+  color: "var(--text)",
+  transition: "transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s ease",
+};
+
+const availableLabelStyle = {
+  fontSize: 10,
+  letterSpacing: 0.4,
+  textTransform: "uppercase" as const,
+  color: "var(--muted)",
+};
+
+const availableInputStyle = {
+  width: 92,
+  height: 32,
+  textAlign: "right" as const,
+  borderRadius: 10,
+  border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
+  background: "var(--surface)",
+  color: "var(--text)",
+  padding: "6px 8px",
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 12,
+  outline: "none",
+  transition: "border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
+  animation: "inputPop 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+};

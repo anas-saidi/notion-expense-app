@@ -15,7 +15,7 @@ const navStyle: CSSProperties = {
   zIndex: 50,
   background: "color-mix(in srgb, var(--bg) 82%, var(--surface))",
   borderTop: "1px solid color-mix(in srgb, var(--border2) 56%, transparent)",
-  boxShadow: "0 -4px 12px color-mix(in srgb, var(--ink-strong) 8%, transparent)",
+  boxShadow: "none",
   paddingBottom: "env(safe-area-inset-bottom)",
 };
 

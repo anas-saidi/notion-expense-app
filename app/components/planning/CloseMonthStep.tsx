@@ -540,7 +540,7 @@ const confirmCheckboxBaseStyle: CSSProperties = {
 
 const confirmCheckboxCheckedStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--success) 55%, white)",
-  boxShadow: "0 0 0 3px color-mix(in srgb, var(--success) 16%, transparent)",
+  boxShadow: "0 0 0 2px color-mix(in srgb, var(--success) 14%, transparent)",
   borderColor: "color-mix(in srgb, var(--success) 35%, var(--border2))",
 };
 
@@ -630,7 +630,7 @@ const repairMenuStyle: CSSProperties = {
   padding: 8,
   borderRadius: 18,
   background: "color-mix(in srgb, var(--surface) 94%, white)",
-  boxShadow: "0 14px 30px rgba(15, 17, 20, 0.12)",
+  boxShadow: "0 0 0 1px color-mix(in srgb, var(--ink-strong) 10%, transparent)",
   zIndex: 10,
 };
 

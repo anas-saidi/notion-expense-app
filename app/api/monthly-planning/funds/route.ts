@@ -58,7 +58,6 @@ export async function GET(req: NextRequest) {
             { property: "Date", date: { on_or_after: bounds.start } },
             { property: "Date", date: { on_or_before: bounds.end } },
             { property: "Category", relation: { is_not_empty: true } },
-            { property: "Reverse", checkbox: { equals: false } },
           ],
         },
         page_size: 100,
@@ -74,6 +73,7 @@ export async function GET(req: NextRequest) {
       planned: page.properties.Planned?.number ?? 0,
       date: page.properties.Date?.date?.start ?? null,
       assignmentType: page.properties["Assignment Type"]?.select?.name ?? null,
+      reverse: page.properties.Reverse?.checkbox ?? false,
     })).filter((fund: any) => fund.categoryId);
 
     return NextResponse.json({ funds });

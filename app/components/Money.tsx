@@ -32,6 +32,8 @@ const moneyWrapStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "baseline",
   gap: 6,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
 };
 
 const currencyBaseStyle: CSSProperties = {

@@ -59,7 +59,7 @@ const rowStyle = {
   gap: 12,
   alignItems: "center",
   padding: "12px 0",
-  borderBottom: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
 };
 
 const metaRowStyle = {
@@ -87,10 +87,12 @@ const amountInputStyle = {
   width: "100%",
   minHeight: 42,
   borderRadius: 12,
-  border: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+  border: "1px solid transparent",
   background: "transparent",
   color: "var(--text)",
   padding: "0 10px",
   fontSize: 16,
   textAlign: "right" as const,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
 };

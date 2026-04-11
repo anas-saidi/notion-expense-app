@@ -50,14 +50,15 @@ type AddTransactionSheetProps = {
 
 const shellSurface: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 96%, white)",
-  border: "1px solid color-mix(in srgb, var(--border) 46%, transparent)",
-  borderRadius: 26,
+  border: "1px solid var(--card-border)",
+  borderRadius: "var(--card-radius)",
+  boxShadow: "var(--card-shadow)",
 };
 
 const chipButtonStyle: CSSProperties = {
   minHeight: 40,
   padding: "0 8px",
-  borderRadius: 10,
+  borderRadius: 999,
   border: "1px solid transparent",
   background: "transparent",
   color: "var(--text2)",
@@ -153,7 +154,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         position: "fixed",
         inset: 0,
         zIndex: 70,
-        background: "rgba(39, 24, 19, 0.08)",
+        background: "rgba(14, 15, 12, 0.12)",
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",
@@ -207,9 +208,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   width: 44,
                   height: 44,
                   padding: 10,
-                  borderRadius: 0,
+                  borderRadius: 999,
                   border: "none",
-                  background: "transparent",
+                  background: "color-mix(in srgb, var(--surface2) 52%, white)",
                   color: "var(--text2)",
                   cursor: "pointer",
                   display: "flex",
@@ -281,7 +282,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     color: "var(--text)",
                     outline: "none",
                     fontSize: "clamp(2.8rem, 8vw, 4rem)",
-                    fontWeight: 680,
+                    fontFamily: "var(--font-display)",
+                    fontWeight: 800,
+                    fontVariantNumeric: "tabular-nums",
+                    fontFeatureSettings: "\"tnum\"",
                     lineHeight: 0.95,
                     letterSpacing: -1.1,
                     minWidth: "3.8ch",
@@ -550,21 +554,21 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       <div
                         style={{
                           padding: "10px 10px 11px",
-                          borderTop: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+                          borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
                           background: "color-mix(in srgb, var(--surface2) 10%, white)",
                         }}
                       >
-                        <div
-                          style={{
-                            minHeight: 40,
-                            borderRadius: 12,
-                            border: "1px solid color-mix(in srgb, var(--border2) 40%, transparent)",
-                            background: "color-mix(in srgb, var(--surface) 90%, white)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "0 12px",
-                          }}
+                      <div
+                        style={{
+                          minHeight: 40,
+                          borderRadius: 12,
+                          border: "1px solid transparent",
+                          background: "color-mix(in srgb, var(--surface2) 42%, white)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "0 12px",
+                        }}
                         >
                           <span aria-hidden="true" style={{ fontSize: 12, color: "var(--muted)" }}>
                             /
@@ -686,20 +690,20 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       <div
                         style={{
                           padding: "10px 10px 11px",
-                          borderTop: "1px solid color-mix(in srgb, var(--border) 76%, transparent)",
+                          borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
                           background: "color-mix(in srgb, var(--surface2) 10%, white)",
                         }}
                       >
-                        <div
-                          style={{
-                            minHeight: 40,
-                            borderRadius: 12,
-                            border: "1px solid color-mix(in srgb, var(--border2) 40%, transparent)",
-                            background: "color-mix(in srgb, var(--surface) 90%, white)",
-                            display: "flex",
-                            alignItems: "center",
-                            padding: "0 12px",
-                          }}
+                      <div
+                        style={{
+                          minHeight: 40,
+                          borderRadius: 12,
+                          border: "1px solid transparent",
+                          background: "color-mix(in srgb, var(--surface2) 42%, white)",
+                          display: "flex",
+                          alignItems: "center",
+                          padding: "0 12px",
+                        }}
                         >
                           <input
                             type="date"
