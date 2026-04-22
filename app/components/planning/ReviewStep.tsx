@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import type { MonthlyPlanningSnapshot, PlanningAllocationItem, PlanningIncomeItem } from "../app-types";
 import { Money } from "../Money";
+import { CheckIcon } from "../ui/icons";
 
 type ReviewStepProps = {
   snapshot: MonthlyPlanningSnapshot;
@@ -61,9 +62,7 @@ export function ReviewStep({
               <Money value={snapshot.leftToAssign} />
               {isComplete && (
                 <span className="review-check" aria-hidden="true">
-                  <svg viewBox="0 0 16 12" width="16" height="12" fill="none">
-                    <path d="M1.5 6.2l3.6 3.6L14.5 1.5" />
-                  </svg>
+                  <CheckIcon strokeWidth={2.2} />
                 </span>
               )}
             </span>

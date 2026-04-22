@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { CalendarIcon, XIcon } from "./ui/icons";
 import type { Account, Category, PlanningAllocationItem } from "./app-types";
 import { NumbersHeaderCard } from "./NumbersHeaderCard";
 import { BudgetPlanningStep } from "./planning/BudgetPlanningStep";
@@ -259,10 +260,7 @@ export function BudgetEditSheet({
             />
 
             <button onClick={onClose} aria-label="Close budget editor" style={closeButtonStyle}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              <XIcon size={14} />
             </button>
           </header>
 
@@ -316,19 +314,6 @@ export function BudgetEditSheet({
   );
 }
 
-function CalendarIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 7.5h16" />
-      <path d="M7 3.5v4" />
-      <path d="M17 3.5v4" />
-      <rect x="4" y="6" width="16" height="14" rx="3" />
-      <path d="M8 11h3" />
-      <path d="M13 11h3" />
-      <path d="M8 15h8" />
-    </svg>
-  );
-}
 
 const sheetWrapStyle: CSSProperties = {
   position: "fixed",

@@ -10,6 +10,7 @@ type PendingPropKeys = {
   amount?: string;
   category?: string;
   addedBy?: string;
+  claimedBy?: string;
   date?: string;
 };
 
@@ -51,6 +52,7 @@ async function getPendingPropKeys(token: string): Promise<PendingPropKeys> {
     amount: pickByTypeAndAliases(rawProps, "number", ["Amount", "Price", "Cost"]),
     category: pickByTypeAndAliases(rawProps, "relation", ["Category", "Categories"]),
     addedBy: pickByTypeAndAliases(rawProps, "select", ["AddedBy", "Added By", "By", "Owner"]),
+    claimedBy: pickByTypeAndAliases(rawProps, "select", ["ClaimedBy", "Claimed By", "Claimed"]),
     date: pickByTypeAndAliases(rawProps, "date", ["Date", "Due", "Planned", "When"]),
   };
 }
@@ -66,14 +68,18 @@ export async function GET() {
     });
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
-    const items = data.results.map((page: any) => ({
-      id: page.id,
-      name: page.properties[keys.title]?.title?.[0]?.plain_text ?? "",
-      amount: keys.amount ? page.properties[keys.amount]?.number ?? null : null,
-      categoryId: keys.category ? page.properties[keys.category]?.relation?.[0]?.id ?? null : null,
-      addedBy: keys.addedBy ? page.properties[keys.addedBy]?.select?.name ?? null : null,
-      date: keys.date ? page.properties[keys.date]?.date?.start ?? null : null,
-    }));
+    const items = data.results.map((page: any) => {
+      const rawClaimed = keys.claimedBy ? page.properties[keys.claimedBy]?.select?.name ?? null : null;
+      return {
+        id: page.id,
+        name: page.properties[keys.title]?.title?.[0]?.plain_text ?? "",
+        amount: keys.amount ? page.properties[keys.amount]?.number ?? null : null,
+        categoryId: keys.category ? page.properties[keys.category]?.relation?.[0]?.id ?? null : null,
+        addedBy: keys.addedBy ? page.properties[keys.addedBy]?.select?.name ?? null : null,
+        claimedBy: rawClaimed === "Wife" ? "wife" : rawClaimed === "Husband" ? "husband" : null,
+        date: keys.date ? page.properties[keys.date]?.date?.start ?? null : null,
+      };
+    });
     return NextResponse.json({ items });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to load pending";
@@ -84,7 +90,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
-  const { name, amount, categoryId, addedBy, date } = await req.json();
+  const { name, amount, categoryId, addedBy, claimedBy, date } = await req.json();
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
   try {
     const keys = await getPendingPropKeys(token);
@@ -94,6 +100,7 @@ export async function POST(req: NextRequest) {
     if (keys.amount && amount != null && amount !== "") properties[keys.amount] = { number: parseFloat(String(amount)) };
     if (keys.category && categoryId) properties[keys.category] = { relation: [{ id: categoryId }] };
     if (keys.addedBy && addedBy) properties[keys.addedBy] = { select: { name: addedBy } };
+    if (keys.claimedBy && claimedBy) properties[keys.claimedBy] = { select: { name: claimedBy === "wife" ? "Wife" : "Husband" } };
     if (keys.date && date) properties[keys.date] = { date: { start: date } };
 
     const res = await fetch("https://api.notion.com/v1/pages", {
@@ -102,9 +109,34 @@ export async function POST(req: NextRequest) {
     });
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
-    return NextResponse.json({ id: data.id, name, amount: amount ? parseFloat(String(amount)) : null, categoryId: categoryId ?? null, addedBy: addedBy ?? null, date: date ?? null });
+    return NextResponse.json({ id: data.id, name, amount: amount ? parseFloat(String(amount)) : null, categoryId: categoryId ?? null, addedBy: addedBy ?? null, claimedBy: claimedBy ?? null, date: date ?? null });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to save pending item";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
+  const { id, claimedBy } = await req.json();
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  try {
+    const keys = await getPendingPropKeys(token);
+    if (!keys.claimedBy) return NextResponse.json({ error: "No ClaimedBy property in database" }, { status: 400 });
+    const notionValue = claimedBy === "wife" ? "Wife" : claimedBy === "husband" ? "Husband" : null;
+    const properties: Record<string, unknown> = {
+      [keys.claimedBy]: notionValue ? { select: { name: notionValue } } : { select: null },
+    };
+    const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
+      method: "PATCH", headers: HDR(token),
+      body: JSON.stringify({ properties }),
+    });
+    const data = await res.json();
+    if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
+    return NextResponse.json({ success: true, claimedBy: claimedBy ?? null });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to update claim";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

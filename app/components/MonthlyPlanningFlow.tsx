@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { CalendarIcon, XIcon } from "./ui/icons";
 import { MonthlyPlanningHeader } from "./MonthlyPlanningHeader";
 import { CloseMonthStep } from "./planning/CloseMonthStep";
 import { BudgetPlanningStep } from "./planning/BudgetPlanningStep";
@@ -350,7 +351,7 @@ export function MonthlyPlanningFlow({
 
   return (
     <div id="panel-plan" role="tabpanel" aria-labelledby="tab-plan" style={shellStyle}>
-      <div style={{ ...contentWrapStyle, gap: isCompact ? 12 : 14 }}>
+      <div className="planning-content" style={{ gap: isCompact ? 12 : 14 }}>
         <div style={sheetStyle}>
           <header style={topBarStyle}>
             <button
@@ -381,10 +382,7 @@ export function MonthlyPlanningFlow({
             />
 
             <button onClick={onCancel} aria-label="Close planning" style={closeButtonStyle}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              <XIcon size={14} />
             </button>
           </header>
 
@@ -440,7 +438,7 @@ export function MonthlyPlanningFlow({
                 style={{
                   ...continueButtonStyle,
                   background: canAdvanceFromActiveStep && saveState !== "saving" ? "var(--accent)" : "var(--surface2)",
-                  color: canAdvanceFromActiveStep && saveState !== "saving" ? "#11150f" : "var(--muted)",
+                  color: canAdvanceFromActiveStep && saveState !== "saving" ? "var(--accent-ink)" : "var(--muted)",
                   cursor: canAdvanceFromActiveStep && saveState !== "saving" ? "pointer" : "not-allowed",
                 }}
               >
@@ -460,12 +458,6 @@ const shellStyle: CSSProperties = {
   padding: "calc(var(--safe-top) + 14px) 14px calc(88px + env(safe-area-inset-bottom, 0px))",
 };
 
-const contentWrapStyle: CSSProperties = {
-  maxWidth: 500,
-  margin: "0 auto",
-  display: "grid",
-  gap: 14,
-};
 
 const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 96%, white)",
@@ -493,7 +485,7 @@ const eyebrowStyle: CSSProperties = {
 };
 
 const monthPickerButtonStyle: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   padding: "0 6px",
   border: "none",
   background: "transparent",
@@ -589,8 +581,8 @@ const bottomBarInnerStyle: CSSProperties = {
 };
 
 const closeButtonStyle: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 44,
+  height: 44,
   padding: 8,
   borderRadius: 0,
   border: "none",
@@ -629,11 +621,3 @@ const hiddenMonthInputStyle: CSSProperties = {
   height: 0,
 };
 
-function CalendarIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="18" rx="3" />
-      <path d="M8 2v4M16 2v4M3 10h18" />
-    </svg>
-  );
-}

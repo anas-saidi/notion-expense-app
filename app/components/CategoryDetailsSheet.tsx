@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { FullScreenDelightIcon } from "./ui/FullScreenDelightIcon";
-import { CloseIcon } from "./ui/DelightIcons";
+import { XIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -159,7 +159,7 @@ export function CategoryDetailsSheet({
                 <FullScreenDelightIcon expanded={isFullscreen} />
               </button>
               <button onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
-                <CloseIcon />
+                <XIcon strokeWidth={2.2} />
               </button>
             </div>
           </header>

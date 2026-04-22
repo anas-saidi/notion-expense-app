@@ -1,9 +1,8 @@
-/* Delightful icon hover for BudgetRow */
+/* Icon hover for BudgetRow */
 .budget-row-icon:hover {
-  transform: scale(1.18) rotate(-8deg);
-  transition: transform 0.18s cubic-bezier(.7,1.7,.7,1);
+  transform: scale(1.1) rotate(-6deg);
+  transition: transform 0.15s ease-out;
 }
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap");
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -24,7 +23,7 @@
   --ink-strong: #0e0f0c;
   --text: #0e0f0c;
   --text2: #454745;
-  --muted: #868685;
+  --muted: #6e6e6d;
   --danger: #d03238;
   --success: #054d28;
   --card-border: #e5edf5;
@@ -34,6 +33,19 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font-display: "Fraunces", "Times New Roman", serif;
   --font-body: "Instrument Sans", "Inter", system-ui, sans-serif;
+
+  /* Partner identity colors */
+  --partner-wife: #e86c95;
+  --partner-wife-strong: #b34b6a;
+  --partner-husband: #6aa6e6;
+
+  /* Spend-tone scale */
+  --spend-over: #ef4444;
+  --spend-over-deep: #b91c1c;
+  --spend-warn: #f97316;
+  --spend-warn-deep: #ea580c;
+  --spend-caution: #f59e0b;
+  --spend-caution-deep: #d97706;
 }
 
 /* ── Wife mode — light/white-pink */
@@ -60,7 +72,7 @@ html[data-mode="husband"] {
   --border2: rgba(14, 15, 12, 0.18);
   --text: #0e0f0c;
   --text2: #454745;
-  --muted: #868685;
+  --muted: #6e6e6d;
   --danger: #d03238;
 }
 
@@ -268,8 +280,8 @@ textarea:focus-visible {
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
-  stroke-dasharray: 20;
-  stroke-dashoffset: 20;
+  stroke-dasharray: 23;
+  stroke-dashoffset: 23;
   animation: reviewCheckDraw 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -564,8 +576,8 @@ textarea:focus-visible {
 }
 
 .tx-delete-btn {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -674,5 +686,231 @@ textarea:focus-visible {
   .history-empty__orbit span {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* ── Identity screen ─────────────────────────────────────── */
+
+.identity-card-btn {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, background 0.15s ease-out;
+}
+
+@media (hover: hover) {
+  .identity-card-btn:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.identity-card-btn:active {
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0.08s;
+}
+
+.identity-card-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ── Identity chip (AppShell) ─────────────────────────────── */
+
+.identity-chip {
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.identity-chip:hover {
+  background: var(--surface2) !important;
+}
+
+.identity-chip:active {
+  transform: scale(0.96);
+  transition-duration: 0.08s;
+}
+
+.identity-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Pending screen interactions ─────────────────────────── */
+
+.pending-log-btn {
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.pending-log-btn:hover {
+  color: var(--text) !important;
+  background: var(--surface2);
+}
+
+.pending-log-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+.pending-claim-btn {
+  transition: color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+  border-radius: 6px;
+}
+
+.pending-claim-btn:hover {
+  background: var(--surface2) !important;
+  color: var(--text2) !important;
+}
+
+.pending-claim-btn:active {
+  opacity: 0.7;
+}
+
+.pending-claim-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pending-dismiss-btn {
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.pending-dismiss-btn:hover {
+  background: color-mix(in srgb, var(--danger) 14%, white) !important;
+}
+
+.pending-dismiss-btn:active {
+  transform: scale(0.9);
+}
+
+.pending-dismiss-btn:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ── FAB (add button) ─────────────────────────────────────── */
+
+.fab-add {
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+}
+
+@media (hover: hover) {
+  .fab-add:hover {
+    transform: scale(1.06);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+}
+
+.fab-add:active {
+  transform: scale(0.94);
+  transition-duration: 0.08s;
+}
+
+.fab-add:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 3px;
+}
+
+/* ── Responsive shell ─────────────────────────────────────── */
+
+.app-content {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: calc(var(--safe-top) + 20px) 20px calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+.app-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--bg) 82%, var(--surface));
+  border-top: 1px solid color-mix(in srgb, var(--border2) 56%, transparent);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.app-nav-inner {
+  display: flex;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.app-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 0 11px;
+  background: none;
+  border: none;
+  border-top: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.planning-content {
+  max-width: 500px;
+  margin: 0 auto;
+  display: grid;
+}
+
+/* ── Tablet (≥ 680px) ─────────────────────────────────────── */
+@media (min-width: 680px) {
+  .app-content {
+    max-width: 640px;
+  }
+  .app-nav-inner {
+    max-width: 640px;
+  }
+  .planning-content {
+    max-width: 600px;
+  }
+}
+
+/* ── Desktop (≥ 1100px) — sidebar nav ─────────────────────── */
+@media (min-width: 1100px) {
+  .app-content {
+    margin-left: 220px;
+    max-width: 860px;
+    padding-bottom: 48px;
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: calc(var(--safe-top) + 32px);
+  }
+  .app-nav {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    width: 220px;
+    border-top: none;
+    border-right: 1px solid color-mix(in srgb, var(--border2) 56%, transparent);
+    padding-top: calc(var(--safe-top) + 24px);
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+  .app-nav-inner {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: none;
+    height: 100%;
+    gap: 2px;
+    padding: 0 10px;
+  }
+  .app-nav-btn {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+    border-top: none;
+    border-left: 3px solid transparent;
+    border-radius: 12px;
+  }
+  .app-nav-btn[aria-selected="true"] {
+    border-left-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .planning-content {
+    max-width: 720px;
   }
 }

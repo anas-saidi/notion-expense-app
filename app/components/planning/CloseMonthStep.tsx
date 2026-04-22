@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { CloseMonthStepState, MonthCloseAccountSnapshot, MonthCloseSummary } from "../app-types";
 import { fmtDate, fmtMoney } from "../app-utils";
 import { Money } from "../Money";
+import { WrenchIcon } from "../ui/icons";
 
 type CloseMonthStepProps = {
   selectedMonth: string;
@@ -380,7 +381,7 @@ function AccountRepairRow({
             aria-label={`Repair ${account.label}`}
             title={`Repair ${account.label}`}
           >
-            <RepairIcon />
+            <WrenchIcon size={14} />
           </button>
 
           {isRepairOpen && (
@@ -424,19 +425,6 @@ function AccountRepairRow({
   );
 }
 
-function RepairIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path
-        d="M8.27 1.75a3.25 3.25 0 0 1 3.98 3.98L7.88 10.1a1.75 1.75 0 0 1-1.24.51H4.08v-2.56c0-.46.18-.9.51-1.24l4.37-4.36Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      <path d="M3.5 12.25h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 const panelStyle: CSSProperties = {
   color: "var(--text2)",

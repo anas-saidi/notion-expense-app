@@ -3,6 +3,7 @@ import type { Category, MonthlySummary } from "./app-types";
 import { HomeOverview } from "./HomeOverview";
 import type { Scope } from "./HouseholdStatCard";
 import { Money } from "./Money";
+import { SearchIcon, CheckIcon } from "./ui/icons";
 
 type HomeScreenProps = {
   categories: Category[];
@@ -128,12 +129,10 @@ export function HomeScreen({
             animation: "fadeUp 0.35s 0.04s ease both",
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: "var(--muted)", flexShrink: 0 }}>
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
+          <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
           <input
             type="text"
+            aria-label="Search categories"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search categories"
@@ -168,11 +167,11 @@ export function HomeScreen({
             const livePlanned = isFinite(draftNum) ? Math.max(0, spent + draftNum) : planned;
             const spentPct = Math.min(100, (Math.max(0, spent) / Math.max(1, livePlanned)) * 100);
             const spentTone = spent > livePlanned
-              ? "color-mix(in srgb, #ef4444 75%, #b91c1c)"
+              ? "color-mix(in srgb, var(--spend-over) 75%, var(--spend-over-deep))"
               : spentPct >= 85
-              ? "color-mix(in srgb, #f97316 70%, #ea580c)"
+              ? "color-mix(in srgb, var(--spend-warn) 70%, var(--spend-warn-deep))"
               : spentPct >= 65
-              ? "color-mix(in srgb, #f59e0b 70%, #d97706)"
+              ? "color-mix(in srgb, var(--spend-caution) 70%, var(--spend-caution-deep))"
               : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
 
             return (
@@ -285,9 +284,7 @@ export function HomeScreen({
                       <span style={saveState === "saved" ? savedBadgeStyle : saveBadgeStyle}>
                         {saveState === "saving" ? "saving..." : (
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M20 6 9 17l-5-5" />
-                            </svg>
+                            <CheckIcon size={9} strokeWidth={3} />
                             saved
                           </span>
                         )}

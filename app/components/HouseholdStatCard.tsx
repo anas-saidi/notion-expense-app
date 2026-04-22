@@ -119,13 +119,13 @@ export function HouseholdStatCard({ views, scope, onScopeChange, readyToAssignBy
           key: "wife",
           left: 0,
           width: wifeSpentPct,
-          color: "color-mix(in srgb, #e86c95 60%, #fff5f8)",
+          color: "color-mix(in srgb, var(--partner-wife) 60%, #fff5f8)",
         },
         {
           key: "husband",
           left: wifeSpentPct,
           width: husbandSpentPct,
-          color: "color-mix(in srgb, #6aa6e6 60%, #f3f7ff)",
+          color: "color-mix(in srgb, var(--partner-husband) 60%, #f3f7ff)",
         },
         {
           key: "other",
@@ -254,16 +254,16 @@ export function HouseholdStatCard({ views, scope, onScopeChange, readyToAssignBy
                 }
               }}
             >
-              <div style={{ ...contributionTickLineStyle, background: "#b34b6a" }} />
+              <div style={{ ...contributionTickLineStyle, background: "var(--partner-wife-strong)" }} />
               <div
                 style={{
                   ...contributionTickDotStyle,
-                  background: "#e86c95",
+                  background: "var(--partner-wife)",
                   boxShadow:
                     activeTick === "wife"
-                      ? "0 0 0 4px color-mix(in srgb, #e86c95 18%, transparent)"
+                      ? "0 0 0 4px color-mix(in srgb, var(--partner-wife) 18%, transparent)"
                       : hoverTick === "wife"
-                        ? "0 0 0 3px color-mix(in srgb, #e86c95 14%, transparent)"
+                        ? "0 0 0 3px color-mix(in srgb, var(--partner-wife) 14%, transparent)"
                         : contributionTickDotStyle.boxShadow,
                 }}
               />

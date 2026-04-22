@@ -12,6 +12,7 @@ import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import type { Account, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
+import { IdentityScreen } from "./components/IdentityScreen";
 import { fmtDate, monthBounds, shiftDate, today } from "./components/app-utils";
 
 const LOADING_LINES = [
@@ -73,7 +74,8 @@ function SectionHeader({
 }
 
 export default function App() {
-  const mode = "husband" as const;
+  const [mounted, setMounted] = useState(false);
+  const [mode, setMode] = useState<"wife" | "husband" | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -135,8 +137,18 @@ export default function App() {
   const catRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
 
+  // Resolve identity from localStorage after hydration — runs only on client
   useEffect(() => {
-    document.documentElement.dataset.mode = mode;
+    const saved = localStorage.getItem("identity");
+    if (saved === "wife" || saved === "husband") {
+      setMode(saved);
+      document.documentElement.dataset.mode = saved;
+    }
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mode) document.documentElement.dataset.mode = mode;
   }, [mode]);
 
   useEffect(() => {
@@ -154,7 +166,39 @@ export default function App() {
     toastTimerRef.current = setTimeout(() => setMicroToast(null), timeout);
   };
 
-  const applyDefaultAccountForMode = (accs: Account[], nextMode = mode) => {
+  const selectIdentity = (nextMode: "wife" | "husband") => {
+    localStorage.setItem("identity", nextMode);
+    setMode(nextMode);
+    document.documentElement.dataset.mode = nextMode;
+    if (accounts.length) applyDefaultAccountForMode(accounts, nextMode);
+  };
+
+  const switchIdentity = () => {
+    selectIdentity(mode === "wife" ? "husband" : "wife");
+  };
+
+  const claimPendingItem = async (id: string, claimedBy: "wife" | "husband" | null) => {
+    setPendingItems((prev) => {
+      const updated = prev.map((p) => p.id === id ? { ...p, claimedBy } : p);
+      localStorage.setItem("pendingItems", JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      const res = await fetch("/api/pending", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, claimedBy }),
+      });
+      if (!res.ok) {
+        fetchPending();
+        showToast("Failed to update claim");
+      }
+    } catch {
+      fetchPending();
+    }
+  };
+
+  const applyDefaultAccountForMode = (accs: Account[], nextMode: "wife" | "husband") => {
     const keyword = nextMode === "wife" ? "wife" : "hubb";
     const match = accs.find((a) => a.label.toLowerCase().includes(keyword));
     setAccountId((match ?? accs[0])?.id ?? "");
@@ -225,7 +269,7 @@ export default function App() {
       .then((data) => {
         const accs: Account[] = data.accounts ?? [];
         setAccounts(accs);
-        applyDefaultAccountForMode(accs, mode);
+        if (mode) applyDefaultAccountForMode(accs, mode);
       });
 
     fetchTransactions();
@@ -350,7 +394,7 @@ export default function App() {
     balanceAnimRef.current = requestAnimationFrame(step);
   };
 
-  const addPendingItem = async (data: { name: string; amount: number | null; categoryId: string | null; addedBy: string; date: string | null }) => {
+  const addPendingItem = async (data: { name: string; amount: number | null; categoryId: string | null; addedBy: string; date: string | null; claimedBy: "wife" | "husband" | null }) => {
     const optimistic: PendingItem = { id: `tmp-${Date.now()}`, ...data };
     setPendingItems((prev) => [...prev, optimistic]);
     try {
@@ -728,17 +772,24 @@ export default function App() {
     }
   };
 
-  if (loading) {
+  // Not yet mounted: server and first client render must match — show a neutral shell
+  if (!mounted || loading) {
     return (
-      <div data-mode={mode} style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
           <div style={{ width: 28, height: 28, border: "2px solid var(--border2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-          <p style={{ fontSize: 11, letterSpacing: 0.2, color: "var(--muted)", fontWeight: 600, animation: "fadeUp 0.2s ease both" }}>
-            {LOADING_LINES[loadingLineIdx]}
-          </p>
+          {mounted && (
+            <p style={{ fontSize: 11, letterSpacing: 0.2, color: "var(--muted)", fontWeight: 600, animation: "fadeUp 0.2s ease both" }}>
+              {LOADING_LINES[loadingLineIdx]}
+            </p>
+          )}
         </div>
       </div>
     );
+  }
+
+  if (mode === null) {
+    return <IdentityScreen onSelect={selectIdentity} />;
   }
 
   const parsedAmount = amount ? parseFloat(amount) : 0;
@@ -755,6 +806,7 @@ export default function App() {
       onOpenAdd={() => setShowAddModal(true)}
       toast={microToast}
       mode={mode}
+      onSwitchIdentity={switchIdentity}
       showAddButton={tab !== "plan"}
       immersive={tab === "plan"}
     >
@@ -802,6 +854,7 @@ export default function App() {
           onLogItem={loadPending}
           onDismiss={dismissPending}
           onAdd={addPendingItem}
+          onClaim={claimPendingItem}
         />
       )}
 
@@ -904,77 +957,6 @@ export default function App() {
   );
 }
 
-const inputStyle: CSSProperties = {
-  width: "100%",
-  background: "var(--surface)",
-  border: "1px solid transparent",
-  borderRadius: 14,
-  padding: "13px 16px",
-  color: "var(--text)",
-  fontSize: 16,
-  outline: "none",
-  appearance: "none",
-  WebkitAppearance: "none",
-};
-
-const surfaceStyle: CSSProperties = {
-  background: "var(--surface)",
-  border: "1px solid var(--card-border)",
-  borderRadius: "var(--card-radius)",
-  boxShadow: "var(--card-shadow)",
-  padding: 16,
-};
-
-const chipPickerStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 12px",
-  borderRadius: 14,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  color: "var(--text)",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  cursor: "pointer",
-};
-
-const pickerListButtonStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 42,
-  padding: "10px 12px",
-  background: "transparent",
-  border: "none",
-  borderRadius: 12,
-  color: "var(--text)",
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  cursor: "pointer",
-  textAlign: "left",
-};
-
-const ctaSmallStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 14px",
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--accent) 38%, transparent)",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const iconBadgeStyle: CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 12,
-  background: "var(--surface2)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-  fontSize: 16,
-};
 
 const ghostActionStyle: CSSProperties = {
   minHeight: 34,

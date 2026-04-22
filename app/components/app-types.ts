@@ -37,6 +37,7 @@ export type PendingItem = {
   categoryId: string | null;
   addedBy: string | null;
   date: string | null;
+  claimedBy: "wife" | "husband" | null;
 };
 
 export type MonthlyCategoryTotal = {

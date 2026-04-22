@@ -1,10 +1,11 @@
 "use client";
 
-import type { CSSProperties, RefObject } from "react";
+import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import type { Account, Category } from "./app-types";
 import { fmtDate, shiftDate, today } from "./app-utils";
 import { Money } from "./Money";
 import { PickerPopover } from "./PickerPopover";
+import { CalendarIcon, ChevronDownIcon, CheckIcon, XIcon } from "./ui/icons";
 
 type AddTransactionSheetProps = {
   open: boolean;
@@ -56,7 +57,7 @@ const shellSurface: CSSProperties = {
 };
 
 const chipButtonStyle: CSSProperties = {
-  minHeight: 40,
+  minHeight: 44,
   padding: "0 8px",
   borderRadius: 999,
   border: "1px solid transparent",
@@ -87,30 +88,52 @@ const pickerRowStyle: CSSProperties = {
   boxSizing: "border-box",
 };
 
-function ChevronDownIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{
-        transform: open ? "rotate(180deg)" : "rotate(0deg)",
-        transition: "transform 0.18s ease",
-        flexShrink: 0,
-      }}
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
+
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function AddTransactionSheet(props: AddTransactionSheetProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Focus management: save previous focus, focus first element on open, restore on close
+  useEffect(() => {
+    if (!props.open) return;
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    const first = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE)[0];
+    first?.focus();
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, [props.open]);
+
+  // Keyboard: Escape closes, Tab is trapped inside dialog
+  useEffect(() => {
+    if (!props.open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        props.onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [props.open, props.onClose]);
+
   if (!props.open) return null;
 
   const todayValue = today();
@@ -147,6 +170,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label="Add transaction"
@@ -162,7 +186,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         overflow: "visible",
       }}
     >
-      <div onClick={props.onClose} style={{ position: "absolute", inset: 0 }} />
+      <div onClick={props.onClose} aria-hidden="true" style={{ position: "absolute", inset: 0 }} />
       <div
         style={{
           position: "relative",
@@ -219,10 +243,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   flexShrink: 0,
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                <XIcon size={14} />
               </button>
             </div>
 
@@ -303,6 +324,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             >
               <input
                 type="text"
+                aria-label="Transaction description"
                 value={props.name}
                 onChange={(e) => props.onNameChange(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
@@ -359,7 +381,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       {props.selectedAccount?.label ?? ""}
                     </span>
                     <span style={{ color: "var(--muted)", marginLeft: 2, display: "inline-flex", alignItems: "center" }}>
-                      <ChevronDownIcon open={props.showAccountPicker} />
+                      <ChevronDownIcon size={12} style={{ transform: props.showAccountPicker ? "rotate(180deg)" : "none", transition: "transform 0.18s ease", flexShrink: 0 }} />
                     </span>
                   </button>
 
@@ -470,7 +492,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       {props.selectedCat?.name ?? "Category"}
                     </span>
                     <span style={{ color: "var(--muted)", marginLeft: 2, display: "inline-flex", alignItems: "center" }}>
-                      <ChevronDownIcon open={props.showCatPicker} />
+                      <ChevronDownIcon size={12} style={{ transform: props.showCatPicker ? "rotate(180deg)" : "none", transition: "transform 0.18s ease", flexShrink: 0 }} />
                     </span>
                   </button>
 
@@ -560,7 +582,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       >
                       <div
                         style={{
-                          minHeight: 40,
+                          minHeight: 44,
                           borderRadius: 12,
                           border: "1px solid transparent",
                           background: "color-mix(in srgb, var(--surface2) 42%, white)",
@@ -575,6 +597,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                           </span>
                           <input
                             type="text"
+                            aria-label="Search categories"
                             value={props.catSearch}
                             onChange={(e) => props.onCatSearchChange(e.target.value)}
                             placeholder="Search categories"
@@ -630,14 +653,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                         flexShrink: 0,
                       }}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <rect x="3" y="4" width="18" height="18" rx="3" />
-                        <path d="M8 2v4M16 2v4M3 10h18" />
-                      </svg>
+                      <CalendarIcon size={11} />
                     </span>
                     <span style={{ whiteSpace: "nowrap" }}>{props.selectedDateLabel}</span>
                     <span style={{ color: "var(--muted)", display: "inline-flex", alignItems: "center" }}>
-                      <ChevronDownIcon open={props.showDatePicker} />
+                      <ChevronDownIcon size={12} style={{ transform: props.showDatePicker ? "rotate(180deg)" : "none", transition: "transform 0.18s ease", flexShrink: 0 }} />
                     </span>
                   </button>
 
@@ -696,7 +716,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       >
                       <div
                         style={{
-                          minHeight: 40,
+                          minHeight: 44,
                           borderRadius: 12,
                           border: "1px solid transparent",
                           background: "color-mix(in srgb, var(--surface2) 42%, white)",
@@ -707,6 +727,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                         >
                           <input
                             type="date"
+                            aria-label="Transaction date"
                             value={props.date}
                             onChange={(e) => props.onSelectDate(e.target.value)}
                             style={{
@@ -733,7 +754,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     <button
                       onClick={() => props.onSelectCategory(props.suggestedCategory!)}
                       style={{
-                        minHeight: 34,
+                        minHeight: 44,
                         padding: "0 2px",
                         border: "none",
                         background: "transparent",
@@ -845,17 +866,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   </>
                 ) : props.status === "success" ? (
                   <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
+                    <CheckIcon size={16} />
                     Saved
                   </>
                 ) : props.status === "error" ? (
                   <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
+                    <XIcon size={16} />
                     Error
                   </>
                 ) : (

@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Category, PendingItem } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { DelightTrashButton } from "./ui/DelightTrashButton";
 import { fmtDate, today } from "./app-utils";
 import { PickerPopover } from "./PickerPopover";
 
@@ -13,6 +14,7 @@ type AddData = {
   categoryId: string | null;
   addedBy: string;
   date: string | null;
+  claimedBy: "wife" | "husband" | null;
 };
 
 type Props = {
@@ -22,7 +24,10 @@ type Props = {
   onLogItem: (item: PendingItem) => void;
   onDismiss: (id: string) => void;
   onAdd: (data: AddData) => Promise<void>;
+  onClaim: (id: string, claimedBy: "wife" | "husband" | null) => Promise<void>;
 };
+
+const PARTNER_NAME: Record<"wife" | "husband", string> = { wife: "Salma", husband: "Anas" };
 
 type UrgencyGroup = "Overdue" | "Due today" | "This week" | "This month" | "Later" | "Someday";
 
@@ -132,6 +137,7 @@ export function PendingScreen({
   onLogItem,
   onDismiss,
   onAdd,
+  onClaim,
 }: Props) {
   const [showSheet, setShowSheet] = useState(false);
   const [formName, setFormName] = useState("");
@@ -142,6 +148,19 @@ export function PendingScreen({
   const [showCatPicker, setShowCatPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const catPickerRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showSheet) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSheet(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    // Focus the first input inside the sheet
+    const firstInput = sheetRef.current?.querySelector<HTMLElement>("input, button");
+    firstInput?.focus();
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showSheet]);
 
   const groups = (() => {
     const map = new Map<UrgencyGroup, PendingItem[]>();
@@ -160,6 +179,11 @@ export function PendingScreen({
   const urgentCount =
     (groups.find((g) => g.label === "Overdue")?.items.length ?? 0) +
     (groups.find((g) => g.label === "Due today")?.items.length ?? 0);
+
+  const partner: "wife" | "husband" = mode === "wife" ? "husband" : "wife";
+  const myCount = pendingItems.filter((i) => (i.claimedBy ?? null) === mode).length;
+  const partnerCount = pendingItems.filter((i) => (i.claimedBy ?? null) === partner).length;
+  const sharedCount = pendingItems.filter((i) => (i.claimedBy ?? null) === null).length;
 
   const openSheet = () => {
     setFormName("");
@@ -180,6 +204,7 @@ export function PendingScreen({
         categoryId: formCatId || null,
         addedBy: mode === "wife" ? "Wife" : "Husband",
         date: formDate || null,
+        claimedBy: null,
       });
       setShowSheet(false);
     } catch {
@@ -213,6 +238,33 @@ export function PendingScreen({
                 ? `${urgentCount} need${urgentCount === 1 ? "s" : ""} attention.`
                 : `${pendingItems.length} upcoming.`}
             </p>
+            {pendingItems.length > 0 && (
+              <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                {[
+                  { label: "Yours", count: myCount, color: mode === "wife" ? "var(--partner-wife)" : "var(--partner-husband)" },
+                  { label: PARTNER_NAME[partner], count: partnerCount, color: partner === "wife" ? "var(--partner-wife)" : "var(--partner-husband)" },
+                  { label: "Shared", count: sharedCount, color: "var(--muted)" },
+                ].map(({ label, count, color }) => (
+                  <span
+                    key={label}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      fontSize: 11,
+                      fontFamily: "'DM Mono', monospace",
+                      color: "var(--text2)",
+                      background: "var(--surface2)",
+                      borderRadius: 999,
+                      padding: "3px 8px",
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                    {count} {label}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
             <button onClick={openSheet} style={addChipStyle} aria-label="Add upcoming expense">
@@ -357,36 +409,76 @@ export function PendingScreen({
                         </div>
                         <button
                           onClick={() => onDismiss(item.id)}
+                          className="pending-dismiss-btn"
                           style={{
-                            ...dismissButtonStyle,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             border: "none",
-                            outline: "none",
                             borderRadius: 8,
-                            width: 32,
-                            height: 32,
-                            background: "#fef2f2",
+                            width: 36,
+                            height: 36,
+                            background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
                             cursor: "pointer",
-                            transition: "background 0.2s",
+                            flexShrink: 0,
                           }}
-                          aria-label="Dismiss (send to the void)"
-                          title="Send to the void"
+                          aria-label="Dismiss"
                         >
                           <DelightTrashButton isDeleting={false} />
                         </button>
-                      import { DelightTrashButton } from "./ui/DelightTrashButton";
                       </div>
 
-                      {/* Log it footer */}
-                      <div style={{ borderTop: "1px solid var(--border)", padding: "0 14px 0" }}>
+                      {/* Footer: log + claim */}
+                      <div
+                        style={{
+                          borderTop: "1px solid var(--border)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "0 14px 0 14px",
+                        }}
+                      >
                         <button
                           onClick={() => onLogItem(item)}
+                          className="pending-log-btn"
                           style={logItButtonStyle}
                         >
                           Log it →
                         </button>
+                        {(() => {
+                          const claimed = item.claimedBy ?? null;
+                          if (claimed === mode) {
+                            return (
+                              <button
+                                onClick={() => onClaim(item.id, null)}
+                                className="pending-claim-btn"
+                                style={claimReleaseStyle}
+                                aria-label="Release — move back to shared"
+                              >
+                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: mode === "wife" ? "var(--partner-wife)" : "var(--partner-husband)", flexShrink: 0 }} />
+                                Yours · Release
+                              </button>
+                            );
+                          }
+                          if (claimed === partner) {
+                            return (
+                              <span style={{ ...claimReleaseStyle, cursor: "default", opacity: 0.55 }} aria-label={`Claimed by ${PARTNER_NAME[partner]}`}>
+                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: partner === "wife" ? "var(--partner-wife)" : "var(--partner-husband)", flexShrink: 0 }} />
+                                {PARTNER_NAME[partner]}&apos;s
+                              </span>
+                            );
+                          }
+                          return (
+                            <button
+                              onClick={() => onClaim(item.id, mode)}
+                              className="pending-claim-btn"
+                              style={claimReleaseStyle}
+                              aria-label="Claim — assign to yourself"
+                            >
+                              Claim
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -433,6 +525,7 @@ export function PendingScreen({
         <>
           {/* Backdrop */}
           <div
+            aria-hidden="true"
             onClick={() => setShowSheet(false)}
             style={{
               position: "fixed",
@@ -443,7 +536,13 @@ export function PendingScreen({
             }}
           />
           {/* Sheet */}
-          <div className="pending-add-sheet">
+          <div
+            ref={sheetRef}
+            className="pending-add-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pending-sheet-title"
+          >
             {/* Drag handle */}
             <div
               style={{
@@ -464,6 +563,7 @@ export function PendingScreen({
               }}
             >
               <h2
+                id="pending-sheet-title"
                 style={{
                   fontFamily: "var(--font-display)",
                   fontSize: 22,
@@ -487,6 +587,7 @@ export function PendingScreen({
               {/* Name */}
               <input
                 type="text"
+                aria-label="What's upcoming?"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
@@ -500,6 +601,7 @@ export function PendingScreen({
                 <input
                   type="text"
                   inputMode="decimal"
+                  aria-label="Amount (optional)"
                   value={formAmount}
                   onChange={(e) =>
                     setFormAmount(e.target.value.replace(/[^0-9.]/g, ""))
@@ -510,6 +612,7 @@ export function PendingScreen({
                 <div style={{ position: "relative" }} ref={catPickerRef}>
                   <button
                     onClick={() => setShowCatPicker((v) => !v)}
+                    aria-label="Select category"
                     style={{
                       ...chipPickerStyle,
                       width: 48,
@@ -536,6 +639,7 @@ export function PendingScreen({
                       >
                         <input
                           type="text"
+                          aria-label="Search categories"
                           value={formCatSearch}
                           onChange={(e) => setFormCatSearch(e.target.value)}
                           placeholder="Search categories"
@@ -585,6 +689,7 @@ export function PendingScreen({
               {/* Date */}
               <input
                 type="date"
+                aria-label="Due date (optional)"
                 value={formDate}
                 onChange={(e) => setFormDate(e.target.value)}
                 style={inputStyle}
@@ -596,10 +701,27 @@ export function PendingScreen({
                 disabled={!formName.trim() || saving}
                 style={{
                   ...saveButtonStyle,
-                  opacity: formName.trim() ? 1 : 0.45,
+                  opacity: formName.trim() && !saving ? 1 : 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
                 }}
               >
-                {saving ? "Saving..." : "Save"}
+                {saving && (
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      border: "2px solid color-mix(in srgb, var(--accent-ink) 30%, transparent)",
+                      borderTopColor: "var(--accent-ink)",
+                      borderRadius: "50%",
+                      animation: "spin 0.7s linear infinite",
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                {saving ? "Saving" : "Save"}
               </button>
             </div>
           </div>
@@ -637,7 +759,7 @@ const iconBadgeStyle: CSSProperties = {
 
 const logItButtonStyle: CSSProperties = {
   width: "100%",
-  minHeight: 40,
+  minHeight: 44,
   background: "transparent",
   border: "none",
   color: "var(--text2)",
@@ -649,20 +771,6 @@ const logItButtonStyle: CSSProperties = {
   letterSpacing: 0.1,
 };
 
-const dismissButtonStyle: CSSProperties = {
-  width: 28,
-  height: 28,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "transparent",
-  color: "var(--muted)",
-  fontSize: 16,
-  cursor: "pointer",
-};
 
 const emptyStateStyle: CSSProperties = {
   display: "flex",
@@ -682,7 +790,6 @@ const inputStyle: CSSProperties = {
   padding: "13px 16px",
   color: "var(--text)",
   fontSize: 15,
-  outline: "none",
   boxShadow: "inset 0 0 0 1.5px var(--border2)",
 };
 
@@ -715,8 +822,8 @@ const pickerListButtonStyle: CSSProperties = {
 };
 
 const sheetCloseStyle: CSSProperties = {
-  width: 32,
-  height: 32,
+  width: 36,
+  height: 36,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -739,4 +846,20 @@ const saveButtonStyle: CSSProperties = {
   fontSize: 15,
   cursor: "pointer",
   marginTop: 4,
+};
+
+const claimReleaseStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  height: 32,
+  padding: "0 8px",
+  border: "none",
+  background: "transparent",
+  color: "var(--muted)",
+  fontSize: 11,
+  fontFamily: "'DM Mono', monospace",
+  cursor: "pointer",
+  letterSpacing: 0.2,
+  flexShrink: 0,
 };

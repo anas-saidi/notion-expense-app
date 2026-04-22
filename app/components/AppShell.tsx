@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import type { AppTab } from "./app-types";
 import { BottomNav } from "./BottomNav";
+import { PlusIcon } from "./ui/icons";
 
 type AppShellProps = {
   children: ReactNode;
@@ -8,10 +9,17 @@ type AppShellProps = {
   pendingCount: number;
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
+  onSwitchIdentity: () => void;
   toast: string | null;
   mode: "wife" | "husband";
   showAddButton?: boolean;
   immersive?: boolean;
+};
+
+const IDENTITY_NAMES: Record<"wife" | "husband", string> = { wife: "Salma", husband: "Anas" };
+const IDENTITY_COLOR: Record<"wife" | "husband", string> = {
+  wife: "var(--partner-wife)",
+  husband: "var(--partner-husband)",
 };
 
 export function AppShell({
@@ -20,6 +28,7 @@ export function AppShell({
   pendingCount,
   onTabChange,
   onOpenAdd,
+  onSwitchIdentity,
   toast,
   mode,
   showAddButton = true,
@@ -28,12 +37,46 @@ export function AppShell({
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
       <div
-        style={
-          immersive
-            ? { minHeight: "100dvh" }
-            : { maxWidth: 480, margin: "0 auto", padding: "calc(var(--safe-top) + 20px) 20px calc(72px + env(safe-area-inset-bottom, 0px))" }
-        }
+        className={immersive ? undefined : "app-content"}
+        style={immersive ? { minHeight: "100dvh" } : { position: "relative" }}
       >
+        {!immersive && (
+          <button
+            onClick={onSwitchIdentity}
+            className="identity-chip"
+            aria-label={`Signed in as ${IDENTITY_NAMES[mode]} — tap to switch`}
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              minHeight: 44,
+              padding: "0 12px",
+              borderRadius: 999,
+              border: "1px solid var(--border2)",
+              background: "var(--surface)",
+              color: "var(--text2)",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              letterSpacing: 0.2,
+              zIndex: 10,
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: IDENTITY_COLOR[mode],
+                flexShrink: 0,
+              }}
+            />
+            {IDENTITY_NAMES[mode]}
+          </button>
+        )}
         {children}
       </div>
 
@@ -42,7 +85,8 @@ export function AppShell({
       {showAddButton && (
         <button
           onClick={onOpenAdd}
-          aria-label="Open add expense"
+          className="fab-add"
+          aria-label="Add expense"
           style={{
             position: "fixed",
             right: "max(18px, calc(50% - 222px))",
@@ -61,15 +105,13 @@ export function AppShell({
             justifyContent: "center",
           }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+          <PlusIcon size={22} strokeWidth={2.5} />
         </button>
       )}
 
       {toast && (
         <div
+          role="status"
           aria-live="polite"
           style={{
             position: "fixed",
