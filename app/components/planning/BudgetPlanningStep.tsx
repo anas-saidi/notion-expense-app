@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { Category, PlanningAllocationItem } from "../app-types";
 import { Money } from "../Money";
+import { CategoryIcon } from "../ui/CategoryIcon";
 import { PickerPopover } from "../PickerPopover";
 
 type BudgetPlanningStepProps = {
@@ -208,7 +209,7 @@ export function BudgetPlanningStep({
                       }}
                       disabled={isAdded}
                     >
-                      <span style={addOptionIconStyle}>{category.icon ?? "#"}</span>
+                      <CategoryIcon icon={category.icon} style={addOptionIconStyle} />
                       <span style={addOptionLabelStyle}>{category.name}</span>
                       {isAdded && <span style={addOptionBadgeStyle}>Added</span>}
                     </button>
@@ -249,7 +250,7 @@ export function BudgetPlanningStep({
           <div key={item.categoryId} style={rowStyle}>
             <div style={{ display: "grid", gap: 4 }}>
               <strong style={{ color: "var(--text)", fontSize: 15 }}>
-                {item.icon ? `${item.icon} ` : ""}{item.name}
+                {item.icon ? <CategoryIcon icon={item.icon} size={18} style={{ marginRight: 4 }} /> : null}{item.name}
               </strong>
               <div style={metaRowStyle}>
                 {(item.lastMonthSpent ?? 0) > 0 && (

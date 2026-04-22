@@ -6,6 +6,7 @@ import { CloseMonthStep } from "./planning/CloseMonthStep";
 import { BudgetPlanningStep } from "./planning/BudgetPlanningStep";
 import { IncomeStep } from "./planning/IncomeStep";
 import { ReviewStep } from "./planning/ReviewStep";
+import { SavingsStep } from "./planning/SavingsStep";
 import type {
   Account,
   Category,
@@ -58,7 +59,14 @@ const steps: StepMeta[] = [
     id: "budget",
     label: "Budget",
     title: "Plan budget categories",
-    description: "Assign household, personal, and savings categories.",
+    description: "Assign household and personal categories.",
+    nextLabel: "Continue",
+  },
+  {
+    id: "savings",
+    label: "Savings",
+    title: "Add savings",
+    description: "Set aside money for savings goals.",
     nextLabel: "Continue",
   },
   {
@@ -97,37 +105,32 @@ const isSavingsAccount = (account: Account) => {
 
 const savingsTypeHints = ["saving", "savings", "sinking", "goal", "fund"];
 
-const isHouseholdCategory = (category: Category) =>
-  category.isTeamFund === true && !isSavingsCategory(category);
+const isHouseholdCategory = (category: Category) => {
+  if (category.isTeamFund) return true;
+  return category.type.some((value) => {
+    const normalized = value.toLowerCase();
+    return normalized.includes("team") || normalized.includes("household");
+  });
+};
 
 const isWifeCategory = (category: Category) =>
-  !category.isTeamFund &&
-  !isSavingsCategory(category) &&
-  (category.owner?.toLowerCase().includes("salma") ?? false);
+  category.owner?.toLowerCase() === "salma";
 
 const isHusbandCategory = (category: Category) =>
-  !category.isTeamFund &&
-  !isSavingsCategory(category) &&
-  (category.owner?.toLowerCase().includes("anas") ?? false);
+  category.owner?.toLowerCase() === "anas";
 
 const isSavingsCategory = (category: Category) => {
   const types = category.type.map((value) => value.toLowerCase());
-  if (category.isTeamFund) return false;
+  if (isHouseholdCategory(category)) return false;
   return types.some((value) => savingsTypeHints.some((hint) => value.includes(hint)));
 };
-
-const isFallbackHouseholdCategory = (category: Category) =>
-  !isHouseholdCategory(category) &&
-  !isSavingsCategory(category) &&
-  !isWifeCategory(category) &&
-  !isHusbandCategory(category);
 
 function toAllocationItem(category: Category): PlanningAllocationItem {
   return {
     categoryId: category.id,
     name: category.name,
     icon: category.icon,
-    amount: category.available ?? 0,
+    amount: category.planned ?? 0,
     available: category.available,
     lastMonthSpent: category.lastMonthSpent,
   };
@@ -152,8 +155,6 @@ export function MonthlyPlanningFlow({
   const [wifeItems, setWifeItems] = useState<PlanningAllocationItem[]>([]);
   const [husbandItems, setHusbandItems] = useState<PlanningAllocationItem[]>([]);
   const [savingsItems, setSavingsItems] = useState<PlanningAllocationItem[]>([]);
-  const [fundByCategoryId, setFundByCategoryId] = useState<Record<string, boolean>>({});
-  const fundUpdateTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [isCompact, setIsCompact] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState("");
@@ -183,21 +184,6 @@ export function MonthlyPlanningFlow({
     setSaveState("idle");
     setSaveError("");
   }, [selectedMonth, categories]);
-
-  useEffect(() => {
-    if (!/^\d{4}-\d{2}$/.test(selectedMonth)) return;
-    fetch(`/api/monthly-planning/funds?month=${selectedMonth}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data?.funds) return;
-        const nextMap: Record<string, boolean> = {};
-        for (const fund of data.funds as Array<{ id: string; categoryId: string }>) {
-          nextMap[fund.categoryId] = true;
-        }
-        setFundByCategoryId(nextMap);
-      })
-      .catch(() => null);
-  }, [selectedMonth]);
 
   useEffect(() => {
     const handleResize = () => setIsCompact(window.innerWidth < 640);
@@ -252,16 +238,7 @@ export function MonthlyPlanningFlow({
     [savingsItems],
   );
   const availablePool = baseAccountPool;
-  const deltaTotal = useMemo(
-    () =>
-      [...householdItems, ...wifeItems, ...husbandItems, ...savingsItems].reduce((sum, item) => {
-        const currentAvailable = item.available ?? 0;
-        const targetAvailable = Number.isFinite(item.amount) ? item.amount : 0;
-        return sum + (targetAvailable - currentAvailable);
-      }, 0),
-    [householdItems, husbandItems, savingsItems, wifeItems],
-  );
-  const leftToAssign = readyToAssignPool - deltaTotal;
+  const leftToAssign = readyToAssignPool - assignedHousehold - assignedSavings;
   const snapshot: MonthlyPlanningSnapshot = {
     availablePool,
     assignedHousehold,
@@ -277,72 +254,10 @@ export function MonthlyPlanningFlow({
   const canAdvanceFromActiveStep = useMemo(() => {
     if (activeStep === "close") return closeStepState.reviewed;
     if (activeStep === "income") return incomeMeta.ready;
-    if (activeStep === "budget") return householdItems.length + wifeItems.length + husbandItems.length + savingsItems.length > 0;
+    if (activeStep === "budget") return householdItems.length + wifeItems.length + husbandItems.length > 0;
+    if (activeStep === "savings") return savingsItems.length > 0;
     return true;
   }, [activeStep, closeStepState.reviewed, householdItems.length, husbandItems.length, incomeMeta.ready, savingsItems.length, wifeItems.length]);
-
-  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
-  const availableByCategoryId = useMemo(() => {
-    const entries: Array<[string, number]> = [...householdItems, ...wifeItems, ...husbandItems, ...savingsItems].map((item) => [
-      item.categoryId,
-      item.available ?? 0,
-    ]);
-    return new Map(entries);
-  }, [householdItems, husbandItems, savingsItems, wifeItems]);
-
-  const householdAvailable = useMemo(() => {
-    const candidates = categories.filter((category) => isHouseholdCategory(category) || isFallbackHouseholdCategory(category));
-    return candidates;
-  }, [categories, householdItems]);
-
-  const wifeAvailable = useMemo(() => {
-    const candidates = categories.filter(isWifeCategory);
-    return candidates;
-  }, [categories, wifeItems]);
-
-  const husbandAvailable = useMemo(() => {
-    const candidates = categories.filter(isHusbandCategory);
-    return candidates;
-  }, [categories, husbandItems]);
-
-  const savingsAvailable = useMemo(() => {
-    const candidates = categories.filter(isSavingsCategory);
-    return candidates;
-  }, [categories, savingsItems]);
-
-  const handleFundUpdate = (categoryId: string, targetAvailable: number) => {
-    if (!/^\d{4}-\d{2}$/.test(selectedMonth)) return;
-    if (fundUpdateTimersRef.current[categoryId]) {
-      clearTimeout(fundUpdateTimersRef.current[categoryId]);
-    }
-
-    const currentAvailable = availableByCategoryId.get(categoryId) ?? 0;
-    const delta = targetAvailable - currentAvailable;
-
-    fundUpdateTimersRef.current[categoryId] = setTimeout(() => {
-      const category = categoryById.get(categoryId);
-      const reverse = delta < 0;
-      const planned = Math.abs(delta);
-      if (planned === 0) return;
-      fetch("/api/monthly-planning/funds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          month: selectedMonth,
-          categoryId,
-          planned,
-          accountId: category?.defaultAccount ?? null,
-          reverse,
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (!data?.fund?.id) return;
-          setFundByCategoryId((current) => ({ ...current, [categoryId]: true }));
-        })
-        .catch(() => null);
-    }, 450);
-  };
 
   const completeActiveStep = async () => {
     if (!canAdvanceFromActiveStep) return;
@@ -408,18 +323,15 @@ export function MonthlyPlanningFlow({
             wifeItems={wifeItems}
             husbandItems={husbandItems}
             savingsItems={savingsItems}
-            availableHouseholdCategories={householdAvailable}
-            availableWifeCategories={wifeAvailable}
-            availableHusbandCategories={husbandAvailable}
-            availableSavingsCategories={savingsAvailable}
-            fundByCategoryId={fundByCategoryId}
             onHouseholdChange={setHouseholdItems}
             onWifeChange={setWifeItems}
             onHusbandChange={setHusbandItems}
             onSavingsChange={setSavingsItems}
-            onFundUpdate={handleFundUpdate}
+            poolRemaining={leftToAssign}
           />
         );
+      case "savings":
+        return <SavingsStep items={savingsItems} onChange={setSavingsItems} />;
       case "review":
         return (
           <ReviewStep
@@ -528,7 +440,7 @@ export function MonthlyPlanningFlow({
                 style={{
                   ...continueButtonStyle,
                   background: canAdvanceFromActiveStep && saveState !== "saving" ? "var(--accent)" : "var(--surface2)",
-                  color: canAdvanceFromActiveStep && saveState !== "saving" ? "var(--accent-ink)" : "var(--muted)",
+                  color: canAdvanceFromActiveStep && saveState !== "saving" ? "#11150f" : "var(--muted)",
                   cursor: canAdvanceFromActiveStep && saveState !== "saving" ? "pointer" : "not-allowed",
                 }}
               >
@@ -544,7 +456,7 @@ export function MonthlyPlanningFlow({
 
 const shellStyle: CSSProperties = {
   minHeight: "100dvh",
-  background: "var(--bg)",
+  background: "linear-gradient(180deg, color-mix(in srgb, var(--bg) 94%, white), color-mix(in srgb, var(--surface) 64%, white))",
   padding: "calc(var(--safe-top) + 14px) 14px calc(88px + env(safe-area-inset-bottom, 0px))",
 };
 
@@ -557,9 +469,7 @@ const contentWrapStyle: CSSProperties = {
 
 const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 96%, white)",
-  borderRadius: "var(--card-radius)",
-  border: "1px solid var(--card-border)",
-  boxShadow: "var(--card-shadow)",
+  borderRadius: 26,
   padding: "18px 18px 14px",
   display: "grid",
   gap: 14,
@@ -626,7 +536,7 @@ const progressFillStyle: CSSProperties = {
 
 const screenTitleStyle: CSSProperties = {
   marginTop: 2,
-  fontFamily: "'Space Grotesk', sans-serif",
+  fontFamily: "var(--font-display)",
   lineHeight: 1.05,
   letterSpacing: -0.2,
   color: "var(--text)",
@@ -682,9 +592,9 @@ const closeButtonStyle: CSSProperties = {
   width: 36,
   height: 36,
   padding: 8,
-  borderRadius: 999,
+  borderRadius: 0,
   border: "none",
-  background: "color-mix(in srgb, var(--surface2) 52%, white)",
+  background: "transparent",
   color: "var(--text2)",
   cursor: "pointer",
   display: "flex",
@@ -695,7 +605,7 @@ const closeButtonStyle: CSSProperties = {
 
 const cancelButtonStyle: CSSProperties = {
   minHeight: 48,
-  borderRadius: 999,
+  borderRadius: 16,
   border: "none",
   background: "color-mix(in srgb, var(--surface2) 54%, white)",
   color: "var(--text)",
@@ -705,7 +615,7 @@ const cancelButtonStyle: CSSProperties = {
 
 const continueButtonStyle: CSSProperties = {
   minHeight: 48,
-  borderRadius: 999,
+  borderRadius: 16,
   border: "none",
   fontSize: 13,
   fontWeight: 600,

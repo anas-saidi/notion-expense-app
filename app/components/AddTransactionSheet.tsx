@@ -725,88 +725,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     </div>
                   </PickerPopover>
                 </div>
-                <button
-                  onClick={props.onSubmit}
-                  disabled={!props.canSubmit}
-                  aria-label={
-                    props.status === "saving"
-                      ? "Saving transaction"
-                      : props.status === "success"
-                        ? "Transaction saved"
-                        : props.status === "error"
-                          ? `Save failed: ${props.errorMsg}`
-                          : "Save transaction"
-                  }
-                  title={
-                    props.status === "saving"
-                      ? "Saving..."
-                      : props.status === "success"
-                        ? "Saved"
-                        : props.status === "error"
-                          ? `Error: ${props.errorMsg}`
-                          : "Save"
-                  }
-                  className="pressable"
-                  style={{
-                    minWidth: 40,
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    border:
-                      props.status === "success"
-                        ? "1px solid color-mix(in srgb, var(--success) 18%, transparent)"
-                        : props.status === "error"
-                          ? "1px solid color-mix(in srgb, var(--danger) 18%, transparent)"
-                          : "1px solid transparent",
-                    background:
-                      props.status === "success"
-                        ? "color-mix(in srgb, var(--success) 8%, white)"
-                        : props.status === "error"
-                          ? "color-mix(in srgb, var(--danger) 8%, white)"
-                          : "transparent",
-                    color:
-                      props.status === "success"
-                        ? "var(--success)"
-                        : props.status === "error"
-                          ? "var(--danger)"
-                          : "color-mix(in srgb, var(--accent) 76%, var(--text2))",
-                    cursor: props.canSubmit ? "pointer" : "not-allowed",
-                    opacity: props.canSubmit || props.status !== "idle" ? 1 : 0.45,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    boxShadow: "none",
-                    transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
-                  }}
-                >
-                  {props.status === "saving" ? (
-                    <span
-                      style={{
-                        width: 15,
-                        height: 15,
-                        border: "2px solid color-mix(in srgb, currentColor 26%, transparent)",
-                        borderTopColor: "currentColor",
-                        borderRadius: "50%",
-                        animation: "spin 0.6s linear infinite",
-                      }}
-                    />
-                  ) : props.status === "success" ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  ) : props.status === "error" ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 19V5" />
-                      <path d="m5 12 7-7 7 7" />
-                    </svg>
-                  )}
-                </button>
               </div>
 
               {(props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
@@ -867,6 +785,83 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   )}
                 </div>
               )}
+
+              <button
+                onClick={props.onSubmit}
+                disabled={!props.canSubmit}
+                aria-label={
+                  props.status === "saving"
+                    ? "Saving transaction"
+                    : props.status === "success"
+                      ? "Transaction saved"
+                      : props.status === "error"
+                        ? `Save failed: ${props.errorMsg}`
+                        : "Save transaction"
+                }
+                className="pressable cta-save"
+                style={{
+                  width: "100%",
+                  minHeight: 52,
+                  borderRadius: 14,
+                  border: "none",
+                  background:
+                    props.status === "success"
+                      ? "color-mix(in srgb, var(--success) 12%, white)"
+                      : props.status === "error"
+                        ? "color-mix(in srgb, var(--danger) 10%, white)"
+                        : "var(--accent)",
+                  color:
+                    props.status === "success"
+                      ? "var(--success)"
+                      : props.status === "error"
+                        ? "var(--danger)"
+                        : "var(--accent-ink)",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: props.canSubmit ? "pointer" : "not-allowed",
+                  opacity: props.canSubmit || props.status !== "idle" ? 1 : 0.4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginTop: 4,
+                  transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {props.status === "saving" ? (
+                  <>
+                    <span
+                      style={{
+                        width: 15,
+                        height: 15,
+                        border: "2px solid color-mix(in srgb, currentColor 26%, transparent)",
+                        borderTopColor: "currentColor",
+                        borderRadius: "50%",
+                        animation: "spin 0.6s linear infinite",
+                        flexShrink: 0,
+                      }}
+                    />
+                    Saving...
+                  </>
+                ) : props.status === "success" ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                    Saved
+                  </>
+                ) : props.status === "error" ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M18 6 6 18" />
+                      <path d="m6 6 12 12" />
+                    </svg>
+                    Error
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </button>
             </div>
           </div>
         </div>

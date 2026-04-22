@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Money } from "../Money";
 import { TargetInput } from "./TargetInput";
+import { CategoryIcon } from "./CategoryIcon";
 
 type BudgetRowProps = {
   name: string;
@@ -33,14 +34,15 @@ export function BudgetRow({
   onPointerUp,
   onPointerCancel,
 }: BudgetRowProps) {
+  const isOverBudget = available !== null && available !== undefined && available < 0;
   const spent = Math.max(0, value - (available ?? value));
   const spentPct = Math.min(100, (spent / Math.max(1, value)) * 100);
 
   return (
     <div style={rowStyle}>
       <div style={{ display: "grid", gap: 4 }}>
-        <strong style={{ color: "var(--text)", fontSize: 15 }}>
-          {icon ? `${icon} ` : ""}{name}
+        <strong style={{ color: "var(--text)", fontSize: 15, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {icon ? <CategoryIcon icon={icon} size={16} style={{ marginRight: 4, transition: "transform 0.18s cubic-bezier(.7,1.7,.7,1)", display: "inline-block" }} /> : null}{name}
         </strong>
         <div style={metaRowStyle}>
           {(lastMonthSpent ?? 0) > 0 && (
@@ -62,11 +64,18 @@ export function BudgetRow({
           onPointerCancel={onPointerCancel}
         />
         <div style={spentBarTrackStyle} aria-hidden="true">
-          <div style={{ ...spentBarFillStyle, width: `${spentPct}%` }} />
+          <div style={{ ...spentBarFillStyle, width: `${spentPct}%`, background: getBarColor(spentPct, isOverBudget) }} />
         </div>
       </div>
     </div>
   );
+}
+
+function getBarColor(pct: number, isOverBudget: boolean): string {
+  if (isOverBudget || pct >= 100) return "color-mix(in srgb, #ef4444 75%, #b91c1c)";
+  if (pct >= 85) return "color-mix(in srgb, #f97316 70%, #ea580c)";
+  if (pct >= 65) return "color-mix(in srgb, #f59e0b 70%, #d97706)";
+  return "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
 }
 
 const rowStyle: CSSProperties = {
@@ -123,6 +132,5 @@ const spentBarTrackStyle: CSSProperties = {
 const spentBarFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
-  transition: "width 0.18s ease",
+  transition: "width 0.3s ease, background 0.4s ease",
 };

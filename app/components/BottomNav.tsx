@@ -30,12 +30,7 @@ export function BottomNav({ tab, pendingCount, onTabChange }: BottomNavProps) {
     <nav role="tablist" aria-label="App navigation" style={navStyle}>
       <div style={{ display: "flex", maxWidth: 480, margin: "0 auto" }}>
         {items.map((item) => {
-          const activeColor =
-            item.key === "home"
-              ? "var(--accent)"
-              : item.key === "pending"
-                  ? "var(--warning)"
-                  : "var(--info)";
+          const activeColor = "var(--accent)";
 
           return (
             <button

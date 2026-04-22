@@ -31,24 +31,14 @@ export async function GET(req: NextRequest) {
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
 
-    const findProperty = (props: Record<string, any>, target: string) => {
-      if (props[target]) return props[target];
-      const normalizedTarget = target.replace(/\s+/g, " ").trim().toLowerCase();
-      const key = Object.keys(props).find((candidate) =>
-        candidate.replace(/\s+/g, " ").trim().toLowerCase() === normalizedTarget,
-      );
-      return key ? props[key] : undefined;
-    };
-
     const categories = data.results.map((page: any) => {
-      const props = page.properties ?? {};
-      const lastMonthProp = findProperty(props, "Last Month ( Spent )");
-
+      const isTeamFund = page.properties["Team Fund"]?.formula?.boolean ?? false;
+      const typeValues = page.properties.Type?.multi_select?.map((t: any) => t.name) ?? [];
       return {
       id: page.id,
       name: page.properties.Category?.title?.[0]?.plain_text ?? "Unnamed",
       icon: page.icon?.emoji ?? null,
-      type: page.properties.Type?.multi_select?.map((t: any) => t.name) ?? [],
+      type: typeValues,
       owner:
         page.properties.Owner?.select?.name ??
         page.properties.Owner?.people?.[0]?.name ??
@@ -56,8 +46,8 @@ export async function GET(req: NextRequest) {
       defaultAccount: page.properties.Default?.relation?.[0]?.id ?? null,
       available: page.properties["Available"]?.formula?.number ?? null,
       planned: page.properties.Planned?.number ?? null,
-      lastMonthSpent: lastMonthProp?.formula?.number ?? lastMonthProp?.number ?? null,
-      isTeamFund: page.properties["Team Fund"]?.formula?.boolean ?? false,
+      lastMonthSpent: page.properties["Last month spent"]?.formula?.number ?? null,
+      isTeamFund,
     };
     });
 

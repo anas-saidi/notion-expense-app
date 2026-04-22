@@ -4,8 +4,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import Fuse from "fuse.js";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
+import { HistoryScreen } from "./components/HistoryScreen";
+import { PendingScreen } from "./components/PendingScreen";
 import { MonthlyPlanningFlow } from "./components/MonthlyPlanningFlow";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
+import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import type { Account, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
@@ -70,7 +73,7 @@ function SectionHeader({
 }
 
 export default function App() {
-  const [mode, setMode] = useState<"wife" | "husband">("husband");
+  const mode = "husband" as const;
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -88,6 +91,7 @@ export default function App() {
   const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
   const [plannerSummaryReady, setPlannerSummaryReady] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [homeSearch, setHomeSearch] = useState("");
 
   const [amount, setAmount] = useState("");
@@ -107,13 +111,6 @@ export default function App() {
   const [lastUsedCatId, setLastUsedCatId] = useState("");
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [pendingName, setPendingName] = useState("");
-  const [pendingAmount, setPendingAmount] = useState("");
-  const [pendingCatId, setPendingCatId] = useState("");
-  const [pendingDate, setPendingDate] = useState(today());
-  const [addingPending, setAddingPending] = useState(false);
-  const [showPendingCatPicker, setShowPendingCatPicker] = useState(false);
-  const [pendingCatSearch, setPendingCatSearch] = useState("");
   const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const [plannedByCategory, setPlannedByCategory] = useState<Record<string, number>>({});
@@ -137,16 +134,10 @@ export default function App() {
   const dateRef = useRef<HTMLDivElement>(null);
   const catRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
-  const pendingCatRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.documentElement.dataset.mode = mode;
   }, [mode]);
-
-  useEffect(() => {
-    const savedMode = localStorage.getItem("mode") as "wife" | "husband" | null;
-    if (savedMode) setMode(savedMode);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -167,13 +158,6 @@ export default function App() {
     const keyword = nextMode === "wife" ? "wife" : "hubb";
     const match = accs.find((a) => a.label.toLowerCase().includes(keyword));
     setAccountId((match ?? accs[0])?.id ?? "");
-  };
-
-  const toggleMode = () => {
-    const next = mode === "wife" ? "husband" : "wife";
-    setMode(next);
-    localStorage.setItem("mode", next);
-    applyDefaultAccountForMode(accounts, next);
   };
 
   const fetchTransactions = async () => {
@@ -348,7 +332,6 @@ export default function App() {
       if (dateRef.current && !dateRef.current.contains(e.target as Node)) setShowDatePicker(false);
       if (catRef.current && !catRef.current.contains(e.target as Node)) setShowCatPicker(false);
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) setShowAccountPicker(false);
-      if (pendingCatRef.current && !pendingCatRef.current.contains(e.target as Node)) setShowPendingCatPicker(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -367,44 +350,29 @@ export default function App() {
     balanceAnimRef.current = requestAnimationFrame(step);
   };
 
-  const addPending = async () => {
-    if (!pendingName.trim()) return;
-    setAddingPending(true);
-    const optimistic: PendingItem = {
-      id: `tmp-${Date.now()}`,
-      name: pendingName.trim(),
-      amount: pendingAmount ? parseFloat(pendingAmount) : null,
-      categoryId: pendingCatId || null,
-      addedBy: mode === "wife" ? "Wife" : "Husband",
-      date: pendingDate || null,
-    };
+  const addPendingItem = async (data: { name: string; amount: number | null; categoryId: string | null; addedBy: string; date: string | null }) => {
+    const optimistic: PendingItem = { id: `tmp-${Date.now()}`, ...data };
     setPendingItems((prev) => [...prev, optimistic]);
-    setPendingName("");
-    setPendingAmount("");
-    setPendingCatId("");
-    setPendingDate(today());
-
     try {
-      const data = await fetch("/api/pending", {
+      const json = await fetch("/api/pending", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(optimistic),
       }).then(async (r) => {
-        const json = await r.json();
-        if (!r.ok) throw new Error(json.error || "Failed to save");
-        return json;
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Failed to save");
+        return d;
       });
       setPendingItems((prev) => {
-        const updated = prev.map((p) => (p.id === optimistic.id ? { ...p, id: data.id } : p));
+        const updated = prev.map((p) => (p.id === optimistic.id ? { ...p, id: json.id } : p));
         localStorage.setItem("pendingItems", JSON.stringify(updated));
         return updated;
       });
-      showToast("Wishlist updated");
+      showToast("Added to upcoming");
     } catch (e: unknown) {
       setPendingItems((prev) => prev.filter((p) => p.id !== optimistic.id));
-      showToast(`Failed to save - ${e instanceof Error ? e.message : "Unknown error"}`);
-    } finally {
-      setAddingPending(false);
+      showToast(`Failed to save`);
+      throw e;
     }
   };
 
@@ -572,6 +540,11 @@ export default function App() {
     }
     setShowCatPicker(false);
     setCatSearch("");
+  };
+
+  const openCategoryDetails = (cat: Category) => {
+    selectCategory(cat);
+    setShowCategoryDetails(true);
   };
 
   const filteredCats = categories
@@ -774,14 +747,6 @@ export default function App() {
   const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && categoryId && status === "idle" && !categoryUnfunded && !categoryOverBudget);
   const suggestedCategory = suggestedCatId ? categories.find((c) => c.id === suggestedCatId) : undefined;
 
-  const modeButton = (
-    <button onClick={toggleMode} style={modeButtonStyle}>
-      <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>
-        {mode === "wife" ? "Wifey" : "Hubby"}
-      </span>
-    </button>
-  );
-
   return (
     <AppShell
       tab={tab}
@@ -800,6 +765,7 @@ export default function App() {
           search={homeSearch}
           onSearchChange={setHomeSearch}
           onSelectCategory={selectCategory}
+          onOpenCategoryDetails={openCategoryDetails}
           onOpenAdd={() => setShowAddModal(true)}
           onOpenPlan={() => setTab("plan")}
           monthlySummary={monthlySummary}
@@ -829,114 +795,31 @@ export default function App() {
       )}
 
       {tab === "pending" && (
-        <div id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
-          <SectionHeader title="Pending" subtitle="Save ideas now and turn them into real expenses later." action={modeButton} />
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={surfaceStyle}>
-              <div style={{ display: "grid", gap: 10 }}>
-                <input type="text" value={pendingName} onChange={(e) => setPendingName(e.target.value)} placeholder="Want to buy..." style={inputStyle} />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, alignItems: "center" }}>
-                  <input type="text" inputMode="decimal" value={pendingAmount} onChange={(e) => setPendingAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Amount" style={inputStyle} />
-                  <div style={{ position: "relative" }} ref={pendingCatRef}>
-                    <button onClick={() => setShowPendingCatPicker((v) => !v)} style={{ ...chipPickerStyle, width: 48, justifyContent: "center", padding: 0 }}>
-                      {pendingCatId ? (categories.find((c) => c.id === pendingCatId)?.icon ?? "#") : "#"}
-                    </button>
-                    <PickerPopover open={showPendingCatPicker} align="right" placement="top" width="min(240px, calc(100vw - 72px))">
-                      <div style={{ maxHeight: 220, overflowY: "auto", padding: 8 }}>
-                        <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
-                          <input type="text" value={pendingCatSearch} onChange={(e) => setPendingCatSearch(e.target.value)} placeholder="Search categories" style={{ ...inputStyle, background: "transparent", border: "none", padding: 0 }} />
-                        </div>
-                        <button onClick={() => { setPendingCatId(""); setShowPendingCatPicker(false); setPendingCatSearch(""); }} style={pickerListButtonStyle}>No category</button>
-                        {categories.filter((c) => c.name.toLowerCase().includes(pendingCatSearch.toLowerCase())).map((cat) => (
-                          <button key={cat.id} onClick={() => { setPendingCatId(cat.id); setShowPendingCatPicker(false); setPendingCatSearch(""); }} style={pickerListButtonStyle}>
-                            <span>{cat.icon ?? "#"}</span>
-                            <span>{cat.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </PickerPopover>
-                  </div>
-                  <button onClick={addPending} disabled={!pendingName.trim() || addingPending} style={{ ...ctaSmallStyle, opacity: pendingName.trim() ? 1 : 0.45 }}>
-                    {addingPending ? "..." : "Add"}
-                  </button>
-                </div>
-                <input type="date" value={pendingDate} onChange={(e) => setPendingDate(e.target.value)} style={inputStyle} />
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gap: 8 }}>
-              {pendingItems.map((item) => {
-                const cat = categories.find((c) => c.id === item.categoryId);
-                return (
-                  <div key={item.id} style={{ ...surfaceStyle, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={iconBadgeStyle}>{cat?.icon ?? "#"}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace" }}>
-                        {[item.date ? fmtDate(item.date) : null, cat?.name, item.addedBy].filter(Boolean).join(" / ")}
-                      </div>
-                    </div>
-                    {item.amount !== null && (
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--text2)" }}>
-                        <Money value={item.amount} />
-                      </span>
-                    )}
-                    <button onClick={() => loadPending(item)} style={ghostActionStyle}>Fill</button>
-                    <button onClick={() => dismissPending(item.id)} style={ghostActionStyle}>x</button>
-                  </div>
-                );
-              })}
-
-              {pendingItems.length === 0 && (
-                <div style={{ ...surfaceStyle, color: "var(--muted)", fontSize: 14 }}>Nothing pending. Future-you says thanks.</div>
-              )}
-            </div>
-          </div>
-        </div>
+        <PendingScreen
+          pendingItems={pendingItems}
+          categories={categories}
+          mode={mode}
+          onLogItem={loadPending}
+          onDismiss={dismissPending}
+          onAdd={addPendingItem}
+        />
       )}
 
       {tab === "history" && (
-        <div id="panel-history" role="tabpanel" aria-labelledby="tab-history">
-          <SectionHeader title="History" subtitle="Recent spending, ready to review or reuse." action={modeButton} />
-          <div style={{ display: "grid", gap: 8 }}>
-            {transactions.map((t) => {
-              const cat = categories.find((c) => c.id === t.category);
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => {
-                    if (deletingId === t.id) return;
-                    setName(t.name);
-                    if (t.category) {
-                      const found = categories.find((x) => x.id === t.category);
-                      if (found) selectCategory(found);
-                    }
-                    setShowAddModal(true);
-                  }}
-                  style={{ ...surfaceStyle, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", borderColor: deletingId === t.id ? "var(--danger)" : "var(--border)" }}
-                >
-                  <div style={iconBadgeStyle}>{cat?.icon ?? "#"}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace" }}>
-                      {[cat?.name ?? "Unsorted", fmtDate(t.date)].join(" / ")}
-                    </div>
-                  </div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--danger)" }}>
-                    -<Money value={t.amount} absolute />
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }} style={{ ...ghostActionStyle, color: deletingId === t.id ? "var(--surface)" : "var(--muted)", background: deletingId === t.id ? "var(--danger)" : "transparent" }}>
-                    Del
-                  </button>
-                </div>
-              );
-            })}
-
-            {transactions.length === 0 && (
-              <div style={{ ...surfaceStyle, color: "var(--muted)", fontSize: 14 }}>No transactions yet.</div>
-            )}
-          </div>
-        </div>
+        <HistoryScreen
+          transactions={transactions}
+          categories={categories}
+          deletingId={deletingId}
+          onClickTransaction={(t) => {
+            setName(t.name);
+            if (t.category) {
+              const found = categories.find((x) => x.id === t.category);
+              if (found) selectCategory(found);
+            }
+            setShowAddModal(true);
+          }}
+          onDeleteTransaction={deleteTransaction}
+        />
       )}
 
       <AddTransactionSheet
@@ -1006,6 +889,17 @@ export default function App() {
         accountRef={accountRef}
       />
 
+      <CategoryDetailsSheet
+        open={showCategoryDetails}
+        category={selectedCat ?? null}
+        month={(monthlySummary.start || today()).slice(0, 7)}
+        onClose={() => setShowCategoryDetails(false)}
+        onOpenAdd={() => {
+          setShowCategoryDetails(false);
+          setShowAddModal(true);
+        }}
+      />
+
     </AppShell>
   );
 }
@@ -1029,18 +923,6 @@ const surfaceStyle: CSSProperties = {
   borderRadius: "var(--card-radius)",
   boxShadow: "var(--card-shadow)",
   padding: 16,
-};
-
-const modeButtonStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 0,
-  padding: "8px 14px",
-  borderRadius: 20,
-  border: "1px solid var(--border2)",
-  background: "var(--surface)",
-  cursor: "pointer",
-  color: "var(--text2)",
 };
 
 const chipPickerStyle: CSSProperties = {
