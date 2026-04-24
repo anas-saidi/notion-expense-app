@@ -12,7 +12,6 @@ import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import type { Account, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
-import { IdentityScreen } from "./components/IdentityScreen";
 import { fmtDate, monthBounds, shiftDate, today } from "./components/app-utils";
 
 const LOADING_LINES = [
@@ -75,7 +74,7 @@ function SectionHeader({
 
 export default function App() {
   const [mounted, setMounted] = useState(false);
-  const [mode, setMode] = useState<"wife" | "husband" | null>(null);
+  const [mode, setMode] = useState<"wife" | "husband">("husband");
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -143,6 +142,8 @@ export default function App() {
     if (saved === "wife" || saved === "husband") {
       setMode(saved);
       document.documentElement.dataset.mode = saved;
+    } else {
+      document.documentElement.dataset.mode = "husband";
     }
     setMounted(true);
   }, []);
@@ -166,17 +167,6 @@ export default function App() {
     toastTimerRef.current = setTimeout(() => setMicroToast(null), timeout);
   };
 
-  const selectIdentity = (nextMode: "wife" | "husband") => {
-    localStorage.setItem("identity", nextMode);
-    setMode(nextMode);
-    document.documentElement.dataset.mode = nextMode;
-    if (accounts.length) applyDefaultAccountForMode(accounts, nextMode);
-  };
-
-  const switchIdentity = () => {
-    selectIdentity(mode === "wife" ? "husband" : "wife");
-  };
-
   const claimPendingItem = async (id: string, claimedBy: "wife" | "husband" | null) => {
     setPendingItems((prev) => {
       const updated = prev.map((p) => p.id === id ? { ...p, claimedBy } : p);
@@ -196,12 +186,6 @@ export default function App() {
     } catch {
       fetchPending();
     }
-  };
-
-  const applyDefaultAccountForMode = (accs: Account[], nextMode: "wife" | "husband") => {
-    const keyword = nextMode === "wife" ? "wife" : "hubb";
-    const match = accs.find((a) => a.label.toLowerCase().includes(keyword));
-    setAccountId((match ?? accs[0])?.id ?? "");
   };
 
   const fetchTransactions = async () => {
@@ -269,7 +253,6 @@ export default function App() {
       .then((data) => {
         const accs: Account[] = data.accounts ?? [];
         setAccounts(accs);
-        if (mode) applyDefaultAccountForMode(accs, mode);
       });
 
     fetchTransactions();
@@ -505,26 +488,69 @@ export default function App() {
     };
   }, [accounts, readyToAssignOffset, readyToAssignPool]);
 
+  // Calculate household and individual planned totals using current month assignments
   const contributionDueByScope = useMemo(() => {
-    const norm = (value: string) => value.toLowerCase();
-    let wifeDue = 0;
-    let husbandDue = 0;
+    const norm = (value) => value.toLowerCase();
+    // Get household and individual category IDs
+    const householdCategoryIds = new Set(categories.filter((c) => c.isTeamFund).map((c) => c.id));
+    // Map of categoryId to assigned amount for current month
+    const assignedByCategory = monthlySummary.assignedByCategory;
+    // Calculate household planned total
+    const householdPlanned = assignedByCategory
+      .filter((item) => householdCategoryIds.has(item.categoryId))
+      .reduce((sum, item) => sum + item.total, 0);
+    // Calculate individual planned total (all non-household)
+    const individualPlanned = assignedByCategory
+      .filter((item) => !householdCategoryIds.has(item.categoryId))
+      .reduce((sum, item) => sum + item.total, 0);
 
-    for (const account of accounts) {
-      if (isSavingsAccount(account)) continue;
-      const label = norm(account.label);
-      const due = Math.max(0, account.jointDue ?? 0);
-      if (!due) continue;
-      if (label.includes("wife")) wifeDue += due;
-      if (label.includes("hubb")) husbandDue += due;
+    // Find wife and husband accounts with contributionPercent
+    const wifeAccount = accounts.find((a) => !isSavingsAccount(a) && norm(a.label).includes("wife") && typeof a.contributionPercent === "number");
+    const husbandAccount = accounts.find((a) => !isSavingsAccount(a) && norm(a.label).includes("hubb") && typeof a.contributionPercent === "number");
+    const wifePercent = wifeAccount?.contributionPercent ?? 0;
+    const husbandPercent = husbandAccount?.contributionPercent ?? 0;
+    // Use contributionPercent directly as a multiplier (e.g., 0.6 means 60%)
+    const wifePlanned = Math.round(householdPlanned * wifePercent);
+    const husbandPlanned = Math.round(householdPlanned * husbandPercent);
+
+    // DEBUG PRINTS
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG] Monthly household planned:", householdPlanned);
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG] Monthly individual planned:", individualPlanned);
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG] Husband planned contribution:", husbandPlanned);
+      // eslint-disable-next-line no-console
+      console.log("[DEBUG] Wife planned contribution:", wifePlanned);
     }
 
     return {
-      wife: wifeDue,
-      husband: husbandDue,
-      total: wifeDue + husbandDue,
+      wife: wifePlanned,
+      husband: husbandPlanned,
+      total: wifePlanned + husbandPlanned,
     };
-  }, [accounts]);
+  }, [accounts, categories, monthlySummary.assignedByCategory]);
+  // DEBUG PRINTS for spent on team categories
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Find all team (household) categories
+    const teamCategoryIds = new Set(categories.filter((c) => c.isTeamFund).map((c) => c.id));
+    // Map accountId to label
+    const accountLabelById = new Map(accounts.map((a) => [a.id, a.label.toLowerCase()]));
+    let husbandSpent = 0;
+    let wifeSpent = 0;
+    for (const txn of transactions) {
+      if (!txn.category || !teamCategoryIds.has(txn.category)) continue;
+      const label = txn.accountId ? accountLabelById.get(txn.accountId) ?? "" : "";
+      if (label.includes("hubb")) husbandSpent += txn.amount ?? 0;
+      if (label.includes("wife")) wifeSpent += txn.amount ?? 0;
+    }
+    // eslint-disable-next-line no-console
+    console.log("[DEBUG] Husband spent on team categories:", husbandSpent);
+    // eslint-disable-next-line no-console
+    console.log("[DEBUG] Wife spent on team categories:", wifeSpent);
+  }, [accounts, categories, transactions]);
 
   const householdSpentByPartner = useMemo(() => {
     const householdCategoryIds = new Set(
@@ -788,10 +814,6 @@ export default function App() {
     );
   }
 
-  if (mode === null) {
-    return <IdentityScreen onSelect={selectIdentity} />;
-  }
-
   const parsedAmount = amount ? parseFloat(amount) : 0;
   const categoryUnfunded = !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
   const categoryOverBudget = !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
@@ -805,8 +827,6 @@ export default function App() {
       onTabChange={setTab}
       onOpenAdd={() => setShowAddModal(true)}
       toast={microToast}
-      mode={mode}
-      onSwitchIdentity={switchIdentity}
       showAddButton={tab !== "plan"}
       immersive={tab === "plan"}
     >

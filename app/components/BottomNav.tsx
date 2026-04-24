@@ -9,9 +9,9 @@ type BottomNavProps = {
 
 export function BottomNav({ tab, pendingCount, onTabChange }: BottomNavProps) {
   const items: { key: AppTab; label: string }[] = [
-    { key: "home", label: "Home" },
-    { key: "pending", label: "Pending" },
-    { key: "history", label: "History" },
+    { key: "home", label: "Budget" },
+    { key: "pending", label: "Upcoming" },
+    { key: "history", label: "Activity" },
   ];
 
   return (

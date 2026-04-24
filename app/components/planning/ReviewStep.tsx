@@ -43,8 +43,8 @@ export function ReviewStep({
           {isOver
             ? "You have assigned more than the available pool."
             : isComplete
-              ? "All set. Future-you approves."
-              : "There is still money left to assign before finishing."}
+              ? "All set. Your shared plan is ready to save."
+              : "There is still money left to assign before saving the shared plan."}
         </span>
       </div>
 
@@ -53,10 +53,10 @@ export function ReviewStep({
         <Row label="Budget categories" value={String(budgetItems.length)} />
         <Row label="Savings categories" value={String(savingsItems.length)} />
         <Row label="Available pool" value={<Money value={snapshot.availablePool} />} />
-        <Row label="Assigned budgets" value={<Money value={snapshot.assignedHousehold} />} />
+        <Row label="Assigned categories" value={<Money value={snapshot.assignedHousehold} />} />
         <Row label="Assigned savings" value={<Money value={snapshot.assignedSavings} />} />
         <Row
-          label="Left to assign"
+          label="Still to assign"
           value={
             <span className="review-left-assign">
               <Money value={snapshot.leftToAssign} />

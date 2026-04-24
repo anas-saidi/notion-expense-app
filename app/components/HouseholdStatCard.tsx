@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Money } from "./Money";
 
 export type Scope = "household" | "wife" | "husband";
@@ -8,12 +8,6 @@ export type Scope = "household" | "wife" | "husband";
 type StatView = {
   spent: number;
   planned: number;
-};
-
-type DerivedStatView = StatView & {
-  remaining: number;
-  progress: number;
-  status: "on-track" | "near-limit" | "over-budget";
 };
 
 type HouseholdStatCardProps = {
@@ -25,605 +19,429 @@ type HouseholdStatCardProps = {
   householdSpentByPartner?: { wife: number; husband: number; other: number; total: number };
 };
 
-const SCOPE_ORDER: Scope[] = ["household", "wife", "husband"];
-
-const SCOPE_LABELS: Record<Scope, string> = {
-  household: "Household",
-  wife: "Wife",
-  husband: "Husband",
+type RingSegment = {
+  key: "wife" | "husband";
+  label: string;
+  value: number;
+  spent: number;
+  color: string;
+  spentColor: string;
+  startAngle: number;
+  endAngle: number;
+  spentEndAngle: number;
 };
 
+const RING_SIZE = 216;
+const RING_CENTER = RING_SIZE / 2;
+const RING_RADIUS = 68;
+const RING_STROKE = 18;
+const SPENT_RING_RADIUS = 68;
+const SPENT_RING_STROKE = 8;
+const RING_START = -90;
+const RING_SWEEP = 360;
+const SEGMENT_GAP = 16;
+const SCOPE_ORDER: Scope[] = ["household", "wife", "husband"];
+const SCOPE_LABELS: Record<Scope, string> = {
+  household: "Joint",
+  wife: "Salma",
+  husband: "Anas",
+};
 const HINT_STORAGE_KEY = "household-stat-card-hint-hidden";
 
-export function HouseholdStatCard({ views, scope, onScopeChange, readyToAssignByScope, contributionDueByScope, householdSpentByPartner }: HouseholdStatCardProps) {
-  const [hasHydrated, setHasHydrated] = useState(false);
+export function HouseholdStatCard({
+  views,
+  scope,
+  onScopeChange,
+  readyToAssignByScope,
+  contributionDueByScope,
+  householdSpentByPartner,
+}: HouseholdStatCardProps) {
   const [showHint, setShowHint] = useState(false);
-  const [transitionKey, setTransitionKey] = useState(0);
-  const [activeTick, setActiveTick] = useState<"wife" | "husband" | null>(null);
-  const [hoverTick, setHoverTick] = useState<"wife" | "husband" | null>(null);
-  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // DEBUG: Print partner contribution and spend values
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.log("[DEBUG] contributionDueByScope:", contributionDueByScope);
+    // eslint-disable-next-line no-console
+    console.log("[DEBUG] householdSpentByPartner:", householdSpentByPartner);
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setShowHint(window.localStorage.getItem(HINT_STORAGE_KEY) !== "true");
-    setHasHydrated(true);
   }, []);
 
-  useEffect(() => {
-    setTransitionKey((value) => value + 1);
-    setActiveTick(null);
-  }, [scope]);
+  const wifePlanned = Math.max(0, contributionDueByScope?.wife ?? 0);
+  const husbandPlanned = Math.max(0, contributionDueByScope?.husband ?? 0);
+  const wifeSpent = Math.max(0, householdSpentByPartner?.wife ?? 0);
+  const husbandSpent = Math.max(0, householdSpentByPartner?.husband ?? 0);
+  const totalPartnerPlanned = wifePlanned + husbandPlanned;
 
-  const activeView = useMemo<DerivedStatView>(() => {
-    const planned = views[scope].planned;
-    const spent = views[scope].spent;
-    const remaining = readyToAssignByScope[scope] ?? 0;
-    const progress = planned > 0 ? spent / planned : 0;
+  const ringSegments = useMemo(() => {
+    const total = Math.max(1, wifePlanned + husbandPlanned);
+    let cursor = RING_START;
 
-    let status: DerivedStatView["status"] = "on-track";
-    if (progress > 1) status = "over-budget";
-    else if (progress >= 0.85) status = "near-limit";
+    const buildSegment = (
+      key: "wife" | "husband",
+      label: string,
+      value: number,
+      spent: number,
+      color: string,
+      spentColor: string,
+    ): RingSegment => {
+      const sweep = RING_SWEEP * (value / total);
+      const visibleSweep = Math.max(12, sweep - SEGMENT_GAP);
+      const startAngle = cursor + SEGMENT_GAP / 2;
+      const endAngle = startAngle + visibleSweep;
+      const spentRatio = value > 0 ? Math.min(1, spent / value) : 0;
+      const spentEndAngle = startAngle + visibleSweep * spentRatio;
+      cursor += sweep;
+      return { key, label, value, spent, color, spentColor, startAngle, endAngle, spentEndAngle };
+    };
 
-    return { planned, spent, remaining, progress, status };
-  }, [readyToAssignByScope, scope, views]);
+    return [
+      buildSegment(
+        "wife",
+        "Wife",
+        wifePlanned,
+        wifeSpent,
+        "color-mix(in srgb, var(--partner-wife) 42%, white)",
+        "var(--partner-wife)",
+      ),
+      buildSegment(
+        "husband",
+        "Husband",
+        husbandPlanned,
+        husbandSpent,
+        "color-mix(in srgb, var(--partner-husband) 42%, white)",
+        "var(--partner-husband)",
+      ),
+    ];
+  }, [husbandPlanned, husbandSpent, wifePlanned, wifeSpent]);
 
-  const hideHint = () => {
-    setShowHint(false);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(HINT_STORAGE_KEY, "true");
-    }
-  };
+  const activeView = views[scope];
+  const remaining = readyToAssignByScope[scope] ?? 0;
 
   const cycleScope = () => {
     const currentIndex = SCOPE_ORDER.indexOf(scope);
     const nextScope = SCOPE_ORDER[(currentIndex + 1) % SCOPE_ORDER.length];
     onScopeChange(nextScope);
-    if (showHint) hideHint();
+    if (showHint && typeof window !== "undefined") {
+      setShowHint(false);
+      window.localStorage.setItem(HINT_STORAGE_KEY, "true");
+    }
   };
-
-  const animatedRemaining = useAnimatedNumber(activeView.remaining);
-  const barTone = resolveStatusTone(activeView.status);
-  const clampedProgress = Math.max(0, Math.min(activeView.progress, 1));
-  const statusLabel = resolveStatusLabel(activeView.status);
-  
-  const transitionName = prefersReducedMotion ? "statCardFade" : "statCardRise";
-  const remainingAbs = Math.abs(animatedRemaining);
-  const remainingIsNegative = animatedRemaining < 0;
-  const householdPlanned = views.household.planned;
-  const showContributionTicks = scope === "household" && !!contributionDueByScope?.total && householdPlanned > 0;
-  const wifeTickPct = showContributionTicks
-    ? Math.min(100, (contributionDueByScope!.wife / householdPlanned) * 100)
-    : 0;
-  const husbandTickPct = showContributionTicks
-    ? Math.min(100, (contributionDueByScope!.husband / householdPlanned) * 100)
-    : 0;
-  const spentForBar = Math.min(activeView.spent, activeView.planned);
-  const splitSourceTotal = householdSpentByPartner?.total ?? 0;
-  const hasSplit = scope === "household" && splitSourceTotal > 0 && activeView.planned > 0;
-  const splitScale = hasSplit && spentForBar > 0
-    ? Math.min(1, spentForBar / splitSourceTotal)
-    : 0;
-  const wifeSpent = hasSplit ? (householdSpentByPartner!.wife * splitScale) : 0;
-  const husbandSpent = hasSplit ? (householdSpentByPartner!.husband * splitScale) : 0;
-  const otherSpent = hasSplit ? (householdSpentByPartner!.other * splitScale) : 0;
-  const splitSum = wifeSpent + husbandSpent + otherSpent;
-  const unassignedSpent = hasSplit ? Math.max(0, spentForBar - splitSum) : 0;
-  const plannedDenominator = activeView.planned || 1;
-  const wifeSpentPct = hasSplit ? (wifeSpent / plannedDenominator) * 100 : 0;
-  const husbandSpentPct = hasSplit ? (husbandSpent / plannedDenominator) * 100 : 0;
-  const otherSpentPct = hasSplit ? (otherSpent / plannedDenominator) * 100 : 0;
-  const unassignedSpentPct = hasSplit ? (unassignedSpent / plannedDenominator) * 100 : 0;
-  const segmentParts = hasSplit
-    ? [
-        {
-          key: "wife",
-          left: 0,
-          width: wifeSpentPct,
-          color: "color-mix(in srgb, var(--partner-wife) 60%, #fff5f8)",
-        },
-        {
-          key: "husband",
-          left: wifeSpentPct,
-          width: husbandSpentPct,
-          color: "color-mix(in srgb, var(--partner-husband) 60%, #f3f7ff)",
-        },
-        {
-          key: "other",
-          left: wifeSpentPct + husbandSpentPct,
-          width: otherSpentPct,
-          color: "color-mix(in srgb, var(--surface2) 88%, white)",
-        },
-        {
-          key: "unassigned",
-          left: wifeSpentPct + husbandSpentPct + otherSpentPct,
-          width: unassignedSpentPct,
-          color: barTone,
-        },
-      ].filter((segment) => segment.width > 0)
-    : [];
-  const firstSegmentKey = segmentParts[0]?.key ?? null;
-  const lastSegmentKey = segmentParts[segmentParts.length - 1]?.key ?? null;
-  const segmentRadius = (key: string) => {
-    if (key === firstSegmentKey && key === lastSegmentKey) return "8px";
-    if (key === firstSegmentKey) return "8px 0 0 8px";
-    if (key === lastSegmentKey) return "0 8px 8px 0";
-    return "0";
-  };
-  const showPartnerChips = scope === "household" && !!householdSpentByPartner && householdSpentByPartner.total > 0;
-  const wifeContribution = contributionDueByScope?.wife ?? 0;
-  const husbandContribution = contributionDueByScope?.husband ?? 0;
 
   return (
-    <section
-      aria-label="Monthly household budget summary"
-      style={{
-        display: "grid",
-        gap: 16,
-        padding: "18px 18px 17px",
-        borderRadius: 22,
-        border: "none",
-        background: "color-mix(in srgb, var(--surface) 96%, white)",
-        boxShadow: "0 18px 32px -26px color-mix(in srgb, var(--accent) 22%, transparent)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <span style={eyebrowStyle}>This month</span>
+    <section style={shellStyle} aria-label="Monthly household budget summary">
+      <div style={headerStyle}>
+        <span style={eyebrowStyle}>Partner contributions</span>
+        <span style={scopeBadgeStyle}>{SCOPE_LABELS[scope]}</span>
       </div>
 
       <button
         type="button"
         onClick={cycleScope}
-        aria-label={`Tap to switch summary scope. Currently showing ${SCOPE_LABELS[scope]}.`}
         style={tapAreaStyle}
+        aria-label={`Switch summary scope. Currently showing ${SCOPE_LABELS[scope]}.`}
       >
-        <div key={`scope-${transitionKey}`} style={{ ...contentStackStyle, animation: `${transitionName} 200ms ease-out both` }}>
-          <span style={scopeLabelStyle}>{SCOPE_LABELS[scope]}</span>
-          <div style={headlineRowStyle}>
-            <div style={numberWrapStyle}>
-              <div style={{ ...numberStyle, color: remainingIsNegative ? "var(--danger)" : numberStyle.color }}>
-                <Money
-                  value={remainingAbs}
-                  currencyStyle={{ fontSize: "0.3em", letterSpacing: 0.7, opacity: 0.48 }}
+        <div style={contentStyle}>
+          <div style={ringWrapStyle}>
+            <svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
+              <circle
+                cx={RING_CENTER}
+                cy={RING_CENTER}
+                r={RING_RADIUS}
+                fill="none"
+                stroke="color-mix(in srgb, var(--surface2) 58%, white)"
+                strokeWidth={RING_STROKE}
+                opacity="0.7"
+              />
+
+              {ringSegments.map((segment) => (
+                <path
+                  key={segment.key}
+                  d={describeArc(RING_CENTER, RING_CENTER, RING_RADIUS, segment.startAngle, segment.endAngle)}
+                  fill="none"
+                  stroke={segment.color}
+                  strokeWidth={RING_STROKE}
+                  strokeLinecap="round"
+                  style={{
+                    opacity: scope === "household" || scope === segment.key ? 0.82 : 0.22,
+                    filter: "none",
+                  }}
                 />
-                <span style={numberSuffixStyle}>remaining</span>
+              ))}
+
+              {ringSegments.map((segment) => (
+                <path
+                  key={`${segment.key}-spent`}
+                  d={describeArc(RING_CENTER, RING_CENTER, SPENT_RING_RADIUS, segment.startAngle, segment.spentEndAngle)}
+                  fill="none"
+                  stroke={segment.spentColor}
+                  strokeWidth={SPENT_RING_STROKE}
+                  strokeLinecap="round"
+                  style={{
+                    opacity: scope === "household" || scope === segment.key ? 0.96 : 0.18,
+                  }}
+                />
+              ))}
+            </svg>
+
+            <div style={ringCenterStyle}>
+              <div style={centerLabelStyle}>Assigned</div>
+              <div style={centerAmountStyle}>
+                {totalPartnerPlanned.toLocaleString("fr-MA")}
               </div>
+              <div style={centerCurrencyStyle}>MAD</div>
+            </div>
+          </div>
+
+          <div style={summaryStyle}>
+            <div style={summaryTitleStyle}>How you're contributing</div>
+            <p style={summaryBodyStyle}>
+              Outer ring shows planned share. Inner line shows spend so far.
+            </p>
+            <div style={legendStyle}>
+              {ringSegments.map((segment) => (
+                <div key={segment.key} style={legendRowStyle}>
+                  <span style={{ ...legendDotStyle, background: segment.color }} />
+                  <span style={legendLabelStyle}>{segment.label}</span>
+                  <span style={legendValueStyle}>
+                    <Money value={segment.spent} /> / <Money value={segment.value} />
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={statsStyle}>
+              <div style={statRowStyle}>
+                <span style={statLabelStyle}>Spent</span>
+                <span style={statValueStyle}>
+                  <Money value={activeView.spent} />
+                </span>
+              </div>
+              {scope !== "household" ? (
+                <div style={statRowStyle}>
+                  <span style={statLabelStyle}>Remaining</span>
+                  <span style={{ ...statValueStyle, color: remaining < 0 ? "var(--danger)" : "var(--text)" }}>
+                    <Money value={Math.abs(remaining)} absolute />
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
-
-        <div aria-hidden="true" style={dotsRowStyle}>
-          {SCOPE_ORDER.map((item) => (
-            <span
-              key={item}
-              style={{
-                ...dotStyle,
-                opacity: item === scope ? 1 : 0.28,
-                transform: item === scope ? "scale(1)" : "scale(0.8)",
-                background: item === scope ? "var(--text)" : "color-mix(in srgb, var(--text2) 60%, white)",
-                boxShadow: item === scope
-                  ? "inset 0 0 0 1px color-mix(in srgb, var(--ink-strong) 10%, white), 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent)"
-                  : dotStyle.boxShadow,
-                animation: "none",
-              }}
-            />
-          ))}
-        </div>
-
-        {hasHydrated && showHint ? <span style={hintStyle}>Tap to switch</span> : null}
       </button>
 
-      <div style={{ display: "grid", gap: 8 }}>
-        <div style={progressWrapStyle}>
-          <div aria-hidden="true" style={progressTrackStyle}>
-            {hasSplit ? (
-              <>
-                {segmentParts.map((segment) => (
-                  <div
-                    key={segment.key}
-                    style={{
-                      ...progressSegmentStyle,
-                      left: `${segment.left}%`,
-                      width: `${segment.width}%`,
-                      background: segment.color,
-                      borderRadius: segmentRadius(segment.key),
-                    }}
-                  />
-                ))}
-              </>
-            ) : (
-              <div style={{ ...progressFillStyle, width: `${clampedProgress * 100}%`, background: barTone }} />
-            )}
-          </div>
-
-          {showContributionTicks && contributionDueByScope!.wife > 0 && (
-            <div
-              style={{ ...contributionTickWrapStyle, left: `${wifeTickPct}%` }}
-              role="button"
-              tabIndex={0}
-              aria-pressed={activeTick === "wife"}
-              aria-label="Show wife contribution"
-              onMouseEnter={() => setHoverTick("wife")}
-              onMouseLeave={() => setHoverTick(null)}
-              onFocus={() => setHoverTick("wife")}
-              onBlur={() => setHoverTick(null)}
-              onClick={() => setActiveTick((prev) => (prev === "wife" ? null : "wife"))}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setActiveTick((prev) => (prev === "wife" ? null : "wife"));
-                }
-              }}
-            >
-              <div style={{ ...contributionTickLineStyle, background: "var(--partner-wife-strong)" }} />
-              <div
-                style={{
-                  ...contributionTickDotStyle,
-                  background: "var(--partner-wife)",
-                  boxShadow:
-                    activeTick === "wife"
-                      ? "0 0 0 4px color-mix(in srgb, var(--partner-wife) 18%, transparent)"
-                      : hoverTick === "wife"
-                        ? "0 0 0 3px color-mix(in srgb, var(--partner-wife) 14%, transparent)"
-                        : contributionTickDotStyle.boxShadow,
-                }}
-              />
-              {showPartnerChips && activeTick === "wife" && (
-                <div style={tickChipStyle}>
-                  W · <Money value={householdSpentByPartner!.wife} />/<Money value={wifeContribution} />
-                </div>
-              )}
-            </div>
-          )}
-          {showContributionTicks && contributionDueByScope!.husband > 0 && (
-            <div
-              style={{ ...contributionTickWrapStyle, left: `${husbandTickPct}%` }}
-              role="button"
-              tabIndex={0}
-              aria-pressed={activeTick === "husband"}
-              aria-label="Show husband contribution"
-              onMouseEnter={() => setHoverTick("husband")}
-              onMouseLeave={() => setHoverTick(null)}
-              onFocus={() => setHoverTick("husband")}
-              onBlur={() => setHoverTick(null)}
-              onClick={() => setActiveTick((prev) => (prev === "husband" ? null : "husband"))}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setActiveTick((prev) => (prev === "husband" ? null : "husband"));
-                }
-              }}
-            >
-              <div style={{ ...contributionTickLineStyle, background: "#2a6fb4" }} />
-              <div
-                style={{
-                  ...contributionTickDotStyle,
-                  background: "#6aa6e6",
-                  boxShadow:
-                    activeTick === "husband"
-                      ? "0 0 0 4px color-mix(in srgb, #6aa6e6 18%, transparent)"
-                      : hoverTick === "husband"
-                        ? "0 0 0 3px color-mix(in srgb, #6aa6e6 14%, transparent)"
-                        : contributionTickDotStyle.boxShadow,
-                }}
-              />
-              {showPartnerChips && activeTick === "husband" && (
-                <div style={tickChipStyle}>
-                  H · <Money value={householdSpentByPartner!.husband} />/<Money value={husbandContribution} />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div style={barMetaRowStyle}>
-          <span style={barMetaStyle}>Spent <span style={barMetaEmphasisStyle}><Money value={activeView.spent} /></span></span>
-          <span style={barMetaStyle}>Planned <span style={barMetaEmphasisStyle}><Money value={activeView.planned} /></span></span>
-        </div>
-        <div style={footerRowStyle}>
-          <span style={footerStatusStyle(activeView.status)}>{statusLabel}</span>
-        </div>
-      </div>
+      {showHint ? (
+        <div style={hintStyle}>Tap to preview the same ring while switching scopes.</div>
+      ) : null}
     </section>
   );
 }
 
-function resolveStatusLabel(status: DerivedStatView["status"]) {
-  if (status === "over-budget") return "Over plan";
-  if (status === "near-limit") return "Close to limit";
-  return "On track";
+function polarToCartesian(cx: number, cy: number, radius: number, angleInDegrees: number) {
+  const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180;
+  return {
+    x: cx + radius * Math.cos(angleInRadians),
+    y: cy + radius * Math.sin(angleInRadians),
+  };
 }
 
-function resolveStatusTone(status: DerivedStatView["status"]) {
-  if (status === "over-budget") return "color-mix(in srgb, var(--danger) 82%, #f2a1a0)";
-  if (status === "near-limit") return "color-mix(in srgb, #c7881a 78%, #f3ddb0)";
-  return "color-mix(in srgb, #2f8f8a 78%, #bfe9de)";
+function describeArc(cx: number, cy: number, radius: number, startAngle: number, endAngle: number) {
+  const safeEnd = Math.max(startAngle + 0.001, endAngle);
+  const start = polarToCartesian(cx, cy, radius, safeEnd);
+  const end = polarToCartesian(cx, cy, radius, startAngle);
+  const largeArcFlag = safeEnd - startAngle <= 180 ? "0" : "1";
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
 }
 
-function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setPrefersReducedMotion(query.matches);
-
-    update();
-
-    if (query.addEventListener) {
-      query.addEventListener("change", update);
-      return () => query.removeEventListener("change", update);
-    }
-
-    query.addListener(update);
-    return () => query.removeListener(update);
-  }, []);
-
-  return prefersReducedMotion;
-}
-
-function useAnimatedNumber(value: number) {
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const [displayValue, setDisplayValue] = useState(value);
-  const previousValueRef = useRef(value);
-  const frameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const startValue = previousValueRef.current;
-    const targetValue = value;
-
-    if (frameRef.current) cancelAnimationFrame(frameRef.current);
-
-    if (prefersReducedMotion || startValue === targetValue) {
-      setDisplayValue(targetValue);
-      previousValueRef.current = targetValue;
-      return;
-    }
-
-    const delta = targetValue - startValue;
-    const duration = 380;
-    const start = performance.now();
-
-    const tick = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(startValue + delta * eased);
-      if (progress < 1) {
-        frameRef.current = requestAnimationFrame(tick);
-      } else {
-        previousValueRef.current = targetValue;
-      }
-    };
-
-    frameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
-    };
-  }, [prefersReducedMotion, value]);
-
-  return displayValue;
-}
-
-const eyebrowStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  color: "color-mix(in srgb, var(--text2) 80%, #7a7268)",
-};
-
-const tapAreaStyle: CSSProperties = {
-  appearance: "none",
-  border: "none",
-  background: "transparent",
+const shellStyle: CSSProperties = {
   display: "grid",
-  gap: 10,
-  justifyItems: "start",
-  textAlign: "left",
-  padding: 0,
-  cursor: "pointer",
+  gap: 14,
+  padding: "16px 15px 16px",
+  borderRadius: 22,
+  border: "1px solid color-mix(in srgb, var(--border) 16%, transparent)",
+  background:
+    "radial-gradient(circle at top, color-mix(in srgb, var(--accent) 5%, transparent), transparent 40%), color-mix(in srgb, var(--surface) 98%, white)",
 };
 
-const contentStackStyle: CSSProperties = {
-  display: "grid",
-  gap: 8,
-  minHeight: 108,
-  alignContent: "start",
-};
-
-const scopeLabelStyle: CSSProperties = {
-  fontSize: 14,
-  lineHeight: 1.2,
-  fontWeight: 600,
-  color: "color-mix(in srgb, var(--text) 88%, #473f37)",
-};
-
-const valueContextStyle: CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.35,
-  color: "color-mix(in srgb, var(--muted) 86%, #93897d)",
-};
-
-const numberSuffixStyle: CSSProperties = {
-  marginLeft: 8,
-  fontSize: "0.28em",
-  fontWeight: 600,
-  letterSpacing: 0.4,
-  textTransform: "uppercase",
-  color: "color-mix(in srgb, var(--text2) 70%, #8a8278)",
-};
-
-const numberStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "clamp(2.45rem, 9vw, 3.15rem)",
-  lineHeight: 0.9,
-  letterSpacing: -1.35,
-  fontWeight: 700,
-  color: "color-mix(in srgb, var(--text) 95%, #231b17)",
-};
-
-const numberWrapStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-};
-
-const headlineRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto",
-  alignItems: "end",
-  gap: 12,
-};
-
-const supportingCopyStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-  alignItems: "baseline",
-  fontSize: 14,
-  lineHeight: 1.45,
-  color: "color-mix(in srgb, var(--text2) 84%, #7f766d)",
-};
-
-const remainingPulseStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "baseline",
-  gap: 6,
-  animation: "remainingPulse 220ms cubic-bezier(0.22, 1, 0.36, 1)",
-};
-
-const dotsRowStyle: CSSProperties = {
-  display: "flex",
-  gap: 6,
-  alignItems: "center",
-};
-
-const dotStyle: CSSProperties = {
-  width: 6,
-  height: 6,
-  borderRadius: 999,
-  transition: "transform 180ms ease-out, opacity 180ms ease-out, background-color 180ms ease-out",
-  boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--ink-strong) 10%, white)",
-};
-
-const hintStyle: CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.4,
-  color: "color-mix(in srgb, var(--muted) 82%, #958b80)",
-};
-
-const footerRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-start",
-  gap: 8,
-  flexWrap: "wrap",
-};
-
-const barMetaRowStyle: CSSProperties = {
+const headerStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   gap: 12,
 };
 
-const barMetaStyle: CSSProperties = {
-  fontSize: 11,
-  color: "color-mix(in srgb, var(--text2) 72%, #7a7167)",
-  letterSpacing: 0.2,
-};
-
-const barMetaEmphasisStyle: CSSProperties = {
-  color: "color-mix(in srgb, var(--text) 92%, #2e2520)",
+const eyebrowStyle: CSSProperties = {
+  fontSize: 10,
   fontWeight: 600,
+  letterSpacing: 0.3,
+  textTransform: "uppercase",
+  color: "color-mix(in srgb, var(--muted) 84%, transparent)",
 };
 
-const progressWrapStyle: CSSProperties = {
+const scopeBadgeStyle: CSSProperties = {
+  padding: "5px 8px",
+  borderRadius: 999,
+  background: "color-mix(in srgb, var(--surface2) 48%, white)",
+  fontSize: 9,
+  fontWeight: 600,
+  letterSpacing: 0.22,
+  textTransform: "uppercase",
+  color: "var(--text2)",
+};
+
+const tapAreaStyle: CSSProperties = {
+  appearance: "none",
+  border: "none",
+  background: "transparent",
+  padding: 0,
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const contentStyle: CSSProperties = {
+  display: "grid",
+  gap: 12,
+  justifyItems: "center",
+};
+
+const ringWrapStyle: CSSProperties = {
   position: "relative",
-  height: 28,
-  marginBottom: 12,
-  marginTop: 10,
+  width: RING_SIZE,
+  height: RING_SIZE,
+  display: "grid",
+  placeItems: "center",
+  marginInline: "auto",
 };
 
-const progressTrackStyle: CSSProperties = {
+const ringCenterStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
-  borderRadius: 8,
-  overflow: "hidden",
-  background: "color-mix(in srgb, var(--surface2) 78%, white)",
-  boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 30%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent)",
+  display: "grid",
+  placeItems: "center",
+  gap: 4,
+  textAlign: "center",
+  pointerEvents: "none",
+  padding: 48,
 };
 
-const progressFillStyle: CSSProperties = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  height: "100%",
-  borderRadius: 0,
-  transition: "width 0.6s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s",
+const centerLabelStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 600,
+  letterSpacing: 0.28,
+  textTransform: "uppercase",
+  color: "color-mix(in srgb, var(--muted) 84%, transparent)",
 };
 
-const progressSegmentStyle: CSSProperties = {
-  position: "absolute",
-  top: 0,
-  height: "100%",
-  borderRadius: 0,
-  transition: "width 0.6s cubic-bezier(0.22, 1, 0.36, 1), left 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
+const centerValueStyle: CSSProperties = {
+  display: "none",
 };
 
-const contributionTickWrapStyle: CSSProperties = {
-  position: "absolute",
-  top: -8,
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "flex-start",
-  pointerEvents: "auto",
-  transform: "translateX(-50%)",
-  width: 0,
-  minWidth: 36,
-  minHeight: 36,
-  cursor: "pointer",
-  transition: "left 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s",
-};
-
-const contributionTickLineStyle: CSSProperties = {
-  width: 2,
-  height: 8,
-  borderRadius: 1,
-};
-
-const contributionTickDotStyle: CSSProperties = {
-  width: 8,
-  height: 8,
-  borderRadius: 999,
-  border: "2px solid #fff",
-  boxShadow: "0 0 0 1px color-mix(in srgb, var(--surface) 55%, transparent)",
-  position: "relative",
-  top: -4,
-};
-
-
-const tickChipStyle: CSSProperties = {
-  position: "absolute",
-  bottom: "100%",
-  left: "50%",
-  transform: "translateX(-50%)",
-  marginBottom: 6,
-  fontSize: 10,
-  fontWeight: 500,
-  lineHeight: 1.1,
-  color: "color-mix(in srgb, var(--text2) 62%, #6f665c)",
-  background: "color-mix(in srgb, var(--surface2) 86%, white)",
-  padding: "2px 5px",
-  borderRadius: 999,
+const centerAmountStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: "clamp(1.18rem, 4.8vw, 1.48rem)",
+  lineHeight: 1,
+  letterSpacing: -0.12,
+  color: "var(--text2)",
+  fontWeight: 600,
+  maxWidth: "100%",
   whiteSpace: "nowrap",
 };
 
-const footerStatusStyle = (status: DerivedStatView["status"]): CSSProperties => ({
+const centerCurrencyStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 600,
+  letterSpacing: 0.26,
+  textTransform: "uppercase",
+  color: "color-mix(in srgb, var(--muted) 82%, transparent)",
+};
+
+const summaryStyle: CSSProperties = {
+  display: "grid",
+  gap: 10,
+  width: "100%",
+  textAlign: "center",
+};
+
+const summaryTitleStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
-  color:
-    status === "over-budget"
-      ? "var(--danger)"
-      : status === "near-limit"
-        ? "color-mix(in srgb, #9a6a00 82%, var(--text))"
-        : "var(--success)",
-});
+  color: "var(--text2)",
+};
 
+const summaryBodyStyle: CSSProperties = {
+  fontSize: 10,
+  lineHeight: 1.45,
+  color: "var(--muted)",
+};
+
+const legendStyle: CSSProperties = {
+  display: "grid",
+  gap: 7,
+  width: "100%",
+};
+
+const legendRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  width: "100%",
+};
+
+const legendDotStyle: CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: 999,
+  flexShrink: 0,
+};
+
+const legendLabelStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: "var(--text2)",
+};
+
+const legendValueStyle: CSSProperties = {
+  marginLeft: "auto",
+  fontSize: 10,
+  color: "var(--text2)",
+};
+
+const statsStyle: CSSProperties = {
+  display: "grid",
+  gap: 7,
+  padding: "9px 11px",
+  borderRadius: 14,
+  background: "color-mix(in srgb, var(--surface2) 38%, white)",
+  border: "1px solid color-mix(in srgb, var(--border) 14%, transparent)",
+  width: "100%",
+};
+
+const statRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const statLabelStyle: CSSProperties = {
+  fontSize: 10,
+  letterSpacing: 0.24,
+  textTransform: "uppercase",
+  color: "var(--muted)",
+};
+
+const statValueStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: "var(--text2)",
+};
+
+const hintStyle: CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.45,
+  color: "color-mix(in srgb, var(--muted) 72%, transparent)",
+};

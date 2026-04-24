@@ -71,16 +71,16 @@ function buildHistoryStory(transactions: Transaction[], categories: Category[]):
 
   const lead =
     transactions.length === 1
-      ? "A first note in your shared money story."
+      ? "A first activity in your shared budget."
       : activeDays.size <= 2
-        ? "A light trail of spending, easy to revisit together."
+        ? "A light run of household activity, easy to revisit together."
         : activeDays.size <= 6
-          ? "A steady rhythm of check-ins across the week."
-          : "A well-kept timeline of everyday household decisions.";
+          ? "A steady rhythm of shared spending across the week."
+          : "A clear timeline of everyday household spending.";
 
   const note = topCategoryName
-    ? `${topCategoryName} shows up the most, so it is shaping the story right now.`
-    : "Each entry stays ready to review, repeat, or tidy up later.";
+    ? `${topCategoryName} shows up the most in your shared activity right now.`
+    : "Each entry stays ready to review, log again, or tidy up later.";
 
   return {
     lead,
@@ -133,53 +133,29 @@ export function HistoryScreen({
 
   return (
     <div id="panel-history" role="tabpanel" aria-labelledby="tab-history">
-      <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 32,
-                lineHeight: 0.95,
-                fontWeight: 800,
-                color: "var(--text)",
-              }}
-            >
-              History
-            </h1>
-            <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
-              {transactions.length === 0
-                ? "Your spending story starts here."
-                : story?.lead ?? `${transactions.length} transactions, all logged.`}
-            </p>
-          </div>
-        </div>
-      </header>
+      {transactions.length > 0 && (
+        <p style={historyLeadStyle}>
+          {story?.lead ?? `${transactions.length} transactions, all logged.`}
+        </p>
+      )}
 
       {transactions.length > 0 && (
         <section className="history-spotlight" aria-label="History summary">
           <div className="history-spotlight__main">
-            <span className="history-spotlight__eyebrow">Shared money trail</span>
+            <span className="history-spotlight__eyebrow">Household activity</span>
             <div style={{ display: "grid", gap: 8 }}>
               <span style={summaryAmountStyle}>
                 <Money value={totalSpent} absolute />
               </span>
               <p className="history-spotlight__note">
-                {story?.note ?? "Every expense stays close at hand for a quick check-in."}
+                {story?.note ?? "Every expense stays close at hand for a quick household check-in."}
               </p>
             </div>
           </div>
 
           <div className="history-spotlight__stats">
             <div className="history-pill">
-              <span style={summaryLabelStyle}>Latest</span>
+              <span style={summaryLabelStyle}>Most recent</span>
               <strong>{story ? fmtDate(story.latestDate) : "-"}</strong>
             </div>
             <div className="history-pill">
@@ -187,7 +163,7 @@ export function HistoryScreen({
               <strong>{story?.activeDays ?? 0}</strong>
             </div>
             <div className="history-pill">
-              <span style={summaryLabelStyle}>Average</span>
+              <span style={summaryLabelStyle}>Average spend</span>
               <strong>
                 <Money value={story?.averageSpend ?? 0} absolute />
               </strong>
@@ -283,9 +259,9 @@ export function HistoryScreen({
                           <span
                             className="tx-reuse-hint"
                             aria-hidden="true"
-                            title="Tap to reuse"
+                            title="Log similar"
                           >
-                            reuse
+                            log similar
                           </span>
 
                           <button
@@ -344,7 +320,7 @@ export function HistoryScreen({
               marginBottom: 8,
             }}
           >
-            Nothing logged yet
+            No activity yet
           </div>
           <div
             style={{
@@ -414,4 +390,12 @@ const emptyStateStyle: CSSProperties = {
   padding: "64px 24px",
   animation: "fadeUp 0.5s ease both",
   animationDelay: "80ms",
+};
+
+const historyLeadStyle: CSSProperties = {
+  marginBottom: 14,
+  fontSize: 13,
+  lineHeight: 1.55,
+  color: "var(--muted)",
+  animation: "fadeUp 0.32s ease both",
 };

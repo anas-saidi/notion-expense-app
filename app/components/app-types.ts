@@ -28,6 +28,7 @@ export type Account = {
   balance: number | null;
   readyToAssign: number | null;
   jointDue?: number | null;
+  contributionPercent?: number | null;
 };
 
 export type PendingItem = {

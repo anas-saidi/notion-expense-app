@@ -202,7 +202,7 @@ export function PendingScreen({
         name: formName.trim(),
         amount: formAmount ? parseFloat(formAmount) : null,
         categoryId: formCatId || null,
-        addedBy: mode === "wife" ? "Wife" : "Husband",
+        addedBy: PARTNER_NAME[mode],
         date: formDate || null,
         claimedBy: null,
       });
@@ -216,63 +216,48 @@ export function PendingScreen({
 
   return (
     <div id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
-      {/* Header */}
-      <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-          <div>
-            <h1
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 32,
-                lineHeight: 0.95,
-                fontWeight: 800,
-                color: "var(--text)",
-              }}
-            >
-              Upcoming
-            </h1>
-            <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
-              {pendingItems.length === 0
-                ? "Bills, subs, and things you plan to buy."
-                : urgentCount > 0
-                ? `${urgentCount} need${urgentCount === 1 ? "s" : ""} attention.`
-                : `${pendingItems.length} upcoming.`}
-            </p>
-            {pendingItems.length > 0 && (
-              <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                {[
-                  { label: "Yours", count: myCount, color: mode === "wife" ? "var(--partner-wife)" : "var(--partner-husband)" },
-                  { label: PARTNER_NAME[partner], count: partnerCount, color: partner === "wife" ? "var(--partner-wife)" : "var(--partner-husband)" },
-                  { label: "Shared", count: sharedCount, color: "var(--muted)" },
-                ].map(({ label, count, color }) => (
-                  <span
-                    key={label}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      fontSize: 11,
-                      fontFamily: "'DM Mono', monospace",
-                      color: "var(--text2)",
-                      background: "var(--surface2)",
-                      borderRadius: 999,
-                      padding: "3px 8px",
-                    }}
-                  >
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                    {count} {label}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-            <button onClick={openSheet} style={addChipStyle} aria-label="Add upcoming expense">
-              + Add
-            </button>
-          </div>
+      <section style={pendingIntroStyle} aria-label="Pending summary">
+        <div style={pendingIntroTopRowStyle}>
+          <p style={pendingIntroCopyStyle}>
+            {pendingItems.length === 0
+              ? "Bills, subscriptions, and planned household spending live here."
+              : urgentCount > 0
+              ? `${urgentCount} need${urgentCount === 1 ? "s" : ""} attention.`
+              : `${pendingItems.length} upcoming.`}
+          </p>
+          <button onClick={openSheet} style={addChipStyle} aria-label="Add upcoming expense">
+            + Add
+          </button>
         </div>
-      </header>
+
+        {pendingItems.length > 0 && (
+          <div style={pendingOwnershipRowStyle}>
+            {[
+              { label: "Assigned to you", count: myCount, color: mode === "wife" ? "var(--partner-wife)" : "var(--partner-husband)" },
+              { label: PARTNER_NAME[partner], count: partnerCount, color: partner === "wife" ? "var(--partner-wife)" : "var(--partner-husband)" },
+              { label: "Unassigned", count: sharedCount, color: "var(--muted)" },
+            ].map(({ label, count, color }) => (
+              <span
+                key={label}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  fontSize: 11,
+                  fontFamily: "'DM Mono', monospace",
+                  color: "var(--text2)",
+                  background: "var(--surface2)",
+                  borderRadius: 999,
+                  padding: "4px 8px",
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                {count} {label}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Grouped list */}
       {groups.length > 0 ? (
@@ -443,7 +428,7 @@ export function PendingScreen({
                           className="pending-log-btn"
                           style={logItButtonStyle}
                         >
-                          Log it →
+                          Log expense ->
                         </button>
                         {(() => {
                           const claimed = item.claimedBy ?? null;
@@ -456,7 +441,7 @@ export function PendingScreen({
                                 aria-label="Release — move back to shared"
                               >
                                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: mode === "wife" ? "var(--partner-wife)" : "var(--partner-husband)", flexShrink: 0 }} />
-                                Yours · Release
+                                Assigned to you · Release
                               </button>
                             );
                           }
@@ -473,9 +458,9 @@ export function PendingScreen({
                               onClick={() => onClaim(item.id, mode)}
                               className="pending-claim-btn"
                               style={claimReleaseStyle}
-                              aria-label="Claim — assign to yourself"
+                              aria-label="Take this - assign to yourself"
                             >
-                              Claim
+                              Take this
                             </button>
                           );
                         })()}
@@ -512,7 +497,7 @@ export function PendingScreen({
               marginBottom: 24,
             }}
           >
-            Add bills, subscriptions, or planned purchases — they'll show up here sorted by urgency.
+            Add bills, subscriptions, or planned household purchases - they'll show up here sorted by urgency.
           </div>
           <button onClick={openSheet} style={addChipStyle}>
             + Add something
@@ -572,7 +557,7 @@ export function PendingScreen({
                   lineHeight: 1,
                 }}
               >
-                Add upcoming
+                Add upcoming expense
               </h2>
               <button
                 onClick={() => setShowSheet(false)}
@@ -862,4 +847,31 @@ const claimReleaseStyle: CSSProperties = {
   cursor: "pointer",
   letterSpacing: 0.2,
   flexShrink: 0,
+};
+
+const pendingIntroStyle: CSSProperties = {
+  display: "grid",
+  gap: 12,
+  marginBottom: 20,
+  animation: "fadeUp 0.4s ease both",
+};
+
+const pendingIntroTopRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const pendingIntroCopyStyle: CSSProperties = {
+  fontSize: 13,
+  color: "var(--muted)",
+  lineHeight: 1.5,
+  minWidth: 0,
+};
+
+const pendingOwnershipRowStyle: CSSProperties = {
+  display: "flex",
+  gap: 10,
+  flexWrap: "wrap",
 };

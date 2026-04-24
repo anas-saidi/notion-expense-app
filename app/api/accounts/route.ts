@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
     const jointDueKey = pickByTypeAndAliases(props, "formula", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"])
       ?? pickByTypeAndAliases(props, "number", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"])
       ?? pickByTypeAndAliases(props, "rollup", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"]);
+      const contributionPercentKey = pickByTypeAndAliases(props, "number", ["Contribution ( percent )", "Contribution %", "Contribution Percent"]);
 
     const queryBody: Record<string, unknown> = {
       page_size: 50,
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
       const balanceProp = balanceKey ? properties[balanceKey] : null;
       const readyProp = readyKey ? properties[readyKey] : null;
       const jointDueProp = jointDueKey ? properties[jointDueKey] : null;
+        const contributionPercentProp = contributionPercentKey ? properties[contributionPercentKey] : null;
 
       return {
         id: page.id,
@@ -81,6 +83,7 @@ export async function GET(req: NextRequest) {
         balance: readNumber(balanceProp),
         readyToAssign: readNumber(readyProp),
         jointDue: readNumber(jointDueProp),
+          contributionPercent: contributionPercentProp?.number ?? null,
       };
     });
 

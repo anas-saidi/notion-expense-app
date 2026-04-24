@@ -94,17 +94,6 @@ export function HomeScreen({
 
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
-      <header style={{ marginBottom: 20, animation: "fadeUp 0.4s ease both" }}>
-        <div>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 0.95, fontWeight: 800, color: "var(--text)" }}>
-            Home
-          </h1>
-          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
-            Your budget this month.
-          </p>
-        </div>
-      </header>
-
       <div style={stickyHeaderWrapStyle}>
         <HomeOverview
           onOpenPlan={onOpenPlan}
@@ -149,15 +138,6 @@ export function HomeScreen({
         </div>
 
         <section style={{ display: "grid", gap: 0, paddingBottom: 72 }}>
-          <div style={{ paddingBottom: 12 }}>
-            <div>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--muted)" }}>
-                Categories
-              </div>
-              <p style={{ marginTop: 6, fontSize: 14, color: "var(--text2)" }}>Tap a category to open its details.</p>
-            </div>
-          </div>
-
           {visibleCategories.map((cat, i) => {
             const planned = cat.planned ?? 0;
             const spent = spentByCategory.get(cat.id) ?? 0;
@@ -216,7 +196,7 @@ export function HomeScreen({
                       {cat.name}
                     </div>
                     <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
-                      {(cat.type[0] ?? "Category").toUpperCase()} · Planned <Money value={planned} />
+                      Assigned <Money value={planned} />
                     </p>
                     <div style={spentBarTrackStyle} aria-hidden="true">
                       <div style={{ ...spentBarFillStyle, width: `${spentPct}%`, background: spentTone }} />

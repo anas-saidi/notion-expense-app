@@ -23,6 +23,7 @@ export function HomeOverview({
   contributionDueByScope,
   householdSpentByPartner,
 }: HomeOverviewProps) {
+  const monthLabel = formatMonthLabel(monthlySummary.start);
   const wifeCategoryIds = new Set(
     categories
       .filter(isWifeCategory)
@@ -47,23 +48,29 @@ export function HomeOverview({
   const wifeSpent = sumForCategoryIds(monthlySummary.spentByCategory, wifeCategoryIds);
   const husbandAssigned = sumForCategoryIds(monthlySummary.assignedByCategory, husbandCategoryIds);
   const husbandSpent = sumForCategoryIds(monthlySummary.spentByCategory, husbandCategoryIds);
+  const householdRemaining = readyToAssignByScope.household ?? 0;
 
   return (
     <section
-      aria-label="Budget health"
-      style={{
-        display: "grid",
-        gap: 10,
-        paddingBottom: 14,
-        borderBottom: "1px solid color-mix(in srgb, var(--border2) 62%, transparent)",
-        animation: "fadeUp 0.36s 0.02s ease both",
-      }}
+      aria-label="Shared budget"
+      style={heroShellStyle}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ fontSize: 11, letterSpacing: 0.3, textTransform: "uppercase", color: "color-mix(in srgb, var(--muted) 80%, #9a9288)" }}>
-          Budget health
+      <div style={heroHeaderStyle}>
+        <div style={{ minWidth: 0 }}>
+          <div style={heroEyebrowStyle}>
+            This month
+          </div>
+          <h2 style={heroTitleStyle}>{monthLabel}</h2>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={heroHeaderAsideStyle}>
+          <div style={heroRemainingWrapStyle}>
+            <span style={heroRemainingLabelStyle}>Still to assign</span>
+            <strong style={heroRemainingValueStyle(householdRemaining < 0)}>
+              {householdRemaining < 0 ? "-" : ""}
+              {Math.abs(householdRemaining).toLocaleString("fr-MA")}
+              <span style={{ marginLeft: 4, fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>MAD</span>
+            </strong>
+          </div>
           <button
             type="button"
             onClick={onOpenPlan}
@@ -72,9 +79,11 @@ export function HomeOverview({
             style={planTriggerStyle}
           >
             <CalendarIcon />
+            <span>Shared plan</span>
           </button>
         </div>
       </div>
+
       <HouseholdStatCard
         views={{
           household: {
@@ -100,6 +109,13 @@ export function HomeOverview({
   );
 }
 
+function formatMonthLabel(start: string) {
+  const source = start || new Date().toISOString().slice(0, 10);
+  const parsed = new Date(source);
+  if (Number.isNaN(parsed.getTime())) return "This month";
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(parsed);
+}
+
 function sumForCategoryIds(items: MonthlySummary["assignedByCategory"], categoryIds: Set<string>) {
   return items.reduce((sum, item) => {
     if (!categoryIds.has(item.categoryId)) return sum;
@@ -116,17 +132,80 @@ function isHusbandCategory(category: Category) {
 }
 
 const planTriggerStyle = {
-  width: 44,
-  height: 44,
+  minHeight: 44,
+  padding: "0 12px",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 12,
-  border: "1px solid color-mix(in srgb, var(--ink-strong) 6%, #e6ded2)",
-  background: "linear-gradient(180deg, #fffdf8 0%, #fff9f2 100%)",
-  color: "color-mix(in srgb, var(--text) 80%, #4a423a)",
+  gap: 7,
+  borderRadius: 14,
+  border: "1px solid color-mix(in srgb, var(--border2) 78%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 52%, white)",
+  color: "var(--text2)",
   cursor: "pointer",
-  boxShadow: "rgba(0,0,0,0.02) 0px 2px 6px, rgba(255,255,255,0.75) 0px 1px 0px inset",
+  boxShadow: "none",
+  fontSize: 11,
+  fontWeight: 600,
 };
 
+const heroShellStyle = {
+  display: "grid",
+  gap: 12,
+  paddingBottom: 14,
+  borderBottom: "1px solid color-mix(in srgb, var(--border2) 28%, transparent)",
+  animation: "fadeUp 0.36s 0.02s ease both",
+};
 
+const heroHeaderStyle = {
+  display: "grid",
+  gap: 12,
+};
+
+const heroEyebrowStyle = {
+  fontSize: 10,
+  letterSpacing: 0.28,
+  textTransform: "uppercase" as const,
+  color: "color-mix(in srgb, var(--muted) 82%, transparent)",
+  fontWeight: 600,
+};
+
+const heroTitleStyle = {
+  marginTop: 4,
+  fontFamily: "var(--font-display)",
+  fontSize: "clamp(1.22rem, 5.1vw, 1.45rem)",
+  lineHeight: 1.02,
+  letterSpacing: -0.12,
+  color: "var(--text2)",
+  fontWeight: 600,
+};
+
+const heroHeaderAsideStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  flexWrap: "wrap" as const,
+};
+
+const heroRemainingWrapStyle = {
+  display: "grid",
+  gap: 3,
+  minWidth: 0,
+};
+
+const heroRemainingLabelStyle = {
+  fontSize: 9,
+  letterSpacing: 0.22,
+  textTransform: "uppercase" as const,
+  color: "color-mix(in srgb, var(--muted) 82%, transparent)",
+  fontWeight: 500,
+};
+
+const heroRemainingValueStyle = (isNegative: boolean) => ({
+  color: isNegative ? "color-mix(in srgb, var(--danger) 78%, var(--text2))" : "var(--text2)",
+  fontFamily: "var(--font-body)",
+  fontSize: "clamp(0.92rem, 3.7vw, 1.06rem)",
+  lineHeight: 1.05,
+  letterSpacing: -0.04,
+  fontWeight: 500,
+});

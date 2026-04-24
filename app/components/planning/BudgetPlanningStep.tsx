@@ -53,9 +53,9 @@ export function BudgetPlanningStep({
 }: BudgetPlanningStepProps) {
   const groups = useMemo<BudgetGroup[]>(
     () => [
-      { key: "household", label: "Household", items: householdItems, availableCategories: availableHouseholdCategories, onChange: onHouseholdChange },
-      { key: "wife", label: "Wife", items: wifeItems, availableCategories: availableWifeCategories, onChange: onWifeChange },
-      { key: "husband", label: "Husband", items: husbandItems, availableCategories: availableHusbandCategories, onChange: onHusbandChange },
+      { key: "household", label: "Joint", items: householdItems, availableCategories: availableHouseholdCategories, onChange: onHouseholdChange },
+      { key: "wife", label: "Salma", items: wifeItems, availableCategories: availableWifeCategories, onChange: onWifeChange },
+      { key: "husband", label: "Anas", items: husbandItems, availableCategories: availableHusbandCategories, onChange: onHusbandChange },
       { key: "savings", label: "Savings", items: savingsItems, availableCategories: availableSavingsCategories, onChange: onSavingsChange },
     ],
     [availableHouseholdCategories, availableHusbandCategories, availableSavingsCategories, availableWifeCategories, householdItems, husbandItems, onHouseholdChange, onHusbandChange, onSavingsChange, onWifeChange, savingsItems, wifeItems],
@@ -175,7 +175,7 @@ export function BudgetPlanningStep({
     <section style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gap: 10 }}>
         <div style={headRowStyle}>
-          <span style={eyebrowStyle}>Budget categories</span>
+          <span style={eyebrowStyle}>Shared budget categories</span>
           <button
             ref={addAnchorRef}
             type="button"

@@ -52,30 +52,30 @@ const steps: StepMeta[] = [
   {
     id: "income",
     label: "Income",
-    title: "Confirm income",
-    description: "Confirm the money available this month.",
+    title: "Confirm shared income",
+    description: "Confirm the money available for your household this month.",
     nextLabel: "Continue",
   },
   {
     id: "budget",
     label: "Budget",
-    title: "Plan budget categories",
-    description: "Assign household and personal categories.",
+    title: "Plan joint and partner-owned categories",
+    description: "Assign joint and partner-owned categories across your shared budget.",
     nextLabel: "Continue",
   },
   {
     id: "savings",
     label: "Savings",
-    title: "Add savings",
-    description: "Set aside money for savings goals.",
+    title: "Set aside savings",
+    description: "Set aside money for shared savings goals.",
     nextLabel: "Continue",
   },
   {
     id: "review",
     label: "Review",
-    title: "Review and finish",
-    description: "Check totals and finish the month plan.",
-    nextLabel: "Finish planning",
+    title: "Review shared plan",
+    description: "Check totals and save the shared plan for the month.",
+    nextLabel: "Save shared plan",
   },
 ];
 
@@ -278,14 +278,14 @@ export function MonthlyPlanningFlow({
           }),
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Failed to save monthly plan");
+        if (!response.ok) throw new Error(data.error || "Failed to save shared plan");
         setCompletedSteps((prev) => ({ ...prev, [activeStep]: true }));
         setSaveState("idle");
         onCancel();
         return;
       } catch (error: unknown) {
         setSaveState("error");
-        setSaveError(error instanceof Error ? error.message : "Failed to save monthly plan");
+        setSaveError(error instanceof Error ? error.message : "Failed to save shared plan");
         return;
       }
     }
@@ -442,7 +442,7 @@ export function MonthlyPlanningFlow({
                   cursor: canAdvanceFromActiveStep && saveState !== "saving" ? "pointer" : "not-allowed",
                 }}
               >
-                {saveState === "saving" ? "Saving..." : nextStep ? activeStepMeta.nextLabel : "Finish planning"}
+                {saveState === "saving" ? "Saving..." : nextStep ? activeStepMeta.nextLabel : "Save shared plan"}
               </button>
             </div>
           </div>

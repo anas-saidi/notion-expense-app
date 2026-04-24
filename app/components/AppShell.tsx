@@ -9,17 +9,15 @@ type AppShellProps = {
   pendingCount: number;
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
-  onSwitchIdentity: () => void;
   toast: string | null;
-  mode: "wife" | "husband";
   showAddButton?: boolean;
   immersive?: boolean;
 };
-
-const IDENTITY_NAMES: Record<"wife" | "husband", string> = { wife: "Salma", husband: "Anas" };
-const IDENTITY_COLOR: Record<"wife" | "husband", string> = {
-  wife: "var(--partner-wife)",
-  husband: "var(--partner-husband)",
+const TAB_COPY: Record<AppTab, { eyebrow: string; title: string }> = {
+  home: { eyebrow: "Notion Expense", title: "Shared budget" },
+  plan: { eyebrow: "Notion Expense", title: "Shared plan" },
+  pending: { eyebrow: "Notion Expense", title: "Upcoming items" },
+  history: { eyebrow: "Notion Expense", title: "Activity" },
 };
 
 export function AppShell({
@@ -28,12 +26,13 @@ export function AppShell({
   pendingCount,
   onTabChange,
   onOpenAdd,
-  onSwitchIdentity,
   toast,
-  mode,
   showAddButton = true,
   immersive = false,
 }: AppShellProps) {
+  const shellCopy = TAB_COPY[tab];
+  const isHomeTab = tab === "home";
+
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
       <div
@@ -41,41 +40,41 @@ export function AppShell({
         style={immersive ? { minHeight: "100dvh" } : { position: "relative" }}
       >
         {!immersive && (
-          <button
-            onClick={onSwitchIdentity}
-            className="identity-chip"
-            aria-label={`Signed in as ${IDENTITY_NAMES[mode]} — tap to switch`}
+          <div
             style={{
-              position: "absolute",
-              top: 0,
-              right: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              minHeight: 44,
-              padding: "0 12px",
-              borderRadius: 999,
-              border: "1px solid var(--border2)",
-              background: "var(--surface)",
-              color: "var(--text2)",
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-              letterSpacing: 0.2,
-              zIndex: 10,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 18,
             }}
           >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: IDENTITY_COLOR[mode],
-                flexShrink: 0,
-              }}
-            />
-            {IDENTITY_NAMES[mode]}
-          </button>
+            <div style={{ minWidth: 0, display: "grid", gap: 5, paddingTop: 2 }}>
+              <span
+                style={{
+                  fontSize: isHomeTab ? 10 : 11,
+                  fontWeight: isHomeTab ? 600 : 700,
+                  letterSpacing: isHomeTab ? 0.32 : 0.42,
+                  textTransform: "uppercase",
+                  color: isHomeTab ? "color-mix(in srgb, var(--muted) 86%, transparent)" : "var(--muted)",
+                }}
+              >
+                {shellCopy.eyebrow}
+              </span>
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: isHomeTab ? "clamp(1.32rem, 5.3vw, 1.72rem)" : "clamp(1.5rem, 6vw, 2rem)",
+                  lineHeight: isHomeTab ? 0.98 : 0.94,
+                  letterSpacing: isHomeTab ? -0.25 : -0.5,
+                  color: "var(--text)",
+                  fontWeight: isHomeTab ? 650 : undefined,
+                }}
+              >
+                {shellCopy.title}
+              </h1>
+            </div>
+          </div>
         )}
         {children}
       </div>
@@ -96,7 +95,7 @@ export function AppShell({
             height: 58,
             borderRadius: "50%",
             border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
-            background: mode === "wife" ? "color-mix(in srgb, var(--accent) 82%, white)" : "var(--accent)",
+            background: "var(--accent)",
             color: "var(--accent-ink)",
             boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)",
             cursor: "pointer",
