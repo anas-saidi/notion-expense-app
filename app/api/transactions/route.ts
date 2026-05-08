@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
       amount: page.properties.Amount?.number ?? 0,
       date: page.properties.Date?.date?.start ?? "",
       category: page.properties.Category?.relation?.[0]?.id ?? null,
+      accountId: page.properties.Account?.relation?.[0]?.id ?? null,
     }));
 
     return NextResponse.json({ transactions });
