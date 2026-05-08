@@ -5,7 +5,7 @@ import type { Scope } from "./HouseholdStatCard";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { ChipTabs } from "./ui/ChipTabs";
-import { PlusIcon, SearchIcon, SlidersIcon } from "./ui/icons";
+import { SearchIcon, SlidersIcon } from "./ui/icons";
 
 type HomeScreenProps = {
   categories: Category[];
@@ -91,16 +91,9 @@ export function HomeScreen({
               <h2 style={listTitleStyle}>Categories</h2>
               <p style={listSubtitleStyle}>{visibleCategories.length} in {scopeLabel(scope)}</p>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={onOpenRebalance} style={rebalanceButtonStyle}>
-                <SlidersIcon size={13} className="rebalance-btn-icon" />
-                Rebalance
-              </button>
-              <button type="button" onClick={onOpenAdd} style={quickAddStyle}>
-                <PlusIcon size={13} />
-                Add
-              </button>
-            </div>
+            <button type="button" onClick={onOpenRebalance} style={rebalanceButtonStyle} aria-label="Rebalance budget">
+              <SlidersIcon size={15} className="rebalance-btn-icon" />
+            </button>
           </div>
 
           <ChipTabs
@@ -172,11 +165,11 @@ export function HomeScreen({
                     style={{
                       ...categoryIconWrapStyle,
                       background: cat.id === selectedCategoryId
-                        ? "color-mix(in srgb, var(--accent) 18%, white)"
-                        : "color-mix(in srgb, var(--surface2) 72%, white)",
+                        ? "color-mix(in srgb, var(--accent) 16%, var(--surface2))"
+                        : "var(--surface2)",
                       borderColor: cat.id === selectedCategoryId
-                        ? "color-mix(in srgb, var(--accent) 35%, transparent)"
-                        : "color-mix(in srgb, var(--border) 58%, transparent)",
+                        ? "color-mix(in srgb, var(--accent) 32%, var(--card-border))"
+                        : "var(--card-border)",
                     }}
                   >
                     <CategoryIcon icon={cat.icon} size={19} />
@@ -260,10 +253,20 @@ const categoryRowWrapStyle = {
 
 const stickyHeaderWrapStyle = {
   position: "sticky" as const,
-  top: "calc(var(--safe-top) + 8px)",
+  top: 0,
   zIndex: 10,
-  background: "var(--bg)",
+  // Full-bleed background: pull out of the 20px content padding so no gap shows at sides
+  marginLeft: -20,
+  marginRight: -20,
+  paddingLeft: 20,
+  paddingRight: 20,
+  // Extend background upward to cover the safe-area + top padding zone
+  marginTop: "calc(-1 * (var(--safe-top) + 20px))",
+  paddingTop: "calc(var(--safe-top) + 20px)",
   paddingBottom: 16,
+  background: "var(--bg)",
+  // Subtle separator when content scrolls underneath
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--border) 60%, transparent)",
 };
 
 const listHeaderStyle = {
@@ -288,33 +291,18 @@ const listSubtitleStyle = {
 };
 
 const rebalanceButtonStyle = {
-  minHeight: 44,
-  padding: "0 12px",
+  width: 44,
+  height: 44,
+  padding: 0,
   borderRadius: 12,
   border: "1px solid color-mix(in srgb, var(--border2) 58%, transparent)",
   background: "color-mix(in srgb, var(--surface2) 48%, white)",
   color: "var(--text2)",
-  fontSize: 12,
-  fontWeight: 680,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  gap: 5,
-};
-
-const quickAddStyle = {
-  minHeight: 44,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid color-mix(in srgb, var(--accent) 36%, transparent)",
-  background: "color-mix(in srgb, var(--accent) 14%, white)",
-  color: "var(--accent-ink)",
-  fontSize: 12,
-  fontWeight: 750,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 5,
+  justifyContent: "center",
+  flexShrink: 0,
 };
 
 const searchWrapStyle = {
@@ -355,14 +343,14 @@ const categoryRowStyle = {
   width: "100%",
   minHeight: 78,
   padding: "12px 12px",
-  background: "color-mix(in srgb, var(--surface) 92%, white)",
-  border: "1px solid color-mix(in srgb, var(--border) 54%, transparent)",
+  background: "var(--surface)",
+  border: "1px solid var(--card-border)",
   borderRadius: 16,
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   gap: 12,
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 5%, transparent)",
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
 };
 
 const selectedCategoryRowStyle = {
@@ -374,7 +362,7 @@ const categoryIconWrapStyle = {
   width: 42,
   height: 42,
   borderRadius: 14,
-  border: "1px solid color-mix(in srgb, var(--border) 58%, transparent)",
+  border: "1px solid var(--card-border)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
