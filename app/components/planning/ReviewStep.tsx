@@ -116,10 +116,10 @@ const noteStyle = {
 const summaryNoteStyle = {
   display: "grid",
   gap: 4,
-  padding: "10px 12px",
-  borderRadius: 16,
-  border: "1px solid transparent",
-  background: "color-mix(in srgb, var(--surface2) 50%, white)",
+  padding: "0 0 10px",
+  borderRadius: 0,
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 30%, transparent)",
+  background: "transparent",
 };
 
 const summaryTitleStyle = {

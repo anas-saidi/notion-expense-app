@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Category, PendingItem } from "./app-types";
+import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { DelightTrashButton } from "./ui/DelightTrashButton";
+import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { fmtDate, today } from "./app-utils";
 import { PickerPopover } from "./PickerPopover";
 
@@ -317,8 +318,8 @@ export function PendingScreen({
                   const rel = getRelativeTime(item.date);
 
                   return (
+                    <SwipeToDelete key={item.id} onDelete={() => onDismiss(item.id)}>
                     <div
-                      key={item.id}
                       className="pending-card"
                       style={
                         {
@@ -392,25 +393,6 @@ export function PendingScreen({
                             )}
                           </div>
                         </div>
-                        <button
-                          onClick={() => onDismiss(item.id)}
-                          className="pending-dismiss-btn"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            border: "none",
-                            borderRadius: 8,
-                            width: 36,
-                            height: 36,
-                            background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
-                            cursor: "pointer",
-                            flexShrink: 0,
-                          }}
-                          aria-label="Dismiss"
-                        >
-                          <DelightTrashButton isDeleting={false} />
-                        </button>
                       </div>
 
                       {/* Footer: log + claim */}
@@ -428,7 +410,7 @@ export function PendingScreen({
                           className="pending-log-btn"
                           style={logItButtonStyle}
                         >
-                          Log expense ->
+                          Log expense →
                         </button>
                         {(() => {
                           const claimed = item.claimedBy ?? null;
@@ -466,6 +448,7 @@ export function PendingScreen({
                         })()}
                       </div>
                     </div>
+                    </SwipeToDelete>
                   );
                 })}
               </div>
@@ -507,38 +490,18 @@ export function PendingScreen({
 
       {/* Add sheet */}
       {showSheet && (
-        <>
-          {/* Backdrop */}
-          <div
-            aria-hidden="true"
-            onClick={() => setShowSheet(false)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.28)",
-              zIndex: 100,
-              animation: "backdropIn 0.22s ease both",
-            }}
-          />
-          {/* Sheet */}
-          <div
-            ref={sheetRef}
-            className="pending-add-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pending-sheet-title"
-          >
-            {/* Drag handle */}
-            <div
-              style={{
-                width: 36,
-                height: 4,
-                borderRadius: 2,
-                background: "var(--border2)",
-                margin: "0 auto 20px",
-              }}
-            />
-
+        <BottomSheet
+          open={showSheet}
+          onClose={() => setShowSheet(false)}
+          labelledBy="pending-sheet-title"
+          panelRef={sheetRef}
+          maxWidth="480px"
+          zIndex={101}
+          detent="default"
+          snapPoints={[0, 0.55, 1]}
+          initialSnap={1}
+          contentStyle={{ padding: "0 20px calc(28px + env(safe-area-inset-bottom, 0px))" }}
+        >
             <div
               style={{
                 display: "flex",
@@ -709,8 +672,7 @@ export function PendingScreen({
                 {saving ? "Saving" : "Save"}
               </button>
             </div>
-          </div>
-        </>
+        </BottomSheet>
       )}
     </div>
   );
@@ -719,7 +681,7 @@ export function PendingScreen({
 // ── Styles ────────────────────────────────────────────────
 
 const addChipStyle: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   padding: "0 14px",
   borderRadius: 999,
   border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
@@ -793,7 +755,7 @@ const chipPickerStyle: CSSProperties = {
 
 const pickerListButtonStyle: CSSProperties = {
   width: "100%",
-  minHeight: 42,
+  minHeight: 44,
   padding: "10px 12px",
   background: "transparent",
   border: "none",
@@ -807,8 +769,8 @@ const pickerListButtonStyle: CSSProperties = {
 };
 
 const sheetCloseStyle: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 44,
+  height: 44,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -837,7 +799,7 @@ const claimReleaseStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: 5,
-  height: 32,
+  minHeight: 44,
   padding: "0 8px",
   border: "none",
   background: "transparent",

@@ -46,8 +46,9 @@ const chipRowStyle: CSSProperties = {
 };
 
 const chipStyle: CSSProperties = {
+  minHeight: 44,
   borderRadius: 999,
-  padding: "6px 12px",
+  padding: "0 12px",
   border: "1px solid transparent",
   background: "color-mix(in srgb, var(--surface2) 60%, white)",
   color: "var(--text2)",

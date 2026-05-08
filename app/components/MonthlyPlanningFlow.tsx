@@ -12,6 +12,7 @@ import type {
   Account,
   Category,
   CloseMonthStepState,
+  MonthlyCategoryTotal,
   MonthlyPlanningSnapshot,
   PlanningAllocationItem,
   PlanningIncomeItem,
@@ -23,6 +24,7 @@ type MonthlyPlanningFlowProps = {
   selectedMonth: string;
   onSelectedMonthChange: (nextMonth: string) => void;
   onCancel: () => void;
+  onComplete?: () => void;
   onOpenAddTransaction?: (payload: {
     accountId: string;
     amount: number;
@@ -30,6 +32,7 @@ type MonthlyPlanningFlowProps = {
   }) => void;
   accounts: Account[];
   categories: Category[];
+  assignedByCategory?: MonthlyCategoryTotal[];
   isUsingFallbackData: boolean;
 };
 
@@ -126,14 +129,15 @@ const isSavingsCategory = (category: Category) => {
   return types.some((value) => savingsTypeHints.some((hint) => value.includes(hint)));
 };
 
-function toAllocationItem(category: Category): PlanningAllocationItem {
+function toAllocationItem(category: Category, plannedAmount: number): PlanningAllocationItem {
   return {
     categoryId: category.id,
     name: category.name,
     icon: category.icon,
-    amount: category.planned ?? 0,
+    amount: plannedAmount,
     available: category.available,
     lastMonthSpent: category.lastMonthSpent,
+    defaultAccount: category.defaultAccount,
   };
 }
 
@@ -141,9 +145,11 @@ export function MonthlyPlanningFlow({
   selectedMonth,
   onSelectedMonthChange,
   onCancel,
+  onComplete,
   onOpenAddTransaction,
   accounts,
   categories,
+  assignedByCategory = [],
   isUsingFallbackData,
 }: MonthlyPlanningFlowProps) {
   const monthInputRef = useRef<HTMLInputElement | null>(null);
@@ -161,6 +167,11 @@ export function MonthlyPlanningFlow({
   const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
+    const plannedByCategory = new Map(assignedByCategory.map((item) => [item.categoryId, item.total]));
+    const resolvePlannedAmount = (category: Category) => {
+      if (plannedByCategory.has(category.id)) return plannedByCategory.get(category.id) ?? 0;
+      return 0;
+    };
     setActiveStep("close");
     setCompletedSteps(buildStepState());
     setCloseStepState(initialCloseStepState);
@@ -177,14 +188,16 @@ export function MonthlyPlanningFlow({
         !isWifeCategory(category) &&
         !isHusbandCategory(category),
     );
-    const householdBudgetItems = [...householdCategories, ...fallbackHouseholdCategories].map(toAllocationItem);
+    const toMonthAllocationItem = (category: Category) =>
+      toAllocationItem(category, resolvePlannedAmount(category));
+    const householdBudgetItems = [...householdCategories, ...fallbackHouseholdCategories].map(toMonthAllocationItem);
     setHouseholdItems(householdBudgetItems);
-    setWifeItems(wifeCategories.map(toAllocationItem));
-    setHusbandItems(husbandCategories.map(toAllocationItem));
-    setSavingsItems(savingsCategories.map(toAllocationItem));
+    setWifeItems(wifeCategories.map(toMonthAllocationItem));
+    setHusbandItems(husbandCategories.map(toMonthAllocationItem));
+    setSavingsItems(savingsCategories.map(toMonthAllocationItem));
     setSaveState("idle");
     setSaveError("");
-  }, [selectedMonth, categories]);
+  }, [selectedMonth, categories, assignedByCategory]);
 
   useEffect(() => {
     const handleResize = () => setIsCompact(window.innerWidth < 640);
@@ -209,15 +222,6 @@ export function MonthlyPlanningFlow({
     return date.toLocaleDateString("en", { month: "short" });
   }, [selectedMonth]);
 
-  const baseAccountPool = useMemo(
-    () =>
-      accounts.reduce((sum, account) => {
-        if (isSavingsAccount(account)) return sum;
-        return sum + (account.balance ?? 0);
-      }, 0),
-    [accounts],
-  );
-
   const readyToAssignPool = useMemo(
     () =>
       accounts.reduce((sum, account) => {
@@ -238,8 +242,13 @@ export function MonthlyPlanningFlow({
     () => savingsItems.reduce((sum, item) => sum + item.amount, 0),
     [savingsItems],
   );
-  const availablePool = baseAccountPool;
-  const leftToAssign = readyToAssignPool - assignedHousehold - assignedSavings;
+  const initialAssignedTotal = useMemo(
+    () => assignedByCategory.reduce((sum, item) => sum + item.total, 0),
+    [assignedByCategory],
+  );
+  const assignedDelta = assignedHousehold + assignedSavings - initialAssignedTotal;
+  const availablePool = readyToAssignPool;
+  const leftToAssign = readyToAssignPool - assignedDelta;
   const snapshot: MonthlyPlanningSnapshot = {
     availablePool,
     assignedHousehold,
@@ -272,7 +281,7 @@ export function MonthlyPlanningFlow({
           body: JSON.stringify({
             month: selectedMonth,
             incomeItems,
-            householdItems,
+            budgetItems: [...householdItems, ...wifeItems, ...husbandItems],
             savingsItems,
             snapshot,
           }),
@@ -281,6 +290,7 @@ export function MonthlyPlanningFlow({
         if (!response.ok) throw new Error(data.error || "Failed to save shared plan");
         setCompletedSteps((prev) => ({ ...prev, [activeStep]: true }));
         setSaveState("idle");
+        onComplete?.();
         onCancel();
         return;
       } catch (error: unknown) {
@@ -454,17 +464,17 @@ export function MonthlyPlanningFlow({
 
 const shellStyle: CSSProperties = {
   minHeight: "100dvh",
-  background: "linear-gradient(180deg, color-mix(in srgb, var(--bg) 94%, white), color-mix(in srgb, var(--surface) 64%, white))",
+  background: "var(--bg)",
   padding: "calc(var(--safe-top) + 14px) 14px calc(88px + env(safe-area-inset-bottom, 0px))",
 };
 
 
 const sheetStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 96%, white)",
-  borderRadius: 26,
-  padding: "18px 18px 14px",
+  background: "transparent",
+  borderRadius: 0,
+  padding: "4px 0 0",
   display: "grid",
-  gap: 14,
+  gap: 18,
   animation: "fadeUp 0.24s ease both",
 };
 
@@ -474,6 +484,8 @@ const topBarStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 10,
   flexWrap: "nowrap",
+  padding: "0 4px 12px",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 30%, transparent)",
 };
 
 const eyebrowStyle: CSSProperties = {
@@ -500,7 +512,7 @@ const monthPickerButtonStyle: CSSProperties = {
 
 const screenStyle: CSSProperties = {
   display: "grid",
-  gap: 12,
+  gap: 16,
   border: "none",
   background: "transparent",
   boxShadow: "none",
@@ -509,6 +521,8 @@ const screenStyle: CSSProperties = {
 const screenHeaderStyle: CSSProperties = {
   display: "grid",
   gap: 8,
+  padding: "0 4px 10px",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 24%, transparent)",
 };
 
 const progressTrackStyle: CSSProperties = {
@@ -557,6 +571,7 @@ const incomeHeaderCopyStyle: CSSProperties = {
 const screenBodyStyle: CSSProperties = {
   display: "grid",
   gap: 14,
+  padding: "0 4px",
 };
 
 const warningBannerStyle: CSSProperties = {
@@ -571,7 +586,8 @@ const warningBannerStyle: CSSProperties = {
 
 const footerBarStyle: CSSProperties = {
   marginTop: 4,
-  paddingTop: 12,
+  paddingTop: 14,
+  borderTop: "1px solid color-mix(in srgb, var(--border) 30%, transparent)",
 };
 
 const bottomBarInnerStyle: CSSProperties = {

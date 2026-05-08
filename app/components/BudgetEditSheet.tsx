@@ -52,9 +52,10 @@ const toAllocationItem = (category: Category, plannedByCategory: Record<string, 
   categoryId: category.id,
   name: category.name,
   icon: category.icon,
-  amount: plannedByCategory[category.id] ?? category.planned ?? category.available ?? 0,
+  amount: plannedByCategory[category.id] ?? 0,
   available: category.available,
   lastMonthSpent: category.lastMonthSpent,
+  defaultAccount: category.defaultAccount,
 });
 
 export function BudgetEditSheet({

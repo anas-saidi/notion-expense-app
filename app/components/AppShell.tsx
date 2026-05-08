@@ -2,40 +2,112 @@ import { type ReactNode } from "react";
 import type { AppTab } from "./app-types";
 import { BottomNav } from "./BottomNav";
 import { PlusIcon } from "./ui/icons";
+import { TAB_COPY } from "./tab-copy";
 
-type AppShellProps = {
-  children: ReactNode;
-  tab: AppTab;
-  pendingCount: number;
-  onTabChange: (tab: AppTab) => void;
-  onOpenAdd: () => void;
-  toast: string | null;
-  showAddButton?: boolean;
-  immersive?: boolean;
-};
-const TAB_COPY: Record<AppTab, { eyebrow: string; title: string }> = {
-  home: { eyebrow: "Notion Expense", title: "Shared budget" },
-  plan: { eyebrow: "Notion Expense", title: "Shared plan" },
-  pending: { eyebrow: "Notion Expense", title: "Upcoming items" },
-  history: { eyebrow: "Notion Expense", title: "Activity" },
-};
-
+// Simple couple badge for header
+function CoupleBadge() {
+  // Hardcoded initials and colors for now
+  const initials = [
+    { label: "S", color: "#e57373" }, // e.g., Salma
+    { label: "A", color: "#4f8cff" }, // e.g., Anas
+  ];
+  return (
+    <span className="couple-badge-responsive" style={{
+      display: "inline-flex",
+      alignItems: "center",
+      background: "#f6f3ed",
+      borderRadius: 999,
+      padding: "4px 10px 4px 8px",
+      fontSize: 16,
+      fontWeight: 500,
+      color: "#888",
+      boxShadow: "0 1px 2px 0 rgba(0,0,0,0.03)",
+      marginLeft: 10,
+      position: "relative",
+      minWidth: 0,
+    }}>
+      <span style={{
+        display: "inline-flex",
+        alignItems: "center",
+        position: "relative",
+        minWidth: 0,
+      }}>
+        <span style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 32,
+          height: 32,
+          borderRadius: "50%",
+          background: initials[0].color,
+          color: "#fff",
+          fontWeight: 700,
+          fontSize: 18,
+          border: "2.5px solid #fff",
+          boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04)",
+          zIndex: 2,
+        }}>{initials[0].label}</span>
+        <span style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 32,
+          height: 32,
+          borderRadius: "50%",
+          background: initials[1].color,
+          color: "#fff",
+          fontWeight: 700,
+          fontSize: 18,
+          border: "2.5px solid #fff",
+          boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04)",
+          zIndex: 1,
+          position: "absolute",
+          left: 22,
+          top: 0,
+        }}>{initials[1].label}</span>
+      </span>
+      <style>{`
+        @media (max-width: 767px) {
+          .couple-badge-responsive {
+            position: absolute !important;
+            right: 12px;
+            top: 10px;
+            margin-left: 0 !important;
+            z-index: 20;
+            box-shadow: 0 2px 8px 0 rgba(0,0,0,0.06);
+            padding: 4px 10px 4px 8px;
+          }
+        }
+      `}</style>
+    </span>
+  );
+}
 export function AppShell({
-  children,
   tab,
-  pendingCount,
+  pendingCount = 0,
   onTabChange,
   onOpenAdd,
   toast,
   showAddButton = true,
   immersive = false,
-}: AppShellProps) {
+  children,
+}: {
+  tab: AppTab;
+  pendingCount?: number;
+  onTabChange: (tab: AppTab) => void;
+  onOpenAdd: () => void;
+  toast?: string | null;
+  showAddButton?: boolean;
+  immersive?: boolean;
+  children?: ReactNode;
+}) {
   const shellCopy = TAB_COPY[tab];
   const isHomeTab = tab === "home";
 
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
       <div
+        id={!immersive ? "app-root-shell" : undefined}
         className={immersive ? undefined : "app-content"}
         style={immersive ? { minHeight: "100dvh" } : { position: "relative" }}
       >
@@ -69,9 +141,13 @@ export function AppShell({
                   letterSpacing: isHomeTab ? -0.25 : -0.5,
                   color: "var(--text)",
                   fontWeight: isHomeTab ? 650 : undefined,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
                 }}
               >
                 {shellCopy.title}
+                <CoupleBadge />
               </h1>
             </div>
           </div>
@@ -79,33 +155,35 @@ export function AppShell({
         {children}
       </div>
 
-      {!immersive && <BottomNav tab={tab} pendingCount={pendingCount} onTabChange={onTabChange} />}
+      {!immersive && (
+        <div className="app-nav-wrap">
+          <BottomNav tab={tab} pendingCount={pendingCount} onTabChange={onTabChange} />
 
-      {showAddButton && (
-        <button
-          onClick={onOpenAdd}
-          className="fab-add"
-          aria-label="Add expense"
-          style={{
-            position: "fixed",
-            right: "max(18px, calc(50% - 222px))",
-            bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
-            zIndex: 60,
-            width: 58,
-            height: 58,
-            borderRadius: "50%",
-            border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
-            background: "var(--accent)",
-            color: "var(--accent-ink)",
-            boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <PlusIcon size={22} strokeWidth={2.5} />
-        </button>
+          {showAddButton && (
+            <button
+              onClick={onOpenAdd}
+              className="fab-add app-nav-add"
+              aria-label="Add expense"
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: "50%",
+                border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
+                background: "var(--accent)",
+                color: "var(--accent-ink)",
+                boxShadow:
+                  "0 16px 30px color-mix(in srgb, var(--ink-strong) 12%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <PlusIcon size={22} strokeWidth={2.5} />
+            </button>
+          )}
+        </div>
       )}
 
       {toast && (

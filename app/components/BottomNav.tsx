@@ -55,9 +55,9 @@ export function BottomNav({ tab, pendingCount, onTabChange }: BottomNavProps) {
                 </span>
               )}
 
-              {item.key === "home" && <HomeIcon strokeWidth={tab === "home" ? 2.5 : 2} />}
-              {item.key === "pending" && <ClockIcon strokeWidth={tab === "pending" ? 2.5 : 2} />}
-              {item.key === "history" && <ListIcon strokeWidth={tab === "history" ? 2.5 : 2} />}
+              {item.key === "home" && <HomeIcon size={20} strokeWidth={tab === "home" ? 2.5 : 2} />}
+              {item.key === "pending" && <ClockIcon size={20} strokeWidth={tab === "pending" ? 2.5 : 2} />}
+              {item.key === "history" && <ListIcon size={20} strokeWidth={tab === "history" ? 2.5 : 2} />}
 
               <span style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>{item.label}</span>
             </button>

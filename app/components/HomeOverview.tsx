@@ -1,158 +1,144 @@
-import type { Category, MonthlySummary } from "./app-types";
-import { HouseholdStatCard, type Scope } from "./HouseholdStatCard";
-import { CalendarIcon } from "./ui/icons";
+import { ListChecks } from "lucide-react";
+import { Money } from "./Money";
+import type { MonthlySummary } from "./app-types";
+import type { Scope } from "./HouseholdStatCard";
+import { ChipTabs } from "./ui/ChipTabs";
 
 type HomeOverviewProps = {
   onOpenPlan: () => void;
-  categories: Category[];
   monthlySummary: MonthlySummary;
-  scope: Scope;
-  onScopeChange: (nextScope: Scope) => void;
   readyToAssignByScope: Record<Scope, number>;
-  contributionDueByScope: { wife: number; husband: number; total: number };
-  householdSpentByPartner: { wife: number; husband: number; other: number; total: number };
+  homeMonth: string;
+  onHomeMonthChange: (month: string) => void;
+  planDone?: boolean;
 };
 
 export function HomeOverview({
   onOpenPlan,
-  categories,
   monthlySummary,
-  scope,
-  onScopeChange,
   readyToAssignByScope,
-  contributionDueByScope,
-  householdSpentByPartner,
+  homeMonth,
+  onHomeMonthChange,
+  planDone,
 }: HomeOverviewProps) {
-  const monthLabel = formatMonthLabel(monthlySummary.start);
-  const wifeCategoryIds = new Set(
-    categories
-      .filter(isWifeCategory)
-      .map((category) => category.id),
-  );
+  const todayMonth = new Date().toISOString().slice(0, 7);
+  const tabs = [shiftMonth(todayMonth, -1), todayMonth, shiftMonth(todayMonth, +1)] as const;
+  const isCurrentMonth = homeMonth === todayMonth;
+  const chipTabItems = tabs.map((month) => ({
+    key: month,
+    label: monthShortLabel(month),
+  }));
 
-  const husbandCategoryIds = new Set(
-    categories
-      .filter(isHusbandCategory)
-      .map((category) => category.id),
-  );
-
-  const householdCategoryIds = new Set(
-    categories
-      .filter((category) => category.isTeamFund)
-      .map((category) => category.id),
-  );
-
-  const householdAssigned = sumForCategoryIds(monthlySummary.assignedByCategory, householdCategoryIds);
-  const householdSpent = sumForCategoryIds(monthlySummary.spentByCategory, householdCategoryIds);
-  const wifeAssigned = sumForCategoryIds(monthlySummary.assignedByCategory, wifeCategoryIds);
-  const wifeSpent = sumForCategoryIds(monthlySummary.spentByCategory, wifeCategoryIds);
-  const husbandAssigned = sumForCategoryIds(monthlySummary.assignedByCategory, husbandCategoryIds);
-  const husbandSpent = sumForCategoryIds(monthlySummary.spentByCategory, husbandCategoryIds);
-  const householdRemaining = readyToAssignByScope.household ?? 0;
+  const totalAssigned = monthlySummary.totalAssigned;
+  const totalSpent = monthlySummary.totalSpent;
+  const available = isCurrentMonth ? readyToAssignByScope.household : totalAssigned - totalSpent;
 
   return (
-    <section
-      aria-label="Shared budget"
-      style={heroShellStyle}
-    >
+    <section aria-label="Monthly budget hub" style={heroShellStyle}>
       <div style={heroHeaderStyle}>
-        <div style={{ minWidth: 0 }}>
-          <div style={heroEyebrowStyle}>
-            This month
-          </div>
-          <h2 style={heroTitleStyle}>{monthLabel}</h2>
-        </div>
-        <div style={heroHeaderAsideStyle}>
+        <ChipTabs
+          items={chipTabItems}
+          activeKey={homeMonth}
+          ariaLabel="Select month"
+          onChange={onHomeMonthChange}
+        />
+
+        <div key={homeMonth} style={{ ...heroHeaderAsideStyle, animation: "fadeUp 0.22s ease both" }}>
           <div style={heroRemainingWrapStyle}>
-            <span style={heroRemainingLabelStyle}>Still to assign</span>
-            <strong style={heroRemainingValueStyle(householdRemaining < 0)}>
-              {householdRemaining < 0 ? "-" : ""}
-              {Math.abs(householdRemaining).toLocaleString("fr-MA")}
-              <span style={{ marginLeft: 4, fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>MAD</span>
+            <span style={heroRemainingLabelStyle}>
+              {isCurrentMonth ? "Monthly overview" : "Month snapshot"}
+            </span>
+            <strong style={heroRemainingValueStyle(available < 0)}>
+              {isCurrentMonth ? "Ready to assign" : formatMonthLabel(homeMonth)}
             </strong>
           </div>
-          <button
-            type="button"
-            onClick={onOpenPlan}
-            aria-label="Open monthly planning"
-            title="Open monthly planning"
-            style={planTriggerStyle}
-          >
-            <CalendarIcon />
-            <span>Shared plan</span>
-          </button>
+          {!planDone && (
+            <button
+              type="button"
+              className="cta-save"
+              onClick={onOpenPlan}
+              aria-label="Plan this month"
+              title="Plan this month"
+              style={planTriggerStyle}
+            >
+              <ListChecks size={17} />
+            </button>
+          )}
         </div>
       </div>
 
-      <HouseholdStatCard
-        views={{
-          household: {
-            planned: householdAssigned,
-            spent: householdSpent,
-          },
-          wife: {
-            planned: wifeAssigned,
-            spent: wifeSpent,
-          },
-          husband: {
-            planned: husbandAssigned,
-            spent: husbandSpent,
-          },
-        }}
-        scope={scope}
-        onScopeChange={onScopeChange}
-        readyToAssignByScope={readyToAssignByScope}
-        contributionDueByScope={contributionDueByScope}
-        householdSpentByPartner={householdSpentByPartner}
-      />
+      <div style={summaryGridStyle}>
+        <MetricCard label="Assigned" value={totalAssigned} tone="default" />
+        <MetricCard label="Spent" value={totalSpent} tone="default" />
+        <MetricCard
+          label={isCurrentMonth ? "Ready" : "Available"}
+          value={available}
+          tone={available < 0 ? "danger" : "default"}
+        />
+      </div>
     </section>
   );
 }
 
-function formatMonthLabel(start: string) {
-  const source = start || new Date().toISOString().slice(0, 10);
-  const parsed = new Date(source);
-  if (Number.isNaN(parsed.getTime())) return "This month";
-  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(parsed);
+function MetricCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "default" | "danger";
+}) {
+  return (
+    <div
+      style={{
+        ...metricCardStyle,
+        background:
+          tone === "danger"
+            ? "color-mix(in srgb, var(--danger) 8%, white)"
+            : "color-mix(in srgb, var(--surface2) 58%, white)",
+      }}
+    >
+      <span style={metricLabelStyle}>{label}</span>
+      <strong style={{ ...metricValueStyle, color: tone === "danger" ? "var(--danger)" : "var(--text)" }}>
+        <Money value={Math.abs(value)} />
+      </strong>
+    </div>
+  );
 }
 
-function sumForCategoryIds(items: MonthlySummary["assignedByCategory"], categoryIds: Set<string>) {
-  return items.reduce((sum, item) => {
-    if (!categoryIds.has(item.categoryId)) return sum;
-    return sum + item.total;
-  }, 0);
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function isWifeCategory(category: Category) {
-  return !category.isTeamFund && (category.owner?.toLowerCase().includes("salma") ?? false);
+function monthShortLabel(ym: string): string {
+  return new Intl.DateTimeFormat("en", { month: "short", year: "2-digit" }).format(new Date(`${ym}-01`));
 }
 
-function isHusbandCategory(category: Category) {
-  return !category.isTeamFund && (category.owner?.toLowerCase().includes("anas") ?? false);
+function formatMonthLabel(ym: string) {
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(new Date(`${ym}-01`));
 }
 
 const planTriggerStyle = {
+  minWidth: 44,
   minHeight: 44,
-  padding: "0 12px",
+  flexShrink: 0,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 7,
-  borderRadius: 14,
-  border: "1px solid color-mix(in srgb, var(--border2) 78%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 52%, white)",
-  color: "var(--text2)",
+  borderRadius: 12,
+  border: "1px solid color-mix(in srgb, var(--accent) 42%, transparent)",
+  background: "var(--accent)",
+  color: "var(--accent-ink)",
   cursor: "pointer",
-  boxShadow: "none",
-  fontSize: 11,
-  fontWeight: 600,
 };
 
 const heroShellStyle = {
   display: "grid",
-  gap: 12,
-  paddingBottom: 14,
-  borderBottom: "1px solid color-mix(in srgb, var(--border2) 28%, transparent)",
+  gap: 14,
+  padding: "0 0 4px",
   animation: "fadeUp 0.36s 0.02s ease both",
 };
 
@@ -161,30 +147,13 @@ const heroHeaderStyle = {
   gap: 12,
 };
 
-const heroEyebrowStyle = {
-  fontSize: 10,
-  letterSpacing: 0.28,
-  textTransform: "uppercase" as const,
-  color: "color-mix(in srgb, var(--muted) 82%, transparent)",
-  fontWeight: 600,
-};
-
-const heroTitleStyle = {
-  marginTop: 4,
-  fontFamily: "var(--font-display)",
-  fontSize: "clamp(1.22rem, 5.1vw, 1.45rem)",
-  lineHeight: 1.02,
-  letterSpacing: -0.12,
-  color: "var(--text2)",
-  fontWeight: 600,
-};
-
 const heroHeaderAsideStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   gap: 10,
   flexWrap: "wrap" as const,
+  minHeight: 44,
 };
 
 const heroRemainingWrapStyle = {
@@ -194,18 +163,47 @@ const heroRemainingWrapStyle = {
 };
 
 const heroRemainingLabelStyle = {
-  fontSize: 9,
+  fontSize: 11,
   letterSpacing: 0.22,
   textTransform: "uppercase" as const,
-  color: "color-mix(in srgb, var(--muted) 82%, transparent)",
+  color: "var(--muted)",
   fontWeight: 500,
 };
 
 const heroRemainingValueStyle = (isNegative: boolean) => ({
   color: isNegative ? "color-mix(in srgb, var(--danger) 78%, var(--text2))" : "var(--text2)",
   fontFamily: "var(--font-body)",
-  fontSize: "clamp(0.92rem, 3.7vw, 1.06rem)",
+  fontSize: "clamp(0.98rem, 4vw, 1.12rem)",
   lineHeight: 1.05,
   letterSpacing: -0.04,
-  fontWeight: 500,
+  fontWeight: 650,
 });
+
+const summaryGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 10,
+};
+
+const metricCardStyle = {
+  display: "grid",
+  gap: 6,
+  minWidth: 0,
+  padding: "12px 12px 11px",
+  borderRadius: 16,
+};
+
+const metricLabelStyle = {
+  fontSize: 10,
+  letterSpacing: 0.24,
+  textTransform: "uppercase" as const,
+  color: "var(--muted)",
+};
+
+const metricValueStyle = {
+  fontSize: 13,
+  lineHeight: 1.25,
+  fontWeight: 760,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
+};

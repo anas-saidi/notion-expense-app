@@ -87,6 +87,7 @@ export type PlanningAllocationItem = {
   amount: number;
   available: number | null;
   lastMonthSpent: number | null;
+  defaultAccount: string | null;
 };
 
 export type CloseMonthStatus = "complete" | "attention" | "pending";

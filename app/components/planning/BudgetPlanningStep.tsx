@@ -174,7 +174,7 @@ export function BudgetPlanningStep({
   return (
     <section style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gap: 10 }}>
-        <div style={headRowStyle}>
+      <div style={headRowStyle}>
           <span style={eyebrowStyle}>Shared budget categories</span>
           <button
             ref={addAnchorRef}
@@ -245,7 +245,7 @@ export function BudgetPlanningStep({
         </div>
       </div>
 
-      <div style={{ display: "grid", gap: 0 }}>
+      <div style={rowsWrapStyle}>
         {active.items.map((item) => (
           <div key={item.categoryId} style={rowStyle}>
             <div style={{ display: "grid", gap: 4 }}>
@@ -332,9 +332,10 @@ const toAllocationItem = (category: Category): PlanningAllocationItem => ({
   categoryId: category.id,
   name: category.name,
   icon: category.icon,
-  amount: category.planned ?? category.available ?? 0,
+  amount: 0,
   available: category.available,
   lastMonthSpent: category.lastMonthSpent,
+  defaultAccount: category.defaultAccount,
 });
 
 const eyebrowStyle = {
@@ -350,6 +351,7 @@ const headRowStyle = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 10,
+  paddingBottom: 6,
 };
 
 const chipRowStyle = {
@@ -484,6 +486,12 @@ const rowStyle = {
   alignItems: "start",
   padding: "12px 0",
   borderBottom: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
+};
+
+const rowsWrapStyle = {
+  display: "grid",
+  gap: 0,
+  borderTop: "1px solid color-mix(in srgb, var(--border) 24%, transparent)",
 };
 
 const metaRowStyle = {

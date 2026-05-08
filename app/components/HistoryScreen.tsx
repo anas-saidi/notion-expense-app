@@ -1,16 +1,15 @@
 "use client";
-import { DelightTrashButton } from "./ui/DelightTrashButton";
 
 import { useMemo, type CSSProperties } from "react";
 import type { Category, Transaction } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { fmtDate } from "./app-utils";
 
 type Props = {
   transactions: Transaction[];
   categories: Category[];
-  deletingId: string | null;
   onClickTransaction: (t: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
 };
@@ -94,7 +93,6 @@ function buildHistoryStory(transactions: Transaction[], categories: Category[]):
 export function HistoryScreen({
   transactions,
   categories,
-  deletingId,
   onClickTransaction,
   onDeleteTransaction,
 }: Props) {
@@ -133,8 +131,9 @@ export function HistoryScreen({
 
   return (
     <div id="panel-history" role="tabpanel" aria-labelledby="tab-history">
+
       {transactions.length > 0 && (
-        <p style={historyLeadStyle}>
+        <p className="history-lead" style={historyLeadStyle}>
           {story?.lead ?? `${transactions.length} transactions, all logged.`}
         </p>
       )}
@@ -143,8 +142,8 @@ export function HistoryScreen({
         <section className="history-spotlight" aria-label="History summary">
           <div className="history-spotlight__main">
             <span className="history-spotlight__eyebrow">Household activity</span>
-            <div style={{ display: "grid", gap: 8 }}>
-              <span style={summaryAmountStyle}>
+            <div className="history-spotlight__summary">
+              <span className="history-spotlight__amount" style={summaryAmountStyle}>
                 <Money value={totalSpent} absolute />
               </span>
               <p className="history-spotlight__note">
@@ -155,15 +154,15 @@ export function HistoryScreen({
 
           <div className="history-spotlight__stats">
             <div className="history-pill">
-              <span style={summaryLabelStyle}>Most recent</span>
+              <span className="history-pill__label" style={summaryLabelStyle}>Most recent</span>
               <strong>{story ? fmtDate(story.latestDate) : "-"}</strong>
             </div>
             <div className="history-pill">
-              <span style={summaryLabelStyle}>Active days</span>
+              <span className="history-pill__label" style={summaryLabelStyle}>Active days</span>
               <strong>{story?.activeDays ?? 0}</strong>
             </div>
             <div className="history-pill">
-              <span style={summaryLabelStyle}>Average spend</span>
+              <span className="history-pill__label" style={summaryLabelStyle}>Average spend</span>
               <strong>
                 <Money value={story?.averageSpend ?? 0} absolute />
               </strong>
@@ -186,115 +185,68 @@ export function HistoryScreen({
                 <div style={{ display: "grid", gap: 6 }}>
                   {items.map((transaction, localIdx) => {
                     const category = categories.find((entry) => entry.id === transaction.category);
-                    const isDeleting = deletingId === transaction.id;
                     const staggerIdx = startIdx + localIdx;
 
                     return (
-                      <div
+                      <SwipeToDelete
                         key={transaction.id}
-                        onClick={() => {
-                          if (!isDeleting) onClickTransaction(transaction);
-                        }}
-                        className={`tx-row${isDeleting ? " tx-row--deleting" : ""}`}
-                        style={
-                          {
-                            "--stagger": `${staggerIdx * 22}ms`,
-                            "--tx-accent":
-                              label === "Today" || label === "Yesterday"
-                                ? "var(--accent)"
-                                : "color-mix(in srgb, var(--border2) 78%, transparent)",
-                            cursor: isDeleting ? "default" : "pointer",
-                          } as CSSProperties
-                        }
+                        onDelete={() => onDeleteTransaction(transaction.id)}
                       >
-                        <div className="tx-icon" style={iconBadgeStyle}>
-                          <CategoryIcon icon={category?.icon} style={{ fontSize: 18 }} />
-                        </div>
-
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: 14,
-                              fontWeight: 500,
-                              color: "var(--text)",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {transaction.name}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "var(--muted)",
-                              marginTop: 2,
-                              fontFamily: "'DM Mono', monospace",
-                            }}
-                          >
-                            {[category?.name ?? "Unsorted", fmtDate(transaction.date)].join(" / ")}
-                          </div>
-                        </div>
-
                         <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            flexShrink: 0,
-                          }}
+                          onClick={() => onClickTransaction(transaction)}
+                          className="tx-row"
+                          style={
+                            {
+                              "--stagger": `${staggerIdx * 22}ms`,
+                              "--tx-accent":
+                                label === "Today" || label === "Yesterday"
+                                  ? "var(--accent)"
+                                  : "color-mix(in srgb, var(--border2) 78%, transparent)",
+                            } as CSSProperties
+                          }
                         >
-                          <span
-                            style={{
-                              fontFamily: "'DM Mono', monospace",
-                              fontSize: 13,
-                              color: isDeleting ? "var(--danger)" : "var(--text2)",
-                              fontWeight: isDeleting ? 600 : 400,
-                              transition: "color 0.2s ease",
-                            }}
-                          >
-                            -<Money value={transaction.amount} absolute />
-                          </span>
+                          <div className="tx-icon" style={iconBadgeStyle}>
+                            <CategoryIcon icon={category?.icon} style={{ fontSize: 18 }} />
+                          </div>
 
-                          <span
-                            className="tx-reuse-hint"
-                            aria-hidden="true"
-                            title="Log similar"
-                          >
-                            log similar
-                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 500,
+                                color: "var(--text)",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {transaction.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--muted)",
+                                marginTop: 2,
+                                fontFamily: "'DM Mono', monospace",
+                              }}
+                            >
+                              {[category?.name ?? "Unsorted", fmtDate(transaction.date)].join(" / ")}
+                            </div>
+                          </div>
 
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDeleteTransaction(transaction.id);
-                            }}
-                            className={`tx-delete-btn${isDeleting ? " tx-delete-btn--confirm" : ""}`}
-                            aria-label={isDeleting ? "Send to the void?" : "Delete transaction"}
-                            title={isDeleting ? "Poof! Gone" : "Delete this transaction"}
-                            style={{
-                              background: isDeleting ? "#ffe5ec" : undefined,
-                              transition: "background 0.2s",
-                              position: "relative",
-                              border: "none",
-                              outline: "none",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              borderRadius: 8,
-                              width: 32,
-                              height: 32,
-                            }}
-                            onMouseDown={e => e.currentTarget.classList.add('shake')}
-                            onMouseUp={e => e.currentTarget.classList.remove('shake')}
-                            onMouseLeave={e => e.currentTarget.classList.remove('shake')}
-                          >
-                            {/* Delightful TrashIcon with lid pop and shake */}
-                            <DelightTrashButton isDeleting={isDeleting} />
-                          </button>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                            <span
+                              style={{
+                                fontFamily: "'DM Mono', monospace",
+                                fontSize: 13,
+                                color: "var(--text2)",
+                              }}
+                            >
+                              -<Money value={transaction.amount} absolute />
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      </SwipeToDelete>
                     );
                   })}
                 </div>

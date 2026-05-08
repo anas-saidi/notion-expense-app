@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { FullScreenDelightIcon } from "./ui/FullScreenDelightIcon";
+import { BottomSheet } from "./ui/BottomSheet";
 import { XIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
@@ -96,8 +97,8 @@ export function CategoryDetailsSheet({
   const summary = data?.summary;
   const details = data?.category;
 
-  const spent = details?.spent ?? category?.planned ?? 0;
-  const planned = details?.planned ?? category?.planned ?? 0;
+  const spent = details?.spent ?? 0;
+  const planned = details?.planned ?? 0;
   const available = details?.available ?? category?.available ?? 0;
 
   const spentPct = useMemo(() => {
@@ -108,23 +109,29 @@ export function CategoryDetailsSheet({
   if (!open || !category) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${category.name} details`}
-      style={sheetWrapStyle}
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      label={`${category.name} details`}
+      align={isFullscreen ? "center" : "bottom"}
+      maxWidth={isFullscreen ? "820px" : "520px"}
+      maxHeight={
+        isFullscreen
+          ? "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px)"
+          : "calc(100dvh - 20px - 88px - env(safe-area-inset-bottom, 0px))"
+      }
+      detent={isFullscreen ? "content" : "default"}
+      snapPoints={isFullscreen ? undefined : [0, 0.82, 1]}
+      initialSnap={isFullscreen ? undefined : 1}
+      panelStyle={{
+        ...sheetStyle,
+        height: isFullscreen
+          ? "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px)"
+          : undefined,
+        borderRadius: isFullscreen ? 20 : 20,
+      }}
+      contentStyle={{ paddingTop: 0 }}
     >
-      <div onClick={onClose} style={{ position: "absolute", inset: 0 }} />
-      <div
-        style={{
-          ...sheetStyle,
-          width: isFullscreen ? "min(100%, 820px)" : "min(100%, 520px)",
-          maxHeight: isFullscreen
-            ? "calc(100dvh - 8px)"
-            : "calc(100dvh - 20px - 88px - env(safe-area-inset-bottom, 0px))",
-          borderRadius: isFullscreen ? 28 : "var(--card-radius)",
-        }}
-      >
         <div style={sheetInnerStyle}>
           <header style={topBarStyle}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -147,10 +154,10 @@ export function CategoryDetailsSheet({
                   alignItems: "center",
                   justifyContent: "center",
                   position: "relative",
-                  width: 38,
-                  height: 38,
+                  width: 44,
+                  height: 44,
                   borderRadius: 999,
-                  background: isFullscreen ? "#e0f2fe" : undefined,
+                  background: isFullscreen ? "var(--info-dim)" : undefined,
                   transition: "background 0.2s",
                 }}
                 aria-label={isFullscreen ? "Exit full screen" : "Go big mode!"}
@@ -240,8 +247,7 @@ export function CategoryDetailsSheet({
             )}
           </section>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -262,7 +268,7 @@ function StatCard({
         : { background: "color-mix(in srgb, var(--surface2) 42%, white)", color: "var(--text)" };
 
   return (
-    <div style={{ ...statCardStyle, background: palette.background }}>
+    <div style={statCardStyle}>
       <div style={statLabelStyle}>{label}</div>
       <div style={{ ...statValueStyle, color: palette.color }}>
         <Money value={value ?? 0} />
@@ -285,7 +291,7 @@ function SummaryChip({
     : { color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 10%, white)" };
 
   return (
-    <div style={{ ...summaryChipStyle, background: palette.background }}>
+    <div style={summaryChipStyle}>
       <span style={summaryChipLabelStyle}>{label}</span>
       <span style={{ ...summaryChipValueStyle, color: palette.color }}>
         <Money value={value} />
@@ -335,24 +341,10 @@ function timelineTone(direction: "in" | "out") {
       };
 }
 
-const sheetWrapStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 76,
-  background: "rgba(18, 16, 22, 0.24)",
-  display: "flex",
-  alignItems: "flex-end",
-  justifyContent: "center",
-  padding: "20px 14px calc(88px + env(safe-area-inset-bottom, 0px))",
-};
-
 const sheetStyle: CSSProperties = {
   position: "relative",
   overflow: "hidden",
   background: "color-mix(in srgb, var(--surface) 97%, white)",
-  border: "1px solid var(--card-border)",
-  boxShadow: "var(--card-shadow)",
-  animation: "fadeUp 0.24s ease both",
   display: "flex",
   flexDirection: "column",
 };
@@ -361,7 +353,7 @@ const sheetInnerStyle: CSSProperties = {
   padding: "18px 18px 16px",
   overflowY: "auto",
   display: "grid",
-  gap: 16,
+  gap: 18,
 };
 
 const topBarStyle: CSSProperties = {
@@ -372,7 +364,7 @@ const topBarStyle: CSSProperties = {
 };
 
 const topActionStyle: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   padding: "0 12px",
   borderRadius: 999,
   border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
@@ -384,8 +376,8 @@ const topActionStyle: CSSProperties = {
 };
 
 const closeButtonStyle: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 44,
+  height: 44,
   borderRadius: 999,
   border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
   background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
@@ -404,7 +396,7 @@ const iconOrbStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 20,
+  fontSize: 24,
   flexShrink: 0,
 };
 
@@ -447,11 +439,9 @@ const scopeBadgeStyle: CSSProperties = {
 
 const heroWrapStyle: CSSProperties = {
   display: "grid",
-  gap: 14,
-  padding: "16px",
-  borderRadius: 24,
-  background: "linear-gradient(180deg, color-mix(in srgb, var(--accent-dim) 26%, white) 0%, color-mix(in srgb, var(--surface2) 48%, white) 100%)",
-  border: "1px solid color-mix(in srgb, var(--border2) 62%, transparent)",
+  gap: 16,
+  padding: "4px 0 16px",
+  borderBottom: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
 };
 
 const heroValueStyle: CSSProperties = {
@@ -487,14 +477,14 @@ const progressFillStyle: CSSProperties = {
 const heroStatGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 10,
+  gap: 12,
 };
 
 const statCardStyle: CSSProperties = {
   display: "grid",
-  gap: 8,
-  padding: "12px 12px 11px",
-  borderRadius: 18,
+  gap: 6,
+  padding: "0",
+  borderRadius: 0,
 };
 
 const statLabelStyle: CSSProperties = {
@@ -512,15 +502,16 @@ const statValueStyle: CSSProperties = {
 const summarySectionStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 10,
+  gap: 12,
+  paddingBottom: 2,
 };
 
 const summaryChipStyle: CSSProperties = {
   display: "grid",
-  gap: 6,
-  minHeight: 72,
-  padding: "14px 14px 12px",
-  borderRadius: 18,
+  gap: 4,
+  minHeight: 0,
+  padding: "0",
+  borderRadius: 0,
 };
 
 const summaryChipLabelStyle: CSSProperties = {
@@ -536,7 +527,7 @@ const summaryChipValueStyle: CSSProperties = {
 };
 
 const primaryActionStyle: CSSProperties = {
-  minHeight: 38,
+  minHeight: 44,
   padding: "0 14px",
   borderRadius: 999,
   border: "1px solid color-mix(in srgb, var(--accent) 38%, transparent)",
