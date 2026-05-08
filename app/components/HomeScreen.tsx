@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Category, MonthlySummary } from "./app-types";
 import { HomeOverview } from "./HomeOverview";
 import type { Scope } from "./HouseholdStatCard";
 import { Money } from "./Money";
-import { SearchIcon, CheckIcon } from "./ui/icons";
+import { CategoryIcon } from "./ui/CategoryIcon";
+import { ChipTabs } from "./ui/ChipTabs";
+import { PlusIcon, SearchIcon, SlidersIcon } from "./ui/icons";
 
 type HomeScreenProps = {
   categories: Category[];
@@ -14,11 +16,12 @@ type HomeScreenProps = {
   onOpenCategoryDetails: (category: Category) => void;
   onOpenAdd: () => void;
   onOpenPlan: () => void;
+  onOpenRebalance: () => void;
   monthlySummary: MonthlySummary;
-  onPlannedChange: (categoryId: string, nextPlanned: number) => void;
   readyToAssignByScope: Record<Scope, number>;
-  contributionDueByScope: { wife: number; husband: number; total: number };
-  householdSpentByPartner: { wife: number; husband: number; other: number; total: number };
+  homeMonth: string;
+  onHomeMonthChange: (month: string) => void;
+  planDone?: boolean;
 };
 
 export function HomeScreen({
@@ -30,19 +33,15 @@ export function HomeScreen({
   onOpenCategoryDetails,
   onOpenAdd,
   onOpenPlan,
+  onOpenRebalance,
   monthlySummary,
-  onPlannedChange,
   readyToAssignByScope,
-  contributionDueByScope,
-  householdSpentByPartner,
+  homeMonth,
+  onHomeMonthChange,
+  planDone,
 }: HomeScreenProps) {
   const [scope, setScope] = useState<Scope>("household");
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
-  const [draftAvailable, setDraftAvailable] = useState("");
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const [saveCategoryId, setSaveCategoryId] = useState<string | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Inline editing disabled. All edits must go through the category modal.
   const spentByCategory = useMemo(() => {
     const map = new Map<string, number>();
     for (const entry of monthlySummary.spentByCategory ?? []) {
@@ -51,40 +50,14 @@ export function HomeScreen({
     return map;
   }, [monthlySummary.spentByCategory]);
 
-  const commitAvailable = (categoryId: string, rawValue: string) => {
-    const cleaned = rawValue.replace(/[^0-9.\-]/g, "");
-    if (!cleaned) {
-      setEditingCategoryId(null);
-      setDraftAvailable("");
-      setSaveState("idle");
-      return;
+  // Use FUNDS_DB planned amounts from the summary so historical months show correct planned figures
+  const plannedByCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of monthlySummary.assignedByCategory ?? []) {
+      map.set(entry.categoryId, entry.total);
     }
-    const numericValue = Number(cleaned);
-    if (!Number.isFinite(numericValue)) return;
-    const spent = spentByCategory.get(categoryId) ?? 0;
-    const nextPlanned = Math.max(0, spent + numericValue);
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    setSaveCategoryId(categoryId);
-    setSaveState("saving");
-    onPlannedChange(categoryId, nextPlanned);
-    setEditingCategoryId(null);
-    setDraftAvailable("");
-    saveTimerRef.current = setTimeout(() => {
-      setSaveState("saved");
-      savedTimerRef.current = setTimeout(() => {
-        setSaveState("idle");
-        setSaveCategoryId(null);
-      }, 1200);
-    }, 300);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    };
-  }, []);
+    return map;
+  }, [monthlySummary.assignedByCategory]);
 
   const visibleCategories = useMemo(() => {
     if (scope === "household") return categories.filter(isHouseholdCategory);
@@ -97,54 +70,82 @@ export function HomeScreen({
       <div style={stickyHeaderWrapStyle}>
         <HomeOverview
           onOpenPlan={onOpenPlan}
-          categories={categories}
           monthlySummary={monthlySummary}
-          scope={scope}
-          onScopeChange={setScope}
           readyToAssignByScope={readyToAssignByScope}
-          contributionDueByScope={contributionDueByScope}
-          householdSpentByPartner={householdSpentByPartner}
+          homeMonth={homeMonth}
+          onHomeMonthChange={onHomeMonthChange}
+          planDone={planDone}
         />
       </div>
 
-      <div style={{ display: "grid", gap: 18 }}>
+      <div style={{ display: "grid", gap: 16 }}>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            paddingBottom: 12,
-            borderBottom: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
+            display: "grid",
+            gap: 10,
             animation: "fadeUp 0.35s 0.04s ease both",
           }}
         >
-          <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
-          <input
-            type="text"
-            aria-label="Search categories"
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search categories"
-            style={{
-              flex: 1,
-              background: "transparent",
-              padding: 0,
-              border: "none",
-              fontSize: 15,
-              color: "var(--text)",
-              outline: "none",
-            }}
+          <div style={listHeaderStyle}>
+            <div>
+              <h2 style={listTitleStyle}>Categories</h2>
+              <p style={listSubtitleStyle}>{visibleCategories.length} in {scopeLabel(scope)}</p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={onOpenRebalance} style={rebalanceButtonStyle}>
+                <SlidersIcon size={13} className="rebalance-btn-icon" />
+                Rebalance
+              </button>
+              <button type="button" onClick={onOpenAdd} style={quickAddStyle}>
+                <PlusIcon size={13} />
+                Add
+              </button>
+            </div>
+          </div>
+
+          <ChipTabs
+            items={[
+              { key: "household", label: "Joint" },
+              { key: "wife", label: "Salma" },
+              { key: "husband", label: "Anas" },
+            ]}
+            activeKey={scope}
+            ariaLabel="Category scope"
+            onChange={(nextScope) => setScope(nextScope as Scope)}
           />
+
+          <label style={searchWrapStyle}>
+            <SearchIcon size={15} style={{ color: "var(--muted)", flexShrink: 0 }} />
+            <input
+              type="text"
+              aria-label="Search categories"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search categories"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                background: "transparent",
+                padding: 0,
+                border: "none",
+                fontSize: 15,
+                color: "var(--text)",
+                outline: "none",
+              }}
+            />
+          </label>
         </div>
 
-        <section style={{ display: "grid", gap: 0, paddingBottom: 72 }}>
+        <section className="home-category-list" style={categoryListStyle}>
           {visibleCategories.map((cat, i) => {
-            const planned = cat.planned ?? 0;
+            const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
+            const planned = plannedByCategory.get(cat.id) ?? 0;
             const spent = spentByCategory.get(cat.id) ?? 0;
-            const available = cat.available ?? 0;
-            const isEditing = editingCategoryId === cat.id;
-            const draftNum = isEditing ? parseFloat(draftAvailable) : NaN;
-            const livePlanned = isFinite(draftNum) ? Math.max(0, spent + draftNum) : planned;
+            // For current month use Notion's formula (includes carryover); compute for other months
+            const available = isCurrentMonth
+              ? (cat.available ?? planned - spent)
+              : planned - spent;
+            const livePlanned = planned;
             const spentPct = Math.min(100, (Math.max(0, spent) / Math.max(1, livePlanned)) * 100);
             const spentTone = spent > livePlanned
               ? "color-mix(in srgb, var(--spend-over) 75%, var(--spend-over-deep))"
@@ -155,7 +156,7 @@ export function HomeScreen({
               : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
 
             return (
-              <div key={cat.id} style={categoryRowWrapStyle}>
+              <article key={cat.id} style={categoryRowWrapStyle}>
                 <button
                   onClick={() => {
                     onSelectCategory(cat);
@@ -163,122 +164,72 @@ export function HomeScreen({
                   }}
                   style={{
                     ...categoryRowStyle,
+                    ...(cat.id === selectedCategoryId ? selectedCategoryRowStyle : null),
                     animation: `fadeUp 0.28s ${i * 0.03}s ease both`,
                   }}
                 >
                   <div
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 14,
-                      background: cat.id === selectedCategoryId ? "color-mix(in srgb, var(--accent-dim) 42%, white)" : "var(--surface2)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 18,
-                      flexShrink: 0,
-                      transition: "background-color 0.2s ease",
+                      ...categoryIconWrapStyle,
+                      background: cat.id === selectedCategoryId
+                        ? "color-mix(in srgb, var(--accent) 18%, white)"
+                        : "color-mix(in srgb, var(--surface2) 72%, white)",
+                      borderColor: cat.id === selectedCategoryId
+                        ? "color-mix(in srgb, var(--accent) 35%, transparent)"
+                        : "color-mix(in srgb, var(--border) 58%, transparent)",
                     }}
                   >
-                    {cat.icon ?? "#"}
+                    <CategoryIcon icon={cat.icon} size={19} />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 16,
-                        fontWeight: cat.id === selectedCategoryId ? 700 : 650,
-                        color: "var(--text)",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {cat.name}
+                  <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
+                    <div style={categoryTitleRowStyle}>
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: cat.id === selectedCategoryId ? 750 : 680,
+                          color: "var(--text)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          minWidth: 0,
+                        }}
+                      >
+                        {cat.name}
+                      </div>
+                      <span style={percentPillStyle(spent > livePlanned && livePlanned > 0)}>
+                        {Math.round(spentPct)}%
+                      </span>
                     </div>
-                    <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, fontFamily: "'DM Mono', monospace", letterSpacing: 0.5 }}>
-                      Assigned <Money value={planned} />
-                    </p>
                     <div style={spentBarTrackStyle} aria-hidden="true">
                       <div style={{ ...spentBarFillStyle, width: `${spentPct}%`, background: spentTone }} />
                     </div>
+                    <div style={categoryMetaRowStyle}>
+                      <span>Assigned <Money value={planned} /></span>
+                      <span>Spent <Money value={spent} /></span>
+                    </div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0, display: "grid", gap: 6, justifyItems: "end" }}>
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setEditingCategoryId(cat.id);
-                          setDraftAvailable(String(available));
-                        }}
-                        style={availableButtonStyle}
-                      >
-                        <span style={availableLabelStyle}>Available</span>
-                        <Money value={available} />
-                      </button>
-                    )}
-                    {isEditing && (
-                      <div style={{ display: "grid", gap: 5 }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          autoFocus
-                          value={draftAvailable}
-                          onChange={(event) => {
-                            const cleaned = event.target.value.replace(/[^0-9.\-]/g, "");
-                            const normalized = cleaned.replace(/(?!^)-/g, "");
-                            if ((normalized.match(/\./g) || []).length <= 1) {
-                              setDraftAvailable(normalized);
-                            }
-                          }}
-                          onBlur={() => commitAvailable(cat.id, draftAvailable)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") commitAvailable(cat.id, draftAvailable);
-                            if (event.key === "Escape") {
-                              setEditingCategoryId(null);
-                              setDraftAvailable("");
-                            }
-                          }}
-                          aria-label={`Available amount for ${cat.name}`}
-                          style={availableInputStyle}
-                        />
-                        <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", animation: "fadeUp 0.18s ease both" }}>
-                          {([-100, -10, 10, 100]).map((delta) => (
-                            <button
-                              key={delta}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const current = parseFloat(draftAvailable) || 0;
-                                setDraftAvailable(String(Math.round((current + delta) * 100) / 100));
-                              }}
-                              style={nudgePillStyle}
-                            >
-                              {delta > 0 ? `+${delta}` : delta}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {saveCategoryId === cat.id && saveState !== "idle" && (
-                      <span style={saveState === "saved" ? savedBadgeStyle : saveBadgeStyle}>
-                        {saveState === "saving" ? "saving..." : (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                            <CheckIcon size={9} strokeWidth={3} />
-                            saved
-                          </span>
-                        )}
-                      </span>
-                    )}
+                  <div style={availableStackStyle(available < 0)}>
+                    <span style={availableLabelStyle}>Available</span>
+                    <strong style={availableValueStyle}>
+                      <Money value={available} />
+                    </strong>
                   </div>
                 </button>
-              </div>
+              </article>
             );
           })}
 
-          {categories.length === 0 && (
-            <div style={{ padding: "18px 0", color: "var(--muted)", fontSize: 14 }}>
-              No categories match that search.
+          {visibleCategories.length === 0 && (
+            <div style={emptyStateStyle}>
+              <div style={emptyStateIconStyle}>
+                <SearchIcon size={18} />
+              </div>
+              <div style={{ display: "grid", gap: 4 }}>
+                <strong style={{ fontSize: 14, color: "var(--text)" }}>No categories found</strong>
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>
+                  Try a different search or switch budget scope.
+                </span>
+              </div>
             </div>
           )}
         </section>
@@ -304,10 +255,7 @@ function isHouseholdCategory(category: Category) {
 }
 
 const categoryRowWrapStyle = {
-  display: "grid",
-  gap: 8,
-  padding: "14px 0",
-  borderBottom: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
+  minWidth: 0,
 };
 
 const stickyHeaderWrapStyle = {
@@ -318,12 +266,72 @@ const stickyHeaderWrapStyle = {
   paddingBottom: 16,
 };
 
-const saveBadgeStyle = {
-  fontSize: 10,
-  letterSpacing: 0.4,
-  textTransform: "uppercase" as const,
-  fontFamily: "'DM Mono', monospace",
-  color: "color-mix(in srgb, var(--muted) 78%, transparent)",
+const listHeaderStyle = {
+  display: "flex",
+  alignItems: "flex-end",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const listTitleStyle = {
+  fontFamily: "var(--font-display)",
+  fontSize: 22,
+  lineHeight: 1,
+  fontWeight: 780,
+  color: "var(--text)",
+};
+
+const listSubtitleStyle = {
+  marginTop: 5,
+  fontSize: 12,
+  color: "var(--muted)",
+};
+
+const rebalanceButtonStyle = {
+  minHeight: 44,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid color-mix(in srgb, var(--border2) 58%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 48%, white)",
+  color: "var(--text2)",
+  fontSize: 12,
+  fontWeight: 680,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+};
+
+const quickAddStyle = {
+  minHeight: 44,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid color-mix(in srgb, var(--accent) 36%, transparent)",
+  background: "color-mix(in srgb, var(--accent) 14%, white)",
+  color: "var(--accent-ink)",
+  fontSize: 12,
+  fontWeight: 750,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+};
+
+const searchWrapStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 9,
+  minHeight: 44,
+  padding: "0 12px",
+  borderRadius: 14,
+  background: "color-mix(in srgb, var(--surface) 86%, var(--surface2))",
+  border: "1px solid color-mix(in srgb, var(--border2) 55%, transparent)",
+};
+
+const categoryListStyle = {
+  display: "grid",
+  gap: 10,
+  paddingBottom: 72,
 };
 
 const spentBarTrackStyle = {
@@ -345,29 +353,79 @@ const spentBarFillStyle = {
 const categoryRowStyle = {
   textAlign: "left" as const,
   width: "100%",
-  padding: 0,
-  background: "transparent",
-  border: "none",
+  minHeight: 78,
+  padding: "12px 12px",
+  background: "color-mix(in srgb, var(--surface) 92%, white)",
+  border: "1px solid color-mix(in srgb, var(--border) 54%, transparent)",
+  borderRadius: 16,
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
   gap: 12,
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 5%, transparent)",
 };
 
-const availableButtonStyle = {
-  display: "inline-flex",
-  flexDirection: "column" as const,
-  alignItems: "flex-end",
-  gap: 4,
-  border: "none",
-  background: "transparent",
-  padding: 0,
-  cursor: "pointer",
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 12,
-  color: "var(--text)",
-  transition: "transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s ease",
+const selectedCategoryRowStyle = {
+  borderColor: "color-mix(in srgb, var(--accent) 38%, var(--border))",
+  background: "linear-gradient(180deg, color-mix(in srgb, var(--accent-dim) 35%, var(--surface)) 0%, var(--surface) 84%)",
 };
+
+const categoryIconWrapStyle = {
+  width: 42,
+  height: 42,
+  borderRadius: 14,
+  border: "1px solid color-mix(in srgb, var(--border) 58%, transparent)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+  transition: "background-color 0.2s ease, border-color 0.2s ease",
+};
+
+const categoryTitleRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  minWidth: 0,
+};
+
+const categoryMetaRowStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  color: "var(--muted)",
+  fontSize: 10,
+  fontFamily: "'DM Mono', monospace",
+  letterSpacing: 0.35,
+  textTransform: "uppercase" as const,
+};
+
+const percentPillStyle = (isOver: boolean) => ({
+  flexShrink: 0,
+  minWidth: 38,
+  textAlign: "center" as const,
+  padding: "3px 7px",
+  borderRadius: 999,
+  background: isOver
+    ? "color-mix(in srgb, var(--danger) 10%, white)"
+    : "color-mix(in srgb, var(--surface2) 70%, white)",
+  color: isOver ? "var(--danger)" : "var(--text2)",
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 10,
+  fontWeight: 700,
+});
+
+const availableStackStyle = (isNegative: boolean) => ({
+  textAlign: "right" as const,
+  flexShrink: 0,
+  display: "grid",
+  gap: 4,
+  justifyItems: "end",
+  color: isNegative ? "var(--danger)" : "var(--text)",
+  maxWidth: 112,
+});
 
 const availableLabelStyle = {
   fontSize: 10,
@@ -376,43 +434,35 @@ const availableLabelStyle = {
   color: "var(--muted)",
 };
 
-const nudgePillStyle = {
-  fontSize: 10,
+const availableValueStyle = {
   fontFamily: "'DM Mono', monospace",
-  letterSpacing: 0.3,
-  padding: "3px 7px",
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 55%, white)",
-  color: "var(--text2)",
-  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 800,
   lineHeight: 1.4,
 };
 
-const savedBadgeStyle = {
-  fontSize: 10,
-  letterSpacing: 0.4,
-  textTransform: "uppercase" as const,
-  fontFamily: "'DM Mono', monospace",
-  color: "var(--success)",
-  display: "inline-flex",
+const emptyStateStyle = {
+  display: "flex",
   alignItems: "center",
-  gap: 3,
-  animation: "fadeUp 0.18s ease both",
+  gap: 12,
+  padding: "18px 2px",
+  color: "var(--muted)",
 };
 
-const availableInputStyle = {
-  width: 92,
-  height: 32,
-  textAlign: "right" as const,
-  borderRadius: 10,
-  border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
-  background: "var(--surface)",
-  color: "var(--text)",
-  padding: "6px 8px",
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 12,
-  outline: "none",
-  transition: "border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
-  animation: "inputPop 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+const emptyStateIconStyle = {
+  width: 40,
+  height: 40,
+  borderRadius: 14,
+  background: "color-mix(in srgb, var(--surface2) 76%, white)",
+  border: "1px solid color-mix(in srgb, var(--border) 54%, transparent)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "var(--muted)",
 };
+
+function scopeLabel(scope: Scope) {
+  if (scope === "wife") return "Salma";
+  if (scope === "husband") return "Anas";
+  return "Joint";
+}

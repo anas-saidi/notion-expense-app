@@ -9,6 +9,7 @@ import { PendingScreen } from "./components/PendingScreen";
 import { MonthlyPlanningFlow } from "./components/MonthlyPlanningFlow";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
+import { RebalanceSheet } from "./components/RebalanceSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import type { Account, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
@@ -90,9 +91,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"home" | "plan" | "pending" | "history">("home");
   const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
+  const [planCompletedMonth, setPlanCompletedMonth] = useState<string | null>(null);
+  const [homeMonth, setHomeMonth] = useState(formatMonthInput(today()));
   const [plannerSummaryReady, setPlannerSummaryReady] = useState(false);
+  const [plannerMonthlySummary, setPlannerMonthlySummary] = useState<MonthlySummary | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
+  const [showRebalance, setShowRebalance] = useState(false);
   const [homeSearch, setHomeSearch] = useState("");
 
   const [amount, setAmount] = useState("");
@@ -111,16 +116,8 @@ export default function App() {
   const [microToast, setMicroToast] = useState<string | null>(null);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
-  const [plannedByCategory, setPlannedByCategory] = useState<Record<string, number>>({});
-  const [readyToAssignOffset, setReadyToAssignOffset] = useState<{ household: number; wife: number; husband: number }>({
-    household: 0,
-    wife: 0,
-    husband: 0,
-  });
-
   const initialAcctApplied = useRef(false);
   const initialCatApplied = useRef(false);
   const plannerMonthHydrated = useRef(false);
@@ -128,8 +125,6 @@ export default function App() {
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const planUpdateTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const balanceAnimRef = useRef<number | null>(null);
   const fuseRef = useRef<Fuse<{ description: string; categoryId: string }> | null>(null);
   const dateRef = useRef<HTMLDivElement>(null);
@@ -156,7 +151,6 @@ export default function App() {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
-      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
       if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
     };
   }, []);
@@ -196,9 +190,10 @@ export default function App() {
     if (latestCat) setLastUsedCatId(latestCat);
   };
 
-  const fetchMonthlySummary = async () => {
+  const fetchMonthlySummary = async (month?: string) => {
     try {
-      const { start, end } = monthBounds(today());
+      const target = month ?? formatMonthInput(today());
+      const { start, end } = monthBounds(`${target}-01`);
       const data = await fetch(`/api/monthly-summary?start=${start}&end=${end}`).then((r) => r.json());
       setMonthlySummary({
         start,
@@ -257,8 +252,12 @@ export default function App() {
 
     fetchTransactions();
     fetchPending();
-    fetchMonthlySummary();
   }, []);
+
+  // Refetch monthly summary whenever the viewed home month changes
+  useEffect(() => {
+    fetchMonthlySummary(homeMonth); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [homeMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (initialCatApplied.current) return;
@@ -280,16 +279,30 @@ export default function App() {
     let cancelled = false;
     if (!plannerMonth) return;
     setPlannerSummaryReady(false);
+    setPlannerMonthlySummary(null);
     const { start, end } = monthBounds(`${plannerMonth}-01`);
 
     fetch(`/api/monthly-summary?start=${start}&end=${end}`)
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to load planner summary");
-        await res.json();
-        if (!cancelled) setPlannerSummaryReady(true);
+        const data = await res.json();
+        if (!cancelled) {
+          setPlannerMonthlySummary({
+            start,
+            end,
+            totalAssigned: data.summary?.totalAssigned ?? 0,
+            totalSpent: data.summary?.totalSpent ?? 0,
+            assignedByCategory: data.summary?.assignedByCategory ?? [],
+            spentByCategory: data.summary?.spentByCategory ?? [],
+          });
+          setPlannerSummaryReady(true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setPlannerSummaryReady(false);
+        if (!cancelled) {
+          setPlannerMonthlySummary(null);
+          setPlannerSummaryReady(false);
+        }
       });
 
     return () => {
@@ -428,24 +441,10 @@ export default function App() {
       });
   };
 
-  const deleteTransaction = async (id: string) => {
-    if (deletingId !== id) {
-      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
-      setDeletingId(id);
-      deleteTimerRef.current = setTimeout(() => setDeletingId(null), 2000);
-      return;
-    }
-    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
-    setDeletingId(null);
+  const deleteTransaction = (id: string) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
     fetch("/api/transactions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
-      .then((r) => {
-        if (!r.ok) {
-          fetchTransactions();
-          return;
-        }
-        fetchMonthlySummary();
-      });
+      .then((r) => { if (!r.ok) fetchTransactions(); else fetchMonthlySummary(homeMonth); });
   };
 
   const selectedCat = categories.find((c) => c.id === categoryId);
@@ -482,55 +481,11 @@ export default function App() {
     }, 0);
 
     return {
-      household: readyToAssignPool + readyToAssignOffset.household,
-      wife: Math.max(0, wifeTotal + readyToAssignOffset.wife),
-      husband: Math.max(0, husbandTotal + readyToAssignOffset.husband),
+      household: readyToAssignPool,
+      wife: Math.max(0, wifeTotal),
+      husband: Math.max(0, husbandTotal),
     };
-  }, [accounts, readyToAssignOffset, readyToAssignPool]);
-
-  // Calculate household and individual planned totals using current month assignments
-  const contributionDueByScope = useMemo(() => {
-    const norm = (value) => value.toLowerCase();
-    // Get household and individual category IDs
-    const householdCategoryIds = new Set(categories.filter((c) => c.isTeamFund).map((c) => c.id));
-    // Map of categoryId to assigned amount for current month
-    const assignedByCategory = monthlySummary.assignedByCategory;
-    // Calculate household planned total
-    const householdPlanned = assignedByCategory
-      .filter((item) => householdCategoryIds.has(item.categoryId))
-      .reduce((sum, item) => sum + item.total, 0);
-    // Calculate individual planned total (all non-household)
-    const individualPlanned = assignedByCategory
-      .filter((item) => !householdCategoryIds.has(item.categoryId))
-      .reduce((sum, item) => sum + item.total, 0);
-
-    // Find wife and husband accounts with contributionPercent
-    const wifeAccount = accounts.find((a) => !isSavingsAccount(a) && norm(a.label).includes("wife") && typeof a.contributionPercent === "number");
-    const husbandAccount = accounts.find((a) => !isSavingsAccount(a) && norm(a.label).includes("hubb") && typeof a.contributionPercent === "number");
-    const wifePercent = wifeAccount?.contributionPercent ?? 0;
-    const husbandPercent = husbandAccount?.contributionPercent ?? 0;
-    // Use contributionPercent directly as a multiplier (e.g., 0.6 means 60%)
-    const wifePlanned = Math.round(householdPlanned * wifePercent);
-    const husbandPlanned = Math.round(householdPlanned * husbandPercent);
-
-    // DEBUG PRINTS
-    if (typeof window !== "undefined") {
-      // eslint-disable-next-line no-console
-      console.log("[DEBUG] Monthly household planned:", householdPlanned);
-      // eslint-disable-next-line no-console
-      console.log("[DEBUG] Monthly individual planned:", individualPlanned);
-      // eslint-disable-next-line no-console
-      console.log("[DEBUG] Husband planned contribution:", husbandPlanned);
-      // eslint-disable-next-line no-console
-      console.log("[DEBUG] Wife planned contribution:", wifePlanned);
-    }
-
-    return {
-      wife: wifePlanned,
-      husband: husbandPlanned,
-      total: wifePlanned + husbandPlanned,
-    };
-  }, [accounts, categories, monthlySummary.assignedByCategory]);
+  }, [accounts, readyToAssignPool]);
   // DEBUG PRINTS for spent on team categories
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -551,54 +506,6 @@ export default function App() {
     // eslint-disable-next-line no-console
     console.log("[DEBUG] Wife spent on team categories:", wifeSpent);
   }, [accounts, categories, transactions]);
-
-  const householdSpentByPartner = useMemo(() => {
-    const householdCategoryIds = new Set(
-      categories.filter((category) => category.isTeamFund).map((category) => category.id),
-    );
-    const accountLabelById = new Map(
-      accounts.map((account) => [account.id, account.label.toLowerCase()]),
-    );
-    const bounds = monthlySummary.start && monthlySummary.end
-      ? { start: monthlySummary.start, end: monthlySummary.end }
-      : monthBounds(today());
-    const startDate = new Date(bounds.start);
-    const endDate = new Date(bounds.end);
-
-    let wife = 0;
-    let husband = 0;
-    let other = 0;
-
-    for (const txn of transactions) {
-      if (!txn.category || !householdCategoryIds.has(txn.category)) continue;
-      if (!txn.date) continue;
-      const txnDate = new Date(txn.date);
-      if (txnDate < startDate || txnDate > endDate) continue;
-      const amount = txn.amount ?? 0;
-      const label = txn.accountId ? accountLabelById.get(txn.accountId) ?? "" : "";
-      if (label.includes("wife")) {
-        wife += amount;
-      } else if (label.includes("hubb")) {
-        husband += amount;
-      } else {
-        other += amount;
-      }
-    }
-
-    return {
-      wife,
-      husband,
-      other,
-      total: wife + husband + other,
-    };
-  }, [accounts, categories, monthlySummary.end, monthlySummary.start, transactions]);
-
-  const totalPlanned = useMemo(
-    () => categories.reduce((sum, category) => sum + (category.planned ?? 0), 0),
-    [categories],
-  );
-
-  const poolRemaining = Math.max(0, readyToAssignPool - totalPlanned);
 
   const selectCategory = (cat: Category) => {
     setCategoryId(cat.id);
@@ -670,85 +577,6 @@ export default function App() {
     setSuggestedCatId(best ? best[0] : null);
   };
 
-  const resolveCategoryScope = (category: Category): "household" | "wife" | "husband" => {
-    if (category.isTeamFund) return "household";
-    const owner = category.owner?.toLowerCase() ?? "";
-    if (owner.includes("salma")) return "wife";
-    if (owner.includes("anas")) return "husband";
-    return "household";
-  };
-
-  const handlePlannedChange = (categoryId: string, nextPlanned: number) => {
-    const category = categories.find((item) => item.id === categoryId);
-    if (!category) return;
-    const currentPlanned = plannedByCategory[categoryId] ?? category.planned ?? 0;
-    if (nextPlanned === currentPlanned) return;
-    const delta = nextPlanned - currentPlanned;
-    const scope = resolveCategoryScope(category);
-
-    const spent = monthlySummary.spentByCategory.find((item) => item.categoryId === categoryId)?.total ?? 0;
-
-    setPlannedByCategory((prev) => ({
-      ...prev,
-      [categoryId]: nextPlanned,
-    }));
-
-    setCategories((prev) =>
-      prev.map((item) => {
-        if (item.id !== categoryId) return item;
-        const nextAvailable = typeof item.available === "number"
-          ? Math.max(0, nextPlanned - spent)
-          : item.available;
-        return { ...item, planned: nextPlanned, available: nextAvailable };
-      }),
-    );
-
-    setMonthlySummary((prev) => {
-      const nextAssignedByCategory = [...prev.assignedByCategory];
-      const entryIndex = nextAssignedByCategory.findIndex((item) => item.categoryId === categoryId);
-      if (entryIndex >= 0) {
-        nextAssignedByCategory[entryIndex] = { ...nextAssignedByCategory[entryIndex], total: nextPlanned };
-      } else {
-        nextAssignedByCategory.push({ categoryId, total: nextPlanned });
-      }
-      const nextTotalAssigned = nextAssignedByCategory.reduce((sum, item) => sum + item.total, 0);
-      return {
-        ...prev,
-        totalAssigned: nextTotalAssigned,
-        assignedByCategory: nextAssignedByCategory,
-      };
-    });
-
-    setReadyToAssignOffset((prev) => ({
-      ...prev,
-      [scope]: prev[scope] - delta,
-    }));
-
-    if (!/^\d{4}-\d{2}$/.test(plannerMonth)) return;
-    if (planUpdateTimersRef.current[categoryId]) {
-      clearTimeout(planUpdateTimersRef.current[categoryId]);
-    }
-
-    planUpdateTimersRef.current[categoryId] = setTimeout(() => {
-      const reverse = delta < 0;
-      const planned = Math.abs(delta);
-      if (planned === 0) return;
-      fetch("/api/monthly-planning/funds", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          month: plannerMonth,
-          categoryId,
-          planned,
-          accountId: category.defaultAccount ?? null,
-          reverse,
-        }),
-      })
-        .then((res) => res.json())
-        .catch(() => null);
-    }, 450);
-  };
-
   const submit = async () => {
     if (!amount || !name || !categoryId) return;
     setStatus("saving");
@@ -778,7 +606,7 @@ export default function App() {
       const expAmt = parseFloat(amount);
       if (displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
-      fetchMonthlySummary();
+      fetchMonthlySummary(homeMonth);
       fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
 
       if (loadedPendingId.current) {
@@ -840,11 +668,12 @@ export default function App() {
           onOpenCategoryDetails={openCategoryDetails}
           onOpenAdd={() => setShowAddModal(true)}
           onOpenPlan={() => setTab("plan")}
+          onOpenRebalance={() => setShowRebalance(true)}
           monthlySummary={monthlySummary}
-          onPlannedChange={handlePlannedChange}
-          readyToAssignByScope={readyToAssignByScope}
-          contributionDueByScope={contributionDueByScope}
-          householdSpentByPartner={householdSpentByPartner}
+          readyToAssignByScope={readyToAssignByScope && typeof readyToAssignByScope === 'object' ? readyToAssignByScope : { household: 0, wife: 0, husband: 0 }}
+          homeMonth={homeMonth}
+          onHomeMonthChange={setHomeMonth}
+          planDone={planCompletedMonth === homeMonth}
         />
       )}
 
@@ -853,6 +682,7 @@ export default function App() {
           selectedMonth={plannerMonth}
           onSelectedMonthChange={setPlannerMonth}
           onCancel={() => setTab("home")}
+          onComplete={() => setPlanCompletedMonth(plannerMonth)}
           onOpenAddTransaction={({ accountId: nextAccountId, amount: nextAmount, name: nextName }) => {
             setAccountId(nextAccountId);
             setAmount(String(nextAmount));
@@ -862,6 +692,7 @@ export default function App() {
           }}
           accounts={accounts}
           categories={categories}
+          assignedByCategory={plannerMonthlySummary?.assignedByCategory ?? []}
           isUsingFallbackData={plannerUsesFallbackData}
         />
       )}
@@ -882,7 +713,6 @@ export default function App() {
         <HistoryScreen
           transactions={transactions}
           categories={categories}
-          deletingId={deletingId}
           onClickTransaction={(t) => {
             setName(t.name);
             if (t.category) {
@@ -970,6 +800,20 @@ export default function App() {
         onOpenAdd={() => {
           setShowCategoryDetails(false);
           setShowAddModal(true);
+        }}
+      />
+
+      <RebalanceSheet
+        open={showRebalance}
+        onClose={() => setShowRebalance(false)}
+        categories={categories}
+        homeMonth={homeMonth}
+        monthlySummary={monthlySummary}
+        onSuccess={() => {
+          fetchMonthlySummary(homeMonth);
+          fetch("/api/categories")
+            .then((r) => r.json())
+            .then((d) => setCategories(d.categories ?? []));
         }}
       />
 
