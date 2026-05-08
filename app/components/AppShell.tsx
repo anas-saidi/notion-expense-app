@@ -4,81 +4,33 @@ import { BottomNav } from "./BottomNav";
 import { PlusIcon } from "./ui/icons";
 import { TAB_COPY } from "./tab-copy";
 
-// Simple couple badge for header
+// Stacked couple avatars shown in the app header
 function CoupleBadge() {
-  // Hardcoded initials and colors for now
-  const initials = [
-    { label: "S", color: "#e57373" }, // e.g., Salma
-    { label: "A", color: "#4f8cff" }, // e.g., Anas
+  const people = [
+    { label: "S", color: "#e57373" },
+    { label: "A", color: "#4f8cff" },
   ];
+  const avatarBase = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 28,
+    height: 28,
+    borderRadius: "50%",
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: 12,
+    border: "2px solid var(--bg, #fbfdf7)",
+    flexShrink: 0,
+  } as const;
   return (
-    <span className="couple-badge-responsive" style={{
-      display: "inline-flex",
-      alignItems: "center",
-      background: "#f6f3ed",
-      borderRadius: 999,
-      padding: "4px 10px 4px 8px",
-      fontSize: 16,
-      fontWeight: 500,
-      color: "#888",
-      boxShadow: "0 1px 2px 0 rgba(0,0,0,0.03)",
-      marginLeft: 10,
-      position: "relative",
-      minWidth: 0,
-    }}>
-      <span style={{
-        display: "inline-flex",
-        alignItems: "center",
-        position: "relative",
-        minWidth: 0,
-      }}>
-        <span style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          background: initials[0].color,
-          color: "#fff",
-          fontWeight: 700,
-          fontSize: 18,
-          border: "2.5px solid #fff",
-          boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04)",
-          zIndex: 2,
-        }}>{initials[0].label}</span>
-        <span style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          background: initials[1].color,
-          color: "#fff",
-          fontWeight: 700,
-          fontSize: 18,
-          border: "2.5px solid #fff",
-          boxShadow: "0 1px 2px 0 rgba(0,0,0,0.04)",
-          zIndex: 1,
-          position: "absolute",
-          left: 22,
-          top: 0,
-        }}>{initials[1].label}</span>
+    <span style={{ display: "inline-flex", alignItems: "center" }}>
+      <span style={{ ...avatarBase, background: people[0].color, zIndex: 2 }}>
+        {people[0].label}
       </span>
-      <style>{`
-        @media (max-width: 767px) {
-          .couple-badge-responsive {
-            position: absolute !important;
-            right: 12px;
-            top: 10px;
-            margin-left: 0 !important;
-            z-index: 20;
-            box-shadow: 0 2px 8px 0 rgba(0,0,0,0.06);
-            padding: 4px 10px 4px 8px;
-          }
-        }
-      `}</style>
+      <span style={{ ...avatarBase, background: people[1].color, zIndex: 1, marginLeft: -8 }}>
+        {people[1].label}
+      </span>
     </span>
   );
 }
@@ -115,7 +67,7 @@ export function AppShell({
           <div
             style={{
               display: "flex",
-              alignItems: "flex-start",
+              alignItems: "center",
               justifyContent: "space-between",
               gap: 12,
               marginBottom: 18,
@@ -141,15 +93,12 @@ export function AppShell({
                   letterSpacing: isHomeTab ? -0.25 : -0.5,
                   color: "var(--text)",
                   fontWeight: isHomeTab ? 650 : undefined,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
                 }}
               >
                 {shellCopy.title}
-                <CoupleBadge />
               </h1>
             </div>
+            <CoupleBadge />
           </div>
         )}
         {children}

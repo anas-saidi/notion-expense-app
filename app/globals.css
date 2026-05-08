@@ -28,6 +28,7 @@
   --success: #054d28;
   --card-shadow: rgba(50,50,93,0.18) 0px 20px 32px -20px, rgba(0,0,0,0.08) 0px 12px 24px -14px;
   --card-radius: 8px;
+  --card-border: rgba(14, 15, 12, 0.12);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font-display: "Fraunces", "Times New Roman", serif;
@@ -385,109 +386,83 @@ button:hover .rebalance-btn-icon {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes historyGlow {
-  0%, 100% { transform: scale(1); opacity: 0.72; }
-  50% { transform: scale(1.06); opacity: 1; }
-}
-
 @keyframes historyOrbit {
   from { transform: rotate(0deg) translateY(-2px); }
   to { transform: rotate(360deg) translateY(-2px); }
 }
 
 .history-spotlight {
-  position: relative;
-  overflow: hidden;
   display: grid;
-  gap: 16px;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 18%, transparent), transparent 34%),
-    linear-gradient(135deg, color-mix(in srgb, var(--surface2) 88%, white), var(--surface));
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
-  border-radius: 22px;
-  padding: 18px 16px;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 16px;
   margin-bottom: 20px;
-  box-shadow: 0 16px 32px color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent);
   animation: fadeUp 0.4s ease both;
   animation-delay: 50ms;
 }
 
-.history-spotlight::after {
-  content: "";
-  position: absolute;
-  top: -28px;
-  right: -24px;
-  width: 92px;
-  height: 92px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  filter: blur(2px);
-  animation: historyGlow 5.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.history-spotlight__main,
-.history-spotlight__stats {
-  position: relative;
-  z-index: 1;
+.history-spotlight__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .history-spotlight__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   font-family: "DM Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--text2);
-}
-
-.history-spotlight__eyebrow::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent);
-  animation: historyGlow 3.2s ease-in-out infinite;
+  color: var(--muted);
+  margin-bottom: 6px;
 }
 
 .history-spotlight__note {
-  max-width: 30ch;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--text2);
+  max-width: 28ch;
+}
+
+.history-spotlight__amount {
+  font-family: "DM Mono", monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-top: 1px;
 }
 
 .history-spotlight__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
+  padding-top: 2px;
+  border-top: 1px solid var(--card-border);
 }
 
 .history-pill {
   display: grid;
-  gap: 6px;
-  padding: 12px 12px 11px;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  gap: 5px;
+  padding: 10px 10px 9px;
+  border-radius: 12px;
+  background: var(--surface2);
   min-width: 0;
-  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .history-pill strong {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .tx-row {
@@ -538,7 +513,6 @@ button:hover .rebalance-btn-icon {
 
   .history-pill:hover {
     transform: translateY(-1px);
-    border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
   }
 }
 
@@ -667,8 +641,6 @@ button:hover .rebalance-btn-icon {
 @media (prefers-reduced-motion: reduce) {
   .tx-row,
   .history-spotlight,
-  .history-spotlight::after,
-  .history-spotlight__eyebrow::before,
   .tx-icon,
   .tx-delete-btn,
   .tx-delete-btn--confirm,

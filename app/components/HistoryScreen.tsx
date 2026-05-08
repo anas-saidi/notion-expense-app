@@ -140,29 +140,29 @@ export function HistoryScreen({
 
       {transactions.length > 0 && (
         <section className="history-spotlight" aria-label="History summary">
-          <div className="history-spotlight__main">
-            <span className="history-spotlight__eyebrow">Household activity</span>
-            <div className="history-spotlight__summary">
-              <span className="history-spotlight__amount" style={summaryAmountStyle}>
-                <Money value={totalSpent} absolute />
-              </span>
+          <div className="history-spotlight__header">
+            <div>
+              <p className="history-spotlight__eyebrow">Household activity</p>
               <p className="history-spotlight__note">
                 {story?.note ?? "Every expense stays close at hand for a quick household check-in."}
               </p>
             </div>
+            <span className="history-spotlight__amount">
+              <Money value={totalSpent} absolute />
+            </span>
           </div>
 
           <div className="history-spotlight__stats">
             <div className="history-pill">
-              <span className="history-pill__label" style={summaryLabelStyle}>Most recent</span>
-              <strong>{story ? fmtDate(story.latestDate) : "-"}</strong>
+              <span style={pillLabelStyle}>Most recent</span>
+              <strong>{story ? fmtDate(story.latestDate) : "—"}</strong>
             </div>
             <div className="history-pill">
-              <span className="history-pill__label" style={summaryLabelStyle}>Active days</span>
+              <span style={pillLabelStyle}>Active days</span>
               <strong>{story?.activeDays ?? 0}</strong>
             </div>
             <div className="history-pill">
-              <span className="history-pill__label" style={summaryLabelStyle}>Average spend</span>
+              <span style={pillLabelStyle}>Avg spend</span>
               <strong>
                 <Money value={story?.averageSpend ?? 0} absolute />
               </strong>
@@ -173,13 +173,23 @@ export function HistoryScreen({
 
       {groups.length > 0 && (
         <div style={{ display: "grid", gap: 24 }}>
-          {groups.map(({ label, items }) => {
+          {groups.map(({ label, items }, groupIdx) => {
             const startIdx = groupStartIndices[label] ?? 0;
             return (
               <div key={label}>
-                <div style={groupLabelStyle}>
+                <div style={{ ...groupLabelStyle, marginBottom: groupIdx === 0 ? 10 : 8 }}>
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: label === "Today" || label === "Yesterday" ? "var(--accent)" : "var(--border2)",
+                      flexShrink: 0,
+                      marginRight: 7,
+                    }}
+                  />
                   <span>{label}</span>
-                  <span style={{ marginLeft: 8, opacity: 0.45 }}>{items.length}</span>
+                  <span style={{ marginLeft: 6, opacity: 0.45 }}>{items.length}</span>
                 </div>
 
                 <div style={{ display: "grid", gap: 6 }}>
@@ -294,20 +304,12 @@ export function HistoryScreen({
   );
 }
 
-const summaryLabelStyle: CSSProperties = {
-  fontSize: 11,
+const pillLabelStyle: CSSProperties = {
+  fontSize: 10,
   color: "var(--muted)",
   fontFamily: "'DM Mono', monospace",
-  letterSpacing: 0.5,
+  letterSpacing: 0.4,
   textTransform: "uppercase",
-};
-
-const summaryAmountStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: 28,
-  lineHeight: 0.95,
-  fontWeight: 700,
-  color: "var(--text)",
 };
 
 const groupLabelStyle: CSSProperties = {

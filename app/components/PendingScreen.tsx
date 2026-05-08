@@ -500,6 +500,11 @@ export function PendingScreen({
           detent="default"
           snapPoints={[0, 0.55, 1]}
           initialSnap={1}
+          panelStyle={{
+            background: "var(--surface)",
+            borderRadius: "20px 20px 0 0",
+            boxShadow: "0 -8px 40px rgba(0,0,0,0.12)",
+          }}
           contentStyle={{ padding: "0 20px calc(28px + env(safe-area-inset-bottom, 0px))" }}
         >
             <div
