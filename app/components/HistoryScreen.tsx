@@ -1,15 +1,16 @@
 "use client";
 
 import { useMemo, type CSSProperties } from "react";
-import type { Category, Transaction } from "./app-types";
+import type { BudgetScope, Category, Transaction } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { fmtDate } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, fmtDate } from "./app-utils";
 
 type Props = {
   transactions: Transaction[];
   categories: Category[];
+  budgetScope: BudgetScope;
   onClickTransaction: (t: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
 };
@@ -41,7 +42,11 @@ function getDateGroup(dateStr: string): DateGroup {
   return "Older";
 }
 
-function buildHistoryStory(transactions: Transaction[], categories: Category[]): HistoryStory | null {
+function buildHistoryStory(
+  transactions: Transaction[],
+  categories: Category[],
+  scopeLabel: string,
+): HistoryStory | null {
   if (transactions.length === 0) return null;
 
   const categoryCounts = new Map<string, number>();
@@ -70,12 +75,12 @@ function buildHistoryStory(transactions: Transaction[], categories: Category[]):
 
   const lead =
     transactions.length === 1
-      ? "A first activity in your shared budget."
+      ? `A first activity in ${scopeLabel.toLowerCase()} budget.`
       : activeDays.size <= 2
-        ? "A light run of household activity, easy to revisit together."
+        ? `A light run of ${scopeLabel.toLowerCase()} activity, easy to revisit.`
         : activeDays.size <= 6
-          ? "A steady rhythm of shared spending across the week."
-          : "A clear timeline of everyday household spending.";
+          ? `A steady rhythm of ${scopeLabel.toLowerCase()} spending across the week.`
+          : `A clear timeline of everyday ${scopeLabel.toLowerCase()} spending.`;
 
   const note = topCategoryName
     ? `${topCategoryName} shows up the most in your shared activity right now.`
@@ -93,6 +98,7 @@ function buildHistoryStory(transactions: Transaction[], categories: Category[]):
 export function HistoryScreen({
   transactions,
   categories,
+  budgetScope,
   onClickTransaction,
   onDeleteTransaction,
 }: Props) {
@@ -102,8 +108,8 @@ export function HistoryScreen({
   );
 
   const story = useMemo(
-    () => buildHistoryStory(transactions, categories),
-    [transactions, categories]
+    () => buildHistoryStory(transactions, categories, BUDGET_SCOPE_LABELS[budgetScope]),
+    [transactions, categories, budgetScope]
   );
 
   const groups = useMemo(() => {
@@ -142,9 +148,9 @@ export function HistoryScreen({
         <section className="history-spotlight" aria-label="History summary">
           <div className="history-spotlight__header">
             <div>
-              <p className="history-spotlight__eyebrow">Household activity</p>
+              <p className="history-spotlight__eyebrow">{BUDGET_SCOPE_LABELS[budgetScope]} activity</p>
               <p className="history-spotlight__note">
-                {story?.note ?? "Every expense stays close at hand for a quick household check-in."}
+                {story?.note ?? "Every expense stays close at hand for a quick check-in."}
               </p>
             </div>
             <span className="history-spotlight__amount">
@@ -293,7 +299,7 @@ export function HistoryScreen({
               textAlign: "center",
             }}
           >
-            Add your first expense and it will land here, ready to revisit, repeat, or tidy up together.
+            Add your first expense and it will land here, ready to revisit, repeat, or tidy up.
           </div>
           <div className="history-empty__prompt" aria-hidden="true">
             groceries / coffee / fuel / weekend plan

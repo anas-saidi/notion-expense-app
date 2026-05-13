@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { FullScreenDelightIcon } from "./ui/FullScreenDelightIcon";
 import { BottomSheet } from "./ui/BottomSheet";
 import { XIcon } from "./ui/icons";
 import type { Category } from "./app-types";
@@ -55,17 +54,9 @@ export function CategoryDetailsSheet({
   onClose,
   onOpenAdd,
 }: CategoryDetailsSheetProps) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CategoryActivityPayload | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      setIsFullscreen(false);
-      return;
-    }
-  }, [open]);
 
   useEffect(() => {
     if (!open || !category?.id || !month) return;
@@ -74,25 +65,21 @@ export function CategoryDetailsSheet({
     setLoading(true);
     setError(null);
 
-    fetch(`/api/categories/${category.id}/activity?month=${month}&limit=${isFullscreen ? 24 : 8}`)
+    fetch(`/api/categories/${category.id}/activity?month=${month}&limit=20`)
       .then(async (res) => {
         const payload = await res.json();
-        if (!res.ok) {
-          throw new Error(payload.error || "Failed to load category details");
-        }
+        if (!res.ok) throw new Error(payload.error || "Failed to load category details");
         if (!cancelled) setData(payload);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load category details");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [open, category?.id, month, isFullscreen]);
+    return () => { cancelled = true; };
+  }, [open, category?.id, month]);
 
   const summary = data?.summary;
   const details = data?.category;
@@ -113,198 +100,197 @@ export function CategoryDetailsSheet({
       open={open}
       onClose={onClose}
       label={`${category.name} details`}
-      align={isFullscreen ? "center" : "bottom"}
-      maxWidth={isFullscreen ? "820px" : "520px"}
-      maxHeight={
-        isFullscreen
-          ? "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px)"
-          : "calc(100dvh - 20px - 88px - env(safe-area-inset-bottom, 0px))"
-      }
-      detent={isFullscreen ? "content" : "default"}
-      snapPoints={isFullscreen ? undefined : [0, 0.82, 1]}
-      initialSnap={isFullscreen ? undefined : 1}
-      panelStyle={{
-        ...sheetStyle,
-        height: isFullscreen
-          ? "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px)"
-          : undefined,
-        borderRadius: isFullscreen ? 20 : 20,
-      }}
+      maxWidth="520px"
+      maxHeight="calc(100dvh - 20px - 88px - env(safe-area-inset-bottom, 0px))"
+      detent="default"
+      snapPoints={[0, 0.82, 1]}
+      initialSnap={1}
+      panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0 }}
     >
-        <div style={sheetInnerStyle}>
-          <header style={topBarStyle}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <CategoryIcon icon={category.icon} style={iconOrbStyle} />
-              <div style={{ minWidth: 0 }}>
-                <div style={eyebrowStyle}>Category details</div>
-                <div style={titleRowStyle}>
-                  <h2 style={titleStyle}>{details?.name ?? category.name}</h2>
-                  <span style={scopeBadgeStyle}>{getScopeLabel(category)}</span>
-                </div>
-              </div>
-            </div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setIsFullscreen((value) => !value)}
-                style={{
-                  ...topActionStyle,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "relative",
-                  width: 44,
-                  height: 44,
-                  borderRadius: 999,
-                  background: isFullscreen ? "var(--info-dim)" : undefined,
-                  transition: "background 0.2s",
-                }}
-                aria-label={isFullscreen ? "Exit full screen" : "Go big mode!"}
-                title={isFullscreen ? "Back to cozy view" : "Go big mode!"}
-              >
-                <FullScreenDelightIcon expanded={isFullscreen} />
-              </button>
-              <button onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
-                <XIcon strokeWidth={2.2} />
-              </button>
-            </div>
-          </header>
+      <div style={sheetInnerStyle}>
 
-          <section style={heroWrapStyle}>
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={eyebrowStyle}>Available now</div>
-              <div style={heroValueStyle}>
-                <Money value={available} />
+        {/* ── Header ── */}
+        <header style={topBarStyle}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <CategoryIcon icon={category.icon} style={iconOrbStyle} />
+            <div style={{ minWidth: 0 }}>
+              <div style={eyebrowStyle}>Category details</div>
+              <div style={titleRowStyle}>
+                <h2 style={titleStyle}>{details?.name ?? category.name}</h2>
+                <span style={scopeBadgeStyle}>{getScopeLabel(category)}</span>
               </div>
-              <p style={heroCopyStyle}>
-                {summary?.month ? `Live view for ${formatMonthLabel(summary.month)}.` : "This month at a glance."}
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
+            <XIcon strokeWidth={2.2} />
+          </button>
+        </header>
+
+        {/* ── Hero ── */}
+        <section style={heroWrapStyle}>
+          <div style={{ display: "grid", gap: 10 }}>
+            <div style={eyebrowStyle}>Available now</div>
+            <div style={heroValueStyle}>
+              <Money value={available} />
+            </div>
+            <p style={heroCopyStyle}>
+              {summary?.month ? `Live view for ${formatMonthLabel(summary.month)}.` : "This month at a glance."}
+            </p>
+          </div>
+
+          <div style={progressRailStyle} aria-hidden="true">
+            <div style={{ ...progressFillStyle, width: `${spentPct}%` }} />
+          </div>
+
+          <div style={heroStatGridStyle}>
+            <StatCard label="Spent" value={spent} tone="default" />
+            <StatCard label="Planned" value={planned} tone="default" />
+            <StatCard label="Net flow" value={summary?.netFlow ?? 0} tone={(summary?.netFlow ?? 0) >= 0 ? "positive" : "negative"} />
+          </div>
+        </section>
+
+        {/* ── Summary chips ── */}
+        <section style={summarySectionStyle}>
+          <SummaryChip label="Funded" value={summary?.fundedTotal ?? 0} tone="positive" />
+          <SummaryChip label="Moved in" value={summary?.movedInTotal ?? 0} tone="positive" />
+          <SummaryChip label="Moved out" value={summary?.movedOutTotal ?? 0} tone="negative" />
+          <SummaryChip label="Expenses" value={summary?.spentTotal ?? 0} tone="negative" />
+        </section>
+
+        {/* ── Activity timeline ── */}
+        <section style={{ display: "grid", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div>
+              <div style={eyebrowStyle}>Recent activity</div>
+              <p style={{ marginTop: 4, fontSize: 13, color: "var(--text2)", lineHeight: 1.4 }}>
+                Funding, transfers, and spending in one stream.
               </p>
             </div>
+            <button type="button" onClick={onOpenAdd} style={primaryActionStyle}>
+              Add
+            </button>
+          </div>
 
-            <div style={progressRailStyle} aria-hidden="true">
-              <div style={{ ...progressFillStyle, width: `${spentPct}%` }} />
-            </div>
+          {loading && <div style={panelMessageStyle}>Loading activity…</div>}
+          {error && !loading && <div style={panelMessageStyle}>{error}</div>}
+          {!loading && !error && (data?.timeline?.length ?? 0) === 0 && (
+            <div style={panelMessageStyle}>No activity recorded for this month yet.</div>
+          )}
 
-            <div style={heroStatGridStyle}>
-              <StatCard label="Spent" value={spent} tone="default" />
-              <StatCard label="Planned" value={planned} tone="default" />
-              <StatCard label="Net flow" value={summary?.netFlow ?? 0} tone={(summary?.netFlow ?? 0) >= 0 ? "positive" : "negative"} />
-            </div>
-          </section>
+          {!loading && !error && (data?.timeline?.length ?? 0) > 0 && (
+            <div>
+              {data!.timeline.map((item, i) => {
+                const isLast = i === data!.timeline.length - 1;
+                const tone = kindTone(item.kind);
+                const meta = [
+                  eventKindLabel(item.kind),
+                  item.relatedCategoryName,
+                  item.subtitle,
+                ].filter(Boolean).join(" · ");
 
-          <section style={summarySectionStyle}>
-            <SummaryChip label="Funded" value={summary?.fundedTotal ?? 0} tone="positive" />
-            <SummaryChip label="Moved in" value={summary?.movedInTotal ?? 0} tone="positive" />
-            <SummaryChip label="Moved out" value={summary?.movedOutTotal ?? 0} tone="negative" />
-            <SummaryChip label="Expenses" value={summary?.spentTotal ?? 0} tone="negative" />
-          </section>
-
-          <section style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div>
-                <div style={eyebrowStyle}>Recent activity</div>
-                <p style={{ marginTop: 6, fontSize: 13, color: "var(--text2)" }}>
-                  Funding, transfers, and spending in one stream.
-                </p>
-              </div>
-              <button type="button" onClick={onOpenAdd} style={primaryActionStyle}>
-                Add transaction
-              </button>
-            </div>
-
-            {loading && <div style={panelMessageStyle}>Loading category activity...</div>}
-            {error && !loading && <div style={panelMessageStyle}>{error}</div>}
-            {!loading && !error && (data?.timeline?.length ?? 0) === 0 && (
-              <div style={panelMessageStyle}>No activity recorded for this month yet.</div>
-            )}
-
-            {!loading && !error && (data?.timeline?.length ?? 0) > 0 && (
-              <div style={timelineListStyle}>
-                {data?.timeline.map((item) => (
-                  <article key={item.id} style={timelineRowStyle}>
-                    <div style={{ ...timelineDotStyle, color: timelineTone(item.direction).color, background: timelineTone(item.direction).background }}>
-                      {item.kind === "expense" ? "-" : item.direction === "in" ? "+" : "-"}
+                return (
+                  <div key={item.id} style={{ display: "flex", gap: 14 }}>
+                    {/* Dot + connector line */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 16 }}>
+                      <div style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: tone.dot,
+                        border: "2px solid var(--surface)",
+                        boxShadow: `0 0 0 1px ${tone.dot}`,
+                        flexShrink: 0,
+                        marginTop: 4,
+                        zIndex: 1,
+                      }} />
+                      {!isLast && (
+                        <div style={{
+                          width: 1,
+                          flex: 1,
+                          background: "var(--card-border)",
+                          minHeight: 16,
+                          marginTop: 3,
+                          marginBottom: 3,
+                        }} />
+                      )}
                     </div>
-                    <div style={{ minWidth: 0, display: "grid", gap: 4 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                        <div style={{ fontSize: 14, fontWeight: 650, color: "var(--text)", minWidth: 0 }}>{item.title}</div>
-                        <div style={{ ...amountTextStyle, color: timelineTone(item.direction).color }}>
-                          {item.direction === "in" ? "+" : "-"}
-                          <Money value={Math.abs(item.amount)} />
+
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : 14 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                        <div style={{
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: "var(--text)",
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {item.title}
+                        </div>
+                        <div style={{ ...amountTextStyle, color: tone.amount, flexShrink: 0 }}>
+                          {item.direction === "in" ? "+" : "−"}<Money value={Math.abs(item.amount)} />
                         </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                        <div style={metaTextStyle}>
-                          {[item.subtitle, item.relatedCategoryName].filter(Boolean).join(" · ") || eventKindLabel(item.kind)}
-                        </div>
-                        <div style={metaTextStyle}>{formatDay(item.date)}</div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 3 }}>
+                        <div style={metaTextStyle}>{meta}</div>
+                        <div style={{ ...metaTextStyle, flexShrink: 0 }}>{formatDay(item.date)}</div>
                       </div>
                     </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
     </BottomSheet>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number | null;
-  tone: "default" | "positive" | "negative";
-}) {
-  const palette =
-    tone === "positive"
-      ? { background: "color-mix(in srgb, var(--success) 10%, white)", color: "var(--success)" }
-      : tone === "negative"
-        ? { background: "color-mix(in srgb, var(--danger) 10%, white)", color: "var(--danger)" }
-        : { background: "color-mix(in srgb, var(--surface2) 42%, white)", color: "var(--text)" };
+// ── Sub-components ──────────────────────────────────────────────────────────
 
+function StatCard({ label, value, tone }: { label: string; value: number | null; tone: "default" | "positive" | "negative" }) {
+  const color =
+    tone === "positive" ? "var(--success)"
+    : tone === "negative" ? "var(--danger)"
+    : "var(--text)";
   return (
     <div style={statCardStyle}>
       <div style={statLabelStyle}>{label}</div>
-      <div style={{ ...statValueStyle, color: palette.color }}>
-        <Money value={value ?? 0} />
-      </div>
+      <div style={{ ...statValueStyle, color }}><Money value={value ?? 0} /></div>
     </div>
   );
 }
 
-function SummaryChip({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "positive" | "negative";
-}) {
-  const palette = tone === "positive"
-    ? { color: "var(--success)", background: "color-mix(in srgb, var(--success) 10%, white)" }
-    : { color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 10%, white)" };
-
+function SummaryChip({ label, value, tone }: { label: string; value: number; tone: "positive" | "negative" }) {
+  const color = tone === "positive" ? "var(--success)" : "var(--danger)";
   return (
     <div style={summaryChipStyle}>
       <span style={summaryChipLabelStyle}>{label}</span>
-      <span style={{ ...summaryChipValueStyle, color: palette.color }}>
-        <Money value={value} />
-      </span>
+      <span style={{ ...summaryChipValueStyle, color }}><Money value={value} /></span>
     </div>
   );
 }
 
-function getScopeLabel(category: Category) {
-  const typeHints = category.type.map((value) => value.toLowerCase());
-  if (typeHints.some((value) => value.includes("saving") || value.includes("goal") || value.includes("sinking"))) {
-    return "Savings";
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function kindTone(kind: TimelineItem["kind"]): { dot: string; amount: string } {
+  if (kind === "funded" || kind === "moved_in") {
+    return { dot: "var(--success)", amount: "var(--success)" };
   }
+  if (kind === "moved_out") {
+    return { dot: "var(--danger)", amount: "var(--danger)" };
+  }
+  // expense — neutral, expected spending
+  return { dot: "var(--muted)", amount: "var(--text2)" };
+}
+
+function getScopeLabel(category: Category) {
+  const typeHints = category.type.map((v) => v.toLowerCase());
+  if (typeHints.some((v) => v.includes("saving") || v.includes("goal") || v.includes("sinking"))) return "Savings";
   if (category.isTeamFund) return "Household";
   if (category.owner?.toLowerCase().includes("salma")) return "Wife";
   if (category.owner?.toLowerCase().includes("anas")) return "Husband";
@@ -313,8 +299,7 @@ function getScopeLabel(category: Category) {
 
 function formatMonthLabel(month: string) {
   const [year, monthValue] = month.split("-").map(Number);
-  const date = new Date(year, (monthValue || 1) - 1, 1);
-  return date.toLocaleDateString("en", { month: "long", year: "numeric" });
+  return new Date(year, (monthValue || 1) - 1, 1).toLocaleDateString("en", { month: "long", year: "numeric" });
 }
 
 function formatDay(value: string) {
@@ -329,17 +314,7 @@ function eventKindLabel(kind: TimelineItem["kind"]) {
   return "Expense";
 }
 
-function timelineTone(direction: "in" | "out") {
-  return direction === "in"
-    ? {
-        color: "var(--success)",
-        background: "color-mix(in srgb, var(--success) 10%, white)",
-      }
-    : {
-        color: "var(--danger)",
-        background: "color-mix(in srgb, var(--danger) 10%, white)",
-      };
-}
+// ── Styles ───────────────────────────────────────────────────────────────────
 
 const sheetStyle: CSSProperties = {
   position: "relative",
@@ -347,10 +322,11 @@ const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 97%, white)",
   display: "flex",
   flexDirection: "column",
+  borderRadius: 20,
 };
 
 const sheetInnerStyle: CSSProperties = {
-  padding: "18px 18px 16px",
+  padding: "18px 18px 32px",
   overflowY: "auto",
   display: "grid",
   gap: 18,
@@ -361,18 +337,6 @@ const topBarStyle: CSSProperties = {
   alignItems: "flex-start",
   justifyContent: "space-between",
   gap: 12,
-};
-
-const topActionStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 12px",
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 62%, white)",
-  color: "var(--text2)",
-  cursor: "pointer",
-  fontSize: 12,
-  fontWeight: 700,
 };
 
 const closeButtonStyle: CSSProperties = {
@@ -386,6 +350,7 @@ const closeButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
+  flexShrink: 0,
 };
 
 const iconOrbStyle: CSSProperties = {
@@ -480,12 +445,7 @@ const heroStatGridStyle: CSSProperties = {
   gap: 12,
 };
 
-const statCardStyle: CSSProperties = {
-  display: "grid",
-  gap: 6,
-  padding: "0",
-  borderRadius: 0,
-};
+const statCardStyle: CSSProperties = { display: "grid", gap: 6 };
 
 const statLabelStyle: CSSProperties = {
   fontSize: 11,
@@ -494,10 +454,7 @@ const statLabelStyle: CSSProperties = {
   color: "var(--muted)",
 };
 
-const statValueStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 700,
-};
+const statValueStyle: CSSProperties = { fontSize: 14, fontWeight: 700 };
 
 const summarySectionStyle: CSSProperties = {
   display: "grid",
@@ -506,13 +463,7 @@ const summarySectionStyle: CSSProperties = {
   paddingBottom: 2,
 };
 
-const summaryChipStyle: CSSProperties = {
-  display: "grid",
-  gap: 4,
-  minHeight: 0,
-  padding: "0",
-  borderRadius: 0,
-};
+const summaryChipStyle: CSSProperties = { display: "grid", gap: 4 };
 
 const summaryChipLabelStyle: CSSProperties = {
   fontSize: 11,
@@ -521,61 +472,36 @@ const summaryChipLabelStyle: CSSProperties = {
   color: "var(--muted)",
 };
 
-const summaryChipValueStyle: CSSProperties = {
-  fontSize: 16,
-  fontWeight: 700,
-};
+const summaryChipValueStyle: CSSProperties = { fontSize: 16, fontWeight: 700 };
 
 const primaryActionStyle: CSSProperties = {
-  minHeight: 44,
+  minHeight: 36,
   padding: "0 14px",
   borderRadius: 999,
   border: "1px solid color-mix(in srgb, var(--accent) 38%, transparent)",
   background: "var(--accent)",
   color: "var(--accent-ink)",
   fontWeight: 700,
+  fontSize: 13,
   cursor: "pointer",
+  flexShrink: 0,
 };
 
 const panelMessageStyle: CSSProperties = {
-  padding: "18px 0",
+  padding: "14px 0",
   color: "var(--muted)",
   fontSize: 14,
-};
-
-const timelineListStyle: CSSProperties = {
-  display: "grid",
-  gap: 8,
-};
-
-const timelineRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "36px minmax(0, 1fr)",
-  gap: 12,
-  alignItems: "start",
-  padding: "12px 0",
-  borderBottom: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
-};
-
-const timelineDotStyle: CSSProperties = {
-  width: 32,
-  height: 32,
-  borderRadius: 999,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 13,
-  fontWeight: 800,
 };
 
 const amountTextStyle: CSSProperties = {
   fontFamily: "'DM Mono', monospace",
   fontSize: 12,
   fontWeight: 700,
-  flexShrink: 0,
 };
 
 const metaTextStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 11,
   color: "var(--muted)",
+  fontFamily: "'DM Mono', monospace",
+  letterSpacing: 0.1,
 };

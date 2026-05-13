@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import type { Category, PendingItem } from "./app-types";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import type { BudgetScope, Category, PendingItem } from "./app-types";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { fmtDate, today } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, categoryIdMatchesScope, categoryMatchesScope, fmtDate, today } from "./app-utils";
 import { PickerPopover } from "./PickerPopover";
 
 type AddData = {
@@ -22,6 +22,7 @@ type Props = {
   pendingItems: PendingItem[];
   categories: Category[];
   mode: "wife" | "husband";
+  budgetScope: BudgetScope;
   onLogItem: (item: PendingItem) => void;
   onDismiss: (id: string) => void;
   onAdd: (data: AddData) => Promise<void>;
@@ -135,6 +136,7 @@ export function PendingScreen({
   pendingItems,
   categories,
   mode,
+  budgetScope,
   onLogItem,
   onDismiss,
   onAdd,
@@ -150,6 +152,14 @@ export function PendingScreen({
   const [saving, setSaving] = useState(false);
   const catPickerRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const scopedPendingItems = useMemo(
+    () => pendingItems.filter((item) => categoryIdMatchesScope(item.categoryId, categories, budgetScope)),
+    [budgetScope, categories, pendingItems],
+  );
+  const scopedCategories = useMemo(
+    () => categories.filter((category) => categoryMatchesScope(category, budgetScope)),
+    [budgetScope, categories],
+  );
 
   useEffect(() => {
     if (!showSheet) return;
@@ -163,9 +173,15 @@ export function PendingScreen({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showSheet]);
 
+  useEffect(() => {
+    if (!formCatId) return;
+    if (scopedCategories.some((category) => category.id === formCatId)) return;
+    setFormCatId("");
+  }, [formCatId, scopedCategories]);
+
   const groups = (() => {
     const map = new Map<UrgencyGroup, PendingItem[]>();
-    for (const item of pendingItems) {
+    for (const item of scopedPendingItems) {
       const g = getUrgencyGroup(item.date);
       if (!map.has(g)) map.set(g, []);
       map.get(g)!.push(item);
@@ -182,9 +198,9 @@ export function PendingScreen({
     (groups.find((g) => g.label === "Due today")?.items.length ?? 0);
 
   const partner: "wife" | "husband" = mode === "wife" ? "husband" : "wife";
-  const myCount = pendingItems.filter((i) => (i.claimedBy ?? null) === mode).length;
-  const partnerCount = pendingItems.filter((i) => (i.claimedBy ?? null) === partner).length;
-  const sharedCount = pendingItems.filter((i) => (i.claimedBy ?? null) === null).length;
+  const myCount = scopedPendingItems.filter((i) => (i.claimedBy ?? null) === mode).length;
+  const partnerCount = scopedPendingItems.filter((i) => (i.claimedBy ?? null) === partner).length;
+  const sharedCount = scopedPendingItems.filter((i) => (i.claimedBy ?? null) === null).length;
 
   const openSheet = () => {
     setFormName("");
@@ -220,18 +236,18 @@ export function PendingScreen({
       <section style={pendingIntroStyle} aria-label="Pending summary">
         <div style={pendingIntroTopRowStyle}>
           <p style={pendingIntroCopyStyle}>
-            {pendingItems.length === 0
-              ? "Bills, subscriptions, and planned household spending live here."
+            {scopedPendingItems.length === 0
+              ? `${BUDGET_SCOPE_LABELS[budgetScope]} upcoming items live here.`
               : urgentCount > 0
               ? `${urgentCount} need${urgentCount === 1 ? "s" : ""} attention.`
-              : `${pendingItems.length} upcoming.`}
+              : `${scopedPendingItems.length} upcoming.`}
           </p>
           <button onClick={openSheet} style={addChipStyle} aria-label="Add upcoming expense">
             + Add
           </button>
         </div>
 
-        {pendingItems.length > 0 && (
+        {scopedPendingItems.length > 0 && (
           <div style={pendingOwnershipRowStyle}>
             {[
               { label: "Assigned to you", count: myCount, color: mode === "wife" ? "var(--partner-wife)" : "var(--partner-husband)" },
@@ -480,7 +496,7 @@ export function PendingScreen({
               marginBottom: 24,
             }}
           >
-            Add bills, subscriptions, or planned household purchases - they'll show up here sorted by urgency.
+            Add bills, subscriptions, or planned purchases - they'll show up here sorted by urgency.
           </div>
           <button onClick={openSheet} style={addChipStyle}>
             + Add something
@@ -614,7 +630,7 @@ export function PendingScreen({
                       >
                         No category
                       </button>
-                      {categories
+                      {scopedCategories
                         .filter((c) =>
                           c.name
                             .toLowerCase()
