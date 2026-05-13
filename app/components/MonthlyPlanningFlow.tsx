@@ -19,6 +19,7 @@ import type {
   PlanningIncomeStepState,
   PlanningStep,
 } from "./app-types";
+import { getLeftToAssignByScope, isSavingsAccount } from "./app-utils";
 
 type MonthlyPlanningFlowProps = {
   selectedMonth: string;
@@ -101,11 +102,6 @@ const emptyIncomeMeta: Pick<PlanningIncomeStepState, "confirmedTotal" | "ready" 
 };
 
 const monthFormatter = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
-
-const isSavingsAccount = (account: Account) => {
-  const value = account.type?.toLowerCase() ?? "";
-  return value.includes("saving");
-};
 
 const savingsTypeHints = ["saving", "savings", "sinking", "goal", "fund"];
 
@@ -222,14 +218,7 @@ export function MonthlyPlanningFlow({
     return date.toLocaleDateString("en", { month: "short" });
   }, [selectedMonth]);
 
-  const readyToAssignPool = useMemo(
-    () =>
-      accounts.reduce((sum, account) => {
-        if (isSavingsAccount(account)) return sum;
-        return sum + (account.readyToAssign ?? 0);
-      }, 0),
-    [accounts],
-  );
+  const readyToAssignPool = useMemo(() => getLeftToAssignByScope(accounts).joint, [accounts]);
 
   const assignedHousehold = useMemo(
     () =>

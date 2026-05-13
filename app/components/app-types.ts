@@ -11,6 +11,8 @@ export type Category = {
   isTeamFund: boolean;
 };
 
+export type BudgetScope = "joint" | "anas" | "salma";
+
 export type Transaction = {
   id: string;
   name: string;

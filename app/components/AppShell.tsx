@@ -1,44 +1,17 @@
 import { type ReactNode } from "react";
-import type { AppTab } from "./app-types";
+import type { AppTab, BudgetScope } from "./app-types";
 import { BottomNav } from "./BottomNav";
+import { ScopePicker } from "./ScopePicker";
 import { PlusIcon } from "./ui/icons";
 import { TAB_COPY } from "./tab-copy";
 
-// Stacked couple avatars shown in the app header
-function CoupleBadge() {
-  const people = [
-    { label: "S", color: "#e57373" },
-    { label: "A", color: "#4f8cff" },
-  ];
-  const avatarBase = {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 28,
-    height: 28,
-    borderRadius: "50%",
-    color: "#fff",
-    fontWeight: 700,
-    fontSize: 12,
-    border: "2px solid var(--bg, #fbfdf7)",
-    flexShrink: 0,
-  } as const;
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center" }}>
-      <span style={{ ...avatarBase, background: people[0].color, zIndex: 2 }}>
-        {people[0].label}
-      </span>
-      <span style={{ ...avatarBase, background: people[1].color, zIndex: 1, marginLeft: -8 }}>
-        {people[1].label}
-      </span>
-    </span>
-  );
-}
 export function AppShell({
   tab,
   pendingCount = 0,
   onTabChange,
   onOpenAdd,
+  budgetScope,
+  onBudgetScopeChange,
   toast,
   showAddButton = true,
   immersive = false,
@@ -48,6 +21,8 @@ export function AppShell({
   pendingCount?: number;
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
+  budgetScope: BudgetScope;
+  onBudgetScopeChange: (scope: BudgetScope) => void;
   toast?: string | null;
   showAddButton?: boolean;
   immersive?: boolean;
@@ -98,7 +73,7 @@ export function AppShell({
                 {shellCopy.title}
               </h1>
             </div>
-            <CoupleBadge />
+            <ScopePicker value={budgetScope} onChange={onBudgetScopeChange} />
           </div>
         )}
         {children}

@@ -12,8 +12,17 @@ import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
 import { RebalanceSheet } from "./components/RebalanceSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
-import type { Account, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
-import { fmtDate, monthBounds, shiftDate, today } from "./components/app-utils";
+import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
+import {
+  categoryMatchesScope,
+  categoryIdMatchesScope,
+  fmtDate,
+  getLeftToAssignByScope,
+  monthBounds,
+  shiftDate,
+  today,
+  transactionMatchesScope,
+} from "./components/app-utils";
 
 const LOADING_LINES = [
   "Warming up Notion...",
@@ -32,11 +41,6 @@ const SAVE_LINES = [
 const FALLBACK_ACCOUNTS: Account[] = [];
 
 const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
-
-const isSavingsAccount = (account: Account) => {
-  const value = account.type?.toLowerCase() ?? "";
-  return value.includes("saving");
-};
 
 const isHouseholdCategory = (category: Category) => {
   return category.type.some((value) => {
@@ -90,6 +94,7 @@ export default function App() {
   });
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"home" | "plan" | "pending" | "history">("home");
+  const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
   const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
   const [planCompletedMonth, setPlanCompletedMonth] = useState<string | null>(null);
   const [homeMonth, setHomeMonth] = useState(formatMonthInput(today()));
@@ -134,11 +139,15 @@ export default function App() {
   // Resolve identity from localStorage after hydration — runs only on client
   useEffect(() => {
     const saved = localStorage.getItem("identity");
+    const savedScope = localStorage.getItem("budgetScope");
     if (saved === "wife" || saved === "husband") {
       setMode(saved);
       document.documentElement.dataset.mode = saved;
     } else {
       document.documentElement.dataset.mode = "husband";
+    }
+    if (savedScope === "joint" || savedScope === "anas" || savedScope === "salma") {
+      setBudgetScope(savedScope);
     }
     setMounted(true);
   }, []);
@@ -146,6 +155,11 @@ export default function App() {
   useEffect(() => {
     if (mode) document.documentElement.dataset.mode = mode;
   }, [mode]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem("budgetScope", budgetScope);
+  }, [budgetScope, mounted]);
 
   useEffect(() => {
     return () => {
@@ -325,6 +339,14 @@ export default function App() {
   }, [categoryId, categories, accounts]);
 
   useEffect(() => {
+    if (!categories.length) return;
+    const current = categories.find((category) => category.id === categoryId);
+    if (current && categoryMatchesScope(current, budgetScope)) return;
+    const nextCategory = categories.find((category) => categoryMatchesScope(category, budgetScope));
+    if (nextCategory) setCategoryId(nextCategory.id);
+  }, [budgetScope, categories, categoryId]);
+
+  useEffect(() => {
     const raw = localStorage.getItem("expenseCorpus");
     if (raw) {
       try {
@@ -452,40 +474,7 @@ export default function App() {
   const plannerUsesFallbackData =
     !plannerSummaryReady || plannerMonth !== formatMonthInput(today());
 
-  const readyToAssignPool = useMemo(
-    () =>
-      accounts.reduce((sum, account) => {
-        if (isSavingsAccount(account)) return sum;
-        return sum + (account.readyToAssign ?? 0);
-      }, 0),
-    [accounts],
-  );
-
-  const readyToAssignByScope = useMemo(() => {
-    const norm = (value: string) => value.toLowerCase();
-    const applyJointDue = (account: Account) => {
-      const base = account.readyToAssign ?? 0;
-      const jointDue = account.jointDue ?? 0;
-      if (jointDue <= 0) return base;
-      return base - jointDue;
-    };
-    const wifeTotal = accounts.reduce((sum, account) => {
-      if (isSavingsAccount(account)) return sum;
-      if (!norm(account.label).includes("wife")) return sum;
-      return sum + applyJointDue(account);
-    }, 0);
-    const husbandTotal = accounts.reduce((sum, account) => {
-      if (isSavingsAccount(account)) return sum;
-      if (!norm(account.label).includes("hubb")) return sum;
-      return sum + applyJointDue(account);
-    }, 0);
-
-    return {
-      household: readyToAssignPool,
-      wife: Math.max(0, wifeTotal),
-      husband: Math.max(0, husbandTotal),
-    };
-  }, [accounts, readyToAssignPool]);
+  const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(accounts), [accounts]);
   // DEBUG PRINTS for spent on team categories
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -525,6 +514,7 @@ export default function App() {
   };
 
   const filteredCats = categories
+    .filter((c) => categoryMatchesScope(c, budgetScope))
     .filter((c) => c.name.toLowerCase().includes(catSearch.toLowerCase()))
     .sort((a, b) => {
       if (a.id === lastUsedCatId) return -1;
@@ -544,6 +534,34 @@ export default function App() {
       if (b.id === lastUsedCatId) return 1;
       return a.name.localeCompare(b.name);
     });
+
+  const scopedMonthlySummary = useMemo(() => {
+    const categoryIds = new Set(
+      categories
+        .filter((category) => categoryMatchesScope(category, budgetScope))
+        .map((category) => category.id),
+    );
+    const assignedByCategory = monthlySummary.assignedByCategory.filter((entry) => categoryIds.has(entry.categoryId));
+    const spentByCategory = monthlySummary.spentByCategory.filter((entry) => categoryIds.has(entry.categoryId));
+
+    return {
+      ...monthlySummary,
+      totalAssigned: assignedByCategory.reduce((sum, entry) => sum + entry.total, 0),
+      totalSpent: spentByCategory.reduce((sum, entry) => sum + entry.total, 0),
+      assignedByCategory,
+      spentByCategory,
+    };
+  }, [budgetScope, categories, monthlySummary]);
+
+  const scopedTransactions = useMemo(
+    () => transactions.filter((transaction) => transactionMatchesScope(transaction, categories, budgetScope)),
+    [budgetScope, categories, transactions],
+  );
+
+  const scopedPendingItems = useMemo(
+    () => pendingItems.filter((item) => categoryIdMatchesScope(item.categoryId, categories, budgetScope)),
+    [budgetScope, categories, pendingItems],
+  );
 
   const selectedDateLabel =
     date === today() ? "Today" :
@@ -651,9 +669,11 @@ export default function App() {
   return (
     <AppShell
       tab={tab}
-      pendingCount={pendingItems.length}
+      pendingCount={scopedPendingItems.length}
       onTabChange={setTab}
       onOpenAdd={() => setShowAddModal(true)}
+      budgetScope={budgetScope}
+      onBudgetScopeChange={setBudgetScope}
       toast={microToast}
       showAddButton={tab !== "plan"}
       immersive={tab === "plan"}
@@ -669,8 +689,9 @@ export default function App() {
           onOpenAdd={() => setShowAddModal(true)}
           onOpenPlan={() => setTab("plan")}
           onOpenRebalance={() => setShowRebalance(true)}
-          monthlySummary={monthlySummary}
-          readyToAssignByScope={readyToAssignByScope && typeof readyToAssignByScope === 'object' ? readyToAssignByScope : { household: 0, wife: 0, husband: 0 }}
+          monthlySummary={scopedMonthlySummary}
+          readyToAssignByScope={readyToAssignByScope}
+          budgetScope={budgetScope}
           homeMonth={homeMonth}
           onHomeMonthChange={setHomeMonth}
           planDone={planCompletedMonth === homeMonth}
@@ -702,6 +723,7 @@ export default function App() {
           pendingItems={pendingItems}
           categories={categories}
           mode={mode}
+          budgetScope={budgetScope}
           onLogItem={loadPending}
           onDismiss={dismissPending}
           onAdd={addPendingItem}
@@ -711,8 +733,9 @@ export default function App() {
 
       {tab === "history" && (
         <HistoryScreen
-          transactions={transactions}
+          transactions={scopedTransactions}
           categories={categories}
+          budgetScope={budgetScope}
           onClickTransaction={(t) => {
             setName(t.name);
             if (t.category) {

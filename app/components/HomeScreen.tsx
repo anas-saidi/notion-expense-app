@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
-import type { Category, MonthlySummary } from "./app-types";
+import { useMemo } from "react";
+import type { BudgetScope, Category, MonthlySummary } from "./app-types";
 import { HomeOverview } from "./HomeOverview";
-import type { Scope } from "./HouseholdStatCard";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { ChipTabs } from "./ui/ChipTabs";
 import { SearchIcon, SlidersIcon } from "./ui/icons";
+import { BUDGET_SCOPE_LABELS, categoryMatchesScope } from "./app-utils";
 
 type HomeScreenProps = {
   categories: Category[];
@@ -18,7 +17,8 @@ type HomeScreenProps = {
   onOpenPlan: () => void;
   onOpenRebalance: () => void;
   monthlySummary: MonthlySummary;
-  readyToAssignByScope: Record<Scope, number>;
+  readyToAssignByScope: Record<BudgetScope, number>;
+  budgetScope: BudgetScope;
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
   planDone?: boolean;
@@ -36,11 +36,11 @@ export function HomeScreen({
   onOpenRebalance,
   monthlySummary,
   readyToAssignByScope,
+  budgetScope,
   homeMonth,
   onHomeMonthChange,
   planDone,
 }: HomeScreenProps) {
-  const [scope, setScope] = useState<Scope>("household");
   // Inline editing disabled. All edits must go through the category modal.
   const spentByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -60,10 +60,8 @@ export function HomeScreen({
   }, [monthlySummary.assignedByCategory]);
 
   const visibleCategories = useMemo(() => {
-    if (scope === "household") return categories.filter(isHouseholdCategory);
-    if (scope === "wife") return categories.filter(isWifeCategory);
-    return categories.filter(isHusbandCategory);
-  }, [categories, scope]);
+    return categories.filter((category) => categoryMatchesScope(category, budgetScope));
+  }, [budgetScope, categories]);
 
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
@@ -72,6 +70,7 @@ export function HomeScreen({
           onOpenPlan={onOpenPlan}
           monthlySummary={monthlySummary}
           readyToAssignByScope={readyToAssignByScope}
+          budgetScope={budgetScope}
           homeMonth={homeMonth}
           onHomeMonthChange={onHomeMonthChange}
           planDone={planDone}
@@ -89,23 +88,12 @@ export function HomeScreen({
           <div style={listHeaderStyle}>
             <div>
               <h2 style={listTitleStyle}>Categories</h2>
-              <p style={listSubtitleStyle}>{visibleCategories.length} in {scopeLabel(scope)}</p>
+              <p style={listSubtitleStyle}>{visibleCategories.length} in {BUDGET_SCOPE_LABELS[budgetScope]}</p>
             </div>
             <button type="button" onClick={onOpenRebalance} style={rebalanceButtonStyle} aria-label="Rebalance budget">
               <SlidersIcon size={15} className="rebalance-btn-icon" />
             </button>
           </div>
-
-          <ChipTabs
-            items={[
-              { key: "household", label: "Joint" },
-              { key: "wife", label: "Salma" },
-              { key: "husband", label: "Anas" },
-            ]}
-            activeKey={scope}
-            ariaLabel="Category scope"
-            onChange={(nextScope) => setScope(nextScope as Scope)}
-          />
 
           <label style={searchWrapStyle}>
             <SearchIcon size={15} style={{ color: "var(--muted)", flexShrink: 0 }} />
@@ -231,42 +219,12 @@ export function HomeScreen({
   );
 }
 
-function isWifeCategory(category: Category) {
-  return !category.isTeamFund && (category.owner?.toLowerCase().includes("salma") ?? false);
-}
-
-function isHusbandCategory(category: Category) {
-  return !category.isTeamFund && (category.owner?.toLowerCase().includes("anas") ?? false);
-}
-
-function isHouseholdCategory(category: Category) {
-  if (category.isTeamFund) return true;
-  return category.type.some((value) => {
-    const normalized = value.toLowerCase();
-    return normalized.includes("team") || normalized.includes("household");
-  });
-}
-
 const categoryRowWrapStyle = {
   minWidth: 0,
 };
 
 const stickyHeaderWrapStyle = {
-  position: "sticky" as const,
-  top: 0,
-  zIndex: 10,
-  // Full-bleed background: pull out of the 20px content padding so no gap shows at sides
-  marginLeft: -20,
-  marginRight: -20,
-  paddingLeft: 20,
-  paddingRight: 20,
-  // Extend background upward to cover the safe-area + top padding zone
-  marginTop: "calc(-1 * (var(--safe-top) + 20px))",
-  paddingTop: "calc(var(--safe-top) + 20px)",
-  paddingBottom: 16,
-  background: "var(--bg)",
-  // Subtle separator when content scrolls underneath
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--border) 60%, transparent)",
+  paddingBottom: 20,
 };
 
 const listHeaderStyle = {
@@ -448,9 +406,3 @@ const emptyStateIconStyle = {
   justifyContent: "center",
   color: "var(--muted)",
 };
-
-function scopeLabel(scope: Scope) {
-  if (scope === "wife") return "Salma";
-  if (scope === "husband") return "Anas";
-  return "Joint";
-}
