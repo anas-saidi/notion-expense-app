@@ -1,4 +1,4 @@
-import { ArrowDown, Check, ListChecks } from "lucide-react";
+import { ArrowDown, ListChecks } from "lucide-react";
 import type { ReactNode } from "react";
 import { Money } from "./Money";
 import type { BudgetScope, MonthlySummary } from "./app-types";
@@ -95,12 +95,6 @@ export function HomeOverview({
       </div>
 
       <div className="home-hero__stats" style={summaryGridStyle}>
-        <MetricCard
-          label={isCurrentMonth ? "Left" : "Available"}
-          value={available}
-          tone={available < 0 ? "danger" : "featured"}
-          icon={<Check size={17} />}
-        />
         <MetricCard label="Assigned" value={totalAssigned} tone="info" icon={<ListChecks size={17} />} />
         <MetricCard label="Spent" value={totalSpent} tone="soft" icon={<ArrowDown size={17} />} />
       </div>
@@ -116,49 +110,31 @@ function MetricCard({
 }: {
   label: string;
   value: number;
-  tone: "default" | "danger" | "featured" | "info" | "soft";
+  tone: "info" | "soft";
   icon: ReactNode;
 }) {
-  const isFeatured = tone === "featured";
-  const isDanger = tone === "danger";
   const isInfo = tone === "info";
-  const isSoft = tone === "soft";
 
   return (
     <div
       className="home-hero__stat"
       style={{
         ...metricCardStyle,
-        ...(isFeatured ? featuredMetricCardStyle : null),
-        background:
-          isDanger
-            ? "color-mix(in srgb, var(--danger) 9%, var(--surface))"
-            : isFeatured
-            ? "linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, white), color-mix(in srgb, var(--accent) 32%, var(--surface)))"
-            : isInfo
-            ? "color-mix(in srgb, var(--info-dim) 44%, var(--surface))"
-            : isSoft
-            ? "color-mix(in srgb, #efe7ff 56%, var(--surface))"
-            : "color-mix(in srgb, var(--surface2) 68%, white)",
+        background: isInfo
+          ? "color-mix(in srgb, var(--info-dim) 44%, var(--surface))"
+          : "color-mix(in srgb, #efe7ff 56%, var(--surface))",
         borderColor:
-          isDanger
-            ? "color-mix(in srgb, var(--danger) 26%, var(--border))"
-            : isFeatured
-            ? "color-mix(in srgb, var(--accent) 42%, var(--border))"
-            : isInfo
+          isInfo
             ? "color-mix(in srgb, var(--info) 18%, var(--border))"
             : "color-mix(in srgb, var(--border) 58%, transparent)",
       }}
     >
       <div style={metricIconStyle(tone)}>{icon}</div>
-      <span style={{ ...metricLabelStyle, color: isFeatured ? "color-mix(in srgb, var(--accent-ink) 76%, transparent)" : "var(--text2)" }}>
-        {label}
-      </span>
+      <span style={metricLabelStyle}>{label}</span>
       <strong
         style={{
           ...metricValueStyle,
-          ...(isFeatured ? featuredMetricValueStyle : null),
-          color: isDanger ? "var(--danger)" : isFeatured ? "var(--accent-ink)" : "var(--text)",
+          color: "var(--text)",
         }}
       >
         <Money value={Math.abs(value)} />
@@ -375,11 +351,6 @@ const metricCardStyle = {
   border: "1px solid transparent",
 };
 
-const featuredMetricCardStyle = {
-  boxShadow:
-    "inset 0 1px 0 color-mix(in srgb, white 54%, transparent), 0 10px 20px color-mix(in srgb, var(--accent) 20%, transparent)",
-};
-
 const metricLabelStyle = {
   fontSize: 10,
   letterSpacing: 0.32,
@@ -387,6 +358,7 @@ const metricLabelStyle = {
   fontWeight: 720,
   gridColumn: "2 / 3",
   alignSelf: "end",
+  color: "var(--text2)",
 };
 
 const metricValueStyle = {
@@ -399,13 +371,7 @@ const metricValueStyle = {
   fontFeatureSettings: "\"tnum\"",
 };
 
-const featuredMetricValueStyle = {
-  fontSize: 24,
-  lineHeight: 1.12,
-  fontWeight: 840,
-};
-
-const metricIconStyle = (tone: "default" | "danger" | "featured" | "info" | "soft") => ({
+const metricIconStyle = (tone: "info" | "soft") => ({
   gridColumn: "1 / 2",
   gridRow: "1 / 3",
   width: 44,
@@ -415,19 +381,11 @@ const metricIconStyle = (tone: "default" | "danger" | "featured" | "info" | "sof
   alignItems: "center",
   justifyContent: "center",
   color:
-    tone === "danger"
-      ? "var(--danger)"
-      : tone === "featured"
-      ? "var(--accent-ink)"
-      : tone === "info"
+    tone === "info"
       ? "color-mix(in srgb, var(--info) 54%, var(--text))"
       : "color-mix(in srgb, #8d69d6 68%, var(--text))",
   background:
-    tone === "danger"
-      ? "color-mix(in srgb, var(--danger) 10%, white)"
-      : tone === "featured"
-      ? "color-mix(in srgb, white 38%, var(--accent))"
-      : tone === "info"
+    tone === "info"
       ? "color-mix(in srgb, var(--info) 12%, white)"
       : "color-mix(in srgb, #dcccff 42%, white)",
 });

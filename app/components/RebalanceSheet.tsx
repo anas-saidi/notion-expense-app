@@ -1,13 +1,14 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ChevronDown } from "lucide-react";
 import type { Category, MonthlySummary } from "./app-types";
 import { today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, XIcon } from "./ui/icons";
-import { ChipTabs } from "./ui/ChipTabs";
 
 type RebalanceSheetProps = {
   open: boolean;
@@ -52,15 +53,13 @@ function isJointCategory(cat: Category): boolean {
 }
 
 function getCategoryGroup(cat: Category): Exclude<GroupFilter, "all"> {
-  // Joint takes priority — team funds can't be personal or savings
   if (isJointCategory(cat)) return "joint";
-  // Savings: type hints, but only for non-joint categories
   if (cat.type.some((t) => SAVINGS_HINTS.some((h) => t.toLowerCase().includes(h)))) {
     return "savings";
   }
   if (cat.owner?.toLowerCase().includes("salma")) return "wife";
   if (cat.owner?.toLowerCase().includes("anas")) return "husband";
-  return "joint"; // unowned, non-savings → joint
+  return "joint";
 }
 
 /** Greedy pairing of sources (reduced) → destinations (increased). */
@@ -131,11 +130,114 @@ function BalancedBurst() {
   );
 }
 
+// ── Group filter picker (portal dropdown, mirrors GroupPicker from MonthlyPlanningFlow) ──
+function GroupFilterPicker({
+  groupTabs,
+  groupFilter,
+  onSelect,
+}: {
+  groupTabs: Array<{ key: string; label: string; count: number }>;
+  groupFilter: GroupFilter;
+  onSelect: (key: GroupFilter) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const active = groupTabs.find((t) => t.key === groupFilter) ?? groupTabs[0];
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const handleToggle = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    }
+    setOpen((o) => !o);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (triggerRef.current?.contains(e.target as Node)) return;
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const menu = (
+    <div
+      ref={menuRef}
+      role="listbox"
+      aria-label="Filter by group"
+      className="view-picker__menu"
+      style={{ ...gfMenuStyle, position: "fixed", top: menuPos.top, right: menuPos.right, left: "auto" }}
+    >
+      {groupTabs.map((tab) => {
+        const isActive = tab.key === groupFilter;
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            role="option"
+            aria-selected={isActive}
+            className={`view-picker__option${isActive ? " view-picker__option--active" : ""}`}
+            onClick={() => { onSelect(tab.key as GroupFilter); setOpen(false); }}
+            style={{ ...gfOptionStyle, ...(isActive ? gfOptionActiveStyle : null) }}
+          >
+            <span style={{ ...gfDotStyle, background: gfDotColor(tab.key) }} />
+            <span style={gfOptionTextStyle}>{tab.label}</span>
+            <span style={gfCountStyle}>{tab.count}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="view-picker" style={gfWrapStyle}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="view-picker__trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Filter by group"
+        onClick={handleToggle}
+        style={gfTriggerStyle}
+      >
+        <span style={gfLabelStyle}>{active?.label ?? "All"}</span>
+        <ChevronDown
+          size={12}
+          aria-hidden="true"
+          style={{ ...gfChevronStyle, transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+      {mounted && open && createPortal(menu, document.body)}
+    </div>
+  );
+}
+
+const gfDotColor = (key: string): string => {
+  if (key === "wife") return "var(--partner-wife-strong)";
+  if (key === "husband") return "var(--partner-husband-strong)";
+  if (key === "savings") return "var(--warning)";
+  return "var(--text2)";
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
 export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth, monthlySummary }: RebalanceSheetProps) {
   const monthCtx = useMemo(() => getMonthContext(homeMonth), [homeMonth]);
   const isReadOnly = monthCtx !== "current";
 
-  // Per-category lookup maps from the monthly summary
   const plannedByCategory = useMemo(() => {
     const m = new Map<string, number>();
     for (const e of monthlySummary.assignedByCategory ?? []) m.set(e.categoryId, e.total);
@@ -148,7 +250,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     return m;
   }, [monthlySummary]);
 
-  // Available amount depends on month context
   const getAvailable = (c: Category): number => {
     if (monthCtx === "current") return Math.round(c.available ?? 0);
     if (monthCtx === "past") {
@@ -156,11 +257,9 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       const spent = spentByCategory.get(c.id) ?? 0;
       return Math.max(0, Math.round(planned - spent));
     }
-    // future — show planned amounts
     return Math.max(0, Math.round(plannedByCategory.get(c.id) ?? c.planned ?? 0));
   };
 
-  // Only categories with a non-zero amount for this month context
   const funded = useMemo(
     () =>
       categories
@@ -176,19 +275,12 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     [categories],
   );
 
-  // Fixed pool: sum of all currently-available funds. Sliders redistribute within this total.
-  const totalPool = useMemo(
-    () => funded.reduce((sum, f) => sum + f.original, 0),
-    [funded],
-  );
-
   const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [inputRaw, setInputRaw] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
 
-  // Reset every time the sheet opens
   useEffect(() => {
     if (!open) return;
     const initial = Object.fromEntries(funded.map((f) => [f.id, f.original]));
@@ -199,16 +291,11 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     setGroupFilter("all");
   }, [open, funded]);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
   const hasChanges = funded.some((f) => (allocations[f.id] ?? f.original) !== f.original);
 
-  // ── Group filter ──────────────────────────────────────────────────────────
   const groupCounts = useMemo(() => {
     const counts: Record<Exclude<GroupFilter, "all">, number> = {
-      joint: 0,
-      wife: 0,
-      husband: 0,
-      savings: 0,
+      joint: 0, wife: 0, husband: 0, savings: 0,
     };
     for (const f of funded) {
       const cat = catById.get(f.id);
@@ -220,18 +307,10 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
   const groupTabs = useMemo(
     () => [
       { key: "all", label: "All", count: funded.length },
-      ...(groupCounts.joint > 0
-        ? [{ key: "joint", label: "Joint", count: groupCounts.joint }]
-        : []),
-      ...(groupCounts.wife > 0
-        ? [{ key: "wife", label: "Salma", count: groupCounts.wife }]
-        : []),
-      ...(groupCounts.husband > 0
-        ? [{ key: "husband", label: "Anas", count: groupCounts.husband }]
-        : []),
-      ...(groupCounts.savings > 0
-        ? [{ key: "savings", label: "Savings", count: groupCounts.savings }]
-        : []),
+      ...(groupCounts.joint > 0 ? [{ key: "joint", label: "Joint", count: groupCounts.joint }] : []),
+      ...(groupCounts.wife > 0 ? [{ key: "wife", label: "Salma", count: groupCounts.wife }] : []),
+      ...(groupCounts.husband > 0 ? [{ key: "husband", label: "Anas", count: groupCounts.husband }] : []),
+      ...(groupCounts.savings > 0 ? [{ key: "savings", label: "Savings", count: groupCounts.savings }] : []),
     ],
     [funded.length, groupCounts],
   );
@@ -244,7 +323,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     });
   }, [funded, catById, groupFilter]);
 
-  // Stats scoped to the visible group
   const groupIds = useMemo(() => new Set(visibleFunded.map((f) => f.id)), [visibleFunded]);
 
   const groupPool = useMemo(
@@ -270,7 +348,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
 
   const canSave = hasChanges && isGroupBalanced && status === "idle";
 
-  // ── Balanced burst ────────────────────────────────────────────────────────
   const wasBalancedRef = useRef(false);
   const [burstKey, setBurstKey] = useState(0);
   useEffect(() => {
@@ -279,7 +356,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     wasBalancedRef.current = nowBalanced;
   }, [isGroupBalanced, hasChanges]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
   const commit = (id: string, raw: number) => {
     const clamped = Math.max(0, Math.min(Math.round(raw), groupPool));
     setAllocations((p) => ({ ...p, [id]: clamped }));
@@ -339,14 +415,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     }
   };
 
-  // ── Pool hint copy ────────────────────────────────────────────────────────
-  const poolHint = (() => {
-    if (isGroupOver) return `Over by ${Math.round(Math.abs(groupFree))} MAD — reduce allocations`;
-    if (isGroupBalanced && hasChanges) return "All funds accounted for — ready to apply";
-    if (isGroupBalanced) return "Drag sliders to move funds between categories";
-    return `${Math.round(groupFree)} MAD not yet assigned`;
-  })();
-
   const saveLabel = (() => {
     if (status === "saving" || status === "success") return null;
     if (!hasChanges) return "No changes";
@@ -355,32 +423,83 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     return "Apply changes";
   })();
 
+  const poolContextLabel =
+    monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Available pool";
+
   return (
     <BottomSheet
       open={open}
       onClose={onClose}
+      showHandle
       label="Rebalance categories"
+      detent="content"
+      maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))"
       maxWidth="520px"
-      detent="default"
-      snapPoints={[0, 0.88, 1]}
-      initialSnap={1}
       panelStyle={panelStyle}
-      contentStyle={{ paddingTop: 0 }}
+      contentStyle={contentStyle}
+      zIndex={80}
     >
-      <div style={sheetInnerStyle}>
+      {/* ── Header ── */}
+      <header style={headerStyle}>
+        <h2 style={titleStyle}>Rebalance</h2>
+        <button onClick={onClose} aria-label="Close" style={closeButtonStyle}>
+          <XIcon size={14} />
+        </button>
+        <span style={monthLabelStyle}>{formatMonth(homeMonth)}</span>
+        {groupTabs.length > 2 && (
+          <GroupFilterPicker
+            groupTabs={groupTabs}
+            groupFilter={groupFilter}
+            onSelect={(key) => setGroupFilter(key as GroupFilter)}
+          />
+        )}
+      </header>
 
-        {/* ── Header ── */}
-        <header style={topBarStyle}>
-          <div>
-            <div style={eyebrowStyle}>{formatMonth(homeMonth)}</div>
-            <h2 style={titleStyle}>Rebalance</h2>
+      {/* ── Scrollable content ── */}
+      <div style={scrollStyle}>
+
+        {/* Pool balance */}
+        <section aria-label="Pool balance" style={balanceSectionStyle}>
+          <div style={poolRowStyle}>
+            <span style={poolLabelStyle}>{poolContextLabel}</span>
+            <span style={poolValueStyle}><Money value={groupPool} /></span>
           </div>
-          <button onClick={onClose} aria-label="Close" style={closeButtonStyle}>
-            <XIcon strokeWidth={2.2} />
-          </button>
-        </header>
+          <div style={poolStatusStyle(isGroupOver, isGroupBalanced && hasChanges)}>
+            <span>
+              {isGroupOver
+                ? "Over assigned"
+                : isGroupBalanced && hasChanges
+                ? "Balanced · ready to apply"
+                : isGroupBalanced
+                ? "Drag sliders to rebalance"
+                : "Left to assign"}
+            </span>
+            {!isGroupBalanced && (
+              <>
+                <span>·</span>
+                <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+                  <Money value={Math.abs(Math.round(groupFree))} />
+                </strong>
+              </>
+            )}
+          </div>
+          <div style={{ ...poolBarTrackStyle, position: "relative", overflow: "visible" }}>
+            <div
+              style={{
+                ...poolBarFillStyle,
+                width: `${poolPct * 100}%`,
+                background: isGroupOver
+                  ? "var(--danger)"
+                  : isGroupBalanced && hasChanges
+                  ? "var(--success)"
+                  : "var(--accent)",
+              }}
+            />
+            {burstKey > 0 && <BalancedBurst key={burstKey} />}
+          </div>
+        </section>
 
-        {/* ── Month context banner (past / future only) ── */}
+        {/* Month context banner (past / future only) */}
         {isReadOnly && (
           <div style={{
             ...contextBannerStyle,
@@ -400,88 +519,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
           </div>
         )}
 
-        {/* ── Pool card ── */}
-        <div style={{ ...statsCardStyle, position: "relative" }}>
-          <div style={statsRowStyle}>
-            <div style={statBlockStyle}>
-              <div style={eyebrowStyle}>
-                {monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Available pool"}
-              </div>
-              <div style={statValueStyle}><Money value={groupPool} /></div>
-            </div>
-            {(hasChanges || isGroupOver) && (
-              <>
-                <div style={statDividerStyle} />
-                <div style={statBlockStyle}>
-                  <div style={eyebrowStyle}>
-                    {isGroupOver ? "Over by" : isGroupBalanced ? "Balanced" : "Unassigned"}
-                  </div>
-                  <div
-                    style={{
-                      ...statValueStyle,
-                      color: isGroupOver
-                        ? "var(--danger)"
-                        : isGroupBalanced
-                        ? "var(--success)"
-                        : "var(--text)",
-                      fontSize: isGroupBalanced ? 15 : 22,
-                      fontFamily: isGroupBalanced ? "var(--font-body, inherit)" : "var(--font-display)",
-                    }}
-                  >
-                    {isGroupBalanced
-                      ? "All good"
-                      : (
-                        <>
-                          {isGroupOver ? "−" : "+"}<Money value={Math.abs(Math.round(groupFree))} />
-                        </>
-                      )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Pool allocation bar */}
-          <div style={{ ...poolBarTrackStyle, position: "relative", overflow: "visible" }}>
-            <div
-              style={{
-                ...poolBarFillStyle,
-                width: `${poolPct * 100}%`,
-                background: isGroupOver
-                  ? "var(--danger)"
-                  : isGroupBalanced && hasChanges
-                  ? "var(--success)"
-                  : "var(--accent)",
-              }}
-            />
-            {burstKey > 0 && <BalancedBurst key={burstKey} />}
-          </div>
-
-          <p
-            style={{
-              ...poolHintStyle,
-              color: isGroupOver
-                ? "color-mix(in srgb, var(--danger) 70%, var(--muted))"
-                : isGroupBalanced && hasChanges
-                ? "color-mix(in srgb, var(--success) 70%, var(--muted))"
-                : "var(--muted)",
-            }}
-          >
-            {poolHint}
-          </p>
-        </div>
-
-        {/* ── Group filter chips ── */}
-        {groupTabs.length > 2 && (
-          <ChipTabs
-            items={groupTabs}
-            activeKey={groupFilter}
-            ariaLabel="Filter categories by group"
-            onChange={(key) => setGroupFilter(key as GroupFilter)}
-          />
-        )}
-
-        {/* ── Sliders ── */}
+        {/* Category sliders */}
         <section key={groupFilter}>
           {visibleFunded.length === 0 && (
             <p style={emptyStateStyle}>No funded categories in this group.</p>
@@ -501,38 +539,32 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
                 key={f.id}
                 style={{
                   padding: "14px 0",
-                  borderTop:
-                    i > 0
-                      ? "1px solid color-mix(in srgb, var(--border) 28%, transparent)"
-                      : "none",
+                  borderTop: i > 0
+                    ? "1px solid color-mix(in srgb, var(--border) 28%, transparent)"
+                    : "none",
                   animation: "fadeUp 0.22s ease both",
                   animationDelay: `${i * 30}ms`,
                 }}
               >
-                {/* Row: icon · name · delta badge · amount input */}
                 <div style={catHeaderRowStyle}>
                   <div style={catIconStyle}>
                     <CategoryIcon icon={cat.icon} size={16} />
                   </div>
-
                   <span style={catNameStyle}>{cat.name}</span>
-
                   {changed && (
                     <span
                       style={{
                         ...deltaBadgeStyle,
                         color: delta > 0 ? "var(--success)" : "var(--danger)",
-                        background:
-                          delta > 0
-                            ? "color-mix(in srgb, var(--success) 10%, transparent)"
-                            : "color-mix(in srgb, var(--danger) 10%, transparent)",
+                        background: delta > 0
+                          ? "color-mix(in srgb, var(--success) 10%, transparent)"
+                          : "color-mix(in srgb, var(--danger) 10%, transparent)",
                         animation: "badgePop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both",
                       }}
                     >
                       {delta > 0 ? "+" : "−"}{Math.abs(Math.round(delta))}
                     </span>
                   )}
-
                   <div style={amountFieldStyle}>
                     {isReadOnly ? (
                       <span style={{ ...amountInputStyle, borderBottom: "none", opacity: 0.7 }}>
@@ -545,9 +577,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
                         value={inputRaw[f.id] ?? String(alloc)}
                         onChange={(e) => handleInputChange(f.id, e.target.value)}
                         onBlur={() => handleInputBlur(f.id)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" && (e.target as HTMLInputElement).blur()
-                        }
+                        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                         aria-label={`${cat.name} allocation`}
                         style={amountInputStyle}
                       />
@@ -556,7 +586,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
                   </div>
                 </div>
 
-                {/* Slider row: percent · track */}
                 <div style={sliderRowStyle}>
                   <span style={pctStyle}>
                     {alloc === 0 ? "0%" : pct < 0.005 ? "<1%" : `${Math.round(pct * 100)}%`}
@@ -582,37 +611,29 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
             );
           })}
         </section>
+      </div>
 
-        {/* ── Error ── */}
-        {status === "error" && (
-          <div style={errorBoxStyle}>{errorMsg}</div>
-        )}
-
-        {/* ── Footer: apply button (current) or read-only notice (past/future) ── */}
+      {/* ── Sticky footer ── */}
+      <div style={footerStyle}>
+        {status === "error" && <div style={errorBoxStyle}>{errorMsg}</div>}
         {isReadOnly ? (
-          <button onClick={onClose} style={readOnlyCloseStyle}>
-            Done
-          </button>
+          <button onClick={onClose} style={readOnlyCloseStyle}>Done</button>
         ) : (
           <button
             onClick={save}
             disabled={!canSave}
             style={{
               ...saveButtonStyle,
-              background:
-                status === "success"
-                  ? "color-mix(in srgb, var(--success) 12%, white)"
-                  : "var(--accent)",
+              background: status === "success"
+                ? "color-mix(in srgb, var(--success) 12%, white)"
+                : "var(--accent)",
               color: status === "success" ? "var(--success)" : "var(--accent-ink)",
               opacity: canSave || status !== "idle" ? 1 : 0.4,
               cursor: canSave ? "pointer" : "not-allowed",
             }}
           >
             {status === "saving" ? (
-              <>
-                <span style={spinnerStyle} />
-                Applying...
-              </>
+              <><span style={spinnerStyle} />Applying...</>
             ) : status === "success" ? (
               <><CheckIcon size={16} />Applied</>
             ) : (
@@ -625,101 +646,200 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────
+// ── GroupFilterPicker styles ────────────────────────────────────────────────
 
-const panelStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 97%, white)",
-  overflow: "hidden",
-  display: "flex",
-  flexDirection: "column",
-  borderRadius: 20,
+const gfWrapStyle: CSSProperties = {
+  position: "relative",
+  display: "inline-flex",
+  alignItems: "center",
+  flexShrink: 0,
+  overflow: "visible",
+  justifySelf: "end",
 };
 
-const sheetInnerStyle: CSSProperties = {
-  padding: "18px 18px 32px",
-  display: "grid",
-  gap: 20,
-};
-
-const topBarStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  justifyContent: "space-between",
-  gap: 12,
-};
-
-const eyebrowStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 10,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-};
-
-const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: 28,
-  lineHeight: 0.95,
-  fontWeight: 800,
-  color: "var(--text)",
-  margin: "4px 0 0",
-};
-
-const closeButtonStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
-  color: "var(--text)",
+const gfTriggerStyle: CSSProperties = {
+  minHeight: 28,
+  padding: 0,
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
+  fontSize: 13,
+  fontWeight: 600,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  justifyContent: "center",
+  gap: 4,
+};
+
+const gfLabelStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+};
+
+const gfChevronStyle: CSSProperties = {
+  pointerEvents: "none",
+  color: "var(--muted)",
+  transition: "transform 0.16s ease",
+};
+
+const gfMenuStyle: CSSProperties = {
+  width: 192,
+  padding: 6,
+  borderRadius: 16,
+  border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)",
+  background: "var(--surface)",
+  boxShadow:
+    "0 18px 36px color-mix(in srgb, var(--ink-strong) 14%, transparent), inset 0 1px 0 color-mix(in srgb, white 55%, transparent)",
+  zIndex: 90,
+  display: "grid",
+  gap: 3,
+};
+
+const gfOptionStyle: CSSProperties = {
+  minHeight: 44,
+  width: "100%",
+  border: "none",
+  borderRadius: 12,
+  background: "transparent",
+  color: "var(--text)",
+  cursor: "pointer",
+  display: "grid",
+  gridTemplateColumns: "8px 1fr auto",
+  alignItems: "center",
+  gap: 9,
+  padding: "0 10px",
+  textAlign: "left",
+};
+
+const gfOptionActiveStyle: CSSProperties = {
+  background: "color-mix(in srgb, var(--surface2) 70%, white)",
+};
+
+const gfDotStyle: CSSProperties = {
+  width: 7,
+  height: 7,
+  borderRadius: 999,
+};
+
+const gfOptionTextStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const gfCountStyle: CSSProperties = {
+  fontFamily: "'DM Mono', monospace",
+  fontSize: 10,
+  color: "var(--muted)",
+};
+
+// ── Sheet layout ───────────────────────────────────────────────────────────
+
+const panelStyle: CSSProperties = {
+  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  borderRadius: "24px 24px 0 0",
+};
+
+const contentStyle: CSSProperties = {
+  overflow: "hidden",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const headerStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  alignItems: "start",
+  rowGap: 6,
+  columnGap: 12,
+  padding: "12px 20px 10px",
   flexShrink: 0,
 };
 
-const statsCardStyle: CSSProperties = {
-  padding: "16px 18px",
-  borderRadius: 16,
-  background: "color-mix(in srgb, var(--surface2) 28%, white)",
-  border: "1px solid color-mix(in srgb, var(--border) 30%, transparent)",
+const titleStyle: CSSProperties = {
+  fontSize: 20,
+  fontWeight: 800,
+  lineHeight: 1.15,
+  color: "var(--text)",
+};
+
+const closeButtonStyle: CSSProperties = {
+  width: 36,
+  height: 36,
+  borderRadius: 999,
+  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
+  color: "var(--text2)",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+  justifySelf: "end",
+};
+
+const monthLabelStyle: CSSProperties = {
+  minHeight: 28,
+  display: "inline-flex",
+  alignItems: "center",
+  color: "var(--text2)",
+  fontSize: 13,
+  fontWeight: 600,
+};
+
+const scrollStyle: CSSProperties = {
+  overflowY: "auto",
+  overflowX: "hidden",
+  padding: "4px 16px 8px",
   display: "grid",
   gap: 12,
 };
 
-const statsRowStyle: CSSProperties = {
-  display: "flex",
-  gap: 0,
-};
-
-const statBlockStyle: CSSProperties = {
-  flex: 1,
+const balanceSectionStyle: CSSProperties = {
   display: "grid",
-  gap: 6,
+  gap: 4,
 };
 
-const statDividerStyle: CSSProperties = {
-  width: 1,
-  background: "color-mix(in srgb, var(--border) 40%, transparent)",
-  margin: "0 18px",
-  flexShrink: 0,
+const poolRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
 };
 
-const statValueStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
+const poolLabelStyle: CSSProperties = {
+  color: "var(--muted)",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const poolValueStyle: CSSProperties = {
+  color: "var(--text)",
   fontSize: 22,
   fontWeight: 800,
-  lineHeight: 1,
-  color: "var(--text)",
-  transition: "color 0.2s ease",
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: "\"tnum\"",
+  letterSpacing: -0.5,
 };
 
+const poolStatusStyle = (isOver: boolean, isBalanced: boolean): CSSProperties => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  color: isOver
+    ? "color-mix(in srgb, var(--danger) 72%, var(--text2))"
+    : isBalanced
+    ? "color-mix(in srgb, var(--success) 60%, var(--text2))"
+    : "var(--muted)",
+  fontSize: 11,
+  fontWeight: 600,
+});
+
 const poolBarTrackStyle: CSSProperties = {
-  height: 4,
+  height: 3,
   borderRadius: 999,
   background: "color-mix(in srgb, var(--surface2) 80%, white)",
   overflow: "hidden",
+  marginTop: 4,
 };
 
 const poolBarFillStyle: CSSProperties = {
@@ -728,13 +848,15 @@ const poolBarFillStyle: CSSProperties = {
   transition: "width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease",
 };
 
-const poolHintStyle: CSSProperties = {
-  margin: 0,
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 12,
-  letterSpacing: 0,
-  transition: "color 0.2s ease",
+const footerStyle: CSSProperties = {
+  flexShrink: 0,
+  padding: "10px 16px calc(16px + env(safe-area-inset-bottom, 0px))",
+  display: "grid",
+  gap: 8,
+  borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)",
 };
+
+// ── Category row styles ────────────────────────────────────────────────────
 
 const catHeaderRowStyle: CSSProperties = {
   display: "flex",
@@ -824,6 +946,8 @@ const emptyStateStyle: CSSProperties = {
   textAlign: "center",
 };
 
+// ── Footer styles ──────────────────────────────────────────────────────────
+
 const errorBoxStyle: CSSProperties = {
   padding: "10px 14px",
   borderRadius: 12,
@@ -856,6 +980,20 @@ const spinnerStyle: CSSProperties = {
   flexShrink: 0,
 };
 
+const readOnlyCloseStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 52,
+  borderRadius: 14,
+  border: "1px solid color-mix(in srgb, var(--border) 45%, transparent)",
+  background: "transparent",
+  fontWeight: 600,
+  fontSize: 15,
+  color: "var(--text2)",
+  cursor: "pointer",
+};
+
+// ── Context banner styles ──────────────────────────────────────────────────
+
 const contextBannerStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -878,16 +1016,4 @@ const contextBannerTextStyle: CSSProperties = {
   fontSize: 11,
   color: "var(--muted)",
   letterSpacing: 0.2,
-};
-
-const readOnlyCloseStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 52,
-  borderRadius: 14,
-  border: "1px solid color-mix(in srgb, var(--border) 45%, transparent)",
-  background: "transparent",
-  fontWeight: 600,
-  fontSize: 15,
-  color: "var(--text2)",
-  cursor: "pointer",
 };

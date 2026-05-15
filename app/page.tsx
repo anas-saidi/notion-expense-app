@@ -698,25 +698,24 @@ export default function App() {
         />
       )}
 
-      {tab === "plan" && (
-        <MonthlyPlanningFlow
-          selectedMonth={plannerMonth}
-          onSelectedMonthChange={setPlannerMonth}
-          onCancel={() => setTab("home")}
-          onComplete={() => setPlanCompletedMonth(plannerMonth)}
-          onOpenAddTransaction={({ accountId: nextAccountId, amount: nextAmount, name: nextName }) => {
-            setAccountId(nextAccountId);
-            setAmount(String(nextAmount));
-            setName(nextName ?? "");
-            setDate(today());
-            setShowAddModal(true);
-          }}
-          accounts={accounts}
-          categories={categories}
-          assignedByCategory={plannerMonthlySummary?.assignedByCategory ?? []}
-          isUsingFallbackData={plannerUsesFallbackData}
-        />
-      )}
+      <MonthlyPlanningFlow
+        open={tab === "plan"}
+        selectedMonth={plannerMonth}
+        onSelectedMonthChange={setPlannerMonth}
+        onCancel={() => setTab("home")}
+        onComplete={() => setPlanCompletedMonth(plannerMonth)}
+        onOpenAddTransaction={({ accountId: nextAccountId, amount: nextAmount, name: nextName }) => {
+          setAccountId(nextAccountId);
+          setAmount(String(nextAmount));
+          setName(nextName ?? "");
+          setDate(today());
+          setShowAddModal(true);
+        }}
+        accounts={accounts}
+        categories={categories}
+        assignedByCategory={plannerMonthlySummary?.assignedByCategory ?? []}
+        isUsingFallbackData={plannerUsesFallbackData}
+      />
 
       {tab === "pending" && (
         <PendingScreen

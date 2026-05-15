@@ -169,13 +169,13 @@ const eyebrowStyle: CSSProperties = {
 
 const numberStyle: CSSProperties = {
   fontFamily: "'Inter', sans-serif",
-  fontSize: "clamp(2.2rem, 8vw, 3rem)",
-  lineHeight: 0.9,
-  letterSpacing: -0.4,
-  fontWeight: 700,
+  fontSize: "clamp(5rem, 18vw, 7.5rem)",
+  lineHeight: 0.8,
+  letterSpacing: -2,
+  fontWeight: 950,
   fontVariantNumeric: "tabular-nums",
   fontFeatureSettings: "\"tnum\"",
-  textAlign: "left",
+  textAlign: "center",
   width: "100%",
 };
 
