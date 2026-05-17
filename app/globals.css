@@ -159,58 +159,46 @@ button:not(:disabled):active {
   border-radius: 999px;
   background: linear-gradient(
     to right,
-    rgba(255, 255, 255, 0.92) var(--range-fill, 0%),
-    rgba(255, 255, 255, 0.24) var(--range-fill, 0%)
+    rgba(255, 255, 255, 0.95) var(--range-fill, 0%),
+    rgba(255, 255, 255, 0.32) var(--range-fill, 0%)
   );
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
-/* Thumb — wide grab area, thin visual tick centred via gradient */
+/* Thumb — frosted-glass pill with centre grip line */
 .planning-dial-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 28px;
   height: 28px;
   margin-top: -11px;
-  border-radius: 3px;
+  border-radius: 999px;
   border: 0;
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 1.5px),
-      rgba(255, 255, 255, 0.9) calc(50% - 1.5px),
-      rgba(255, 255, 255, 0.9) calc(50% + 1.5px),
-      transparent calc(50% + 1.5px)
-    );
+  background: transparent;
   box-shadow: none;
   cursor: grab;
-  transition: height 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: height 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease;
 }
 
 .planning-dial-range:active::-webkit-slider-thumb {
   height: 34px;
   margin-top: -14px;
   cursor: grabbing;
+  box-shadow: none;
 }
 
 .planning-dial-range::-moz-range-track {
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .planning-dial-range::-moz-range-thumb {
   width: 28px;
   height: 28px;
-  border-radius: 3px;
+  border-radius: 999px;
   border: 0;
-  background:
-    linear-gradient(
-      to right,
-      transparent calc(50% - 1.5px),
-      rgba(255, 255, 255, 0.9) calc(50% - 1.5px),
-      rgba(255, 255, 255, 0.9) calc(50% + 1.5px),
-      transparent calc(50% + 1.5px)
-    );
+  background: transparent;
   box-shadow: none;
 }
 
@@ -453,6 +441,19 @@ button:hover .rebalance-btn-icon {
 @keyframes categorySelectIn {
   from { opacity: 0.72; transform: translateY(3px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Delta chip — spring pop-in */
+@keyframes chipIn {
+  0%   { opacity: 0; transform: scale(0.6) translateY(4px); }
+  62%  { opacity: 1; transform: scale(1.1) translateY(-1px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Balanced label — soft slide-up fade */
+@keyframes balancedIn {
+  from { opacity: 0; transform: translateY(5px) scale(0.88); }
+  to   { opacity: 1; transform: translateY(0)  scale(1); }
 }
 
 @keyframes planningCategoryEnter {
