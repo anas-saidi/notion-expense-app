@@ -17,11 +17,18 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowDown,
+  ArrowLeft,
+  ArrowRightLeft,
+  Banknote,
+  HandCoins,
+  RotateCcw,
+  Snowflake,
   X,
   Maximize2,
   Minimize2,
   Wrench,
   SlidersHorizontal,
+  Menu,
   type LucideProps,
 } from "lucide-react";
 
@@ -39,9 +46,16 @@ export const ListIcon         = (p: LucideProps) => <List          size={S} {...
 export const ChevronRightIcon = (p: LucideProps) => <ChevronRight  size={S} {...p} />;
 export const ChevronDownIcon  = (p: LucideProps) => <ChevronDown   size={S} {...p} />;
 export const ArrowDownIcon    = (p: LucideProps) => <ArrowDown      size={S} {...p} />;
+export const ArrowLeftIcon    = (p: LucideProps) => <ArrowLeft      size={S} {...p} />;
+export const TransferIcon     = (p: LucideProps) => <ArrowRightLeft size={S} {...p} />;
+export const BanknoteIcon     = (p: LucideProps) => <Banknote       size={S} {...p} />;
+export const FundIcon         = (p: LucideProps) => <HandCoins      size={S} {...p} />;
+export const ReviveIcon       = (p: LucideProps) => <RotateCcw      size={S} {...p} />;
+export const FreezeIcon       = (p: LucideProps) => <Snowflake      size={S} {...p} />;
 export const XIcon            = (p: LucideProps) => <X             size={S} {...p} />;
 export const WrenchIcon       = (p: LucideProps) => <Wrench        size={S} {...p} />;
 export const SlidersIcon      = (p: LucideProps) => <SlidersHorizontal size={S} {...p} />;
+export const MenuIcon         = (p: LucideProps) => <Menu          size={S} {...p} />;
 
 /** Switches between Maximize2 (enter) and Minimize2 (exit). */
 export function FullScreenIcon({

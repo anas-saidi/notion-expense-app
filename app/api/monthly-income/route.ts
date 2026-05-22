@@ -87,3 +87,54 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: message, ...buildMockIncome(month) }, { status: 500 });
   }
 }
+
+export async function POST(req: NextRequest) {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
+
+  const body = await req.json().catch(() => null);
+  const name = typeof body?.name === "string" && body.name.trim() ? body.name.trim() : "Income";
+  const accountId = typeof body?.accountId === "string" ? body.accountId : "";
+  const date = typeof body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
+    ? body.date
+    : new Date().toISOString().slice(0, 10);
+  const amount = Number(body?.amount);
+
+  if (!accountId) return NextResponse.json({ error: "Missing accountId" }, { status: 400 });
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json({ error: "Amount must be a positive number" }, { status: 400 });
+  }
+
+  try {
+    const res = await fetch("https://api.notion.com/v1/pages", {
+      method: "POST",
+      headers: notionHeaders(token),
+      body: JSON.stringify({
+        parent: { database_id: TRANSACTIONS_DB },
+        properties: {
+          Name: { title: [{ text: { content: name } }] },
+          Amount: { number: amount },
+          Date: { date: { start: date } },
+          Account: { relation: [{ id: accountId }] },
+          Type: { select: { name: "Income" } },
+        },
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) return NextResponse.json({ error: data.message || "Failed to create income", full: data }, { status: res.status });
+
+    return NextResponse.json({
+      income: {
+        id: data.id,
+        name,
+        accountId,
+        amount,
+        date,
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to create income";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

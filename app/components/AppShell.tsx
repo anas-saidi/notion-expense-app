@@ -2,14 +2,14 @@ import { type ReactNode } from "react";
 import type { AppTab, BudgetScope } from "./app-types";
 import { BottomNav } from "./BottomNav";
 import { ScopePicker } from "./ScopePicker";
-import { PlusIcon } from "./ui/icons";
-import { TAB_COPY } from "./tab-copy";
+import { MenuIcon, PlusIcon } from "./ui/icons";
 
 export function AppShell({
   tab,
   pendingCount = 0,
   onTabChange,
   onOpenAdd,
+  onOpenManage,
   budgetScope,
   onBudgetScopeChange,
   toast,
@@ -21,6 +21,7 @@ export function AppShell({
   pendingCount?: number;
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
+  onOpenManage?: () => void;
   budgetScope: BudgetScope;
   onBudgetScopeChange: (scope: BudgetScope) => void;
   toast?: string | null;
@@ -28,9 +29,6 @@ export function AppShell({
   immersive?: boolean;
   children?: ReactNode;
 }) {
-  const shellCopy = TAB_COPY[tab];
-  const isHomeTab = tab === "home";
-
   return (
     <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
       <div
@@ -48,30 +46,12 @@ export function AppShell({
               marginBottom: 18,
             }}
           >
-            <div style={{ minWidth: 0, display: "grid", gap: 5, paddingTop: 2 }}>
-              <span
-                style={{
-                  fontSize: isHomeTab ? 10 : 11,
-                  fontWeight: isHomeTab ? 600 : 700,
-                  letterSpacing: isHomeTab ? 0.32 : 0.42,
-                  textTransform: "uppercase",
-                  color: isHomeTab ? "color-mix(in srgb, var(--muted) 86%, transparent)" : "var(--muted)",
-                }}
-              >
-                {shellCopy.eyebrow}
-              </span>
-              <h1
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: isHomeTab ? "clamp(1.32rem, 5.3vw, 1.72rem)" : "clamp(1.5rem, 6vw, 2rem)",
-                  lineHeight: isHomeTab ? 0.98 : 0.94,
-                  letterSpacing: isHomeTab ? -0.25 : -0.5,
-                  color: "var(--text)",
-                  fontWeight: isHomeTab ? 650 : undefined,
-                }}
-              >
-                {shellCopy.title}
-              </h1>
+            <div style={{ minWidth: 0, display: "flex", alignItems: "center" }}>
+              {onOpenManage && (
+                <button type="button" onClick={onOpenManage} aria-label="Open management menu" style={menuButtonStyle}>
+                  <MenuIcon size={18} />
+                </button>
+              )}
             </div>
             <ScopePicker value={budgetScope} onChange={onBudgetScopeChange} />
           </div>
@@ -139,3 +119,17 @@ export function AppShell({
     </div>
   );
 }
+
+const menuButtonStyle = {
+  width: 44,
+  height: 44,
+  borderRadius: 14,
+  border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 50%, white)",
+  color: "var(--text2)",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+};

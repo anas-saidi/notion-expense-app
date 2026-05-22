@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
   const planned = Number(body.planned ?? 0);
   const categoryId = String(body.categoryId);
   const accountId = body.accountId ? String(body.accountId) : null;
+  const shouldIncrement = body.mode === "increment" || body.increment === true;
 
   try {
     const queryRes = await fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
@@ -124,13 +125,15 @@ export async function POST(req: NextRequest) {
     const existing = queryData.results?.[0];
 
     if (existing) {
+      const currentPlanned = existing.properties.Planned?.number ?? 0;
+      const nextPlanned = shouldIncrement ? currentPlanned + planned : planned;
       const updateRes = await fetch(`https://api.notion.com/v1/pages/${existing.id}`, {
         method: "PATCH",
         headers: notionHeaders(token),
         body: JSON.stringify({
           properties: buildFundPayload({
             categoryId,
-            planned,
+            planned: nextPlanned,
             date: bounds.start,
             accountId,
           }),
@@ -143,7 +146,7 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json({
-        fund: { id: updateData.id, categoryId, planned },
+        fund: { id: updateData.id, categoryId, planned: nextPlanned },
         mode: "updated",
       });
     }

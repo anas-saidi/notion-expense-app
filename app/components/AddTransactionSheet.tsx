@@ -34,6 +34,7 @@ type AddTransactionSheetProps = {
   categoryUnfunded: boolean;
   categoryOverBudget: boolean;
   canSubmit: boolean;
+  modeVariant?: "create" | "edit";
   onClose: () => void;
   onAmountChange: (value: string) => void;
   onNameChange: (value: string) => void;
@@ -53,6 +54,7 @@ type AddTransactionSheetProps = {
 export function AddTransactionSheet(props: AddTransactionSheetProps) {
   if (!props.open) return null;
 
+  const isEditMode = props.modeVariant === "edit";
   const todayValue = today();
   const yesterdayValue = shiftDate(todayValue, -1);
   const tomorrowValue = shiftDate(todayValue, 1);
@@ -69,7 +71,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     <BottomSheet
       open={props.open}
       onClose={props.onClose}
-      label="Add transaction"
+      label={isEditMode ? "Edit transaction" : "Add transaction"}
       maxWidth="500px"
       detent="default"
       snapPoints={[0, 0.72, 1]}
@@ -82,8 +84,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         {/* ── Header ── */}
         <header style={topBarStyle}>
           <div>
-            <div style={eyebrowStyle}>New transaction</div>
-            <h2 style={titleStyle}>Add</h2>
+            <div style={eyebrowStyle}>{isEditMode ? "Existing transaction" : "New transaction"}</div>
+            <h2 style={titleStyle}>{isEditMode ? "Edit" : "Add"}</h2>
           </div>
           <button onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
@@ -330,10 +332,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             onClick={props.onSubmit}
             disabled={!props.canSubmit}
             aria-label={
-              props.status === "saving" ? "Saving transaction"
-              : props.status === "success" ? "Transaction saved"
+              props.status === "saving" ? (isEditMode ? "Updating transaction" : "Saving transaction")
+              : props.status === "success" ? (isEditMode ? "Transaction updated" : "Transaction saved")
               : props.status === "error" ? `Save failed: ${props.errorMsg}`
-              : "Save transaction"
+              : isEditMode ? "Update transaction" : "Save transaction"
             }
             className="pressable cta-save"
             style={{
@@ -361,13 +363,13 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             }}
           >
             {props.status === "saving" ? (
-              <><span style={{ width: 15, height: 15, border: "2px solid color-mix(in srgb, currentColor 26%, transparent)", borderTopColor: "currentColor", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />Saving...</>
+              <><span style={{ width: 15, height: 15, border: "2px solid color-mix(in srgb, currentColor 26%, transparent)", borderTopColor: "currentColor", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />{isEditMode ? "Updating..." : "Saving..."}</>
             ) : props.status === "success" ? (
-              <><CheckIcon size={16} />Saved</>
+              <><CheckIcon size={16} />{isEditMode ? "Updated" : "Saved"}</>
             ) : props.status === "error" ? (
               <><XIcon size={16} />Error</>
             ) : (
-              "Save"
+              isEditMode ? "Update transaction" : "Save"
             )}
           </button>
 

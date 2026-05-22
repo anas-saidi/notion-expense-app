@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { XIcon } from "./ui/icons";
+import { FundIcon, PlusIcon, XIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -45,6 +45,7 @@ type CategoryDetailsSheetProps = {
   month: string;
   onClose: () => void;
   onOpenAdd: () => void;
+  onOpenFund: () => void;
 };
 
 export function CategoryDetailsSheet({
@@ -53,6 +54,7 @@ export function CategoryDetailsSheet({
   month,
   onClose,
   onOpenAdd,
+  onOpenFund,
 }: CategoryDetailsSheetProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,9 +169,16 @@ export function CategoryDetailsSheet({
                 Funding, transfers, and spending in one stream.
               </p>
             </div>
-            <button type="button" onClick={onOpenAdd} style={primaryActionStyle}>
-              Add
-            </button>
+            <div style={actionRowStyle}>
+              <button type="button" onClick={onOpenAdd} style={secondaryActionStyle}>
+                <PlusIcon size={15} strokeWidth={2.3} />
+                Add
+              </button>
+              <button type="button" onClick={onOpenFund} style={primaryActionStyle}>
+                <FundIcon size={15} strokeWidth={2.3} />
+                Fund
+              </button>
+            </div>
           </div>
 
           {loading && <div style={panelMessageStyle}>Loading activity…</div>}
@@ -475,8 +484,8 @@ const summaryChipLabelStyle: CSSProperties = {
 const summaryChipValueStyle: CSSProperties = { fontSize: 16, fontWeight: 700 };
 
 const primaryActionStyle: CSSProperties = {
-  minHeight: 36,
-  padding: "0 14px",
+  minHeight: 44,
+  padding: "0 13px",
   borderRadius: 999,
   border: "1px solid color-mix(in srgb, var(--accent) 38%, transparent)",
   background: "var(--accent)",
@@ -484,6 +493,25 @@ const primaryActionStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: 13,
   cursor: "pointer",
+  flexShrink: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+  whiteSpace: "nowrap",
+};
+
+const secondaryActionStyle: CSSProperties = {
+  ...primaryActionStyle,
+  border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 56%, white)",
+  color: "var(--text2)",
+};
+
+const actionRowStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
   flexShrink: 0,
 };
 
