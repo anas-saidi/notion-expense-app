@@ -8,7 +8,11 @@ import { HistoryScreen } from "./components/HistoryScreen";
 import { PendingScreen } from "./components/PendingScreen";
 import { MonthlyPlanningFlow } from "./components/MonthlyPlanningFlow";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
+import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
+import { AccountTransferSheet } from "./components/AccountTransferSheet";
 import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
+import { CategoryManageSheet } from "./components/CategoryManageSheet";
+import { ManageScreen } from "./components/ManageScreen";
 import { RebalanceSheet } from "./components/RebalanceSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
@@ -81,6 +85,7 @@ export default function App() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<"wife" | "husband">("husband");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
@@ -103,7 +108,13 @@ export default function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [showRebalance, setShowRebalance] = useState(false);
+  const [showManageScreen, setShowManageScreen] = useState(false);
+  const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | null>(null);
+  const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
+  const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
+  const [transferAccount, setTransferAccount] = useState<Account | null>(null);
   const [homeSearch, setHomeSearch] = useState("");
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
 
   const [amount, setAmount] = useState("");
   const [name, setName] = useState("");
@@ -248,14 +259,25 @@ export default function App() {
     } catch {}
   };
 
+  const fetchCategories = async () => {
+    const data = await fetch("/api/categories").then((r) => r.json());
+    setCategories(data.categories ?? []);
+    if (data.categories?.length > 0 && !categoryId) setCategoryId(data.categories[0].id);
+  };
+
+  const fetchFrozenCategories = async () => {
+    try {
+      const data = await fetch("/api/categories?includeSnoozed=true").then((r) => r.json());
+      const frozen = (data.categories ?? []).filter((category: Category) => category.snoozed && !category.archived);
+      setFrozenCategories(frozen);
+    } catch {
+      setFrozenCategories([]);
+    }
+  };
+
   useEffect(() => {
-    fetch("/api/categories")
-      .then((r) => r.json())
-      .then((data) => {
-        setCategories(data.categories ?? []);
-        if (data.categories?.length > 0) setCategoryId(data.categories[0].id);
-      })
-      .finally(() => setLoading(false));
+    fetchCategories().finally(() => setLoading(false));
+    fetchFrozenCategories();
 
     fetch("/api/accounts")
       .then((r) => r.json())
@@ -439,6 +461,7 @@ export default function App() {
   };
 
   const loadPending = (item: PendingItem) => {
+    setEditingTransactionId(null);
     setName(item.name);
     if (item.amount !== null) setAmount(String(item.amount));
     if (item.date) setDate(item.date);
@@ -449,6 +472,22 @@ export default function App() {
     loadedPendingId.current = item.id;
     setShowAddModal(true);
     showToast("Loaded into add form", 1200);
+  };
+
+  const editTransaction = (transaction: Transaction) => {
+    setEditingTransactionId(transaction.id);
+    setName(transaction.name);
+    setAmount(transaction.amount ? String(transaction.amount) : "");
+    setDate(transaction.date || today());
+    setSuggestedCatId(null);
+    setCatSearch("");
+    setShowDatePicker(false);
+    setShowCatPicker(false);
+    setShowAccountPicker(false);
+    if (transaction.category) setCategoryId(transaction.category);
+    if (transaction.accountId) setAccountId(transaction.accountId);
+    loadedPendingId.current = null;
+    setShowAddModal(true);
   };
 
   const dismissPending = async (id: string) => {
@@ -511,6 +550,64 @@ export default function App() {
   const openCategoryDetails = (cat: Category) => {
     selectCategory(cat);
     setShowCategoryDetails(true);
+  };
+
+  const openFundCategory = (cat: Category) => {
+    selectCategory(cat);
+    setCategoryManageCategory(cat);
+    setCategoryManageMode("fund");
+  };
+
+  const openNewCategory = () => {
+    setCategoryManageCategory(null);
+    setCategoryManageMode("create");
+  };
+
+  const refreshBudgetData = (message?: string) => {
+    fetchCategories();
+    fetchFrozenCategories();
+    fetchMonthlySummary(homeMonth);
+    fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
+    if (message) showToast(message, 1500);
+  };
+
+  const refreshAccountsData = (message?: string) => {
+    fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
+    fetchMonthlySummary(homeMonth);
+    if (message) showToast(message, 1500);
+  };
+
+  const reviveCategory = async (category: Category) => {
+    try {
+      const res = await fetch("/api/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: category.id, snoozed: false }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to revive category");
+      refreshBudgetData(`${category.name} revived`);
+      setCategoryManageCategory({ ...category, snoozed: false });
+      setCategoryManageMode("fund");
+    } catch (error: unknown) {
+      showToast(error instanceof Error ? error.message : "Failed to revive");
+    }
+  };
+
+  const freezeCategory = async (category: Category) => {
+    try {
+      const res = await fetch("/api/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: category.id, snoozed: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to freeze category");
+      refreshBudgetData(`${category.name} frozen`);
+      if (selectedCat?.id === category.id) setShowCategoryDetails(false);
+    } catch (error: unknown) {
+      showToast(error instanceof Error ? error.message : "Failed to freeze");
+    }
   };
 
   const filteredCats = categories
@@ -599,11 +696,13 @@ export default function App() {
     if (!amount || !name || !categoryId) return;
     setStatus("saving");
     setErrorMsg("");
+    const isEditing = Boolean(editingTransactionId);
     try {
-      const res = await fetch("/api/expense", {
-        method: "POST",
+      const payload = { name, amount: parseFloat(amount), accountId, categoryId, date };
+      const res = await fetch(isEditing ? "/api/transactions" : "/api/expense", {
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, amount: parseFloat(amount), accountId, categoryId, date }),
+        body: JSON.stringify(isEditing ? { id: editingTransactionId, ...payload } : payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
@@ -612,7 +711,7 @@ export default function App() {
       setShowSaveBurst(true);
       if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
       burstTimerRef.current = setTimeout(() => setShowSaveBurst(false), 850);
-      showToast(SAVE_LINES[Math.floor(Math.random() * SAVE_LINES.length)], 1500);
+      showToast(isEditing ? "Transaction updated" : SAVE_LINES[Math.floor(Math.random() * SAVE_LINES.length)], 1500);
 
       const newEntry = { description: name.trim(), categoryId };
       setCorpus((prev) => {
@@ -622,7 +721,7 @@ export default function App() {
       });
 
       const expAmt = parseFloat(amount);
-      if (displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
+      if (!isEditing && displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
       fetchMonthlySummary(homeMonth);
       fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
@@ -634,9 +733,15 @@ export default function App() {
 
       setAmount("");
       setName("");
+      setEditingTransactionId(null);
       setSuggestedCatId(null);
       setDate(today());
-      setTimeout(() => setStatus("idle"), 2000);
+      if (isEditing) {
+        setShowAddModal(false);
+        setStatus("idle");
+      } else {
+        setTimeout(() => setStatus("idle"), 2000);
+      }
     } catch (e: unknown) {
       setErrorMsg(e instanceof Error ? e.message : "Failed");
       setStatus("error");
@@ -661,9 +766,10 @@ export default function App() {
   }
 
   const parsedAmount = amount ? parseFloat(amount) : 0;
-  const categoryUnfunded = !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
-  const categoryOverBudget = !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
-  const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && categoryId && status === "idle" && !categoryUnfunded && !categoryOverBudget);
+  const isEditingTransaction = Boolean(editingTransactionId);
+  const categoryUnfunded = !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
+  const categoryOverBudget = !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
+  const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && categoryId && accountId && status === "idle" && !categoryUnfunded && !categoryOverBudget);
   const suggestedCategory = suggestedCatId ? categories.find((c) => c.id === suggestedCatId) : undefined;
 
   return (
@@ -671,14 +777,37 @@ export default function App() {
       tab={tab}
       pendingCount={scopedPendingItems.length}
       onTabChange={setTab}
-      onOpenAdd={() => setShowAddModal(true)}
+      onOpenAdd={() => {
+        setEditingTransactionId(null);
+        setShowAddModal(true);
+      }}
+      onOpenManage={() => setShowManageScreen(true)}
       budgetScope={budgetScope}
       onBudgetScopeChange={setBudgetScope}
       toast={microToast}
-      showAddButton={tab !== "plan"}
-      immersive={tab === "plan"}
+      showAddButton={tab !== "plan" && !showManageScreen}
+      immersive={tab === "plan" || showManageScreen}
     >
-      {tab === "home" && (
+      {showManageScreen && (
+        <ManageScreen
+          categories={categories}
+          frozenCategories={frozenCategories}
+          accounts={accounts}
+          onClose={() => setShowManageScreen(false)}
+          onNewCategory={openNewCategory}
+          onOpenCategory={(category) => {
+            setShowManageScreen(false);
+            openCategoryDetails(category);
+          }}
+          onFundCategory={openFundCategory}
+          onFreezeCategory={freezeCategory}
+          onReviveCategory={reviveCategory}
+          onAddIncome={setIncomeAccount}
+          onTransferMoney={setTransferAccount}
+        />
+      )}
+
+      {!showManageScreen && tab === "home" && (
         <HomeScreen
           categories={homeCategories}
           selectedCategoryId={categoryId}
@@ -686,7 +815,10 @@ export default function App() {
           onSearchChange={setHomeSearch}
           onSelectCategory={selectCategory}
           onOpenCategoryDetails={openCategoryDetails}
-          onOpenAdd={() => setShowAddModal(true)}
+          onOpenAdd={() => {
+            setEditingTransactionId(null);
+            setShowAddModal(true);
+          }}
           onOpenPlan={() => setTab("plan")}
           onOpenRebalance={() => setShowRebalance(true)}
           monthlySummary={scopedMonthlySummary}
@@ -698,13 +830,14 @@ export default function App() {
         />
       )}
 
-      <MonthlyPlanningFlow
+      {!showManageScreen && <MonthlyPlanningFlow
         open={tab === "plan"}
         selectedMonth={plannerMonth}
         onSelectedMonthChange={setPlannerMonth}
         onCancel={() => setTab("home")}
         onComplete={() => setPlanCompletedMonth(plannerMonth)}
         onOpenAddTransaction={({ accountId: nextAccountId, amount: nextAmount, name: nextName }) => {
+          setEditingTransactionId(null);
           setAccountId(nextAccountId);
           setAmount(String(nextAmount));
           setName(nextName ?? "");
@@ -715,9 +848,9 @@ export default function App() {
         categories={categories}
         assignedByCategory={plannerMonthlySummary?.assignedByCategory ?? []}
         isUsingFallbackData={plannerUsesFallbackData}
-      />
+      />}
 
-      {tab === "pending" && (
+      {!showManageScreen && tab === "pending" && (
         <PendingScreen
           pendingItems={pendingItems}
           categories={categories}
@@ -730,18 +863,13 @@ export default function App() {
         />
       )}
 
-      {tab === "history" && (
+      {!showManageScreen && tab === "history" && (
         <HistoryScreen
           transactions={scopedTransactions}
           categories={categories}
           budgetScope={budgetScope}
           onClickTransaction={(t) => {
-            setName(t.name);
-            if (t.category) {
-              const found = categories.find((x) => x.id === t.category);
-              if (found) selectCategory(found);
-            }
-            setShowAddModal(true);
+            editTransaction(t);
           }}
           onDeleteTransaction={deleteTransaction}
         />
@@ -773,7 +901,18 @@ export default function App() {
         categoryUnfunded={categoryUnfunded}
         categoryOverBudget={categoryOverBudget}
         canSubmit={canSubmit}
-        onClose={() => setShowAddModal(false)}
+        modeVariant={editingTransactionId ? "edit" : "create"}
+        onClose={() => {
+          if (editingTransactionId) {
+            setAmount("");
+            setName("");
+            setSuggestedCatId(null);
+            setDate(today());
+          }
+          setShowAddModal(false);
+          setEditingTransactionId(null);
+          setStatus("idle");
+        }}
         onAmountChange={(value) => {
           const cleaned = value.replace(/[^0-9.]/g, "");
           if ((cleaned.match(/\./g) || []).length <= 1) setAmount(cleaned);
@@ -820,9 +959,39 @@ export default function App() {
         month={(monthlySummary.start || today()).slice(0, 7)}
         onClose={() => setShowCategoryDetails(false)}
         onOpenAdd={() => {
+          setEditingTransactionId(null);
           setShowCategoryDetails(false);
           setShowAddModal(true);
         }}
+        onOpenFund={() => {
+          if (selectedCat) openFundCategory(selectedCat);
+        }}
+      />
+
+      <CategoryManageSheet
+        open={categoryManageMode !== null}
+        mode={categoryManageMode ?? "fund"}
+        category={categoryManageCategory}
+        month={homeMonth}
+        accounts={accounts}
+        defaultScope={budgetScope}
+        onClose={() => setCategoryManageMode(null)}
+        onSuccess={refreshBudgetData}
+      />
+
+      <AccountIncomeSheet
+        open={incomeAccount !== null}
+        account={incomeAccount}
+        onClose={() => setIncomeAccount(null)}
+        onSuccess={refreshAccountsData}
+      />
+
+      <AccountTransferSheet
+        open={transferAccount !== null}
+        account={transferAccount}
+        accounts={accounts}
+        onClose={() => setTransferAccount(null)}
+        onSuccess={refreshAccountsData}
       />
 
       <RebalanceSheet

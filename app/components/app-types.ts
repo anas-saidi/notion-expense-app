@@ -9,6 +9,8 @@ export type Category = {
   planned: number | null;
   lastMonthSpent: number | null;
   isTeamFund: boolean;
+  snoozed?: boolean;
+  archived?: boolean;
 };
 
 export type BudgetScope = "joint" | "anas" | "salma";
