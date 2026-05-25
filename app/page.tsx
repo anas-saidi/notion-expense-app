@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Fuse from "fuse.js";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
@@ -529,10 +529,7 @@ export default function App() {
       if (label.includes("hubb")) husbandSpent += txn.amount ?? 0;
       if (label.includes("wife")) wifeSpent += txn.amount ?? 0;
     }
-    // eslint-disable-next-line no-console
-    console.log("[DEBUG] Husband spent on team categories:", husbandSpent);
-    // eslint-disable-next-line no-console
-    console.log("[DEBUG] Wife spent on team categories:", wifeSpent);
+
   }, [accounts, categories, transactions]);
 
   const selectCategory = (cat: Category) => {
@@ -632,10 +629,10 @@ export default function App() {
       return a.name.localeCompare(b.name);
     });
 
-  const scopedMonthlySummary = useMemo(() => {
+  const getMonthlySummaryForScope = useCallback((scope: BudgetScope): MonthlySummary => {
     const categoryIds = new Set(
       categories
-        .filter((category) => categoryMatchesScope(category, budgetScope))
+        .filter((category) => categoryMatchesScope(category, scope))
         .map((category) => category.id),
     );
     const assignedByCategory = monthlySummary.assignedByCategory.filter((entry) => categoryIds.has(entry.categoryId));
@@ -648,7 +645,19 @@ export default function App() {
       assignedByCategory,
       spentByCategory,
     };
-  }, [budgetScope, categories, monthlySummary]);
+  }, [categories, monthlySummary]);
+
+  const scopedMonthlySummary = useMemo(() => {
+    return getMonthlySummaryForScope(budgetScope);
+  }, [budgetScope, getMonthlySummaryForScope]);
+
+  const walletMonthlySummaries = useMemo<Partial<Record<BudgetScope, MonthlySummary>>>(() => {
+    return {
+      joint: getMonthlySummaryForScope("joint"),
+      anas: getMonthlySummaryForScope("anas"),
+      salma: getMonthlySummaryForScope("salma"),
+    };
+  }, [getMonthlySummaryForScope]);
 
   const scopedTransactions = useMemo(
     () => transactions.filter((transaction) => transactionMatchesScope(transaction, categories, budgetScope)),
@@ -782,8 +791,6 @@ export default function App() {
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
-      budgetScope={budgetScope}
-      onBudgetScopeChange={setBudgetScope}
       toast={microToast}
       showAddButton={tab !== "plan" && !showManageScreen}
       immersive={tab === "plan" || showManageScreen}
@@ -822,8 +829,10 @@ export default function App() {
           onOpenPlan={() => setTab("plan")}
           onOpenRebalance={() => setShowRebalance(true)}
           monthlySummary={scopedMonthlySummary}
+          walletSummaries={walletMonthlySummaries}
           readyToAssignByScope={readyToAssignByScope}
           budgetScope={budgetScope}
+          onBudgetScopeChange={setBudgetScope}
           homeMonth={homeMonth}
           onHomeMonthChange={setHomeMonth}
           planDone={planCompletedMonth === homeMonth}

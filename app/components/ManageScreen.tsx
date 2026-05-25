@@ -251,7 +251,7 @@ function formatAmount(value: number) {
 
 const screenStyle: CSSProperties = {
   minHeight: "100dvh",
-  padding: "20px 18px calc(24px + env(safe-area-inset-bottom, 0px))",
+  padding: "calc(env(safe-area-inset-top, 0px) + 20px) calc(env(safe-area-inset-right, 0px) + 18px) calc(env(safe-area-inset-bottom, 0px) + 24px) calc(env(safe-area-inset-left, 0px) + 18px)",
   background: "var(--bg)",
   display: "grid",
   alignContent: "start",
@@ -335,7 +335,7 @@ const rowTitleStyle: CSSProperties = {
 };
 
 const rowMetaStyle: CSSProperties = {
-  margin: "4px 0 0",
+  margin: "6px 0 0",
   fontSize: 12,
   color: "var(--muted)",
   whiteSpace: "nowrap",
@@ -406,7 +406,7 @@ const categoryRowStyle: CSSProperties = {
   borderRadius: 18,
   border: "1px solid var(--card-border)",
   background: "var(--surface)",
-  padding: "8px",
+  padding: "12px 14px",
   display: "flex",
   alignItems: "center",
   flexWrap: "wrap",
@@ -503,7 +503,7 @@ const accountRowStyle: CSSProperties = {
   borderRadius: 18,
   border: "1px solid var(--card-border)",
   background: "var(--surface)",
-  padding: "10px 13px",
+  padding: "14px 16px",
   display: "flex",
   alignItems: "center",
   flexWrap: "wrap",

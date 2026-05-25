@@ -353,7 +353,7 @@ export function PendingScreen({
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
-                          padding: "12px 14px 10px",
+                          padding: "14px 14px 12px",
                         }}
                       >
                         <div style={iconBadgeStyle}><CategoryIcon icon={cat?.icon} style={{ fontSize: 18 }} /></div>

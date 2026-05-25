@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { BottomSheet } from "./ui/BottomSheet";
 import { FundIcon, PlusIcon, XIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
+
+type MonthBar = {
+  month: string;
+  spent: number;
+  planned: number;
+};
 
 type TimelineItem = {
   id: string;
@@ -59,6 +66,9 @@ export function CategoryDetailsSheet({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CategoryActivityPayload | null>(null);
+  const [historyBars, setHistoryBars] = useState<MonthBar[] | null>(null);
+
+  const [activePanel, setActivePanel] = useState<0 | 1>(0);
 
   useEffect(() => {
     if (!open || !category?.id || !month) return;
@@ -67,11 +77,21 @@ export function CategoryDetailsSheet({
     setLoading(true);
     setError(null);
 
-    fetch(`/api/categories/${category.id}/activity?month=${month}&limit=20`)
-      .then(async (res) => {
+    Promise.all([
+      fetch(`/api/categories/${category.id}/activity?month=${month}&limit=20`).then(async (res) => {
         const payload = await res.json();
         if (!res.ok) throw new Error(payload.error || "Failed to load category details");
-        if (!cancelled) setData(payload);
+        return payload as CategoryActivityPayload;
+      }),
+      fetch(`/api/categories/${category.id}/history?months=6`).then(async (res) => {
+        const payload = await res.json();
+        return res.ok ? (payload.history as MonthBar[]) : null;
+      }).catch(() => null),
+    ])
+      .then(([activity, history]) => {
+        if (cancelled) return;
+        setData(activity);
+        setHistoryBars(history);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
@@ -83,7 +103,6 @@ export function CategoryDetailsSheet({
     return () => { cancelled = true; };
   }, [open, category?.id, month]);
 
-  const summary = data?.summary;
   const details = data?.category;
 
   const spent = details?.spent ?? 0;
@@ -129,35 +148,42 @@ export function CategoryDetailsSheet({
           </button>
         </header>
 
-        {/* ── Hero ── */}
-        <section style={heroWrapStyle}>
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={eyebrowStyle}>Available now</div>
-            <div style={heroValueStyle}>
-              <Money value={available} />
-            </div>
-            <p style={heroCopyStyle}>
-              {summary?.month ? `Live view for ${formatMonthLabel(summary.month)}.` : "This month at a glance."}
-            </p>
+        {/* ── Inline tab + content ── */}
+        <section style={panelSectionStyle}>
+          <div style={panelTabsStyle}>
+            <button type="button" style={panelTabStyle(activePanel === 0)} onClick={() => setActivePanel(0)}>
+              Overview
+            </button>
+            <button type="button" style={panelTabStyle(activePanel === 1)} onClick={() => setActivePanel(1)}>
+              History
+            </button>
           </div>
 
-          <div style={progressRailStyle} aria-hidden="true">
-            <div style={{ ...progressFillStyle, width: `${spentPct}%` }} />
+          <div key={activePanel} style={{ animation: "fadeUp 0.18s ease both" }}>
+            {activePanel === 0 ? (
+              <section style={heroWrapStyle}>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={eyebrowStyle}>Available now</div>
+                  <div style={heroValueStyle}>
+                    <Money value={available} />
+                  </div>
+                </div>
+                <div style={progressRailStyle} aria-hidden="true">
+                  <div style={{ ...progressFillStyle, width: `${spentPct}%` }} />
+                </div>
+                <div style={heroStatGridStyle}>
+                  <StatCard label="Planned" value={planned} />
+                  <StatCard label="Spent" value={spent} tone={spentPct >= 100 ? "negative" : spentPct >= 85 ? "warn" : "default"} />
+                </div>
+              </section>
+            ) : loading ? (
+              <div style={panelMessageStyle}>Loading history…</div>
+            ) : !historyBars || !historyBars.some((b) => b.spent > 0) ? (
+              <div style={panelMessageStyle}>No spending history yet.</div>
+            ) : (
+              <SpendingBarChart bars={historyBars} categoryPlanned={planned} height={150} />
+            )}
           </div>
-
-          <div style={heroStatGridStyle}>
-            <StatCard label="Spent" value={spent} tone="default" />
-            <StatCard label="Planned" value={planned} tone="default" />
-            <StatCard label="Net flow" value={summary?.netFlow ?? 0} tone={(summary?.netFlow ?? 0) >= 0 ? "positive" : "negative"} />
-          </div>
-        </section>
-
-        {/* ── Summary chips ── */}
-        <section style={summarySectionStyle}>
-          <SummaryChip label="Funded" value={summary?.fundedTotal ?? 0} tone="positive" />
-          <SummaryChip label="Moved in" value={summary?.movedInTotal ?? 0} tone="positive" />
-          <SummaryChip label="Moved out" value={summary?.movedOutTotal ?? 0} tone="negative" />
-          <SummaryChip label="Expenses" value={summary?.spentTotal ?? 0} tone="negative" />
         </section>
 
         {/* ── Activity timeline ── */}
@@ -261,25 +287,74 @@ export function CategoryDetailsSheet({
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
-function StatCard({ label, value, tone }: { label: string; value: number | null; tone: "default" | "positive" | "negative" }) {
+function SpendingBarChart({ bars, categoryPlanned, height = 108 }: { bars: MonthBar[]; categoryPlanned: number; height?: number }) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+
+  const monthLabel = (month: string) => {
+    const [y, m] = month.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("en", { month: "short" });
+  };
+
+  return (
+    <div style={{ paddingTop: 4 }}>
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={bars} barCategoryGap="32%" margin={{ top: 10, right: 2, bottom: 0, left: 2 }}>
+          <XAxis
+            dataKey="month"
+            tickFormatter={monthLabel}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 10, fontFamily: "'DM Mono', monospace", fill: "#6e6e6d" }}
+            interval={0}
+          />
+          {categoryPlanned > 0 && (
+            <ReferenceLine
+              y={categoryPlanned}
+              stroke="#6e6e6d"
+              strokeDasharray="4 3"
+              strokeWidth={1}
+              strokeOpacity={0.55}
+            />
+          )}
+          <Tooltip
+            cursor={false}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const bar = payload[0].payload as MonthBar;
+              if (!bar.spent) return null;
+              return (
+                <div style={chartTooltipStyle}>
+                  {Math.round(bar.spent).toLocaleString("fr-MA")} MAD
+                </div>
+              );
+            }}
+          />
+          <Bar dataKey="spent" radius={[5, 5, 2, 2]} maxBarSize={40}>
+            {bars.map((bar) => {
+              const isCurrent = bar.month === currentMonth;
+              const isOver = bar.spent > bar.planned && bar.planned > 0;
+              const fill = isCurrent
+                ? isOver ? "#ef4444" : "#9fe870"
+                : isOver ? "#fca5a5" : "#dde2d9";
+              return <Cell key={bar.month} fill={fill} />;
+            })}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function StatCard({ label, value, tone = "default" }: { label: string; value: number | null; tone?: "default" | "positive" | "negative" | "warn" }) {
   const color =
     tone === "positive" ? "var(--success)"
-    : tone === "negative" ? "var(--danger)"
+    : tone === "negative" ? "var(--spend-over)"
+    : tone === "warn" ? "var(--spend-warn)"
     : "var(--text)";
   return (
     <div style={statCardStyle}>
       <div style={statLabelStyle}>{label}</div>
       <div style={{ ...statValueStyle, color }}><Money value={value ?? 0} /></div>
-    </div>
-  );
-}
-
-function SummaryChip({ label, value, tone }: { label: string; value: number; tone: "positive" | "negative" }) {
-  const color = tone === "positive" ? "var(--success)" : "var(--danger)";
-  return (
-    <div style={summaryChipStyle}>
-      <span style={summaryChipLabelStyle}>{label}</span>
-      <span style={{ ...summaryChipValueStyle, color }}><Money value={value} /></span>
     </div>
   );
 }
@@ -306,10 +381,6 @@ function getScopeLabel(category: Category) {
   return category.type[0] ?? "Category";
 }
 
-function formatMonthLabel(month: string) {
-  const [year, monthValue] = month.split("-").map(Number);
-  return new Date(year, (monthValue || 1) - 1, 1).toLocaleDateString("en", { month: "long", year: "numeric" });
-}
 
 function formatDay(value: string) {
   if (!value) return "";
@@ -413,9 +484,8 @@ const scopeBadgeStyle: CSSProperties = {
 
 const heroWrapStyle: CSSProperties = {
   display: "grid",
-  gap: 16,
-  padding: "4px 0 16px",
-  borderBottom: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
+  gap: 14,
+  padding: "4px 0 8px",
 };
 
 const heroValueStyle: CSSProperties = {
@@ -426,11 +496,6 @@ const heroValueStyle: CSSProperties = {
   color: "var(--text)",
 };
 
-const heroCopyStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 14,
-  color: "var(--text2)",
-};
 
 const progressRailStyle: CSSProperties = {
   width: "100%",
@@ -450,7 +515,7 @@ const progressFillStyle: CSSProperties = {
 
 const heroStatGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 12,
 };
 
@@ -465,23 +530,6 @@ const statLabelStyle: CSSProperties = {
 
 const statValueStyle: CSSProperties = { fontSize: 14, fontWeight: 700 };
 
-const summarySectionStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 12,
-  paddingBottom: 2,
-};
-
-const summaryChipStyle: CSSProperties = { display: "grid", gap: 4 };
-
-const summaryChipLabelStyle: CSSProperties = {
-  fontSize: 11,
-  letterSpacing: 0.35,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-};
-
-const summaryChipValueStyle: CSSProperties = { fontSize: 16, fontWeight: 700 };
 
 const primaryActionStyle: CSSProperties = {
   minHeight: 44,
@@ -515,6 +563,18 @@ const actionRowStyle: CSSProperties = {
   flexShrink: 0,
 };
 
+
+const chartTooltipStyle: CSSProperties = {
+  background: "#0e0f0c",
+  color: "#ffffff",
+  borderRadius: 999,
+  padding: "4px 10px",
+  fontSize: 11,
+  fontFamily: "'DM Mono', monospace",
+  whiteSpace: "nowrap",
+  pointerEvents: "none",
+};
+
 const panelMessageStyle: CSSProperties = {
   padding: "14px 0",
   color: "var(--muted)",
@@ -533,3 +593,29 @@ const metaTextStyle: CSSProperties = {
   fontFamily: "'DM Mono', monospace",
   letterSpacing: 0.1,
 };
+
+// ── Panel tab styles ──────────────────────────────────────────────────────────
+
+const panelSectionStyle: CSSProperties = {
+  display: "grid",
+  gap: 14,
+};
+
+const panelTabsStyle: CSSProperties = {
+  display: "inline-flex",
+  gap: 6,
+  alignSelf: "flex-start",
+};
+
+const panelTabStyle = (active: boolean): CSSProperties => ({
+  padding: "5px 14px",
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 700,
+  border: "none",
+  cursor: "pointer",
+  background: active ? "var(--text)" : "transparent",
+  color: active ? "var(--surface)" : "var(--muted)",
+  transition: "background 0.15s ease, color 0.15s ease",
+  letterSpacing: 0.1,
+});

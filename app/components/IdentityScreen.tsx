@@ -31,7 +31,7 @@ export function IdentityScreen({ onSelect }: Props) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "40px 24px calc(40px + env(safe-area-inset-bottom, 0px))",
+        padding: "calc(env(safe-area-inset-top, 0px) + 40px) 24px calc(env(safe-area-inset-bottom, 0px) + 40px)",
         background: "var(--bg)",
       }}
     >

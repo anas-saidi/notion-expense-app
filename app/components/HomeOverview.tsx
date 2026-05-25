@@ -1,5 +1,4 @@
-import { ArrowDown, ListChecks } from "lucide-react";
-import type { ReactNode } from "react";
+import { ListChecks } from "lucide-react";
 import { Money } from "./Money";
 import type { BudgetScope, MonthlySummary } from "./app-types";
 import { ChipTabs } from "./ui/ChipTabs";
@@ -62,86 +61,28 @@ export function HomeOverview({
         )}
       </div>
 
-      <div className="home-hero__body" style={heroBodyStyle}>
-        <div key={homeMonth} style={{ ...heroCopyStyle, animation: "fadeUp 0.22s ease both" }}>
-          <div style={heroRemainingWrapStyle}>
-            <span style={heroRemainingLabelStyle}>
-              {BUDGET_SCOPE_LABELS[budgetScope]} {primaryLabel}
+      <div key={homeMonth} style={{ ...heroCopyStyle, animation: "fadeUp 0.22s ease both" }}>
+        <div style={heroRemainingWrapStyle}>
+          <span style={heroRemainingLabelStyle}>
+            {BUDGET_SCOPE_LABELS[budgetScope]} {primaryLabel}
+          </span>
+          <strong style={heroRemainingValueStyle(available < 0)}>
+            <Money value={available} absolute={!isCurrentMonth && available < 0} />
+          </strong>
+          <span style={heroRemainingMetaStyle}>
+            {isCurrentMonth ? "Unassigned money for this month" : formatMonthLabel(homeMonth)}
+          </span>
+          {(totalAssigned > 0 || totalSpent > 0) && (
+            <span style={heroSummaryLineStyle}>
+              <Money value={totalAssigned} /> assigned · <Money value={totalSpent} /> spent
             </span>
-            <strong style={heroRemainingValueStyle(available < 0)}>
-              <Money value={available} absolute={!isCurrentMonth && available < 0} />
-            </strong>
-            <span style={heroRemainingMetaStyle}>
-              {isCurrentMonth ? "Unassigned money for this month" : formatMonthLabel(homeMonth)}
-            </span>
-          </div>
+          )}
         </div>
-
-        <div className="home-hero__visual" style={heroVisualStyle} aria-hidden="true">
-          <span style={sparkleStyle(16, 18, 14)} />
-          <span style={sparkleStyle(74, 33, 9)} />
-          <span style={sparkleStyle(83, 70, 13)} />
-          <div style={visualBlobStyle} />
-          <div style={walletShadowStyle} />
-          <div style={walletStyle}>
-            <div style={cashStackStyle}>
-              <span style={{ ...billStyle, transform: "rotate(-5deg) translateY(2px)" }} />
-              <span style={{ ...billStyle, transform: "rotate(3deg) translate(10px, -3px)" }} />
-            </div>
-            <div style={walletFlapStyle} />
-            <div style={walletButtonStyle} />
-          </div>
-        </div>
-      </div>
-
-      <div className="home-hero__stats" style={summaryGridStyle}>
-        <MetricCard label="Assigned" value={totalAssigned} tone="info" icon={<ListChecks size={17} />} />
-        <MetricCard label="Spent" value={totalSpent} tone="soft" icon={<ArrowDown size={17} />} />
       </div>
     </section>
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: number;
-  tone: "info" | "soft";
-  icon: ReactNode;
-}) {
-  const isInfo = tone === "info";
-
-  return (
-    <div
-      className="home-hero__stat"
-      style={{
-        ...metricCardStyle,
-        background: isInfo
-          ? "color-mix(in srgb, var(--info-dim) 44%, var(--surface))"
-          : "color-mix(in srgb, #efe7ff 56%, var(--surface))",
-        borderColor:
-          isInfo
-            ? "color-mix(in srgb, var(--info) 18%, var(--border))"
-            : "color-mix(in srgb, var(--border) 58%, transparent)",
-      }}
-    >
-      <div style={metricIconStyle(tone)}>{icon}</div>
-      <span style={metricLabelStyle}>{label}</span>
-      <strong
-        style={{
-          ...metricValueStyle,
-          color: "var(--text)",
-        }}
-      >
-        <Money value={Math.abs(value)} />
-      </strong>
-    </div>
-  );
-}
 
 function shiftMonth(ym: string, delta: number): string {
   const [y, m] = ym.split("-").map(Number);
@@ -198,11 +139,6 @@ const monthTabsWrapStyle = {
   flex: 1,
 };
 
-const heroBodyStyle = {
-  display: "grid",
-  gap: 18,
-  alignItems: "center",
-};
 
 const heroCopyStyle = {
   display: "grid",
@@ -225,167 +161,23 @@ const heroRemainingLabelStyle = {
 
 const heroRemainingValueStyle = (isNegative: boolean) => ({
   color: isNegative ? "var(--danger)" : "var(--text)",
-  fontFamily: "var(--font-body)",
+  fontFamily: "var(--font-display)",
   fontSize: "clamp(3.2rem, 15vw, 5.35rem)",
   lineHeight: 0.92,
   letterSpacing: 0,
-  fontWeight: 840,
+  fontWeight: 800,
   fontVariantNumeric: "tabular-nums",
   fontFeatureSettings: "\"tnum\"",
 });
 
 const heroRemainingMetaStyle = {
   color: "var(--text2)",
-  fontSize: 15,
+  fontSize: 13,
   lineHeight: 1.35,
 };
 
-const heroVisualStyle = {
-  position: "relative" as const,
-  minHeight: 180,
-  display: "none",
-  alignItems: "center",
-  justifyContent: "center",
+const heroSummaryLineStyle = {
+  fontSize: 12,
+  color: "var(--muted)",
+  letterSpacing: 0.1,
 };
-
-const visualBlobStyle = {
-  position: "absolute" as const,
-  width: "74%",
-  aspectRatio: "1 / 0.9",
-  borderRadius: "42% 58% 48% 52% / 54% 46% 54% 46%",
-  background: "color-mix(in srgb, var(--accent) 14%, var(--surface2))",
-  transform: "rotate(-12deg)",
-};
-
-const walletShadowStyle = {
-  position: "absolute" as const,
-  bottom: 22,
-  width: "68%",
-  height: 18,
-  borderRadius: 999,
-  background: "color-mix(in srgb, var(--ink-strong) 10%, transparent)",
-  filter: "blur(1px)",
-};
-
-const walletStyle = {
-  position: "relative" as const,
-  width: 168,
-  height: 112,
-  borderRadius: 18,
-  background: "linear-gradient(145deg, #7da95d, #416f36)",
-  border: "1px solid color-mix(in srgb, #214c25 46%, transparent)",
-  boxShadow:
-    "inset 0 2px 0 color-mix(in srgb, white 24%, transparent), 0 18px 28px color-mix(in srgb, #24451e 22%, transparent)",
-  overflow: "hidden",
-};
-
-const cashStackStyle = {
-  position: "absolute" as const,
-  left: 40,
-  top: -20,
-  width: 94,
-  height: 58,
-};
-
-const billStyle = {
-  position: "absolute" as const,
-  inset: "8px 0 auto 0",
-  height: 42,
-  borderRadius: 4,
-  background:
-    "radial-gradient(circle at 28% 50%, #f4cf63 0 15%, transparent 16%), linear-gradient(90deg, #d7e9af, #89bd65)",
-  boxShadow: "0 4px 8px color-mix(in srgb, var(--ink-strong) 12%, transparent)",
-};
-
-const walletFlapStyle = {
-  position: "absolute" as const,
-  right: -10,
-  top: 48,
-  width: 72,
-  height: 42,
-  borderRadius: "16px 0 0 16px",
-  background: "linear-gradient(145deg, #568541, #315f30)",
-  border: "1px solid color-mix(in srgb, #183d1e 48%, transparent)",
-};
-
-const walletButtonStyle = {
-  position: "absolute" as const,
-  right: 43,
-  top: 61,
-  width: 24,
-  height: 24,
-  borderRadius: 999,
-  background: "#145629",
-  boxShadow: "0 0 0 6px color-mix(in srgb, #9fe870 16%, transparent)",
-};
-
-const sparkleStyle = (left: number, top: number, size: number) => ({
-  position: "absolute" as const,
-  left: `${left}%`,
-  top: `${top}%`,
-  width: size,
-  height: size,
-  background: "color-mix(in srgb, var(--warning) 58%, white)",
-  clipPath: "polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%)",
-  opacity: 0.85,
-});
-
-const summaryGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "1fr",
-  gap: 12,
-};
-
-const metricCardStyle = {
-  position: "relative" as const,
-  display: "grid",
-  gridTemplateColumns: "44px minmax(0, 1fr)",
-  gridTemplateRows: "auto auto",
-  alignItems: "center",
-  columnGap: 12,
-  rowGap: 4,
-  minWidth: 0,
-  minHeight: 92,
-  padding: "14px 13px",
-  borderRadius: 16,
-  border: "1px solid transparent",
-};
-
-const metricLabelStyle = {
-  fontSize: 10,
-  letterSpacing: 0.32,
-  textTransform: "uppercase" as const,
-  fontWeight: 720,
-  gridColumn: "2 / 3",
-  alignSelf: "end",
-  color: "var(--text2)",
-};
-
-const metricValueStyle = {
-  gridColumn: "2 / 3",
-  alignSelf: "start",
-  fontSize: 22,
-  lineHeight: 1.25,
-  fontWeight: 800,
-  fontVariantNumeric: "tabular-nums",
-  fontFeatureSettings: "\"tnum\"",
-};
-
-const metricIconStyle = (tone: "info" | "soft") => ({
-  gridColumn: "1 / 2",
-  gridRow: "1 / 3",
-  width: 44,
-  height: 44,
-  borderRadius: 999,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color:
-    tone === "info"
-      ? "color-mix(in srgb, var(--info) 54%, var(--text))"
-      : "color-mix(in srgb, #8d69d6 68%, var(--text))",
-  background:
-    tone === "info"
-      ? "color-mix(in srgb, var(--info) 12%, white)"
-      : "color-mix(in srgb, #dcccff 42%, white)",
-});

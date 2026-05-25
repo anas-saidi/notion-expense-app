@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { BudgetScope, Category, MonthlySummary } from "./app-types";
-import { HomeOverview } from "./HomeOverview";
+import { WalletCardSwitcher } from "./WalletCardSwitcher";
+import { WalletDetailsSheet } from "./WalletDetailsSheet";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SearchIcon, SlidersIcon } from "./ui/icons";
@@ -17,8 +18,10 @@ type HomeScreenProps = {
   onOpenPlan: () => void;
   onOpenRebalance: () => void;
   monthlySummary: MonthlySummary;
+  walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   readyToAssignByScope: Record<BudgetScope, number>;
   budgetScope: BudgetScope;
+  onBudgetScopeChange: (scope: BudgetScope) => void;
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
   planDone?: boolean;
@@ -35,12 +38,16 @@ export function HomeScreen({
   onOpenPlan,
   onOpenRebalance,
   monthlySummary,
+  walletSummaries,
   readyToAssignByScope,
   budgetScope,
+  onBudgetScopeChange,
   homeMonth,
   onHomeMonthChange,
   planDone,
 }: HomeScreenProps) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   // Inline editing disabled. All edits must go through the category modal.
   const spentByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -65,17 +72,26 @@ export function HomeScreen({
 
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
-      <div style={stickyHeaderWrapStyle}>
-        <HomeOverview
-          onOpenPlan={onOpenPlan}
+      <div style={walletSwitcherWrapStyle}>
+        <WalletCardSwitcher
+          value={budgetScope}
+          onChange={onBudgetScopeChange}
           monthlySummary={monthlySummary}
-          readyToAssignByScope={readyToAssignByScope}
-          budgetScope={budgetScope}
-          homeMonth={homeMonth}
-          onHomeMonthChange={onHomeMonthChange}
-          planDone={planDone}
+          walletSummaries={walletSummaries}
+          onCardTap={() => setSheetOpen(true)}
         />
       </div>
+
+      <WalletDetailsSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        budgetScope={budgetScope}
+        monthlySummary={monthlySummary}
+        readyToAssign={readyToAssignByScope[budgetScope]}
+        categories={categories}
+        homeMonth={homeMonth}
+        onHomeMonthChange={onHomeMonthChange}
+      />
 
       <div style={{ display: "grid", gap: 16 }}>
         <div
@@ -223,8 +239,10 @@ const categoryRowWrapStyle = {
   minWidth: 0,
 };
 
-const stickyHeaderWrapStyle = {
-  paddingBottom: 20,
+const walletSwitcherWrapStyle = {
+  paddingTop: 8,
+  paddingBottom: 28,
+  margin: "0 -20px",
 };
 
 const listHeaderStyle = {
@@ -243,7 +261,7 @@ const listTitleStyle = {
 };
 
 const listSubtitleStyle = {
-  marginTop: 5,
+  marginTop: 8,
   fontSize: 12,
   color: "var(--muted)",
 };
@@ -276,7 +294,7 @@ const searchWrapStyle = {
 
 const categoryListStyle = {
   display: "grid",
-  gap: 10,
+  gap: 12,
   paddingBottom: 72,
 };
 
@@ -300,7 +318,7 @@ const categoryRowStyle = {
   textAlign: "left" as const,
   width: "100%",
   minHeight: 78,
-  padding: "12px 12px",
+  padding: "14px 14px",
   background: "var(--surface)",
   border: "1px solid var(--card-border)",
   borderRadius: 16,
@@ -342,7 +360,7 @@ const categoryMetaRowStyle = {
   justifyContent: "space-between",
   gap: 10,
   color: "var(--muted)",
-  fontSize: 10,
+  fontSize: 11,
   fontFamily: "'DM Mono', monospace",
   letterSpacing: 0.35,
   textTransform: "uppercase" as const,
@@ -382,7 +400,7 @@ const availableLabelStyle = {
 
 const availableValueStyle = {
   fontFamily: "'DM Mono', monospace",
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 800,
   lineHeight: 1.4,
 };
