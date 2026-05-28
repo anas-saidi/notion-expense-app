@@ -135,7 +135,7 @@ export function CategoryManageSheet({
       <div style={innerStyle}>
         <header style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <CategoryIcon icon={isCreate ? icon : category?.icon} style={iconStyle} />
+            <CategoryIcon icon={isCreate ? icon : category?.icon} style={{ fontSize: 28, flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
               <div style={eyebrowStyle}>{eyebrow}</div>
               <h2 style={titleStyle}>{title}</h2>
@@ -255,16 +255,9 @@ const headerStyle: CSSProperties = {
   gap: 12,
 };
 
-const iconStyle: CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--accent) 11%, var(--surface2))",
-  border: "1px solid color-mix(in srgb, var(--accent) 20%, var(--card-border))",
-};
 
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -282,11 +275,13 @@ const titleStyle: CSSProperties = {
 const closeStyle: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
-  color: "var(--text)",
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
   cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 
 const sectionStyle: CSSProperties = {
@@ -309,9 +304,10 @@ const inputStyle: CSSProperties = {
   width: "100%",
   minHeight: 48,
   borderRadius: 14,
-  border: "1px solid var(--card-border)",
+  border: "1px solid transparent",
+  boxShadow: "inset 0 0 0 1.5px var(--border2)",
   background: "color-mix(in srgb, var(--surface2) 34%, white)",
-  color: "var(--text)",
+  color: "var(--text2)",
   padding: "0 13px",
   fontSize: 15,
   outline: "none",
@@ -347,14 +343,14 @@ const segmentStyle: CSSProperties = {
 
 const segmentActiveStyle: CSSProperties = {
   background: "var(--surface)",
-  color: "var(--text)",
+  color: "var(--text2)",
   boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 7%, transparent)",
 };
 
 const amountWrapStyle: CSSProperties = {
   minHeight: 56,
   borderRadius: 16,
-  border: "1px solid var(--card-border)",
+  border: "1px solid var(--border)",
   background: "var(--surface)",
   display: "flex",
   alignItems: "center",
@@ -368,14 +364,14 @@ const amountInputStyle: CSSProperties = {
   border: "none",
   outline: "none",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   fontFamily: "var(--font-display)",
   fontSize: 28,
   fontWeight: 800,
 };
 
 const currencyStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 12,
   color: "var(--muted)",
 };

@@ -63,11 +63,11 @@ const chipStyle: CSSProperties = {
 const chipActiveStyle: CSSProperties = {
   border: "1px solid transparent",
   background: "var(--accent-dim)",
-  color: "var(--text)",
+  color: "var(--text2)",
 };
 
 const chipCountStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   opacity: 0.7,
 };

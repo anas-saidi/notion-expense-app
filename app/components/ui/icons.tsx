@@ -29,6 +29,8 @@ import {
   Wrench,
   SlidersHorizontal,
   Menu,
+  User,
+  UserRound,
   type LucideProps,
 } from "lucide-react";
 
@@ -56,6 +58,8 @@ export const XIcon            = (p: LucideProps) => <X             size={S} {...
 export const WrenchIcon       = (p: LucideProps) => <Wrench        size={S} {...p} />;
 export const SlidersIcon      = (p: LucideProps) => <SlidersHorizontal size={S} {...p} />;
 export const MenuIcon         = (p: LucideProps) => <Menu          size={S} {...p} />;
+export const UserIcon         = (p: LucideProps) => <User          size={S} {...p} />;
+export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
 
 /** Switches between Maximize2 (enter) and Minimize2 (exit). */
 export function FullScreenIcon({

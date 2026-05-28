@@ -1,35 +1,76 @@
-import { type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
-import { BUDGET_SCOPE_LABELS, fmt } from "./app-utils";
+import { fmt } from "./app-utils";
 
 type WalletCardSwitcherProps = {
   value: BudgetScope;
   onChange: (scope: BudgetScope) => void;
   monthlySummary?: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
-  onCardTap?: () => void;
+  leftToSpendByScope?: Record<BudgetScope, number>;
 };
 
 const SCOPES: BudgetScope[] = ["joint", "anas", "salma"];
 
+const SCOPE_EMOJI: Record<BudgetScope, string> = {
+  joint: "👫",
+  anas:  "👨",
+  salma: "👩",
+};
+
 const SCOPE_LABEL: Record<BudgetScope, string> = {
-  joint: "Together",
-  anas: "Anas",
+  joint: "Couple",
+  anas:  "Anas",
   salma: "Salma",
 };
 
-const SCOPE_CONTEXT: Record<BudgetScope, string> = {
-  joint: "shared month",
-  anas: "personal room",
-  salma: "personal room",
+const SCOPE_BG: Record<BudgetScope, string> = {
+  joint: "var(--accent)",
+  anas:  "var(--partner-husband)",
+  salma: "var(--partner-wife)",
 };
 
-const getWalletStatus = (available: number | null, planned: number | null) => {
-  if (planned === null || planned <= 0) return "Needs a plan";
+const SCOPE_INK: Record<BudgetScope, string> = {
+  joint: "var(--accent-ink)",
+  anas:  "#ffffff",
+  salma: "#ffffff",
+};
+
+/* Subtle background wash — each scope tints the whole hero */
+const SCOPE_WASH: Record<BudgetScope, string> = {
+  joint: "color-mix(in srgb, var(--accent) 6%, var(--bg))",
+  anas:  "color-mix(in srgb, var(--partner-husband) 8%, var(--bg))",
+  salma: "color-mix(in srgb, var(--partner-wife) 8%, var(--bg))",
+};
+
+/* Curve stroke color per scope */
+const SCOPE_CURVE_COLOR: Record<BudgetScope, string> = {
+  joint: "var(--accent)",
+  anas:  "var(--partner-husband)",
+  salma: "var(--partner-wife)",
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  "On track":  "var(--accent-ink)",
+  "Together":  "var(--accent-ink)",
+  "Low":       "var(--warning)",
+  "Over":      "var(--danger)",
+  "No plan":   "var(--muted)",
+  "Quiet":     "var(--muted)",
+};
+
+const getScopeColor = (scope: BudgetScope) => {
+  if (scope === "anas")  return "var(--partner-husband)";
+  if (scope === "salma") return "var(--partner-wife)";
+  return "var(--accent)";
+};
+
+const getStatus = (available: number | null, planned: number | null, scope?: BudgetScope) => {
+  if (planned === null || planned <= 0) return "No plan";
   if (available === null) return "Quiet";
   if (available < 0) return "Over";
   if (available / planned <= 0.18) return "Low";
-  return "On track";
+  return scope === "joint" ? "Together" : "On track";
 };
 
 const getProgress = (available: number | null, planned: number | null) => {
@@ -38,342 +79,302 @@ const getProgress = (available: number | null, planned: number | null) => {
   return Math.min(100, Math.round((spent / planned) * 100));
 };
 
-const getScopeColor = (scope: BudgetScope) => {
-  if (scope === "anas") return "var(--partner-husband-strong)";
-  if (scope === "salma") return "var(--partner-wife-strong)";
-  return "var(--accent-ink)";
-};
 
-export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, onCardTap }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope }: WalletCardSwitcherProps) {
+  const [hovered, setHovered]   = useState<BudgetScope | null>(null);
+  const [pressed, setPressed]   = useState<BudgetScope | null>(null);
+
   const currentSummary = monthlySummary ?? walletSummaries?.[value];
-  const available = currentSummary ? currentSummary.totalAssigned - currentSummary.totalSpent : null;
-  const planned = currentSummary?.totalAssigned ?? null;
-  const progress = getProgress(available, planned);
-  const status = getWalletStatus(available, planned);
-  const isOver = available !== null && available < 0;
-  const hasPlan = planned !== null && planned > 0;
+  const available = leftToSpendByScope != null ? leftToSpendByScope[value] : currentSummary ? currentSummary.totalAssigned - currentSummary.totalSpent : null;
+  const planned   = currentSummary?.totalAssigned ?? null;
+  const progress  = getProgress(available, planned);
+  const status    = getStatus(available, planned, value);
+  const isOver    = available !== null && available < 0;
+  const hasPlan   = planned !== null && planned > 0;
 
   return (
-    <section style={wrapStyle} aria-label="Wallet overview">
+    <section
+      style={{
+        ...wrapStyle,
+        background: SCOPE_WASH[value],
+        transition: "background 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
+      aria-label="Wallet overview"
+    >
+
+      {/* Scope switcher */}
       <div style={pillRailStyle} role="tablist" aria-label="Budget view">
         {SCOPES.map((scope) => {
           const isActive = scope === value;
-          const summary = walletSummaries?.[scope] ?? (isActive ? currentSummary : null);
-          const scopeAvailable = summary ? summary.totalAssigned - summary.totalSpent : null;
-
-          if (isActive) {
-            return (
-              <button
-                key={scope}
-                type="button"
-                role="tab"
-                aria-selected={true}
-                aria-label={`${BUDGET_SCOPE_LABELS[scope]} wallet (active)`}
-                onClick={onCardTap}
-                style={activePillStyle(scope)}
-              >
-                <span style={pillInitialBadgeStyle(scope)}>
-                  {SCOPE_INITIAL[scope]}
-                </span>
-                <span style={pillNameStyle(scope)}>{SCOPE_LABEL[scope]}</span>
-                <span style={pillBalanceStyle(scope)}>
-                  {scopeAvailable !== null ? fmt(Math.abs(scopeAvailable)) : "—"}
-                </span>
-              </button>
-            );
-          }
+          const isHov    = hovered === scope && !isActive;
+          const isPrs    = pressed === scope;
 
           return (
             <button
               key={scope}
               type="button"
               role="tab"
-              aria-selected={false}
-              aria-label={`Switch to ${BUDGET_SCOPE_LABELS[scope]} wallet`}
+              aria-selected={isActive}
+              aria-label={isActive ? `${scope} wallet, active` : `Switch to ${scope} wallet`}
               onClick={() => onChange(scope)}
-              style={inactivePillStyle(scope)}
+              onMouseEnter={() => setHovered(scope)}
+              onMouseLeave={() => { setHovered(null); setPressed(null); }}
+              onMouseDown={() => setPressed(scope)}
+              onMouseUp={() => setPressed(null)}
+              style={
+                isActive
+                  ? {
+                      ...activePillStyle(scope),
+                      transform: isPrs ? "scale(0.95)" : "translateY(-1px)",
+                    }
+                  : {
+                      ...inactivePillStyle(scope),
+                      opacity: isPrs ? 0.9 : isHov ? 0.75 : 0.45,
+                      transform: isPrs ? "scale(0.93)" : isHov ? "translateY(-2px)" : "none",
+                    }
+              }
             >
-              <span style={inactiveInitialStyle(scope)}>{SCOPE_INITIAL[scope]}</span>
+              <span style={{ fontSize: 18, lineHeight: 1 }}>{SCOPE_EMOJI[scope]}</span>
+              {isActive && <span style={activeLabelStyle}>{SCOPE_LABEL[scope]}</span>}
+
             </button>
           );
         })}
       </div>
 
-      <button
-        key={value}
-        type="button"
-        onClick={onCardTap}
-        style={statementStyle}
-        aria-label={`${BUDGET_SCOPE_LABELS[value]} wallet details`}
-      >
-        <span style={statusBadgeWrapStyle}>
-          <span style={statusBadgeStyle(status)}>
-            <span style={statusDotStyle(status)} aria-hidden="true" />
-            {status}
-          </span>
-          <span style={statusContextStyle}>· {SCOPE_CONTEXT[value]}</span>
-        </span>
+      {/* Hero */}
+      <div style={heroStyle} key={value}>
 
-        <span style={sentenceStyle}>
-          <strong style={nameStyle(value)}>{SCOPE_LABEL[value]}</strong>
-          {" has "}
-          <strong style={amountStyle(isOver)}>
-            {fmt(Math.abs(available ?? 0))}
-            <span style={currencyStyle}> MAD</span>
-          </strong>
-          {isOver ? " to cover" : " left"}
-        </span>
+        {/* Status + number */}
+        <div style={numberGroupStyle}>
+          <span style={statusStyle(status)}>{status}</span>
+          <div style={amountRowStyle}>
+            <span style={bigNumberStyle(isOver)}>
+              {fmt(Math.abs(available ?? 0))}
+            </span>
+            <span style={unitStyle(isOver)}>
+              MAD {isOver ? "over" : "left"}
+            </span>
+          </div>
+        </div>
 
-        <span style={trackStyle} aria-hidden="true">
-          <span style={{ ...fillStyle(value, isOver), width: `${progress}%` }} />
-        </span>
+        {/* Curve chart + caption */}
+        {(() => {
+          const t = progress / 100;
+          const curveColor = isOver
+            ? "var(--spend-over)"
+            : progress >= 85 ? "var(--spend-warn)"
+            : progress >= 65 ? "var(--spend-caution)"
+            : SCOPE_CURVE_COLOR[value];
+          // Quadratic bezier M 0,37 Q 120,2 240,37
+          // x(t) = 240t  →  curX = 240 * t
+          // y(t) = 37 - 70*t*(1-t)
+          const curX = 240 * t;
+          const curY = 37 - 70 * t * (1 - t);
+          return (
+            <div style={curveGroupStyle}>
+              <svg
+                viewBox="0 0 240 42"
+                style={{ width: "100%", height: 42, display: "block", overflow: "visible" }}
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id={`wcs-fill-${value}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={curveColor} stopOpacity="0.28" />
+                    <stop offset="100%" stopColor={curveColor} stopOpacity="0.03" />
+                  </linearGradient>
+                  <clipPath id={`wcs-clip-${value}`}>
+                    <rect x="0" y="0" height="42"
+                      style={{
+                        width: hasPlan ? curX : 0,
+                        transition: "width 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
+                      }}
+                    />
+                  </clipPath>
+                </defs>
 
-        <span style={metaStyle}>
-          {hasPlan ? `${fmt(planned!)} MAD planned · ${progress}% used` : "No plan yet — tap to set one up"}
-        </span>
-      </button>
+                {/* Faint full-arc track */}
+                <path
+                  d="M 0,37 Q 120,2 240,37"
+                  fill="none"
+                  stroke="var(--surface2)"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+
+                {/* Tinted fill under curve, clipped to progress */}
+                <path
+                  d="M 0,37 Q 120,2 240,37 L 240,42 L 0,42 Z"
+                  fill={`url(#wcs-fill-${value})`}
+                  clipPath={`url(#wcs-clip-${value})`}
+                />
+
+                {/* Active stroke, clipped to progress */}
+                <path
+                  d="M 0,37 Q 120,2 240,37"
+                  fill="none"
+                  stroke={curveColor}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  clipPath={`url(#wcs-clip-${value})`}
+                />
+
+                {/* Current position dot */}
+                {hasPlan && progress > 0 && (
+                  <circle
+                    cx={0} cy={0} r="4"
+                    fill={curveColor}
+                    style={{
+                      transform: `translate(${curX}px, ${curY}px)`,
+                      transition: "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
+                    }}
+                  />
+                )}
+              </svg>
+
+              <div style={captionRowStyle}>
+                {hasPlan ? (
+                  <>
+                    <span style={captionStyle}>{progress}% spent</span>
+                    <span style={captionDimStyle}>of {fmt(planned!)} MAD planned</span>
+                  </>
+                ) : (
+                  <span style={captionStyle}>No plan yet</span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+      </div>
+
     </section>
   );
 }
 
-const SCOPE_INITIAL: Record<BudgetScope, string> = {
-  joint: "T",
-  anas: "A",
-  salma: "S",
-};
-
-const SCOPE_BG: Record<BudgetScope, string> = {
-  joint: "var(--accent)",
-  anas: "var(--partner-husband)",
-  salma: "var(--partner-wife)",
-};
-
-const SCOPE_INK: Record<BudgetScope, string> = {
-  joint: "var(--accent-ink)",
-  anas: "#ffffff",
-  salma: "#ffffff",
-};
+/* ─── Styles ──────────────────────────────────────────────────── */
 
 const wrapStyle: CSSProperties = {
   display: "grid",
-  gap: 20,
-  padding: "0 24px",
+  gap: 36,
+  padding: "16px 24px 24px",
+  borderRadius: 24,
 };
 
 const pillRailStyle: CSSProperties = {
   display: "flex",
   gap: 8,
-  alignItems: "center",
-  overflowX: "auto",
-  padding: "4px 0",
 };
 
 const activePillStyle = (scope: BudgetScope): CSSProperties => ({
-  flex: "0 0 116px",
-  minHeight: 38,
+  height: 38,
   borderRadius: 12,
-  border: "1px solid transparent",
+  border: "none",
   background: SCOPE_BG[scope],
   color: SCOPE_INK[scope],
-  padding: "6px 9px",
-  display: "grid",
-  gridTemplateColumns: "24px minmax(0, 1fr)",
-  gridTemplateRows: "auto auto",
-  alignItems: "center",
-  gap: "1px 7px",
-  textAlign: "left",
+  padding: "0 14px 0 10px",
+  gap: 7,
   cursor: "pointer",
-  boxShadow: "none",
-  animation: "categorySelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both",
-  transition: "box-shadow 0.22s ease",
-});
-
-const pillInitialBadgeStyle = (scope: BudgetScope): CSSProperties => ({
-  gridColumn: "1 / 2",
-  gridRow: "1 / 3",
-  width: 24,
-  height: 24,
-  borderRadius: "50%",
-  background: "rgba(255, 255, 255, 0.22)",
-  display: "flex",
+  display: "inline-flex",
   alignItems: "center",
-  justifyContent: "center",
-  fontFamily: "var(--font-display)",
-  fontSize: 11,
-  fontWeight: 800,
-  color: SCOPE_INK[scope],
-  flexShrink: 0,
+  transition: "transform 0.15s cubic-bezier(0.22, 1, 0.36, 1)",
+  animation: "categorySelectIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+  position: "relative",
 });
 
-const pillNameStyle = (scope: BudgetScope): CSSProperties => ({
-  gridColumn: "2 / 3",
-  gridRow: "1 / 2",
-  fontSize: 11,
-  fontWeight: 800,
-  fontFamily: "var(--font-display)",
+const activeLabelStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: 13,
+  fontWeight: 600,
   lineHeight: 1,
-  color: SCOPE_INK[scope],
-  overflow: "hidden",
-  textOverflow: "ellipsis",
   whiteSpace: "nowrap",
-});
-
-const pillBalanceStyle = (scope: BudgetScope): CSSProperties => ({
-  gridColumn: "2 / 3",
-  gridRow: "2 / 3",
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 9,
-  fontWeight: 500,
-  lineHeight: 1,
-  color: SCOPE_INK[scope],
-  opacity: 0.7,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-});
+};
 
 const inactivePillStyle = (scope: BudgetScope): CSSProperties => ({
-  flex: "0 0 36px",
-  width: 36,
-  minHeight: 36,
-  borderRadius: 10,
-  border: "1px solid color-mix(in srgb, var(--border) 38%, transparent)",
-  background: "color-mix(in srgb, var(--surface) 90%, white)",
+  width: 38,
+  height: 38,
+  borderRadius: 12,
+  border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
+  background: "transparent",
   color: getScopeColor(scope),
-  padding: 0,
+  cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  cursor: "pointer",
-  boxShadow: "none",
-  transition: "transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease",
+  transition: "opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
+  position: "relative",
 });
 
-const inactiveInitialStyle = (scope: BudgetScope): CSSProperties => ({
-  fontFamily: "var(--font-display)",
-  fontSize: 12,
-  fontWeight: 800,
-  color: getScopeColor(scope),
-  opacity: 0.6,
-  lineHeight: 1,
-});
-
-const statementStyle: CSSProperties = {
-  width: "100%",
-  border: "none",
-  background: "transparent",
-  color: "var(--text)",
-  padding: 0,
+const heroStyle: CSSProperties = {
   display: "grid",
-  gap: 12,
-  textAlign: "left",
-  cursor: "pointer",
+  gap: 24,
   animation: "fadeUp 0.22s ease both",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  "On track": "var(--accent)",
-  "Low": "var(--warning)",
-  "Over": "var(--danger)",
-  "Needs a plan": "var(--muted)",
-  "Quiet": "var(--muted)",
+const numberGroupStyle: CSSProperties = {
+  display: "grid",
+  gap: 5,
 };
 
-const statusBadgeWrapStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-};
-
-const statusBadgeStyle = (status: string): CSSProperties => {
-  const color = STATUS_COLOR[status] ?? "var(--muted)";
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    padding: "3px 9px 3px 6px",
-    borderRadius: 999,
-    background: `color-mix(in srgb, ${color} 12%, var(--surface2))`,
-    border: `1px solid color-mix(in srgb, ${color} 22%, transparent)`,
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: 0.2,
-    color: `color-mix(in srgb, ${color} 80%, var(--text2))`,
-  };
-};
-
-const statusDotStyle = (status: string): CSSProperties => {
-  const color = STATUS_COLOR[status] ?? "var(--muted)";
-  const isPulsing = status === "Low" || status === "Over";
-  return {
-    display: "inline-block",
-    width: 6,
-    height: 6,
-    borderRadius: "50%",
-    background: color,
-    flexShrink: 0,
-    animation: isPulsing ? "pulse 1.6s ease infinite" : undefined,
-  };
-};
-
-const statusContextStyle: CSSProperties = {
-  fontSize: 11,
-  color: "var(--muted)",
-  letterSpacing: 0.2,
-};
-
-const sentenceStyle: CSSProperties = {
-  display: "block",
-  maxWidth: 620,
-  fontSize: "clamp(28px, 7vw, 48px)",
-  lineHeight: 0.98,
-  fontFamily: "var(--font-display)",
-  fontWeight: 760,
-  color: "var(--text)",
-};
-
-const nameStyle = (scope: BudgetScope): CSSProperties => ({
-  fontWeight: 880,
-  color: scope === "anas"
-    ? "var(--partner-husband)"
-    : scope === "salma"
-    ? "var(--partner-wife)"
-    : "inherit",
-});
-
-const amountStyle = (isOver: boolean): CSSProperties => ({
-  fontWeight: 880,
-  color: isOver ? "var(--danger)" : "var(--text)",
-  fontVariantNumeric: "tabular-nums",
-  fontFeatureSettings: "\"tnum\"",
-});
-
-const currencyStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
-  fontSize: "0.28em",
+const statusStyle = (status: string): CSSProperties => ({
+  fontSize: 9,
   fontWeight: 700,
-  color: "var(--muted)",
-};
-
-const trackStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  height: 7,
-  borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface2) 78%, white)",
-  overflow: "hidden",
-};
-
-const fillStyle = (scope: BudgetScope, isOver: boolean): CSSProperties => ({
-  display: "block",
-  height: "100%",
-  borderRadius: 999,
-  background: isOver ? "var(--danger)" : getScopeColor(scope),
-  transition: "width 0.26s cubic-bezier(0.22, 1, 0.36, 1)",
+  letterSpacing: 1.4,
+  textTransform: "uppercase",
+  color: STATUS_COLOR[status] ?? "var(--muted)",
 });
 
-const metaStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+const amountRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: 7,
+};
+
+const bigNumberStyle = (isOver: boolean): CSSProperties => ({
+  fontFamily: "var(--font-body)",
+  fontSize: "clamp(56px, 15vw, 88px)",
+  fontWeight: 400,
+  lineHeight: 0.88,
+  letterSpacing: "-0.022em",
+  color: isOver ? "var(--danger)" : "var(--text2)",
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: '"tnum"',
+});
+
+const unitStyle = (isOver: boolean): CSSProperties => ({
+  fontFamily: "var(--font-body)",
+  fontSize: "clamp(12px, 2.8vw, 15px)",
+  fontWeight: 400,
+  letterSpacing: "0.01em",
+  color: isOver ? "color-mix(in srgb, var(--danger) 70%, var(--muted))" : "var(--muted)",
+  lineHeight: 1,
+});
+
+const curveGroupStyle: CSSProperties = {
+  display: "grid",
+  gap: 4,
+};
+
+const captionRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "center",
+  gap: 6,
+};
+
+const captionStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
   fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "0.02em",
+  color: "var(--text2)",
+};
+
+const captionDimStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: 10,
+  fontWeight: 400,
+  letterSpacing: "0.02em",
   color: "var(--muted)",
 };
+

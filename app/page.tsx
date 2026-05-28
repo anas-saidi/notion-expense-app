@@ -20,6 +20,7 @@ import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Trans
 import {
   categoryMatchesScope,
   categoryIdMatchesScope,
+  evalExpr,
   fmtDate,
   getLeftToAssignByScope,
   monthBounds,
@@ -109,6 +110,7 @@ export default function App() {
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [showRebalance, setShowRebalance] = useState(false);
   const [showManageScreen, setShowManageScreen] = useState(false);
+  const [showHomeCategories, setShowHomeCategories] = useState(false);
   const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | null>(null);
   const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
   const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
@@ -132,6 +134,9 @@ export default function App() {
   const [microToast, setMicroToast] = useState<string | null>(null);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
+  const [monthlyTrend, setMonthlyTrend] = useState<Array<{ month: string; totalSpent: number }>>([]);
+  const [historyMonth, setHistoryMonth] = useState(formatMonthInput(today()));
+  const [historyTransactions, setHistoryTransactions] = useState<Transaction[]>([]);
   const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const initialAcctApplied = useRef(false);
@@ -211,9 +216,20 @@ export default function App() {
     const data = await fetch("/api/transactions?page_size=100").then((r) => r.json());
     const txns: Transaction[] = data.transactions ?? [];
     setTransactions(txns);
-    const latestCat = txns[0]?.category;
+    const latestCat = txns.find(t => (!t.type || t.type === "Expense") && t.category)?.category;
     if (latestCat) setLastUsedCatId(latestCat);
   };
+
+  const fetchHistoryTransactions = useCallback(async (month: string) => {
+    const { start, end } = monthBounds(`${month}-01`);
+    const data = await fetch(`/api/transactions?start=${start}&end=${end}&page_size=100`).then(r => r.json());
+    setHistoryTransactions(data.transactions ?? []);
+  }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (tab === "history") fetchHistoryTransactions(historyMonth);
+  }, [tab, historyMonth, fetchHistoryTransactions]);
 
   const fetchMonthlySummary = async (month?: string) => {
     try {
@@ -238,6 +254,22 @@ export default function App() {
         spentByCategory: [],
       });
     }
+  };
+
+  const fetchMonthlyTrend = async () => {
+    const months = Array.from({ length: 5 }, (_, i) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - (4 - i));
+      return d.toISOString().slice(0, 7);
+    });
+    const results = await Promise.allSettled(
+      months.map(async (m) => {
+        const { start, end } = monthBounds(`${m}-01`);
+        const data = await fetch(`/api/monthly-summary?start=${start}&end=${end}`).then(r => r.json());
+        return { month: m, totalSpent: data.summary?.totalSpent ?? 0 };
+      })
+    );
+    setMonthlyTrend(results.flatMap(r => r.status === "fulfilled" ? [r.value] : []));
   };
 
   const fetchPending = async () => {
@@ -288,6 +320,7 @@ export default function App() {
 
     fetchTransactions();
     fetchPending();
+    fetchMonthlyTrend();
   }, []);
 
   // Refetch monthly summary whenever the viewed home month changes
@@ -504,8 +537,9 @@ export default function App() {
 
   const deleteTransaction = (id: string) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+    setHistoryTransactions((prev) => prev.filter((t) => t.id !== id));
     fetch("/api/transactions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
-      .then((r) => { if (!r.ok) fetchTransactions(); else fetchMonthlySummary(homeMonth); });
+      .then((r) => { if (!r.ok) { fetchTransactions(); fetchHistoryTransactions(historyMonth); } else fetchMonthlySummary(homeMonth); });
   };
 
   const selectedCat = categories.find((c) => c.id === categoryId);
@@ -659,9 +693,22 @@ export default function App() {
     };
   }, [getMonthlySummaryForScope]);
 
+  const leftToSpendByScope = useMemo<Record<BudgetScope, number>>(() => {
+    const sum = (scope: BudgetScope) =>
+      categories
+        .filter(c => categoryMatchesScope(c, scope) && !isSavingsCategory(c))
+        .reduce((s, c) => s + (c.available ?? 0), 0);
+    return { joint: sum("joint"), anas: sum("anas"), salma: sum("salma") };
+  }, [categories]);
+
   const scopedTransactions = useMemo(
     () => transactions.filter((transaction) => transactionMatchesScope(transaction, categories, budgetScope)),
     [budgetScope, categories, transactions],
+  );
+
+  const scopedHistoryTransactions = useMemo(
+    () => historyTransactions.filter(t => transactionMatchesScope(t, categories, budgetScope)),
+    [historyTransactions, categories, budgetScope],
   );
 
   const scopedPendingItems = useMemo(
@@ -774,7 +821,7 @@ export default function App() {
     );
   }
 
-  const parsedAmount = amount ? parseFloat(amount) : 0;
+  const parsedAmount = amount ? evalExpr(amount) : 0;
   const isEditingTransaction = Boolean(editingTransactionId);
   const categoryUnfunded = !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
   const categoryOverBudget = !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
@@ -785,7 +832,7 @@ export default function App() {
     <AppShell
       tab={tab}
       pendingCount={scopedPendingItems.length}
-      onTabChange={setTab}
+      onTabChange={(t) => { setTab(t); if (t !== "home") setShowHomeCategories(false); }}
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setShowAddModal(true);
@@ -794,6 +841,7 @@ export default function App() {
       toast={microToast}
       showAddButton={tab !== "plan" && !showManageScreen}
       immersive={tab === "plan" || showManageScreen}
+      hideHeader={showHomeCategories}
     >
       {showManageScreen && (
         <ManageScreen
@@ -828,14 +876,21 @@ export default function App() {
           }}
           onOpenPlan={() => setTab("plan")}
           onOpenRebalance={() => setShowRebalance(true)}
+          onFundCategory={openFundCategory}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
+          leftToSpendByScope={leftToSpendByScope}
           readyToAssignByScope={readyToAssignByScope}
           budgetScope={budgetScope}
           onBudgetScopeChange={setBudgetScope}
           homeMonth={homeMonth}
           onHomeMonthChange={setHomeMonth}
           planDone={planCompletedMonth === homeMonth}
+          showCategories={showHomeCategories}
+          onShowCategoriesChange={setShowHomeCategories}
+          transactions={scopedTransactions}
+          pendingItems={scopedPendingItems}
+          onOpenHistory={() => setTab("history")}
         />
       )}
 
@@ -874,12 +929,12 @@ export default function App() {
 
       {!showManageScreen && tab === "history" && (
         <HistoryScreen
-          transactions={scopedTransactions}
+          transactions={scopedHistoryTransactions}
           categories={categories}
           budgetScope={budgetScope}
-          onClickTransaction={(t) => {
-            editTransaction(t);
-          }}
+          historyMonth={historyMonth}
+          onHistoryMonthChange={setHistoryMonth}
+          onClickTransaction={editTransaction}
           onDeleteTransaction={deleteTransaction}
         />
       )}
@@ -923,8 +978,8 @@ export default function App() {
           setStatus("idle");
         }}
         onAmountChange={(value) => {
-          const cleaned = value.replace(/[^0-9.]/g, "");
-          if ((cleaned.match(/\./g) || []).length <= 1) setAmount(cleaned);
+          const cleaned = value.replace(/[^0-9.+\-*/\s]/g, "");
+          setAmount(cleaned);
         }}
         onNameChange={(value) => {
           setName(value);

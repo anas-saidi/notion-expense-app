@@ -86,7 +86,7 @@ const GROUP_META: Record<UrgencyGroup, GroupMeta> = {
     dotColor: "var(--danger)",
     labelColor: "var(--danger)",
     cardBg: "color-mix(in srgb, var(--danger) 5%, var(--surface))",
-    cardBorder: "color-mix(in srgb, var(--danger) 28%, var(--card-border))",
+    cardBorder: "color-mix(in srgb, var(--danger) 28%, var(--border))",
     timeColor: "var(--danger)",
     urgent: true,
   },
@@ -94,15 +94,15 @@ const GROUP_META: Record<UrgencyGroup, GroupMeta> = {
     dotColor: "var(--warning)",
     labelColor: "color-mix(in srgb, var(--warning) 55%, #7a5800)",
     cardBg: "color-mix(in srgb, var(--warning) 7%, var(--surface))",
-    cardBorder: "color-mix(in srgb, var(--warning) 35%, var(--card-border))",
+    cardBorder: "color-mix(in srgb, var(--warning) 35%, var(--border))",
     timeColor: "color-mix(in srgb, var(--warning) 55%, #7a5800)",
     urgent: true,
   },
   "This week": {
     dotColor: "var(--accent)",
-    labelColor: "var(--text2)",
+    labelColor: "var(--muted)",
     cardBg: "var(--surface)",
-    cardBorder: "var(--card-border)",
+    cardBorder: "transparent",
     timeColor: "var(--text2)",
     urgent: false,
   },
@@ -110,7 +110,7 @@ const GROUP_META: Record<UrgencyGroup, GroupMeta> = {
     dotColor: "var(--muted)",
     labelColor: "var(--muted)",
     cardBg: "var(--surface)",
-    cardBorder: "var(--card-border)",
+    cardBorder: "transparent",
     timeColor: "var(--muted)",
     urgent: false,
   },
@@ -118,7 +118,7 @@ const GROUP_META: Record<UrgencyGroup, GroupMeta> = {
     dotColor: "var(--muted)",
     labelColor: "var(--muted)",
     cardBg: "var(--surface)",
-    cardBorder: "var(--card-border)",
+    cardBorder: "transparent",
     timeColor: "var(--muted)",
     urgent: false,
   },
@@ -126,7 +126,7 @@ const GROUP_META: Record<UrgencyGroup, GroupMeta> = {
     dotColor: "var(--border2)",
     labelColor: "var(--muted)",
     cardBg: "var(--surface)",
-    cardBorder: "var(--card-border)",
+    cardBorder: "transparent",
     timeColor: "var(--muted)",
     urgent: false,
   },
@@ -261,7 +261,7 @@ export function PendingScreen({
                   alignItems: "center",
                   gap: 5,
                   fontSize: 11,
-                  fontFamily: "'DM Mono', monospace",
+                  fontFamily: "var(--font-body)",
                   color: "var(--text2)",
                   background: "var(--surface2)",
                   borderRadius: 999,
@@ -306,11 +306,11 @@ export function PendingScreen({
                 <span
                   style={{
                     fontSize: 11,
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: "var(--font-body)",
                     letterSpacing: 0.7,
                     textTransform: "uppercase",
                     color: meta.labelColor,
-                    fontWeight: meta.urgent ? 600 : 400,
+                    fontWeight: 700,
                   }}
                 >
                   {label}
@@ -318,7 +318,7 @@ export function PendingScreen({
                 <span
                   style={{
                     fontSize: 11,
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: "var(--font-body)",
                     color: "var(--muted)",
                     opacity: 0.45,
                   }}
@@ -341,8 +341,9 @@ export function PendingScreen({
                         {
                           background: meta.cardBg,
                           border: `1px solid ${meta.cardBorder}`,
-                          borderRadius: "var(--card-radius)",
+                          borderRadius: 14,
                           overflow: "hidden",
+                          boxShadow: meta.urgent ? "none" : "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
                           "--stagger": `${i * 35}ms`,
                         } as CSSProperties
                       }
@@ -356,13 +357,13 @@ export function PendingScreen({
                           padding: "14px 14px 12px",
                         }}
                       >
-                        <div style={iconBadgeStyle}><CategoryIcon icon={cat?.icon} style={{ fontSize: 18 }} /></div>
+                        <CategoryIcon icon={cat?.icon} style={{ fontSize: 18, flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: 500,
-                              color: "var(--text)",
+                              color: "var(--text2)",
                               whiteSpace: "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
@@ -374,7 +375,7 @@ export function PendingScreen({
                           <div
                             style={{
                               fontSize: 11,
-                              fontFamily: "'DM Mono', monospace",
+                              fontFamily: "var(--font-body)",
                               color: "var(--muted)",
                               marginTop: 3,
                               display: "flex",
@@ -480,7 +481,7 @@ export function PendingScreen({
               fontFamily: "var(--font-display)",
               fontSize: 18,
               fontWeight: 700,
-              color: "var(--text)",
+              color: "var(--text2)",
               marginBottom: 8,
             }}
           >
@@ -537,7 +538,7 @@ export function PendingScreen({
                   fontFamily: "var(--font-display)",
                   fontSize: 22,
                   fontWeight: 700,
-                  color: "var(--text)",
+                  color: "var(--text2)",
                   lineHeight: 1,
                 }}
               >
@@ -713,17 +714,6 @@ const addChipStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const iconBadgeStyle: CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 12,
-  background: "var(--surface2)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-  fontSize: 16,
-};
 
 const logItButtonStyle: CSSProperties = {
   width: "100%",
@@ -756,7 +746,7 @@ const inputStyle: CSSProperties = {
   border: "1px solid transparent",
   borderRadius: 14,
   padding: "13px 16px",
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 15,
   boxShadow: "inset 0 0 0 1.5px var(--border2)",
 };
@@ -767,7 +757,7 @@ const chipPickerStyle: CSSProperties = {
   borderRadius: 14,
   border: "1px solid var(--border)",
   background: "var(--surface)",
-  color: "var(--text)",
+  color: "var(--text2)",
   display: "inline-flex",
   alignItems: "center",
   gap: 8,
@@ -781,7 +771,7 @@ const pickerListButtonStyle: CSSProperties = {
   background: "transparent",
   border: "none",
   borderRadius: 12,
-  color: "var(--text)",
+  color: "var(--text2)",
   display: "flex",
   alignItems: "center",
   gap: 10,
@@ -826,7 +816,7 @@ const claimReleaseStyle: CSSProperties = {
   background: "transparent",
   color: "var(--muted)",
   fontSize: 11,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   cursor: "pointer",
   letterSpacing: 0.2,
   flexShrink: 0,

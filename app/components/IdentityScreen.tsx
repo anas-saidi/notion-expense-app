@@ -91,7 +91,7 @@ export function IdentityScreen({ onSelect }: Props) {
               {name[0]}
             </span>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", lineHeight: 1.1 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text2)", lineHeight: 1.1 }}>
                 {name}
               </div>
               <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>

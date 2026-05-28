@@ -134,7 +134,7 @@ export function CategoryDetailsSheet({
         {/* ── Header ── */}
         <header style={topBarStyle}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <CategoryIcon icon={category.icon} style={iconOrbStyle} />
+            <CategoryIcon icon={category.icon} style={{ fontSize: 28, flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
               <div style={eyebrowStyle}>Category details</div>
               <div style={titleRowStyle}>
@@ -243,7 +243,7 @@ export function CategoryDetailsSheet({
                         <div style={{
                           width: 1,
                           flex: 1,
-                          background: "var(--card-border)",
+                          background: "var(--border)",
                           minHeight: 16,
                           marginTop: 3,
                           marginBottom: 3,
@@ -257,7 +257,7 @@ export function CategoryDetailsSheet({
                         <div style={{
                           fontSize: 14,
                           fontWeight: 600,
-                          color: "var(--text)",
+                          color: "var(--text2)",
                           minWidth: 0,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -304,7 +304,7 @@ function SpendingBarChart({ bars, categoryPlanned, height = 108 }: { bars: Month
             tickFormatter={monthLabel}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 10, fontFamily: "'DM Mono', monospace", fill: "#6e6e6d" }}
+            tick={{ fontSize: 10, fontFamily: "var(--font-body)", fill: "#6e6e6d" }}
             interval={0}
           />
           {categoryPlanned > 0 && (
@@ -350,7 +350,7 @@ function StatCard({ label, value, tone = "default" }: { label: string; value: nu
     tone === "positive" ? "var(--success)"
     : tone === "negative" ? "var(--spend-over)"
     : tone === "warn" ? "var(--spend-warn)"
-    : "var(--text)";
+    : "var(--text2)";
   return (
     <div style={statCardStyle}>
       <div style={statLabelStyle}>{label}</div>
@@ -422,10 +422,9 @@ const topBarStyle: CSSProperties = {
 const closeButtonStyle: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
-  color: "var(--text)",
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -433,17 +432,6 @@ const closeButtonStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-const iconOrbStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 16,
-  background: "linear-gradient(180deg, color-mix(in srgb, var(--accent-dim) 58%, white) 0%, color-mix(in srgb, var(--surface2) 75%, white) 100%)",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 24,
-  flexShrink: 0,
-};
 
 const titleRowStyle: CSSProperties = {
   display: "flex",
@@ -463,7 +451,7 @@ const titleStyle: CSSProperties = {
 };
 
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -493,7 +481,7 @@ const heroValueStyle: CSSProperties = {
   fontSize: "clamp(2.3rem, 7vw, 3.8rem)",
   lineHeight: 0.92,
   fontWeight: 800,
-  color: "var(--text)",
+  color: "var(--text2)",
 };
 
 
@@ -570,7 +558,7 @@ const chartTooltipStyle: CSSProperties = {
   borderRadius: 999,
   padding: "4px 10px",
   fontSize: 11,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   whiteSpace: "nowrap",
   pointerEvents: "none",
 };
@@ -582,7 +570,7 @@ const panelMessageStyle: CSSProperties = {
 };
 
 const amountTextStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 12,
   fontWeight: 700,
 };
@@ -590,7 +578,7 @@ const amountTextStyle: CSSProperties = {
 const metaTextStyle: CSSProperties = {
   fontSize: 11,
   color: "var(--muted)",
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   letterSpacing: 0.1,
 };
 

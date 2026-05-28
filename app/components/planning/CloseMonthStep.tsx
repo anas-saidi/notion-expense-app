@@ -464,7 +464,7 @@ const reconcileHeaderStyle: CSSProperties = {
 };
 
 const reconcileTitleStyle: CSSProperties = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 14,
   fontWeight: 700,
 };
@@ -557,7 +557,7 @@ const identityCopyStyle: CSSProperties = {
 };
 
 const rowTitleStyle: CSSProperties = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 15,
   lineHeight: 1.3,
 };
@@ -576,11 +576,11 @@ const metaStyle: CSSProperties = {
   color: "var(--muted)",
   fontSize: 12,
   lineHeight: 1.45,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
 };
 
 const balanceValueStyle: CSSProperties = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 16,
   lineHeight: 1.1,
 };
@@ -601,7 +601,7 @@ const repairButtonStyle: CSSProperties = {
   borderRadius: 12,
   border: "none",
   background: "color-mix(in srgb, var(--surface2) 52%, white)",
-  color: "var(--text)",
+  color: "var(--text2)",
 };
 
 const repairMenuAnchorStyle: CSSProperties = {
@@ -630,7 +630,7 @@ const repairOptionStyle: CSSProperties = {
   borderRadius: 12,
   border: "none",
   background: "color-mix(in srgb, var(--surface2) 38%, white)",
-  color: "var(--text)",
+  color: "var(--text2)",
 };
 
 const repairFieldStyle: CSSProperties = {
@@ -642,7 +642,7 @@ const repairFieldStyle: CSSProperties = {
 const repairFieldLabelStyle: CSSProperties = {
   color: "var(--muted)",
   fontSize: 11,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   letterSpacing: 0.4,
   textTransform: "uppercase",
 };
@@ -654,12 +654,12 @@ const repairInputStyle: CSSProperties = {
   borderRadius: 12,
   border: "none",
   background: "color-mix(in srgb, var(--surface2) 58%, white)",
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 15,
 };
 
 const repairOptionTitleStyle: CSSProperties = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 13,
   lineHeight: 1.3,
 };
@@ -671,11 +671,11 @@ const repairOptionCopyStyle: CSSProperties = {
 };
 
 const repairDifferenceStyle: CSSProperties = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 12,
   lineHeight: 1.4,
   padding: "0 4px",
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
 };
 
 const repairErrorStyle: CSSProperties = {

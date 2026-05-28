@@ -68,7 +68,7 @@ const inputMetaStyle: CSSProperties = {
 
 const targetLabelStyle: CSSProperties = {
   fontSize: 10,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   textTransform: "uppercase",
   letterSpacing: 0.4,
   color: "color-mix(in srgb, var(--text2) 86%, transparent)",
@@ -76,7 +76,7 @@ const targetLabelStyle: CSSProperties = {
 
 const nowLabelStyle: CSSProperties = {
   fontSize: 10,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   textTransform: "uppercase",
   letterSpacing: 0.3,
   color: "color-mix(in srgb, var(--muted) 82%, transparent)",
@@ -88,7 +88,7 @@ const amountInputStyle: CSSProperties = {
   borderRadius: 12,
   border: "1px solid transparent",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   padding: "0 10px",
   fontSize: 16,
   textAlign: "right",

@@ -190,7 +190,7 @@ const metaChipStyle: CSSProperties = {
   borderRadius: 999,
   background: "color-mix(in srgb, var(--warning) 16%, transparent)",
   color: "color-mix(in srgb, var(--warning) 70%, var(--text))",
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 9,
   letterSpacing: 0.4,
   textTransform: "uppercase",

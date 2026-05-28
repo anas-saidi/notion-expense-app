@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type RefObject } from "react";
 import type { Account, Category } from "./app-types";
-import { fmtDate, shiftDate, today } from "./app-utils";
+import { evalExpr, fmt, fmtDate, isExpression, shiftDate, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { PickerPopover } from "./PickerPopover";
@@ -59,7 +59,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const yesterdayValue = shiftDate(todayValue, -1);
   const tomorrowValue = shiftDate(todayValue, 1);
   const visibleBalance = props.amountAfterBalance ?? props.displayedBalance;
-  const amountInputWidth = `${Math.max((props.amount || "0.00").length, 4) * 0.7 + 0.8}ch`;
 
   const dateOptions = [
     { label: "Today", value: todayValue },
@@ -83,10 +82,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
         {/* ── Header ── */}
         <header style={topBarStyle}>
-          <div>
-            <div style={eyebrowStyle}>{isEditMode ? "Existing transaction" : "New transaction"}</div>
-            <h2 style={titleStyle}>{isEditMode ? "Edit" : "Add"}</h2>
-          </div>
+          <div style={eyebrowStyle}>{isEditMode ? "Edit transaction" : "New transaction"}</div>
           <button onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
@@ -94,36 +90,44 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
         {/* ── Amount hero ── */}
         <section style={heroWrapStyle}>
-          <div style={eyebrowStyle}>MAD</div>
-          <div style={{ marginTop: 8, display: "flex", alignItems: "flex-end" }}>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={props.amount}
-              onChange={(e) => props.onAmountChange(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
-              placeholder="0.00"
-              aria-label="Amount"
-              style={{
-                width: amountInputWidth,
-                minWidth: "3.8ch",
-                maxWidth: "100%",
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                color: "var(--text)",
-                outline: "none",
-                fontSize: "clamp(2.8rem, 8vw, 4rem)",
-                fontFamily: "var(--font-display)",
-                fontWeight: 800,
-                fontVariantNumeric: "tabular-nums",
-                fontFeatureSettings: '"tnum"',
-                lineHeight: 0.95,
-                letterSpacing: -1.1,
-              }}
-            />
-          </div>
-          {visibleBalance !== null && (
+          <span style={currencyLabelStyle}>MAD</span>
+          <input
+            type="text"
+            inputMode="text"
+            value={props.amount}
+            onChange={(e) => props.onAmountChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
+            placeholder="0"
+            aria-label="Amount"
+            autoComplete="off"
+            autoFocus
+            className="amount-hero-input"
+            style={{
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              margin: 0,
+              color: "var(--text2)",
+              outline: "none",
+              textAlign: "center",
+              WebkitAppearance: "none",
+              appearance: "none",
+              fontSize: "clamp(96px, 26vw, 144px)",
+              fontFamily: "var(--font-body)",
+              fontWeight: 500,
+              fontVariantNumeric: "tabular-nums",
+              fontFeatureSettings: '"tnum"',
+              lineHeight: 0.88,
+              letterSpacing: "-0.03em",
+            }}
+          />
+          {isExpression(props.amount) && (
+            <p style={exprPreviewStyle}>
+              = {fmt(evalExpr(props.amount))} MAD
+            </p>
+          )}
+          {visibleBalance !== null && props.amount.trim() !== "" && (
             <p style={{ ...heroCopyStyle, color: visibleBalance >= 0 ? "var(--success)" : "var(--danger)" }}>
               Balance after: <Money value={visibleBalance} />
             </p>
@@ -146,11 +150,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               border: "none",
               borderBottom: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
               padding: "0 0 10px",
-              color: "var(--text)",
+              color: "var(--text2)",
               outline: "none",
-              fontSize: 18,
+              fontSize: 16,
               lineHeight: 1.25,
-              fontWeight: 450,
+              fontWeight: 400,
             }}
           />
 
@@ -166,9 +170,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 aria-controls="account-picker"
                 style={{
                   ...chipStyle,
-                  borderColor: props.showAccountPicker
-                    ? "color-mix(in srgb, var(--border2) 50%, transparent)"
-                    : "color-mix(in srgb, var(--border) 28%, transparent)",
+                  color: props.showAccountPicker ? "var(--text2)" : "var(--muted)",
                 }}
               >
                 <span style={chipIconStyle}>{props.selectedAccount?.icon ?? "$"}</span>
@@ -181,11 +183,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   <div style={{ display: "grid", gap: 2 }}>
                     {props.filteredAccounts.map((acct) => (
                       <button key={acct.id} onClick={() => props.onSelectAccount(acct.id)} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, white)" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
-                        <div style={{ ...pickerIconStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 12%, white)" : "color-mix(in srgb, var(--surface2) 72%, transparent)" }}>
+                        <div style={pickerIconStyle}>
                           {acct.icon ?? "$"}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: acct.id === props.selectedAccount?.id ? 650 : 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acct.label}</div>
+                          <div style={{ fontWeight: acct.id === props.selectedAccount?.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acct.label}</div>
                           {acct.type && <div style={pickerMetaStyle}>{acct.type}</div>}
                         </div>
                         {acct.balance !== null && (
@@ -209,10 +211,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 aria-controls="category-picker"
                 style={{
                   ...chipStyle,
-                  borderColor: props.showCatPicker
-                    ? "color-mix(in srgb, var(--border2) 50%, transparent)"
-                    : "color-mix(in srgb, var(--border) 28%, transparent)",
-                  color: props.selectedCat ? "var(--text2)" : "var(--muted)",
+                  color: props.selectedCat || props.showCatPicker ? "var(--text2)" : "var(--muted)",
                 }}
               >
                 <span style={chipIconStyle}>{props.selectedCat?.icon ?? "#"}</span>
@@ -228,11 +227,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                         const meta = [cat.type[0] ?? null, cat.id === props.lastUsedCatId ? "Last used" : null].filter(Boolean).join(" / ");
                         return (
                           <button key={cat.id} onClick={() => props.onSelectCategory(cat)} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, white)" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
-                            <div style={{ ...pickerIconStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 12%, white)" : "color-mix(in srgb, var(--surface2) 72%, transparent)" }}>
+                            <div style={pickerIconStyle}>
                               {cat.icon ?? "#"}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: cat.id === props.selectedCat?.id ? 650 : 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
+                              <div style={{ fontWeight: cat.id === props.selectedCat?.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
                               {meta && <div style={pickerMetaStyle}>{meta}</div>}
                             </div>
                             {cat.available !== null && (
@@ -251,7 +250,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   <div style={{ padding: "10px 10px 11px", borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)", background: "color-mix(in srgb, var(--surface2) 10%, white)" }}>
                     <div style={{ minHeight: 44, borderRadius: 12, border: "1px solid transparent", background: "color-mix(in srgb, var(--surface2) 42%, white)", display: "flex", alignItems: "center", gap: 8, padding: "0 12px" }}>
                       <span aria-hidden="true" style={{ fontSize: 12, color: "var(--muted)" }}>/</span>
-                      <input type="text" aria-label="Search categories" value={props.catSearch} onChange={(e) => props.onCatSearchChange(e.target.value)} placeholder="Search categories" autoFocus style={{ width: "100%", background: "transparent", border: "none", padding: 0, color: "var(--text)", outline: "none", fontSize: 15 }} />
+                      <input type="text" aria-label="Search categories" value={props.catSearch} onChange={(e) => props.onCatSearchChange(e.target.value)} placeholder="Search categories" autoFocus style={{ width: "100%", background: "transparent", border: "none", padding: 0, color: "var(--text2)", outline: "none", fontSize: 15 }} />
                     </div>
                   </div>
                 </div>
@@ -267,9 +266,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 aria-controls="date-picker"
                 style={{
                   ...chipStyle,
-                  borderColor: props.showDatePicker
-                    ? "color-mix(in srgb, var(--border2) 50%, transparent)"
-                    : "color-mix(in srgb, var(--border) 28%, transparent)",
+                  color: props.showDatePicker ? "var(--text2)" : "var(--muted)",
                 }}
               >
                 <span style={chipIconStyle}><CalendarIcon size={11} /></span>
@@ -283,8 +280,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     {dateOptions.map((option) => {
                       const selected = option.value === props.date;
                       return (
-                        <button key={option.value} onClick={() => props.onSelectDate(option.value)} style={{ width: "100%", minHeight: 42, padding: "9px 12px", background: selected ? "color-mix(in srgb, var(--accent) 10%, white)" : "transparent", border: "none", borderRadius: 10, color: selected ? "color-mix(in srgb, var(--accent) 76%, var(--text2))" : "var(--text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontSize: 14, textAlign: "left", boxShadow: selected ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
-                          <span style={{ fontWeight: selected ? 650 : 600 }}>{option.label}</span>
+                        <button key={option.value} onClick={() => props.onSelectDate(option.value)} style={{ width: "100%", minHeight: 42, padding: "9px 12px", background: selected ? "color-mix(in srgb, var(--accent) 10%, white)" : "transparent", border: "none", borderRadius: 10, color: selected ? "color-mix(in srgb, var(--accent) 76%, var(--text2))" : "var(--text2)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontSize: 13, textAlign: "left", boxShadow: selected ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                          <span style={{ fontWeight: selected ? 600 : 500 }}>{option.label}</span>
                           <span style={{ ...monoSmallStyle, color: selected ? "color-mix(in srgb, var(--accent) 62%, var(--text2))" : "var(--muted)" }}>{fmtDate(option.value)}</span>
                         </button>
                       );
@@ -292,7 +289,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   </div>
                   <div style={{ padding: "10px 10px 11px", borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)", background: "color-mix(in srgb, var(--surface2) 10%, white)" }}>
                     <div style={{ minHeight: 44, borderRadius: 12, border: "1px solid transparent", background: "color-mix(in srgb, var(--surface2) 42%, white)", display: "flex", alignItems: "center", padding: "0 12px" }}>
-                      <input type="date" aria-label="Transaction date" value={props.date} onChange={(e) => props.onSelectDate(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", padding: 0, colorScheme: "light", color: "var(--text)", outline: "none", fontSize: 15 }} />
+                      <input type="date" aria-label="Transaction date" value={props.date} onChange={(e) => props.onSelectDate(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", padding: 0, colorScheme: "light", color: "var(--text2)", outline: "none", fontSize: 15 }} />
                     </div>
                   </div>
                 </div>
@@ -397,35 +394,25 @@ const sheetInnerStyle: CSSProperties = {
 
 const topBarStyle: CSSProperties = {
   display: "flex",
-  alignItems: "flex-start",
+  alignItems: "center",
   justifyContent: "space-between",
   gap: 12,
 };
 
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
 };
 
-const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: 28,
-  lineHeight: 0.95,
-  fontWeight: 800,
-  color: "var(--text)",
-  margin: "4px 0 0",
-};
-
 const closeButtonStyle: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
-  color: "var(--text)",
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -434,43 +421,56 @@ const closeButtonStyle: CSSProperties = {
 };
 
 const heroWrapStyle: CSSProperties = {
-  display: "grid",
-  gap: 10,
-  paddingBottom: 18,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 6,
+  padding: "12px 0 28px",
   borderBottom: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
+};
+
+const currencyLabelStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: 1.4,
+  textTransform: "uppercase",
+  color: "var(--muted)",
+  opacity: 0.6,
 };
 
 const heroCopyStyle: CSSProperties = {
   margin: 0,
-  fontFamily: "'DM Mono', monospace",
-  fontSize: 12,
+  fontFamily: "var(--font-body)",
+  fontSize: 14,
+  fontWeight: 500,
   color: "var(--text2)",
+  textAlign: "center",
+  animation: "fadeUp 0.18s ease both",
 };
 
 const chipStyle: CSSProperties = {
   minHeight: 36,
-  padding: "0 10px",
-  borderRadius: 999,
-  border: "1px solid",
-  background: "color-mix(in srgb, var(--surface2) 38%, white)",
-  color: "var(--text2)",
+  padding: "0 6px",
+  borderRadius: 8,
+  border: "none",
+  background: "transparent",
+  color: "var(--muted)",
   fontSize: 12,
-  fontWeight: 600,
+  fontWeight: 500,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  gap: 6,
+  gap: 5,
 };
 
 const chipIconStyle: CSSProperties = {
-  width: 18,
-  height: 18,
-  borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface2) 30%, white)",
+  width: 16,
+  height: 16,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 10,
+  fontSize: 11,
   flexShrink: 0,
 };
 
@@ -487,12 +487,12 @@ const pickerRowStyle: CSSProperties = {
   background: "transparent",
   border: "none",
   borderRadius: 16,
-  color: "var(--text)",
+  color: "var(--text2)",
   display: "flex",
   alignItems: "center",
   gap: 12,
   cursor: "pointer",
-  fontSize: 14,
+  fontSize: 13,
   textAlign: "left",
   boxSizing: "border-box",
 };
@@ -510,7 +510,7 @@ const pickerIconStyle: CSSProperties = {
 
 const pickerMetaStyle: CSSProperties = {
   marginTop: 3,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 11,
   color: "var(--muted)",
   whiteSpace: "nowrap",
@@ -519,7 +519,7 @@ const pickerMetaStyle: CSSProperties = {
 };
 
 const monoSmallStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 12,
   flexShrink: 0,
 };
@@ -537,4 +537,15 @@ const warnTextStyle: CSSProperties = {
   fontSize: 12,
   color: "color-mix(in srgb, var(--danger) 46%, var(--text2))",
   lineHeight: 1.5,
+};
+
+const exprPreviewStyle: CSSProperties = {
+  margin: 0,
+  fontFamily: "var(--font-body)",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "var(--accent-ink)",
+  letterSpacing: 0.2,
+  opacity: 0.8,
+  animation: "fadeUp 0.15s ease both",
 };

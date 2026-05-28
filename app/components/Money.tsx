@@ -37,7 +37,7 @@ const moneyWrapStyle: CSSProperties = {
 };
 
 const currencyBaseStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: "0.65em",
   letterSpacing: 0.4,
   textTransform: "uppercase",

@@ -335,9 +335,9 @@ const statLabelStyle: CSSProperties = {
 
 const statValueStyle: CSSProperties = {
   fontSize: 13,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontWeight: 700,
-  color: "var(--text)",
+  color: "var(--text2)",
   fontVariantNumeric: "tabular-nums",
   fontFeatureSettings: "\"tnum\"",
 };
@@ -366,7 +366,7 @@ const catIconWrapStyle: CSSProperties = {
   height: 34,
   borderRadius: 10,
   background: "color-mix(in srgb, var(--surface2) 70%, white)",
-  border: "1px solid var(--card-border)",
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -383,7 +383,7 @@ const catNameRowStyle: CSSProperties = {
 const catNameStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 650,
-  color: "var(--text)",
+  color: "var(--text2)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -392,7 +392,7 @@ const catNameStyle: CSSProperties = {
 
 const catAmountStyle: CSSProperties = {
   fontSize: 12,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontWeight: 700,
   color: "var(--text2)",
   flexShrink: 0,

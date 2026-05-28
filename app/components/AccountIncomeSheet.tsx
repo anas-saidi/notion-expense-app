@@ -160,7 +160,7 @@ const accountIconStyle: CSSProperties = {
 };
 
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -178,11 +178,13 @@ const titleStyle: CSSProperties = {
 const closeStyle: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
-  color: "var(--text)",
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
   cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 
 const balanceCardStyle: CSSProperties = {
@@ -218,9 +220,10 @@ const inputStyle: CSSProperties = {
   width: "100%",
   minHeight: 48,
   borderRadius: 14,
-  border: "1px solid var(--card-border)",
+  border: "1px solid transparent",
+  boxShadow: "inset 0 0 0 1.5px var(--border2)",
   background: "color-mix(in srgb, var(--surface2) 34%, white)",
-  color: "var(--text)",
+  color: "var(--text2)",
   padding: "0 13px",
   fontSize: 15,
   outline: "none",
@@ -230,7 +233,7 @@ const inputStyle: CSSProperties = {
 const amountWrapStyle: CSSProperties = {
   minHeight: 56,
   borderRadius: 16,
-  border: "1px solid var(--card-border)",
+  border: "1px solid var(--border)",
   background: "var(--surface)",
   display: "flex",
   alignItems: "center",
@@ -244,14 +247,14 @@ const amountInputStyle: CSSProperties = {
   border: "none",
   outline: "none",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   fontFamily: "var(--font-display)",
   fontSize: 28,
   fontWeight: 800,
 };
 
 const currencyStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 12,
   color: "var(--muted)",
 };

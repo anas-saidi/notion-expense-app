@@ -12,6 +12,7 @@ export function AppShell({
   toast,
   showAddButton = true,
   immersive = false,
+  hideHeader = false,
   children,
 }: {
   tab: AppTab;
@@ -22,6 +23,7 @@ export function AppShell({
   toast?: string | null;
   showAddButton?: boolean;
   immersive?: boolean;
+  hideHeader?: boolean;
   children?: ReactNode;
 }) {
   return (
@@ -31,17 +33,11 @@ export function AppShell({
         className={immersive ? undefined : "app-content"}
         style={immersive ? { minHeight: "100dvh" } : { position: "relative" }}
       >
-        {!immersive && onOpenManage && (
+        {!immersive && !hideHeader && onOpenManage && (
           <header style={headerStyle}>
-            <div style={greetingBlockStyle} aria-label="Couple greeting">
+            <div aria-label="Couple greeting">
               <p style={greetingEyebrowStyle}>{getGreeting()}</p>
-              <h1 style={greetingTitleStyle}>
-                <span style={partnerDotStyle("var(--partner-husband)")} aria-hidden="true" />
-                {"Anas"}
-                <span style={greetingAmpStyle}>&amp;</span>
-                <span style={partnerDotStyle("var(--partner-wife)")} aria-hidden="true" />
-                {"Salma"}
-              </h1>
+              <h1 style={greetingTitleStyle}>Anas &amp; Salma</h1>
             </div>
             <button type="button" onClick={onOpenManage} aria-label="Open management menu" style={menuButtonStyle}>
               <MenuIcon size={18} />
@@ -94,11 +90,11 @@ export function AppShell({
             zIndex: 80,
             background: "var(--surface2)",
             border: "1px solid var(--border2)",
-            color: "var(--text)",
+            color: "var(--text2)",
             borderRadius: 999,
             padding: "8px 12px",
             fontSize: 12,
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "var(--font-body)",
             letterSpacing: 0.4,
             boxShadow: "0 0 0 1px color-mix(in srgb, var(--ink-strong) 10%, transparent)",
             animation: "toastIn 0.2s ease both",
@@ -118,17 +114,6 @@ function getGreeting(): string {
   if (h < 18) return "Good afternoon,";
   return "Good evening,";
 }
-
-const partnerDotStyle = (color: string) => ({
-  display: "inline-block",
-  width: 7,
-  height: 7,
-  borderRadius: "50%",
-  background: color,
-  marginRight: 5,
-  verticalAlign: "middle",
-  flexShrink: 0,
-} as const);
 
 const menuButtonStyle = {
   width: 44,
@@ -154,36 +139,21 @@ const headerStyle = {
   paddingRight: 4,
 };
 
-const greetingBlockStyle = {
-  minWidth: 0,
-  display: "grid",
-  gap: 5,
-};
-
 const greetingEyebrowStyle = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   fontWeight: 500,
   letterSpacing: 0.5,
   textTransform: "uppercase" as const,
   color: "var(--muted)",
-  margin: 0,
+  margin: "0 0 3px",
 };
 
 const greetingTitleStyle = {
   fontFamily: "var(--font-display)",
-  fontSize: 26,
+  fontSize: 18,
   lineHeight: 1,
   fontWeight: 800,
   color: "var(--text)",
   margin: 0,
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-};
-
-const greetingAmpStyle = {
-  color: "var(--muted)",
-  fontWeight: 500,
-  margin: "0 4px",
 };

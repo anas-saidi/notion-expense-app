@@ -121,7 +121,7 @@ const triggerStyle: CSSProperties = {
   borderRadius: 14,
   background: "transparent",
   border: "none",
-  color: "var(--text)",
+  color: "var(--text2)",
   cursor: "pointer",
   display: "grid",
   justifyItems: "start",
@@ -176,7 +176,7 @@ const optionStyle: CSSProperties = {
   border: "none",
   borderRadius: 12,
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   cursor: "pointer",
   display: "grid",
   gridTemplateColumns: "8px 1fr auto",
@@ -202,7 +202,7 @@ const optionTextStyle: CSSProperties = {
 };
 
 const activeMarkStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 8,
   letterSpacing: 0.3,
   textTransform: "uppercase",

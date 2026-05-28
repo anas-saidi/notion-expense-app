@@ -101,7 +101,7 @@ const rowLabelStyle = {
 };
 
 const rowValueStyle = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 14,
   fontVariantNumeric: "tabular-nums",
   fontFeatureSettings: "\"tnum\"",
@@ -123,7 +123,7 @@ const summaryNoteStyle = {
 };
 
 const summaryTitleStyle = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 14,
 };
 

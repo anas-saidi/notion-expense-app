@@ -1,5 +1,56 @@
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 
+/**
+ * Safely evaluate a simple arithmetic expression string (+ - * /).
+ * No eval() — uses a recursive descent parser.
+ * Returns 0 for empty or invalid input.
+ */
+export function evalExpr(input: string): number {
+  const s = input.replace(/\s/g, "");
+  if (!s) return 0;
+  let pos = 0;
+
+  function parseExpr(): number {
+    let left = parseTerm();
+    while (pos < s.length && (s[pos] === "+" || s[pos] === "-")) {
+      const op = s[pos++];
+      const right = parseTerm();
+      left = op === "+" ? left + right : left - right;
+    }
+    return left;
+  }
+
+  function parseTerm(): number {
+    let left = parseFactor();
+    while (pos < s.length && (s[pos] === "*" || s[pos] === "/")) {
+      const op = s[pos++];
+      const right = parseFactor();
+      left = op === "*" ? left * right : right !== 0 ? left / right : 0;
+    }
+    return left;
+  }
+
+  function parseFactor(): number {
+    const neg = s[pos] === "-" && pos++;
+    const start = pos;
+    while (pos < s.length && /[0-9.]/.test(s[pos])) pos++;
+    const n = parseFloat(s.slice(start, pos)) || 0;
+    return neg ? -n : n;
+  }
+
+  try {
+    const result = parseExpr();
+    return isFinite(result) ? Math.round(result * 100) / 100 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Returns true when the input string looks like an expression (contains operators after digits) */
+export function isExpression(input: string): boolean {
+  return /[0-9][+\-*/][0-9]/.test(input.replace(/\s/g, ""));
+}
+
 const toLocalDateString = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");

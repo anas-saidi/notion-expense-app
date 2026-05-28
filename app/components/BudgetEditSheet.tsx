@@ -332,9 +332,8 @@ const sheetStyle: CSSProperties = {
   width: "min(100%, 520px)",
   maxHeight: "calc(100dvh - 20px - 88px - env(safe-area-inset-bottom, 0px))",
   overflow: "hidden",
-  borderRadius: "var(--card-radius)",
+  borderRadius: 20,
   background: "color-mix(in srgb, var(--surface) 96%, white)",
-  border: "1px solid var(--card-border)",
   boxShadow: "var(--card-shadow)",
   animation: "fadeUp 0.24s ease both",
   display: "flex",
@@ -360,7 +359,7 @@ const monthPickerButtonStyle: CSSProperties = {
   padding: "0 6px",
   border: "none",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 12,
   fontWeight: 600,
   display: "inline-flex",
@@ -380,10 +379,9 @@ const hiddenMonthInputStyle: CSSProperties = {
 const closeButtonStyle: CSSProperties = {
   width: 36,
   height: 36,
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 70%, transparent)",
-  color: "var(--text)",
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -396,7 +394,7 @@ const headerStyle: CSSProperties = {
 };
 
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase",
