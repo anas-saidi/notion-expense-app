@@ -21,6 +21,7 @@ export type AllocationGroup = {
 
 type AllocationFlowProps = {
   open: boolean;
+  mode?: "sheet" | "screen";
   selectedMonth: string;
   onSelectedMonthChange?: (nextMonth: string) => void;
   onCancel: () => void;
@@ -62,6 +63,7 @@ export function AllocationFlow({
   flowPreview,
   title = "Set Monthly Budget",
   balancedLabel = "Fully assigned",
+  mode = "sheet",
 }: AllocationFlowProps) {
   const monthInputRef = useRef<HTMLInputElement | null>(null);
   const [activeGroup, setActiveGroup] = useState<BudgetGroupKey>(groups[0]?.key ?? "household");
@@ -174,8 +176,8 @@ export function AllocationFlow({
     }
   };
 
-  return (
-    <BottomSheet open={open} onClose={onCancel} showHandle label="Set monthly budget" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
+  const innerContent = (
+    <>
       {onSelectedMonthChange && (
         <input
           ref={monthInputRef}
@@ -214,7 +216,7 @@ export function AllocationFlow({
         {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
       </header>
 
-      <div style={sheetScrollStyle}>
+      <div style={mode === "screen" ? { ...sheetScrollStyle, flex: 1, minHeight: 0 } : sheetScrollStyle}>
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
           <div style={{ ...quietAvailableRowStyle, alignItems: "flex-start" }}>
             <span style={balanceLabelStyle}>{poolLabel}</span>
@@ -342,9 +344,46 @@ export function AllocationFlow({
           </section>
         </div>
       )}
+    </>
+  );
+
+  if (mode === "screen") {
+    if (!open) return null;
+    return (
+      <div style={screenWrapStyle}>
+        <div style={screenInnerStyle}>
+          {innerContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <BottomSheet open={open} onClose={onCancel} showHandle label="Set monthly budget" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
+      {innerContent}
     </BottomSheet>
   );
 }
+
+const screenWrapStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 80,
+  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  paddingTop: "env(safe-area-inset-top, 0px)",
+};
+const screenInnerStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  borderRadius: "24px 24px 0 0",
+};
 
 // ── Balanced burst ────────────────────────────────────────────────────────────
 type BurstStyleVars = CSSProperties & { "--x": string; "--y": string; "--d": string };

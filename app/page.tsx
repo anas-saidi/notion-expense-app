@@ -5,7 +5,7 @@ import Fuse from "fuse.js";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
 import { HistoryScreen } from "./components/HistoryScreen";
-import { PendingScreen } from "./components/PendingScreen";
+import { CategoriesScreen } from "./components/CategoriesScreen";
 import { MonthlyPlanningFlow } from "./components/MonthlyPlanningFlow";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
@@ -23,6 +23,7 @@ import {
   evalExpr,
   fmtDate,
   getLeftToAssignByScope,
+  getBalanceByScope,
   monthBounds,
   shiftDate,
   today,
@@ -99,7 +100,7 @@ export default function App() {
     spentByCategory: [],
   });
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"home" | "plan" | "pending" | "history">("home");
+  const [tab, setTab] = useState<"home" | "plan" | "budget" | "history">("home");
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
   const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
   const [planCompletedMonth, setPlanCompletedMonth] = useState<string | null>(null);
@@ -110,7 +111,6 @@ export default function App() {
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [showRebalance, setShowRebalance] = useState(false);
   const [showManageScreen, setShowManageScreen] = useState(false);
-  const [showHomeCategories, setShowHomeCategories] = useState(false);
   const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | null>(null);
   const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
   const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
@@ -143,6 +143,7 @@ export default function App() {
   const initialCatApplied = useRef(false);
   const plannerMonthHydrated = useRef(false);
   const loadedPendingId = useRef<string | null>(null);
+  const rebalanceReturnToAdd = useRef(false);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -548,6 +549,7 @@ export default function App() {
     !plannerSummaryReady || plannerMonth !== formatMonthInput(today());
 
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(accounts), [accounts]);
+  const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
   // DEBUG PRINTS for spent on team categories
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -780,7 +782,14 @@ export default function App() {
       if (!isEditing && displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
       fetchMonthlySummary(homeMonth);
+      fetchCategories();
       fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
+      // Re-fetch categories after a short delay — Notion computed properties (formulas/rollups)
+      // may not reflect the new transaction immediately.
+      setTimeout(() => {
+        fetchCategories();
+        fetchMonthlySummary(homeMonth);
+      }, 1500);
 
       if (loadedPendingId.current) {
         dismissPending(loadedPendingId.current);
@@ -832,7 +841,7 @@ export default function App() {
     <AppShell
       tab={tab}
       pendingCount={scopedPendingItems.length}
-      onTabChange={(t) => { setTab(t); if (t !== "home") setShowHomeCategories(false); }}
+      onTabChange={(t) => { setTab(t); }}
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setShowAddModal(true);
@@ -841,22 +850,11 @@ export default function App() {
       toast={microToast}
       showAddButton={tab !== "plan" && !showManageScreen}
       immersive={tab === "plan" || showManageScreen}
-      hideHeader={showHomeCategories}
     >
       {showManageScreen && (
         <ManageScreen
-          categories={categories}
-          frozenCategories={frozenCategories}
           accounts={accounts}
           onClose={() => setShowManageScreen(false)}
-          onNewCategory={openNewCategory}
-          onOpenCategory={(category) => {
-            setShowManageScreen(false);
-            openCategoryDetails(category);
-          }}
-          onFundCategory={openFundCategory}
-          onFreezeCategory={freezeCategory}
-          onReviveCategory={reviveCategory}
           onAddIncome={setIncomeAccount}
           onTransferMoney={setTransferAccount}
         />
@@ -876,18 +874,18 @@ export default function App() {
           }}
           onOpenPlan={() => setTab("plan")}
           onOpenRebalance={() => setShowRebalance(true)}
+          onOpenBudgetTab={() => setTab("budget")}
           onFundCategory={openFundCategory}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
           leftToSpendByScope={leftToSpendByScope}
+          balanceByScope={balanceByScope}
           readyToAssignByScope={readyToAssignByScope}
           budgetScope={budgetScope}
           onBudgetScopeChange={setBudgetScope}
           homeMonth={homeMonth}
           onHomeMonthChange={setHomeMonth}
           planDone={planCompletedMonth === homeMonth}
-          showCategories={showHomeCategories}
-          onShowCategoriesChange={setShowHomeCategories}
           transactions={scopedTransactions}
           pendingItems={scopedPendingItems}
           onOpenHistory={() => setTab("history")}
@@ -914,16 +912,19 @@ export default function App() {
         isUsingFallbackData={plannerUsesFallbackData}
       />}
 
-      {!showManageScreen && tab === "pending" && (
-        <PendingScreen
-          pendingItems={pendingItems}
+      {!showManageScreen && tab === "budget" && (
+        <CategoriesScreen
           categories={categories}
-          mode={mode}
-          budgetScope={budgetScope}
-          onLogItem={loadPending}
-          onDismiss={dismissPending}
-          onAdd={addPendingItem}
-          onClaim={claimPendingItem}
+          frozenCategories={frozenCategories}
+          monthlySummary={monthlySummary}
+          homeMonth={homeMonth}
+          selectedCategoryId={categoryId}
+          onSelectCategory={selectCategory}
+          onOpenCategoryDetails={openCategoryDetails}
+          onOpenRebalance={() => setShowRebalance(true)}
+          onFreezeCategory={freezeCategory}
+          onReviveCategory={reviveCategory}
+          onFundCategory={openFundCategory}
         />
       )}
 
@@ -966,6 +967,11 @@ export default function App() {
         categoryOverBudget={categoryOverBudget}
         canSubmit={canSubmit}
         modeVariant={editingTransactionId ? "edit" : "create"}
+        onOpenRebalance={() => {
+          rebalanceReturnToAdd.current = true;
+          setShowAddModal(false);
+          setShowRebalance(true);
+        }}
         onClose={() => {
           if (editingTransactionId) {
             setAmount("");
@@ -1060,15 +1066,19 @@ export default function App() {
 
       <RebalanceSheet
         open={showRebalance}
-        onClose={() => setShowRebalance(false)}
+        onClose={() => {
+          setShowRebalance(false);
+          rebalanceReturnToAdd.current = false;
+        }}
         categories={categories}
         homeMonth={homeMonth}
         monthlySummary={monthlySummary}
         onSuccess={() => {
-          fetchMonthlySummary(homeMonth);
-          fetch("/api/categories")
-            .then((r) => r.json())
-            .then((d) => setCategories(d.categories ?? []));
+          refreshBudgetData("Rebalance applied");
+          if (rebalanceReturnToAdd.current) {
+            rebalanceReturnToAdd.current = false;
+            setShowAddModal(true);
+          }
         }}
       />
 

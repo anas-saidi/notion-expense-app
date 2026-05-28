@@ -8,6 +8,7 @@ type WalletCardSwitcherProps = {
   monthlySummary?: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   leftToSpendByScope?: Record<BudgetScope, number>;
+  balanceByScope?: Record<BudgetScope, number>;
 };
 
 const SCOPES: BudgetScope[] = ["joint", "anas", "salma"];
@@ -80,16 +81,19 @@ const getProgress = (available: number | null, planned: number | null) => {
 };
 
 
-export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope }: WalletCardSwitcherProps) {
   const [hovered, setHovered]   = useState<BudgetScope | null>(null);
   const [pressed, setPressed]   = useState<BudgetScope | null>(null);
 
   const currentSummary = monthlySummary ?? walletSummaries?.[value];
+  // Hero number: real account balance by scope (from Notion accounts database)
+  const balance   = balanceByScope != null ? balanceByScope[value] : null;
+  // Curve/progress still uses category-based left-to-spend for spend % display
   const available = leftToSpendByScope != null ? leftToSpendByScope[value] : currentSummary ? currentSummary.totalAssigned - currentSummary.totalSpent : null;
   const planned   = currentSummary?.totalAssigned ?? null;
   const progress  = getProgress(available, planned);
-  const status    = getStatus(available, planned, value);
-  const isOver    = available !== null && available < 0;
+  const status    = getStatus(balance, planned, value);
+  const isOver    = balance !== null && balance < 0;
   const hasPlan   = planned !== null && planned > 0;
 
   return (
@@ -150,10 +154,10 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
           <span style={statusStyle(status)}>{status}</span>
           <div style={amountRowStyle}>
             <span style={bigNumberStyle(isOver)}>
-              {fmt(Math.abs(available ?? 0))}
+              {fmt(Math.abs(balance ?? available ?? 0))}
             </span>
             <span style={unitStyle(isOver)}>
-              MAD {isOver ? "over" : "left"}
+              MAD {isOver ? "over" : "balance"}
             </span>
           </div>
         </div>
@@ -377,4 +381,6 @@ const captionDimStyle: CSSProperties = {
   letterSpacing: "0.02em",
   color: "var(--muted)",
 };
+
+
 

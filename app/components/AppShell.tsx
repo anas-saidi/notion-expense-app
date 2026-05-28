@@ -27,11 +27,11 @@ export function AppShell({
   children?: ReactNode;
 }) {
   return (
-    <div style={{ minHeight: "100dvh", position: "relative", zIndex: 1 }}>
+    <div style={{ height: "100dvh", overflow: "hidden", position: "relative", zIndex: 1 }}>
       <div
         id={!immersive ? "app-root-shell" : undefined}
         className={immersive ? undefined : "app-content"}
-        style={immersive ? { minHeight: "100dvh" } : { position: "relative" }}
+        style={immersive ? { height: "100%" } : { height: "100%", overflowY: "auto", WebkitOverflowScrolling: "touch" as any, position: "relative" }}
       >
         {!immersive && !hideHeader && onOpenManage && (
           <header style={headerStyle}>

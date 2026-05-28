@@ -1,20 +1,27 @@
-import { useMemo, useState, type CSSProperties } from "react";
+"use client";
+
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Money } from "./Money";
-import { SearchIcon, ArrowLeftIcon, SlidersIcon } from "./ui/icons";
+import { SearchIcon, SlidersIcon, FreezeIcon, FundIcon, ReviveIcon } from "./ui/icons";
+import { getCategoryScope } from "./app-utils";
 
 type Props = {
   categories: Category[];
+  frozenCategories: Category[];
   monthlySummary: MonthlySummary;
   homeMonth: string;
   selectedCategoryId: string;
   onSelectCategory: (cat: Category) => void;
   onOpenCategoryDetails: (cat: Category) => void;
   onOpenRebalance: () => void;
-  onBack: () => void;
+  onFreezeCategory: (cat: Category) => void;
+  onReviveCategory: (cat: Category) => void;
+  onFundCategory: (cat: Category) => void;
 };
 
+type CategoryChip = "active" | "frozen";
 type Health = "over" | "low" | "ontrack" | "noplan";
 
 const HEALTH_SORT: Record<Health, number> = { over: 0, low: 1, ontrack: 2, noplan: 3 };
@@ -26,24 +33,29 @@ function getHealth(spent: number, planned: number): Health {
   return "ontrack";
 }
 
-function spentTone(spentPct: number, isOver: boolean): string {
-  if (isOver) return "color-mix(in srgb, var(--spend-over) 75%, var(--spend-over-deep))";
-  if (spentPct >= 85) return "color-mix(in srgb, var(--spend-warn) 70%, var(--spend-warn-deep))";
-  if (spentPct >= 65) return "color-mix(in srgb, var(--spend-caution) 70%, var(--spend-caution-deep))";
-  return "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
+function scopeLabel(category: Category): string {
+  const scope = getCategoryScope(category);
+  if (scope === "joint") return "Joint";
+  if (scope === "anas") return "Anas";
+  if (scope === "salma") return "Salma";
+  return "";
 }
 
 export function CategoriesScreen({
   categories,
+  frozenCategories,
   monthlySummary,
   homeMonth,
   selectedCategoryId,
   onSelectCategory,
   onOpenCategoryDetails,
   onOpenRebalance,
-  onBack,
+  onFreezeCategory,
+  onReviveCategory,
+  onFundCategory,
 }: Props) {
   const [search, setSearch] = useState("");
+  const [chip, setChip] = useState<CategoryChip>("active");
 
   const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
 
@@ -59,7 +71,7 @@ export function CategoriesScreen({
     return map;
   }, [monthlySummary.assignedByCategory]);
 
-  const groups = useMemo(() => {
+  const activeGroups = useMemo(() => {
     const q = search.toLowerCase().trim();
     const rows = categories
       .filter(cat =>
@@ -71,10 +83,9 @@ export function CategoriesScreen({
         const planned = plannedByCategory.get(cat.id) ?? 0;
         const spent = spentByCategory.get(cat.id) ?? 0;
         const available = isCurrentMonth ? (cat.available ?? planned - spent) : planned - spent;
-        const spentPct = planned > 0 ? Math.min(100, (Math.max(0, spent) / planned) * 100) : 0;
         const health = getHealth(spent, planned);
         const section = cat.type[0] ?? "Other";
-        return { cat, planned, spent, available, spentPct, health, section };
+        return { cat, planned, spent, available, health, section };
       })
       .sort((a, b) => HEALTH_SORT[a.health] - HEALTH_SORT[b.health]);
 
@@ -86,22 +97,45 @@ export function CategoriesScreen({
     return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
   }, [categories, search, spentByCategory, plannedByCategory, isCurrentMonth]);
 
-  return (
-    <div id="panel-categories" role="region" aria-label="All categories" style={wrapStyle}>
+  const frozenRows = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return frozenCategories.filter(cat =>
+      !q ||
+      cat.name.toLowerCase().includes(q) ||
+      cat.type.some(t => t.toLowerCase().includes(q))
+    );
+  }, [frozenCategories, search]);
 
-      {/* Top bar */}
-      <div style={topBarStyle}>
-        <button type="button" onClick={onBack} style={backBtnStyle} aria-label="Back to home">
-          <ArrowLeftIcon size={16} />
-        </button>
+  return (
+    <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" style={wrapStyle}>
+
+      {/* Header */}
+      <div style={headerStyle}>
+        <div>
+          <div style={eyebrowStyle}>Manage</div>
+          <h1 style={titleStyle}>Budget</h1>
+        </div>
         <button
           type="button"
           onClick={onOpenRebalance}
           style={rebalanceBtnStyle}
           aria-label="Rebalance budget"
         >
-          <SlidersIcon size={15} />
+          <SlidersIcon size={18} />
+          <span style={{ fontSize: 12, fontWeight: 600 }}>Rebalance</span>
         </button>
+      </div>
+
+      {/* Active / Frozen chips */}
+      <div style={chipsRowStyle}>
+        <div style={chipsStyle} role="tablist" aria-label="Category state">
+          <Chip active={chip === "active"} onClick={() => setChip("active")}>
+            {`Active · ${categories.length}`}
+          </Chip>
+          <Chip active={chip === "frozen"} onClick={() => setChip("frozen")}>
+            {`Frozen · ${frozenCategories.length}`}
+          </Chip>
+        </div>
       </div>
 
       {/* Search */}
@@ -117,72 +151,163 @@ export function CategoriesScreen({
         />
       </label>
 
-      {/* Category list — grouped by section */}
+      {/* List */}
       <div style={listStyle}>
-        {groups.length === 0 && (
-          <div style={emptyStyle}>
-            <SearchIcon size={15} style={{ color: "var(--muted)" }} />
-            <div>
-              <strong style={{ fontSize: 13, color: "var(--text2)" }}>No categories found</strong>
-              <p style={{ fontSize: 12, color: "var(--muted)", margin: "3px 0 0" }}>
-                Try a different search term.
-              </p>
-            </div>
-          </div>
+
+        {/* Active tab */}
+        {chip === "active" && (
+          <>
+            {activeGroups.length === 0 && (
+              <div style={emptyStyle}>No categories found.</div>
+            )}
+            {activeGroups.map(({ label, items }) => (
+              <section key={label}>
+                <div style={sectionLabelStyle}>{label}</div>
+                <div style={sectionRowsStyle}>
+                  {items.map(({ cat, available, health }, i) => {
+                    const isOver = health === "over";
+                    const isLow = health === "low";
+                    const scope = scopeLabel(cat);
+                    return (
+                      <article key={cat.id} style={{ ...categoryRowStyle, animation: `fadeUp 0.22s ${Math.min(i * 0.02, 0.18)}s ease both` }}>
+                        <button
+                          type="button"
+                          onClick={() => { onSelectCategory(cat); onOpenCategoryDetails(cat); }}
+                          style={categoryMainStyle}
+                          aria-label={cat.name}
+                        >
+                          <CategoryIcon icon={cat.icon} style={{ fontSize: 22, flexShrink: 0, color: "var(--text2)" }} />
+                          <div style={{ minWidth: 0 }}>
+                            <strong style={rowTitleStyle}>{cat.name}</strong>
+                            <p style={rowMetaStyle}>
+                              {scope && <span style={scopeBadgeStyle}>{scope}</span>}
+                              {scope && " · "}
+                              {cat.type[0] ?? "Budget"}
+                            </p>
+                          </div>
+                        </button>
+                        <div style={rowRightStyle}>
+                          {(isOver || isLow) && (
+                            <span style={healthBadgeStyle(isOver)}>
+                              {isOver ? "OVER" : "LOW"}
+                            </span>
+                          )}
+                          <strong style={availableStyle(isOver)}>
+                            <Money value={available} />
+                          </strong>
+                          <div style={rowActionsStyle}>
+                            <IconActionButton
+                              icon={<FundIcon size={14} strokeWidth={2.2} />}
+                              label="Fund"
+                              ariaLabel={`Fund ${cat.name}`}
+                              onClick={() => onFundCategory(cat)}
+                            />
+                            <IconActionButton
+                              icon={<FreezeIcon size={14} strokeWidth={2.2} />}
+                              label="Freeze"
+                              ariaLabel={`Freeze ${cat.name}`}
+                              tone="quiet"
+                              onClick={() => onFreezeCategory(cat)}
+                            />
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </>
         )}
 
-        {groups.map(({ label, items }) => (
-          <section key={label} style={{ minWidth: 0 }}>
-            <div style={sectionLabelStyle}>{label}</div>
-            <div className="categories-scroll-rail" style={sectionRowsStyle}>
-              {items.map(({ cat, available, spentPct, health }, i) => {
-                const isOver  = health === "over";
-                const isLow   = health === "low";
-                const showTag = isOver || isLow;
-                return (
+        {/* Frozen tab */}
+        {chip === "frozen" && (
+          <>
+            {frozenRows.length === 0 && (
+              <div style={emptyStyle}>No frozen categories.</div>
+            )}
+            {frozenRows.map((cat, i) => {
+              const scope = scopeLabel(cat);
+              return (
+                <article key={cat.id} style={{ ...categoryRowStyle, animation: `fadeUp 0.22s ${Math.min(i * 0.02, 0.18)}s ease both` }}>
                   <button
-                    key={cat.id}
                     type="button"
                     onClick={() => { onSelectCategory(cat); onOpenCategoryDetails(cat); }}
-                    aria-label={`${cat.name}`}
-                    style={{
-                      ...cardStyle,
-                      ...(cat.id === selectedCategoryId ? selectedCardStyle : null),
-                      animation: `fadeUp 0.22s ${Math.min(i * 0.02, 0.18)}s ease both`,
-                    }}
+                    style={categoryMainStyle}
+                    aria-label={cat.name}
                   >
-                    <CategoryIcon
-                      icon={cat.icon}
-                      size={22}
-                      style={{ color: cat.id === selectedCategoryId ? "var(--accent-ink)" : "var(--muted)", flexShrink: 0 }}
-                    />
-                    <span style={cardNameStyle}>{cat.name}</span>
-                    {showTag && (
-                      <span style={healthTagStyle(isOver)}>
-                        {isOver ? "OVER" : "LOW"}
-                      </span>
-                    )}
-                    <strong style={cardAmountStyle(isOver)}>
-                      <Money value={available} />
-                    </strong>
-                    <span style={cardSubStyle(isOver)}>
-                      {isOver ? "over budget" : "remaining"}
-                    </span>
-                    <div style={barTrackStyle}>
-                      <div style={{
-                        ...barFillStyle,
-                        width: `${spentPct}%`,
-                        background: spentTone(spentPct, isOver),
-                      }} />
+                    <CategoryIcon icon={cat.icon} style={{ fontSize: 22, flexShrink: 0, color: "var(--muted)" }} />
+                    <div style={{ minWidth: 0 }}>
+                      <strong style={{ ...rowTitleStyle, color: "var(--muted)" }}>{cat.name}</strong>
+                      <p style={rowMetaStyle}>
+                        {scope && <span style={scopeBadgeStyle}>{scope}</span>}
+                        {scope && " · "}
+                        {cat.type[0] ?? "Budget"}
+                      </p>
                     </div>
                   </button>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                  <div style={rowRightStyle}>
+                    <div style={rowActionsStyle}>
+                      <IconActionButton
+                        icon={<ReviveIcon size={14} strokeWidth={2.2} />}
+                        label="Revive"
+                        ariaLabel={`Revive ${cat.name}`}
+                        onClick={() => onReviveCategory(cat)}
+                      />
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </>
+        )}
+
       </div>
     </div>
+  );
+}
+
+/* ─── Sub-components ──────────────────────────────────────────── */
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{ ...chipStyle, ...(active ? chipActiveStyle : null) }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function IconActionButton({
+  icon,
+  label,
+  ariaLabel,
+  tone = "default",
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  ariaLabel: string;
+  tone?: "default" | "quiet";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={label}
+      style={tone === "quiet" ? quietActionButtonStyle : actionButtonStyle}
+    >
+      <span style={{ width: 16, height: 16, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-hidden="true">
+        {icon}
+      </span>
+      <span style={{ lineHeight: 1 }}>{label}</span>
+    </button>
   );
 }
 
@@ -195,37 +320,72 @@ const wrapStyle: CSSProperties = {
   animation: "fadeUp 0.2s ease both",
 };
 
-const topBarStyle: CSSProperties = {
+const headerStyle: CSSProperties = {
   display: "flex",
-  alignItems: "center",
+  alignItems: "flex-start",
   justifyContent: "space-between",
+  gap: 14,
+  paddingTop: 8,
 };
 
-const backBtnStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  padding: "6px 8px 6px 2px",
-  borderRadius: 10,
-  border: "none",
-  background: "transparent",
-  color: "var(--accent-ink)",
-  cursor: "pointer",
-  fontSize: 14,
-  fontWeight: 600,
+const eyebrowStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: 10,
+  letterSpacing: 0.5,
+  textTransform: "uppercase",
+  color: "var(--muted)",
+};
+
+const titleStyle: CSSProperties = {
+  margin: "4px 0 0",
+  fontFamily: "var(--font-display)",
+  fontSize: 34,
+  lineHeight: 0.95,
+  color: "var(--text)",
 };
 
 const rebalanceBtnStyle: CSSProperties = {
-  width: 36,
-  height: 36,
-  padding: 0,
-  border: "none",
-  background: "transparent",
+  minHeight: 44,
+  padding: "0 12px",
+  borderRadius: 14,
+  border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 54%, white)",
   color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  justifyContent: "center",
+  gap: 6,
+};
+
+const chipsRowStyle: CSSProperties = {
+  display: "flex",
+};
+
+const chipsStyle: CSSProperties = {
+  display: "inline-flex",
+  gap: 6,
+  padding: 4,
+  borderRadius: 16,
+  border: "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 45%, white)",
+};
+
+const chipStyle: CSSProperties = {
+  minHeight: 36,
+  padding: "0 13px",
+  borderRadius: 12,
+  border: "none",
+  background: "transparent",
+  color: "var(--muted)",
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: "pointer",
+};
+
+const chipActiveStyle: CSSProperties = {
+  background: "var(--surface)",
+  color: "var(--text2)",
+  fontWeight: 600,
 };
 
 const searchWrapStyle: CSSProperties = {
@@ -252,7 +412,7 @@ const searchInputStyle: CSSProperties = {
 
 const listStyle: CSSProperties = {
   display: "grid",
-  gap: 8,
+  gap: 10,
 };
 
 const sectionLabelStyle: CSSProperties = {
@@ -266,46 +426,81 @@ const sectionLabelStyle: CSSProperties = {
 };
 
 const sectionRowsStyle: CSSProperties = {
-  display: "flex",
-  gap: 8,
-  overflowX: "auto",
-  padding: "2px 2px 8px",
+  display: "grid",
+  gap: 6,
 };
 
-const cardStyle: CSSProperties = {
-  flex: "0 0 120px",
-  minHeight: 152,
-  borderRadius: 16,
+const categoryRowStyle: CSSProperties = {
+  minHeight: 64,
+  borderRadius: 14,
   border: "none",
   background: "var(--surface)",
-  cursor: "pointer",
+  padding: "10px 12px",
   display: "flex",
-  flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center",
-  textAlign: "center",
-  gap: 4,
-  padding: "14px 10px",
+  gap: 8,
   boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
 };
 
-const selectedCardStyle: CSSProperties = {
-  border: "1px solid color-mix(in srgb, var(--accent) 38%, var(--border))",
-  background: "linear-gradient(180deg, color-mix(in srgb, var(--accent-dim) 35%, var(--surface)) 0%, var(--surface) 84%)",
+const categoryMainStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  border: "none",
+  background: "transparent",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  textAlign: "left",
+  cursor: "pointer",
 };
 
-const cardNameStyle: CSSProperties = {
+const rowTitleStyle: CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 600,
+  color: "var(--text2)",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const rowMetaStyle: CSSProperties = {
+  marginTop: 3,
   fontSize: 11,
+  color: "var(--muted)",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const scopeBadgeStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--muted)",
-  lineHeight: 1.2,
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-  maxWidth: "100%",
 };
 
-const healthTagStyle = (isOver: boolean): CSSProperties => ({
+const rowRightStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexShrink: 0,
+};
+
+const rowActionsStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+};
+
+const availableStyle = (isOver: boolean): CSSProperties => ({
+  fontFamily: "var(--font-body)",
+  fontSize: 13,
+  fontWeight: 600,
+  color: isOver ? "var(--danger)" : "var(--text2)",
+  fontVariantNumeric: "tabular-nums",
+  whiteSpace: "nowrap",
+});
+
+const healthBadgeStyle = (isOver: boolean): CSSProperties => ({
   fontSize: 8,
   fontWeight: 700,
   letterSpacing: 1.1,
@@ -314,47 +509,33 @@ const healthTagStyle = (isOver: boolean): CSSProperties => ({
   lineHeight: 1,
 });
 
-const cardAmountStyle = (isOver: boolean): CSSProperties => ({
-  fontFamily: "var(--font-body)",
-  fontSize: 18,
+const actionButtonStyle: CSSProperties = {
+  minHeight: 36,
+  padding: "0 9px",
+  borderRadius: 10,
+  border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)",
+  background: "color-mix(in srgb, var(--surface2) 54%, white)",
+  color: "var(--text2)",
+  fontSize: 11,
   fontWeight: 600,
-  letterSpacing: "-0.016em",
-  color: isOver ? "var(--danger)" : "var(--text2)",
-  fontVariantNumeric: "tabular-nums",
-  lineHeight: 1,
-  marginTop: 2,
-});
-
-const cardSubStyle = (isOver: boolean): CSSProperties => ({
-  fontFamily: "var(--font-body)",
-  fontSize: 9,
-  fontWeight: 400,
-  letterSpacing: "0.01em",
-  color: isOver
-    ? "color-mix(in srgb, var(--danger) 55%, var(--muted))"
-    : "var(--muted)",
-  lineHeight: 1,
-});
-
-const barTrackStyle: CSSProperties = {
-  width: "100%",
-  height: 5,
-  borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface2) 65%, white)",
-  overflow: "hidden",
-  boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 45%, transparent)",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 5,
+  whiteSpace: "nowrap",
 };
 
-const barFillStyle: CSSProperties = {
-  height: "100%",
-  borderRadius: 999,
-  transition: "width 0.3s ease, background 0.4s ease",
+const quietActionButtonStyle: CSSProperties = {
+  ...actionButtonStyle,
+  background: "transparent",
+  border: "1px solid transparent",
+  color: "var(--muted)",
 };
 
 const emptyStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  padding: "18px 2px",
+  padding: "22px 10px",
   color: "var(--muted)",
+  fontSize: 14,
+  textAlign: "center",
 };

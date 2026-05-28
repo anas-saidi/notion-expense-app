@@ -36,6 +36,7 @@ type AddTransactionSheetProps = {
   canSubmit: boolean;
   modeVariant?: "create" | "edit";
   onClose: () => void;
+  onOpenRebalance?: () => void;
   onAmountChange: (value: string) => void;
   onNameChange: (value: string) => void;
   onToggleDatePicker: () => void;
@@ -309,16 +310,38 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               {props.categoryUnfunded && (
                 <div style={warnStyle}>
                   <span style={{ fontSize: 12, opacity: 0.75, marginTop: 1 }}>!</span>
-                  <span style={warnTextStyle}><strong>{props.selectedCat?.name}</strong> has no available budget. Fund it in Notion first.</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                    <span style={warnTextStyle}><strong>{props.selectedCat?.name}</strong> has no available budget.</span>
+                    {props.onOpenRebalance && (
+                      <button
+                        type="button"
+                        onClick={() => props.onOpenRebalance!()}
+                        style={rebalanceLinkStyle}
+                      >
+                        Rebalance budget →
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
               {props.categoryOverBudget && props.selectedCat && (
                 <div style={warnStyle}>
                   <span style={{ fontSize: 12, opacity: 0.75, marginTop: 1 }}>!</span>
-                  <span style={warnTextStyle}>
-                    Over budget by <strong><Money value={props.parsedAmount - (props.selectedCat.available ?? 0)} /></strong>. Only{" "}
-                    <strong><Money value={props.selectedCat.available ?? 0} /></strong> left in <strong>{props.selectedCat.name}</strong>.
-                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                    <span style={warnTextStyle}>
+                      Over budget by <strong><Money value={props.parsedAmount - (props.selectedCat.available ?? 0)} /></strong>. Only{" "}
+                      <strong><Money value={props.selectedCat.available ?? 0} /></strong> left in <strong>{props.selectedCat.name}</strong>.
+                    </span>
+                    {props.onOpenRebalance && (
+                      <button
+                        type="button"
+                        onClick={() => props.onOpenRebalance!()}
+                        style={rebalanceLinkStyle}
+                      >
+                        Rebalance budget →
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -537,6 +560,19 @@ const warnTextStyle: CSSProperties = {
   fontSize: 12,
   color: "color-mix(in srgb, var(--danger) 46%, var(--text2))",
   lineHeight: 1.5,
+};
+
+const rebalanceLinkStyle: CSSProperties = {
+  alignSelf: "flex-start",
+  padding: 0,
+  border: "none",
+  background: "transparent",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "color-mix(in srgb, var(--accent-ink) 75%, var(--text2))",
+  cursor: "pointer",
+  textDecoration: "underline",
+  textUnderlineOffset: 2,
 };
 
 const exprPreviewStyle: CSSProperties = {

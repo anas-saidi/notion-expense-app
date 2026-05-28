@@ -144,4 +144,4 @@ export type CloseMonthStepState = {
   needsAttention: boolean;
 };
 
-export type AppTab = "home" | "plan" | "pending" | "history";
+export type AppTab = "home" | "plan" | "budget" | "history";

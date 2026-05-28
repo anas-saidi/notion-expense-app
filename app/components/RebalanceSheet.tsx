@@ -219,14 +219,20 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     return Math.max(0, Math.round(plannedByCategory.get(c.id) ?? c.planned ?? 0));
   };
 
-  const funded = useMemo(
+  // All categories (for display in rebalance — unfrozen, non-archived)
+  const allItems = useMemo(
     () =>
       categories
-        .filter((c) => getAvailable(c) > 0)
         .map((c) => ({ id: c.id, original: getAvailable(c) }))
         .sort((a, b) => b.original - a.original),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [categories, monthCtx, plannedByCategory, spentByCategory],
+  );
+
+  // Only categories with available > 0 — used for pool/transfer source computation
+  const funded = useMemo(
+    () => allItems.filter((f) => f.original > 0),
+    [allItems],
   );
 
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
@@ -236,31 +242,40 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
 
   useEffect(() => {
     if (!open) return;
-    setAllocations(Object.fromEntries(funded.map((f) => [f.id, f.original])));
+    setAllocations(Object.fromEntries(allItems.map((f) => [f.id, f.original])));
     setGroupFilter("all");
-  }, [open, funded]);
+  }, [open, allItems]);
 
   // ── Group filtering ──
   const groupCounts = useMemo(() => {
     const counts: Record<Exclude<GroupFilter, "all">, number> = { joint: 0, wife: 0, husband: 0, savings: 0 };
-    for (const f of funded) {
+    for (const f of allItems) {
       const cat = catById.get(f.id);
       if (cat) counts[getCategoryGroup(cat)]++;
     }
     return counts;
-  }, [funded, catById]);
+  }, [allItems, catById]);
 
   const groupTabs = useMemo(
     () => [
-      { key: "all", label: "All", count: funded.length },
+      { key: "all", label: "All", count: allItems.length },
       ...(groupCounts.joint > 0 ? [{ key: "joint", label: "Joint", count: groupCounts.joint }] : []),
       ...(groupCounts.wife > 0 ? [{ key: "wife", label: "Salma", count: groupCounts.wife }] : []),
       ...(groupCounts.husband > 0 ? [{ key: "husband", label: "Anas", count: groupCounts.husband }] : []),
       ...(groupCounts.savings > 0 ? [{ key: "savings", label: "Savings", count: groupCounts.savings }] : []),
     ],
-    [funded.length, groupCounts],
+    [allItems.length, groupCounts],
   );
 
+  const visibleItems = useMemo(() => {
+    if (groupFilter === "all") return allItems;
+    return allItems.filter((f) => {
+      const cat = catById.get(f.id);
+      return cat && getCategoryGroup(cat) === groupFilter;
+    });
+  }, [allItems, catById, groupFilter]);
+
+  // Pool = only the funded (available > 0) categories in the current view
   const visibleFunded = useMemo(() => {
     if (groupFilter === "all") return funded;
     return funded.filter((f) => {
@@ -281,7 +296,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       {
         key: groupFilter,
         label: groupFilter === "all" ? "All" : groupFilter.charAt(0).toUpperCase() + groupFilter.slice(1),
-        items: visibleFunded.map((f): PlanningAllocationItem => {
+        items: visibleItems.map((f): PlanningAllocationItem => {
           const cat = catById.get(f.id)!;
           const amount = allocations[f.id] ?? f.original;
           return {
@@ -307,12 +322,12 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     // The active-category reset effect in AllocationFlow uses `groupKeysSignal`
     // (not the `groups` reference), so it won't fire on every allocation change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groupFilter, visibleFunded, catById, allocations],
+    [groupFilter, visibleItems, catById, allocations],
   );
 
   const liveTransfers = useMemo(
-    () => computeTransfers(funded, allocations),
-    [funded, allocations],
+    () => computeTransfers(allItems, allocations),
+    [allItems, allocations],
   );
 
   const flowPreview = liveTransfers.length === 0 ? undefined : (
@@ -372,6 +387,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
   return (
     <AllocationFlow
       open={open}
+      mode="screen"
       selectedMonth={homeMonth}
       onCancel={onClose}
       onComplete={onSuccess}
@@ -387,7 +403,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       flowPreview={flowPreview}
       headerControls={headerControls}
       onSave={async () => {
-        const transfers = computeTransfers(funded, allocations);
+        const transfers = computeTransfers(allItems, allocations);
         await Promise.all(
           transfers.map((t) =>
             fetch("/api/transfer", {

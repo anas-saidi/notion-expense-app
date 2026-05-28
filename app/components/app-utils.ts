@@ -97,6 +97,34 @@ export const isSavingsAccount = (account: Account) => {
   return value.includes("saving");
 };
 
+export const getBalanceByScope = (accounts: Account[]): Record<BudgetScope, number> => {
+  const norm = (value: string) => value.toLowerCase();
+
+  const salmaTotal = accounts.reduce((sum, account) => {
+    if (isSavingsAccount(account)) return sum;
+    if (!norm(account.label).includes("wife")) return sum;
+    return sum + (account.balance ?? 0);
+  }, 0);
+
+  const anasTotal = accounts.reduce((sum, account) => {
+    if (isSavingsAccount(account)) return sum;
+    if (!norm(account.label).includes("hubb")) return sum;
+    return sum + (account.balance ?? 0);
+  }, 0);
+
+  const jointTotal = accounts.reduce((sum, account) => {
+    if (isSavingsAccount(account)) return sum;
+    if (!norm(account.label).includes("joined")) return sum;
+    return sum + (account.balance ?? 0);
+  }, 0);
+
+  return {
+    joint: jointTotal,
+    salma: salmaTotal,
+    anas: anasTotal,
+  };
+};
+
 export const getLeftToAssignByScope = (accounts: Account[]): Record<BudgetScope, number> => {
   const norm = (value: string) => value.toLowerCase();
   const applyJointDue = (account: Account) => {
