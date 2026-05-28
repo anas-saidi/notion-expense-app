@@ -1,7 +1,6 @@
 import { type ReactNode } from "react";
-import type { AppTab, BudgetScope } from "./app-types";
+import type { AppTab } from "./app-types";
 import { BottomNav } from "./BottomNav";
-import { ScopePicker } from "./ScopePicker";
 import { MenuIcon, PlusIcon } from "./ui/icons";
 
 export function AppShell({
@@ -10,11 +9,10 @@ export function AppShell({
   onTabChange,
   onOpenAdd,
   onOpenManage,
-  budgetScope,
-  onBudgetScopeChange,
   toast,
   showAddButton = true,
   immersive = false,
+  hideHeader = false,
   children,
 }: {
   tab: AppTab;
@@ -22,11 +20,10 @@ export function AppShell({
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
   onOpenManage?: () => void;
-  budgetScope: BudgetScope;
-  onBudgetScopeChange: (scope: BudgetScope) => void;
   toast?: string | null;
   showAddButton?: boolean;
   immersive?: boolean;
+  hideHeader?: boolean;
   children?: ReactNode;
 }) {
   return (
@@ -36,25 +33,16 @@ export function AppShell({
         className={immersive ? undefined : "app-content"}
         style={immersive ? { minHeight: "100dvh" } : { position: "relative" }}
       >
-        {!immersive && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginBottom: 18,
-            }}
-          >
-            <div style={{ minWidth: 0, display: "flex", alignItems: "center" }}>
-              {onOpenManage && (
-                <button type="button" onClick={onOpenManage} aria-label="Open management menu" style={menuButtonStyle}>
-                  <MenuIcon size={18} />
-                </button>
-              )}
+        {!immersive && !hideHeader && onOpenManage && (
+          <header style={headerStyle}>
+            <div aria-label="Couple greeting">
+              <p style={greetingEyebrowStyle}>{getGreeting()}</p>
+              <h1 style={greetingTitleStyle}>Anas &amp; Salma</h1>
             </div>
-            <ScopePicker value={budgetScope} onChange={onBudgetScopeChange} />
-          </div>
+            <button type="button" onClick={onOpenManage} aria-label="Open management menu" style={menuButtonStyle}>
+              <MenuIcon size={18} />
+            </button>
+          </header>
         )}
         {children}
       </div>
@@ -102,11 +90,11 @@ export function AppShell({
             zIndex: 80,
             background: "var(--surface2)",
             border: "1px solid var(--border2)",
-            color: "var(--text)",
+            color: "var(--text2)",
             borderRadius: 999,
             padding: "8px 12px",
             fontSize: 12,
-            fontFamily: "'DM Mono', monospace",
+            fontFamily: "var(--font-body)",
             letterSpacing: 0.4,
             boxShadow: "0 0 0 1px color-mix(in srgb, var(--ink-strong) 10%, transparent)",
             animation: "toastIn 0.2s ease both",
@@ -120,16 +108,52 @@ export function AppShell({
   );
 }
 
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning,";
+  if (h < 18) return "Good afternoon,";
+  return "Good evening,";
+}
+
 const menuButtonStyle = {
   width: 44,
   height: 44,
   borderRadius: 14,
-  border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 50%, white)",
+  border: "none",
+  background: "transparent",
   color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   flexShrink: 0,
+};
+
+const headerStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 16,
+  marginBottom: 18,
+  paddingLeft: 4,
+  paddingRight: 4,
+};
+
+const greetingEyebrowStyle = {
+  fontFamily: "var(--font-body)",
+  fontSize: 10,
+  fontWeight: 500,
+  letterSpacing: 0.5,
+  textTransform: "uppercase" as const,
+  color: "var(--muted)",
+  margin: "0 0 3px",
+};
+
+const greetingTitleStyle = {
+  fontFamily: "var(--font-display)",
+  fontSize: 18,
+  lineHeight: 1,
+  fontWeight: 800,
+  color: "var(--text)",
+  margin: 0,
 };

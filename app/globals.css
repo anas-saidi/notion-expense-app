@@ -77,7 +77,7 @@ html[data-mode="husband"] {
   --danger: #d03238;
 }
 
-html { height: 100%; }
+html { height: 100%; overflow-x: hidden; }
 
 body {
   min-height: 100dvh;
@@ -120,11 +120,15 @@ button:not(:disabled):active {
   transform: translateY(0);
 }
 
-.planning-scroll-rail {
+.planning-scroll-rail,
+.home-scroll-rail,
+.categories-scroll-rail {
   scrollbar-width: none;
 }
 
-.planning-scroll-rail::-webkit-scrollbar {
+.planning-scroll-rail::-webkit-scrollbar,
+.home-scroll-rail::-webkit-scrollbar,
+.categories-scroll-rail::-webkit-scrollbar {
   display: none;
 }
 
@@ -340,6 +344,12 @@ button:disabled {
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
+
+/* Amount hero input — prevent iOS Safari from overriding font-size */
+.amount-hero-input {
+  -webkit-text-size-adjust: 100%;
+  font-size: clamp(96px, 26vw, 144px) !important;
+}
 
 /* Date picker icon */
 input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
@@ -693,11 +703,9 @@ button:hover .rebalance-btn-icon {
   display: grid;
   gap: 14px;
   background: var(--surface);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 14px;
+  padding: 16px 14px;
   margin-bottom: 20px;
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent);
   animation: fadeUp 0.4s ease both;
   animation-delay: 50ms;
 }
@@ -710,7 +718,7 @@ button:hover .rebalance-btn-icon {
 }
 
 .history-spotlight__eyebrow {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-body);
   font-size: 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -726,11 +734,10 @@ button:hover .rebalance-btn-icon {
 }
 
 .history-spotlight__amount {
-  font-family: "DM Mono", monospace;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.3px;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text2);
   white-space: nowrap;
   flex-shrink: 0;
   padding-top: 1px;
@@ -741,7 +748,7 @@ button:hover .rebalance-btn-icon {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding-top: 2px;
-  border-top: 1px solid var(--card-border);
+  border-top: 1px solid var(--border);
 }
 
 .history-pill {
@@ -756,8 +763,8 @@ button:hover .rebalance-btn-icon {
 
 .history-pill strong {
   font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
+  font-weight: 500;
+  color: var(--text2);
   overflow: hidden;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
@@ -767,9 +774,8 @@ button:hover .rebalance-btn-icon {
   position: relative;
   overflow: hidden;
   background: var(--surface);
-  border: 1px solid var(--card-border);
-  border-radius: var(--card-radius);
-  padding: 11px 12px;
+  border-radius: 14px;
+  padding: 16px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -777,31 +783,14 @@ button:hover .rebalance-btn-icon {
   animation-delay: var(--stagger, 0ms);
   transition:
     transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.16s ease,
-    border-color 0.2s ease,
     background-color 0.15s ease;
 }
 
-.tx-row::before {
-  content: "";
-  position: absolute;
-  inset: 10px auto 10px 0;
-  width: 3px;
-  border-radius: 999px;
-  background: var(--tx-accent, color-mix(in srgb, var(--border2) 78%, transparent));
-  opacity: 0.9;
-}
 
 @media (hover: hover) {
   .tx-row:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
   }
-
-  .tx-row:hover .tx-icon {
-    transform: scale(1.1);
-  }
-
 
   .tx-delete-btn:hover {
     background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
@@ -819,23 +808,9 @@ button:hover .rebalance-btn-icon {
 }
 
 .tx-row--deleting {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent) !important;
   background: color-mix(in srgb, var(--danger) 4%, var(--surface)) !important;
+  outline: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
 }
-
-.tx-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: var(--surface2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 16px;
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
 
 .tx-delete-btn {
   width: 44px;
@@ -861,7 +836,7 @@ button:hover .rebalance-btn-icon {
   background: var(--danger) !important;
   border-color: var(--danger) !important;
   color: #fff !important;
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-body);
   font-size: 9px;
   letter-spacing: 0.3px;
   font-weight: 700;
@@ -923,7 +898,7 @@ button:hover .rebalance-btn-icon {
 
 .history-empty__prompt {
   margin-top: 14px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-body);
   font-size: 10px;
   letter-spacing: 0.4px;
   text-transform: uppercase;

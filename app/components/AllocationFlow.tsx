@@ -37,6 +37,7 @@ type AllocationFlowProps = {
   readOnly?: boolean;
   readOnlyBanner?: ReactNode;
   headerControls?: ReactNode;
+  flowPreview?: ReactNode;
   title?: string;
   balancedLabel?: string;
 };
@@ -58,6 +59,7 @@ export function AllocationFlow({
   readOnly = false,
   readOnlyBanner,
   headerControls,
+  flowPreview,
   title = "Set Monthly Budget",
   balancedLabel = "Fully assigned",
 }: AllocationFlowProps) {
@@ -237,6 +239,7 @@ export function AllocationFlow({
           {burstKey > 0 && <BalancedBurst key={burstKey} />}
         </section>
         {readOnlyBanner}
+        {flowPreview}
 
         <section className="planning-studio" aria-label="Budget allocation" style={studioStyle}>
           <div className="planning-scroll-rail planning-category-rail" style={categoryRailStyle} aria-label={`${active.label} categories`}>
@@ -432,32 +435,32 @@ const gpTriggerStyle: CSSProperties = { minHeight: 28, padding: 0, border: "none
 const gpLabelStyle: CSSProperties = { fontSize: 13, fontWeight: 600 };
 const gpChevronStyle: CSSProperties = { pointerEvents: "none", color: "var(--muted)", transition: "transform 0.16s ease" };
 const gpMenuStyle: CSSProperties = { width: 192, padding: 6, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)", background: "var(--surface)", boxShadow: "0 18px 36px color-mix(in srgb, var(--ink-strong) 14%, transparent), inset 0 1px 0 color-mix(in srgb, white 55%, transparent)", zIndex: 90, display: "grid", gap: 3 };
-const gpOptionStyle: CSSProperties = { minHeight: 44, width: "100%", border: "none", borderRadius: 12, background: "transparent", color: "var(--text)", cursor: "pointer", display: "grid", gridTemplateColumns: "8px 1fr auto", alignItems: "center", gap: 9, padding: "0 10px", textAlign: "left" };
+const gpOptionStyle: CSSProperties = { minHeight: 44, width: "100%", border: "none", borderRadius: 12, background: "transparent", color: "var(--text2)", cursor: "pointer", display: "grid", gridTemplateColumns: "8px 1fr auto", alignItems: "center", gap: 9, padding: "0 10px", textAlign: "left" };
 const gpOptionActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--surface2) 70%, white)" };
 const gpDotStyle: CSSProperties = { width: 7, height: 7, borderRadius: 999 };
 const gpOptionTextStyle: CSSProperties = { fontSize: 13, fontWeight: 700 };
-const gpCountStyle: CSSProperties = { fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--muted)" };
+const gpCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 10, color: "var(--muted)" };
 
 const sheetPanelStyle: CSSProperties = { background: "color-mix(in srgb, var(--bg) 96%, white)", borderRadius: "24px 24px 0 0" };
 const sheetContentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
 const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "16px 20px 14px", flexShrink: 0 };
-const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text)" };
+const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text2)" };
 const sheetScrollStyle: CSSProperties = { overflowY: "auto", overflowX: "hidden", padding: "4px 12px 8px", display: "grid", gap: 8 };
 const monthPickerButtonStyle: CSSProperties = { minHeight: 28, padding: 0, border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" };
 const monthLabelFallbackStyle: CSSProperties = { minHeight: 28, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
-const closeButtonStyle: CSSProperties = { width: 36, height: 36, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border2) 70%, transparent)", background: "color-mix(in srgb, var(--surface2) 70%, transparent)", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
+const closeButtonStyle: CSSProperties = { width: 36, height: 36, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
 const hiddenMonthInputStyle: CSSProperties = { position: "absolute", pointerEvents: "none", opacity: 0, width: 0, height: 0 };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
 const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };
-const quietAvailableValueStyle: CSSProperties = { color: "var(--text)", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', letterSpacing: -0.5 };
+const quietAvailableValueStyle: CSSProperties = { color: "var(--text2)", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', letterSpacing: -0.5 };
 const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 999, padding: "5px 9px", background: "color-mix(in srgb, var(--warning-dim) 70%, white)", color: "color-mix(in srgb, var(--warning) 82%, black)", fontSize: 11, fontWeight: 750 };
 const balancedTextStyle: CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
 const deltaChipStyle = (isOver: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "center", gap: 2,
   padding: "2px 7px", borderRadius: 999,
-  fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace",
+  fontSize: 11, fontWeight: 700, fontFamily: "var(--font-body)",
   background: isOver
     ? "color-mix(in srgb, var(--danger) 10%, transparent)"
     : "color-mix(in srgb, var(--success) 10%, transparent)",
@@ -470,20 +473,20 @@ const deltaChipStyle = (isOver: boolean): CSSProperties => ({
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
-const categoryPillStyle: CSSProperties = { flex: "0 0 40px", width: 40, minHeight: 40, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border) 32%, transparent)", background: "color-mix(in srgb, var(--surface) 90%, white)", color: "var(--text)", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 8px 16px color-mix(in srgb, var(--ink-strong) 4%, transparent)", transition: "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.22s ease" };
+const categoryPillStyle: CSSProperties = { flex: "0 0 40px", width: 40, minHeight: 40, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border) 32%, transparent)", background: "color-mix(in srgb, var(--surface) 90%, white)", color: "var(--text2)", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 8px 16px color-mix(in srgb, var(--ink-strong) 4%, transparent)", transition: "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.22s ease" };
 const categoryPillActiveStyle: CSSProperties = { flex: "0 0 140px", minHeight: 54, borderRadius: 18, border: "1px solid transparent", background: "linear-gradient(145deg, #39dec7, color-mix(in srgb, #39dec7 70%, var(--accent)))", color: "var(--accent-ink)", padding: "8px 10px", display: "grid", gridTemplateColumns: "30px minmax(0, 1fr)", gridTemplateRows: "auto auto", alignItems: "center", gap: "2px 8px", textAlign: "left", cursor: "pointer", boxShadow: "0 14px 26px color-mix(in srgb, #39dec7 28%, transparent)", animation: "categorySelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both" };
-const categoryIconStyle = (isActive: boolean): CSSProperties => ({ gridColumn: "1 / 2", gridRow: "1 / 3", width: isActive ? 30 : 34, height: isActive ? 30 : 34, borderRadius: isActive ? 10 : 999, background: isActive ? "color-mix(in srgb, white 30%, transparent)" : "color-mix(in srgb, var(--accent-dim) 48%, white)", display: "flex", alignItems: "center", justifyContent: "center", color: isActive ? "var(--accent-ink)" : "color-mix(in srgb, var(--accent-ink) 78%, var(--text))" });
+const categoryIconStyle = (isActive: boolean): CSSProperties => ({ gridColumn: "1 / 2", gridRow: "1 / 3", color: isActive ? "var(--accent-ink)" : "color-mix(in srgb, var(--accent-ink) 78%, var(--text))", flexShrink: 0 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
 const categoryAmountStyle: CSSProperties = { fontSize: 15, lineHeight: 1, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"' };
 const stackedUnitStyle: CSSProperties = { borderRadius: "24px 0 0 0", overflow: "hidden", flexShrink: 0, background: "var(--surface)" };
 const editorStyle: CSSProperties = { display: "grid" };
 const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gap: 6, minHeight: 120, padding: "12px 10px 10px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
-const amountCurrencyBigStyle: CSSProperties = { position: "absolute", left: 18, top: 18, color: "color-mix(in srgb, var(--muted) 24%, transparent)", fontFamily: "'DM Mono', monospace", fontSize: 22, lineHeight: 1, fontWeight: 600, opacity: 0.6, zIndex: 1 };
-const amountCornerIconStyle: CSSProperties = { position: "absolute", right: 18, top: 30, width: 18, height: 18, borderRadius: 6, background: "color-mix(in srgb, var(--accent) 18%, var(--surface2))", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center" };
+const amountCurrencyBigStyle: CSSProperties = { position: "absolute", left: 18, top: 18, color: "color-mix(in srgb, var(--muted) 24%, transparent)", fontFamily: "var(--font-body)", fontSize: 22, lineHeight: 1, fontWeight: 600, opacity: 0.6, zIndex: 1 };
+const amountCornerIconStyle: CSSProperties = { position: "absolute", right: 18, top: 30, color: "var(--accent-ink)", opacity: 0.45 };
 const amountEditorStyle: CSSProperties = { display: "flex", justifyContent: "center", alignItems: "center", minWidth: 0 };
 const srOnlyStyle: CSSProperties = { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 };
-const amountInputBigStyle = (isOver: boolean): CSSProperties => ({ width: "100%", minWidth: 0, maxWidth: "100vw", border: "none", background: "transparent", color: isOver ? "var(--danger)" : "var(--text)", textAlign: "center", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.88, fontWeight: 950, letterSpacing: -3, outline: "none", fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', zIndex: 2, padding: 0, margin: 0, backgroundClip: "text", transition: "color 0.35s cubic-bezier(0.22, 1, 0.36, 1)" });
-const metaRowStyle: CSSProperties = { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, color: "var(--text2)", fontSize: 10, fontFamily: "'DM Mono', monospace", opacity: 0.5 };
+const amountInputBigStyle = (isOver: boolean): CSSProperties => ({ width: "100%", minWidth: 0, maxWidth: "100vw", border: "none", background: "transparent", color: isOver ? "var(--danger)" : "var(--text2)", textAlign: "center", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.88, fontWeight: 950, letterSpacing: -3, outline: "none", fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', zIndex: 2, padding: 0, margin: 0, backgroundClip: "text", transition: "color 0.35s cubic-bezier(0.22, 1, 0.36, 1)" });
+const metaRowStyle: CSSProperties = { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, color: "var(--text2)", fontSize: 10, fontFamily: "var(--font-body)", opacity: 0.5 };
 const emptyStyle: CSSProperties = { minHeight: 220, display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 13 };
 const dialPanelStyle = (isOver: boolean, isBalanced: boolean): CSSProperties => ({ display: "grid", gap: 14, padding: `20px 18px calc(16px + env(safe-area-inset-bottom, 0px))`, borderRadius: "20px 0 0 0", background: isOver ? "linear-gradient(155deg, color-mix(in srgb, var(--danger) 86%, #5c2f3a), color-mix(in srgb, var(--danger) 62%, #31212a))" : isBalanced ? "linear-gradient(155deg, #9fe870, color-mix(in srgb, #9fe870 68%, #1e4a0d))" : "linear-gradient(155deg, var(--accent), color-mix(in srgb, var(--accent) 76%, #4e3df1))", color: "var(--accent-ink)", transition: "background 0.45s cubic-bezier(0.22, 1, 0.36, 1)" });
 const dialCopyStyle: CSSProperties = { display: "grid", gap: 4 };
@@ -495,4 +498,4 @@ const tickRailStyle: CSSProperties = { display: "flex", alignItems: "center", ju
 const tickStyle: CSSProperties = { width: 2, borderRadius: 999, transition: "opacity 0.1s ease, background-color 0.1s ease" };
 const rangeStyle: CSSProperties = { width: "100%", accentColor: "white" };
 const saveErrorStyle: CSSProperties = { padding: "10px 12px", borderRadius: 14, background: "rgba(255,255,255,0.16)", color: "white", fontSize: 12, lineHeight: 1.4 };
-const saveButtonStyle: CSSProperties = { justifySelf: "end", minHeight: 48, borderRadius: 18, border: "none", background: "color-mix(in srgb, white 96%, var(--accent-ink))", color: "var(--text)", padding: "0 16px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "0 10px 22px color-mix(in srgb, var(--ink-strong) 12%, transparent)" };
+const saveButtonStyle: CSSProperties = { justifySelf: "end", minHeight: 48, borderRadius: 18, border: "none", background: "color-mix(in srgb, white 96%, var(--accent-ink))", color: "var(--text2)", padding: "0 16px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "0 10px 22px color-mix(in srgb, var(--ink-strong) 12%, transparent)" };

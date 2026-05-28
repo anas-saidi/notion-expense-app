@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import type { Category, MonthlySummary } from "./app-types";
 import { today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
+import { CategoryIcon } from "./ui/CategoryIcon";
 import type { PlanningAllocationItem } from "./app-types";
 
 type RebalanceSheetProps = {
@@ -309,6 +310,40 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     [groupFilter, visibleFunded, catById, allocations],
   );
 
+  const liveTransfers = useMemo(
+    () => computeTransfers(funded, allocations),
+    [funded, allocations],
+  );
+
+  const flowPreview = liveTransfers.length === 0 ? undefined : (
+    <div style={flowWrapStyle}>
+      <span style={flowHeadStyle}>Moving</span>
+      <div style={flowListStyle}>
+        {liveTransfers.slice(0, 5).map((t, i) => {
+          const from = catById.get(t.fromId);
+          const to   = catById.get(t.toId);
+          if (!from || !to) return null;
+          return (
+            <div key={i} style={flowRowStyle}>
+              <div style={flowFromStyle}>
+                <CategoryIcon icon={from.icon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                <span style={flowNameStyle}>{from.name}</span>
+              </div>
+              <span style={flowArrowStyle}>→ {t.amount} MAD</span>
+              <div style={flowToStyle}>
+                <span style={flowNameStyle}>{to.name}</span>
+                <CategoryIcon icon={to.icon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+              </div>
+            </div>
+          );
+        })}
+        {liveTransfers.length > 5 && (
+          <span style={flowMoreStyle}>+{liveTransfers.length - 5} more moves</span>
+        )}
+      </div>
+    </div>
+  );
+
   const headerControls = groupTabs.length > 2 ? (
     <GroupFilterPicker groupTabs={groupTabs} groupFilter={groupFilter} onSelect={setGroupFilter} />
   ) : undefined;
@@ -349,6 +384,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       requireBalanced
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}
+      flowPreview={flowPreview}
       headerControls={headerControls}
       onSave={async () => {
         const transfers = computeTransfers(funded, allocations);
@@ -399,14 +435,84 @@ const gfMenuStyle: CSSProperties = {
 };
 const gfOptionStyle: CSSProperties = {
   minHeight: 44, width: "100%", border: "none", borderRadius: 12,
-  background: "transparent", color: "var(--text)", cursor: "pointer",
+  background: "transparent", color: "var(--text2)", cursor: "pointer",
   display: "grid", gridTemplateColumns: "8px 1fr auto",
   alignItems: "center", gap: 9, padding: "0 10px", textAlign: "left",
 };
 const gfOptionActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--surface2) 70%, white)" };
 const gfDotStyle: CSSProperties = { width: 7, height: 7, borderRadius: 999 };
 const gfOptionTextStyle: CSSProperties = { fontSize: 13, fontWeight: 700 };
-const gfCountStyle: CSSProperties = { fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--muted)" };
+const gfCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 10, color: "var(--muted)" };
+
+// ── Flow preview styles ───────────────────────────────────────────────────────
+
+const flowWrapStyle: CSSProperties = {
+  margin: "0 0 4px",
+  padding: "10px 14px 12px",
+  borderRadius: 14,
+  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
+  display: "grid",
+  gap: 8,
+};
+
+const flowHeadStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: 1.2,
+  textTransform: "uppercase",
+  color: "var(--muted)",
+};
+
+const flowListStyle: CSSProperties = {
+  display: "grid",
+  gap: 6,
+};
+
+const flowRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto 1fr",
+  alignItems: "center",
+  gap: 8,
+};
+
+const flowFromStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 5,
+  minWidth: 0,
+};
+
+const flowToStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: 5,
+  minWidth: 0,
+};
+
+const flowNameStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 500,
+  color: "var(--text2)",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
+const flowArrowStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 500,
+  color: "var(--muted)",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+};
+
+const flowMoreStyle: CSSProperties = {
+  fontSize: 10,
+  color: "var(--muted)",
+  textAlign: "center",
+};
 
 // ── Context banner styles ──────────────────────────────────────────────────────
 
@@ -418,5 +524,5 @@ const contextBannerDotStyle: CSSProperties = {
   width: 6, height: 6, borderRadius: "50%", background: "var(--muted)", flexShrink: 0,
 };
 const contextBannerTextStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--muted)", letterSpacing: 0.2,
+  fontFamily: "var(--font-body)", fontSize: 11, color: "var(--muted)", letterSpacing: 0.2,
 };

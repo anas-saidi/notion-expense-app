@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
 const NOTION_VERSION = "2022-06-28";
+const PROP_BUDGET_IN  = "\u{1F4B0} budget (in)";
+const PROP_BUDGET_OUT = "\u{1F4B0} budget (out)";
 
 const notionHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
@@ -16,6 +18,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const pageSize = Math.min(parseInt(searchParams.get("page_size") ?? "10", 10) || 10, 100);
+  const start = searchParams.get("start");
+  const end   = searchParams.get("end");
+
+  const dateFilter = start && end ? {
+    and: [
+      { property: "Date", date: { on_or_after: start } },
+      { property: "Date", date: { on_or_before: end } },
+    ],
+  } : undefined;
 
   try {
     const res = await fetch(`https://api.notion.com/v1/databases/${TRANSACTIONS_DB}/query`, {
@@ -23,7 +34,7 @@ export async function GET(req: NextRequest) {
       headers: notionHeaders(token),
       cache: "no-store",
       body: JSON.stringify({
-        filter: { property: "Type", select: { equals: "Expense" } },
+        ...(dateFilter ? { filter: dateFilter } : {}),
         sorts: [{ property: "Date", direction: "descending" }],
         page_size: pageSize,
       }),
@@ -39,6 +50,9 @@ export async function GET(req: NextRequest) {
       date: page.properties.Date?.date?.start ?? "",
       category: page.properties.Category?.relation?.[0]?.id ?? null,
       accountId: page.properties.Account?.relation?.[0]?.id ?? null,
+      type: page.properties.Type?.select?.name ?? "Expense",
+      fromCategoryId: page.properties[PROP_BUDGET_OUT]?.relation?.[0]?.id ?? null,
+      toCategoryId:   page.properties[PROP_BUDGET_IN]?.relation?.[0]?.id  ?? null,
     }));
 
     return NextResponse.json({ transactions });

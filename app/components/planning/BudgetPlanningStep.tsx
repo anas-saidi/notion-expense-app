@@ -209,7 +209,7 @@ export function BudgetPlanningStep({
                       }}
                       disabled={isAdded}
                     >
-                      <CategoryIcon icon={category.icon} style={addOptionIconStyle} />
+                      <CategoryIcon icon={category.icon} style={{ fontSize: 16, flexShrink: 0 }} />
                       <span style={addOptionLabelStyle}>{category.name}</span>
                       {isAdded && <span style={addOptionBadgeStyle}>Added</span>}
                     </button>
@@ -249,7 +249,7 @@ export function BudgetPlanningStep({
         {active.items.map((item) => (
           <div key={item.categoryId} style={rowStyle}>
             <div style={{ display: "grid", gap: 4 }}>
-              <strong style={{ color: "var(--text)", fontSize: 15 }}>
+              <strong style={{ color: "var(--text2)", fontSize: 15 }}>
                 {item.icon ? <CategoryIcon icon={item.icon} size={18} style={{ marginRight: 4 }} /> : null}{item.name}
               </strong>
               <div style={metaRowStyle}>
@@ -339,7 +339,7 @@ const toAllocationItem = (category: Category): PlanningAllocationItem => ({
 });
 
 const eyebrowStyle = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase" as const,
@@ -365,7 +365,7 @@ const addButtonStyle = {
   padding: "6px 12px",
   border: "1px solid transparent",
   background: "color-mix(in srgb, var(--surface2) 60%, white)",
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 12,
   fontWeight: 600,
   cursor: "pointer",
@@ -386,7 +386,7 @@ const addSearchStyle = {
   borderRadius: 12,
   border: "1px solid transparent",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 13,
   outline: "none",
 };
@@ -407,7 +407,7 @@ const addOptionStyle = {
   borderRadius: 12,
   border: "none",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   cursor: "pointer",
   textAlign: "left" as const,
 };
@@ -417,22 +417,11 @@ const addOptionDisabledStyle = {
   cursor: "not-allowed",
 };
 
-const addOptionIconStyle = {
-  width: 28,
-  height: 28,
-  borderRadius: 10,
-  background: "var(--surface2)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 14,
-  flexShrink: 0,
-};
 
 const addOptionLabelStyle = {
   fontSize: 13,
   fontWeight: 600,
-  color: "var(--text)",
+  color: "var(--text2)",
 };
 
 const addOptionBadgeStyle = {
@@ -444,7 +433,7 @@ const addOptionBadgeStyle = {
   textTransform: "uppercase" as const,
   letterSpacing: 0.4,
   color: "var(--muted)",
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
 };
 
 const addEmptyStyle = {
@@ -470,11 +459,11 @@ const chipStyle = {
 const chipActiveStyle = {
   border: "1px solid transparent",
   background: "var(--accent-dim)",
-  color: "var(--text)",
+  color: "var(--text2)",
 };
 
 const chipCountStyle = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   opacity: 0.7,
 };
@@ -504,7 +493,7 @@ const metaRowStyle = {
 const metaLabelStyle = {
   fontSize: 10,
   color: "color-mix(in srgb, var(--muted) 82%, transparent)",
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   textTransform: "uppercase" as const,
   letterSpacing: 0.3,
 };
@@ -533,7 +522,7 @@ const amountInputStyle = {
   borderRadius: 12,
   border: "1px solid transparent",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   padding: "0 10px",
   fontSize: 16,
   textAlign: "right" as const,
@@ -620,7 +609,7 @@ const inputMetaStyle = {
 
 const targetLabelStyle = {
   fontSize: 10,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   textTransform: "uppercase" as const,
   letterSpacing: 0.4,
   color: "color-mix(in srgb, var(--text2) 86%, transparent)",
@@ -628,7 +617,7 @@ const targetLabelStyle = {
 
 const nowLabelStyle = {
   fontSize: 10,
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   textTransform: "uppercase" as const,
   letterSpacing: 0.3,
   color: "color-mix(in srgb, var(--muted) 82%, transparent)",

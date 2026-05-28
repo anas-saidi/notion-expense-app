@@ -31,7 +31,7 @@ export function IdentityScreen({ onSelect }: Props) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "40px 24px calc(40px + env(safe-area-inset-bottom, 0px))",
+        padding: "calc(env(safe-area-inset-top, 0px) + 40px) 24px calc(env(safe-area-inset-bottom, 0px) + 40px)",
         background: "var(--bg)",
       }}
     >
@@ -91,7 +91,7 @@ export function IdentityScreen({ onSelect }: Props) {
               {name[0]}
             </span>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)", lineHeight: 1.1 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text2)", lineHeight: 1.1 }}>
                 {name}
               </div>
               <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>

@@ -105,7 +105,7 @@ export function ManageScreen({
             {visibleCategories.map((category) => (
               <article key={category.id} style={categoryRowStyle}>
                 <button type="button" onClick={() => onOpenCategory(category)} style={categoryMainStyle}>
-                  <CategoryIcon icon={category.icon} style={rowIconStyle} />
+                  <CategoryIcon icon={category.icon} style={{ fontSize: 22, flexShrink: 0, color: "var(--text2)" }} />
                   <div style={{ minWidth: 0 }}>
                     <strong style={rowTitleStyle}>{category.name}</strong>
                     <p style={rowMetaStyle}>{scopeLabel(category)} · {category.type[0] ?? "Budget"}</p>
@@ -251,7 +251,7 @@ function formatAmount(value: number) {
 
 const screenStyle: CSSProperties = {
   minHeight: "100dvh",
-  padding: "20px 18px calc(24px + env(safe-area-inset-bottom, 0px))",
+  padding: "calc(env(safe-area-inset-top, 0px) + 20px) calc(env(safe-area-inset-right, 0px) + 18px) calc(env(safe-area-inset-bottom, 0px) + 24px) calc(env(safe-area-inset-left, 0px) + 18px)",
   background: "var(--bg)",
   display: "grid",
   alignContent: "start",
@@ -266,7 +266,7 @@ const headerStyle: CSSProperties = {
 };
 
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -285,9 +285,8 @@ const closeStyle: CSSProperties = {
   minWidth: 44,
   height: 44,
   padding: "0 12px",
-  borderRadius: 14,
-  border: "1px solid color-mix(in srgb, var(--border2) 66%, transparent)",
-  background: "color-mix(in srgb, var(--surface2) 50%, white)",
+  border: "none",
+  background: "transparent",
   color: "var(--text2)",
   fontWeight: 750,
   cursor: "pointer",
@@ -305,10 +304,10 @@ const menuGridStyle: CSSProperties = {
 const menuRowStyle: CSSProperties = {
   width: "100%",
   minHeight: 76,
-  border: "1px solid var(--card-border)",
-  borderRadius: 18,
+  border: "none",
+  borderRadius: 14,
   background: "var(--surface)",
-  color: "var(--text)",
+  color: "var(--text2)",
   padding: "0 16px",
   display: "flex",
   alignItems: "center",
@@ -316,6 +315,7 @@ const menuRowStyle: CSSProperties = {
   gap: 14,
   textAlign: "left",
   cursor: "pointer",
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
 };
 
 const disabledRowStyle: CSSProperties = {
@@ -326,17 +326,17 @@ const disabledRowStyle: CSSProperties = {
 
 const rowTitleStyle: CSSProperties = {
   display: "block",
-  fontSize: 15,
-  fontWeight: 760,
-  color: "var(--text)",
+  fontSize: 13,
+  fontWeight: 600,
+  color: "var(--text2)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
 };
 
 const rowMetaStyle: CSSProperties = {
-  margin: "4px 0 0",
-  fontSize: 12,
+  marginTop: 4,
+  fontSize: 11,
   color: "var(--muted)",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -372,13 +372,13 @@ const chipStyle: CSSProperties = {
   background: "transparent",
   color: "var(--muted)",
   fontSize: 13,
-  fontWeight: 780,
+  fontWeight: 500,
   cursor: "pointer",
 };
 
 const chipActiveStyle: CSSProperties = {
   background: "var(--surface)",
-  color: "var(--text)",
+  color: "var(--text2)",
 };
 
 const newButtonStyle: CSSProperties = {
@@ -403,14 +403,15 @@ const listStyle: CSSProperties = {
 
 const categoryRowStyle: CSSProperties = {
   minHeight: 70,
-  borderRadius: 18,
-  border: "1px solid var(--card-border)",
+  borderRadius: 14,
+  border: "none",
   background: "var(--surface)",
-  padding: "8px",
+  padding: "12px 14px",
   display: "flex",
   alignItems: "center",
   flexWrap: "wrap",
   gap: 8,
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
 };
 
 const categoryMainStyle: CSSProperties = {
@@ -426,13 +427,6 @@ const categoryMainStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const rowIconStyle: CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--surface2) 58%, white)",
-  border: "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-};
 
 const actionButtonStyle: CSSProperties = {
   minHeight: 44,
@@ -442,7 +436,7 @@ const actionButtonStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface2) 54%, white)",
   color: "var(--text2)",
   fontSize: 13,
-  fontWeight: 800,
+  fontWeight: 600,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -487,7 +481,7 @@ const emptyStyle: CSSProperties = {
 
 const summaryBandStyle: CSSProperties = {
   minHeight: 58,
-  borderRadius: 18,
+  borderRadius: 14,
   background: "color-mix(in srgb, var(--accent) 9%, white)",
   color: "var(--text2)",
   display: "flex",
@@ -500,14 +494,15 @@ const summaryBandStyle: CSSProperties = {
 
 const accountRowStyle: CSSProperties = {
   minHeight: 72,
-  borderRadius: 18,
-  border: "1px solid var(--card-border)",
+  borderRadius: 14,
+  border: "none",
   background: "var(--surface)",
-  padding: "10px 13px",
+  padding: "14px 16px",
   display: "flex",
   alignItems: "center",
   flexWrap: "wrap",
   gap: 12,
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
 };
 
 const accountIconStyle: CSSProperties = {

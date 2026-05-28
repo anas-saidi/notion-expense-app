@@ -41,7 +41,7 @@ export function BudgetRow({
   return (
     <div style={rowStyle}>
       <div style={{ display: "grid", gap: 4 }}>
-        <strong style={{ color: "var(--text)", fontSize: 15, display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <strong style={{ color: "var(--text2)", fontSize: 15, display: "inline-flex", alignItems: "center", gap: 4 }}>
           {icon ? <CategoryIcon icon={icon} size={16} style={{ marginRight: 4, transition: "transform 0.18s cubic-bezier(.7,1.7,.7,1)", display: "inline-block" }} /> : null}{name}
         </strong>
         <div style={metaRowStyle}>
@@ -102,7 +102,7 @@ const metaRowStyle: CSSProperties = {
 const metaLabelStyle: CSSProperties = {
   fontSize: 10,
   color: "color-mix(in srgb, var(--muted) 82%, transparent)",
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   textTransform: "uppercase",
   letterSpacing: 0.3,
 };

@@ -25,7 +25,7 @@ export function SavingsStep({ items, onChange }: SavingsStepProps) {
         {items.map((item) => (
           <div key={item.categoryId} style={rowStyle}>
             <div style={{ display: "grid", gap: 4 }}>
-              <strong style={{ color: "var(--text)", fontSize: 15 }}>
+              <strong style={{ color: "var(--text2)", fontSize: 15 }}>
                 {item.icon ? `${item.icon} ` : ""}{item.name}
               </strong>
               <span style={metaStyle}>Available now <Money value={item.available ?? 0} /></span>
@@ -46,7 +46,7 @@ export function SavingsStep({ items, onChange }: SavingsStepProps) {
 }
 
 const eyebrowStyle = {
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
   fontSize: 10,
   letterSpacing: 0.5,
   textTransform: "uppercase" as const,
@@ -61,7 +61,7 @@ const summaryStyle = {
 };
 
 const summaryValueStyle = {
-  color: "var(--text)",
+  color: "var(--text2)",
   fontSize: 22,
   lineHeight: 1,
   fontFamily: "var(--font-display)",
@@ -83,7 +83,7 @@ const rowStyle = {
 const metaStyle = {
   fontSize: 12,
   color: "var(--muted)",
-  fontFamily: "'DM Mono', monospace",
+  fontFamily: "var(--font-body)",
 };
 
 const amountInputStyle = {
@@ -92,7 +92,7 @@ const amountInputStyle = {
   borderRadius: 12,
   border: "1px solid transparent",
   background: "transparent",
-  color: "var(--text)",
+  color: "var(--text2)",
   padding: "0 10px",
   fontSize: 16,
   textAlign: "right" as const,

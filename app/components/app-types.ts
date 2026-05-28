@@ -22,6 +22,9 @@ export type Transaction = {
   date: string;
   category: string | null;
   accountId: string | null;
+  type?: "Expense" | "Income" | "Transfer";
+  fromCategoryId?: string | null;
+  toCategoryId?: string | null;
 };
 
 export type Account = {

@@ -43,7 +43,7 @@ export function BottomNav({ tab, pendingCount, onTabChange }: BottomNavProps) {
                     background: "var(--warning)",
                     color: "var(--ink-strong)",
                     fontSize: 9,
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: "var(--font-body)",
                     fontWeight: 700,
                     display: "flex",
                     alignItems: "center",

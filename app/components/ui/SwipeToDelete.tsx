@@ -88,7 +88,7 @@ export function SwipeToDelete({ onDelete, children, threshold = 80 }: Props) {
   return (
     <div ref={outerRef}>
       {/* Inner wrapper clips the horizontal swipe */}
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: "var(--card-radius)" }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: 14 }}>
         {/* Danger layer revealed behind the content */}
         <div
           aria-hidden="true"
@@ -97,7 +97,7 @@ export function SwipeToDelete({ onDelete, children, threshold = 80 }: Props) {
             inset: 0,
             background: isPast
               ? "var(--danger)"
-              : `color-mix(in srgb, var(--danger) ${Math.round(48 + 52 * progress)}%, white)`,
+              : `color-mix(in srgb, var(--danger) ${Math.round(65 * progress)}%, var(--surface))`,
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
