@@ -28,6 +28,8 @@ import {
   Minimize2,
   Wrench,
   SlidersHorizontal,
+  Scale,
+  Shuffle,
   Menu,
   User,
   UserRound,
@@ -57,6 +59,8 @@ export const FreezeIcon       = (p: LucideProps) => <Snowflake      size={S} {..
 export const XIcon            = (p: LucideProps) => <X             size={S} {...p} />;
 export const WrenchIcon       = (p: LucideProps) => <Wrench        size={S} {...p} />;
 export const SlidersIcon      = (p: LucideProps) => <SlidersHorizontal size={S} {...p} />;
+export const ScaleIcon        = (p: LucideProps) => <Scale             size={S} {...p} />;
+export const ShuffleIcon      = (p: LucideProps) => <Shuffle           size={S} {...p} />;
 export const MenuIcon         = (p: LucideProps) => <Menu          size={S} {...p} />;
 export const UserIcon         = (p: LucideProps) => <User          size={S} {...p} />;
 export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
