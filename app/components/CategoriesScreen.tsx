@@ -227,22 +227,22 @@ export function CategoriesScreen({
                               {isOver ? "OVER" : "LOW"}
                             </span>
                           )}
+                          {health !== "noplan" && (
+                            <div style={progressTrackStyle}>
+                              <div style={{
+                                height: "100%",
+                                width: `${progressPct}%`,
+                                borderRadius: 999,
+                                background: health === "over" ? "var(--danger)"
+                                           : health === "low"  ? "var(--warning)"
+                                           :                     "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
+                                transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
+                              }} />
+                            </div>
+                          )}
                           <span style={cardAmountStyle(health)}>{amountStr}</span>
                           <span style={cardUnitStyle}>{unitStr}</span>
                         </button>
-                        {/* Progress bar — full bleed at card bottom */}
-                        {health !== "noplan" && (
-                          <div style={progressTrackStyle}>
-                            <div style={{
-                              height: "100%",
-                              width: `${progressPct}%`,
-                              background: health === "over" ? "var(--danger)"
-                                         : health === "low"  ? "var(--warning)"
-                                         :                     "var(--accent)",
-                              transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
-                            }} />
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -650,9 +650,9 @@ const cardStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  padding: "8px 10px 10px",
   boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
   position: "relative",
+  overflow: "hidden",
 };
 
 const freezeBtnStyle: CSSProperties = {
@@ -678,7 +678,7 @@ const cardBodyStyle: CSSProperties = {
   flexDirection: "column",
   alignItems: "center",
   gap: 5,
-  padding: "4px 4px 8px",
+  padding: "10px 10px 12px",
   border: "none",
   background: "transparent",
   cursor: "pointer",
@@ -689,12 +689,13 @@ const cardBodyStyle: CSSProperties = {
 const cardNameStyle: CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  color: "var(--text2)",
+  color: "var(--muted)",
   lineHeight: 1.2,
   overflow: "hidden",
   whiteSpace: "nowrap",
   textOverflow: "ellipsis",
   maxWidth: "100%",
+  textAlign: "center",
 };
 
 const cardBadgeStyle = (isOver: boolean): CSSProperties => ({
@@ -725,18 +726,15 @@ const cardUnitStyle: CSSProperties = {
 };
 
 const progressTrackStyle: CSSProperties = {
-  position: "absolute",
-  bottom: 0,
-  left: 0,
-  right: 0,
+  width: "100%",
   height: 3,
-  borderRadius: "0 0 16px 16px",
-  background: "color-mix(in srgb, var(--border2) 35%, transparent)",
+  borderRadius: 999,
+  background: "var(--surface2)",
   overflow: "hidden",
 };
 
 const cardActionStyle: CSSProperties = {
-  width: "100%",
+  margin: "0 10px 10px",
   padding: "5px 0",
   borderRadius: 8,
   border: "1px solid var(--border)",
@@ -745,6 +743,7 @@ const cardActionStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--text2)",
   cursor: "pointer",
+  alignSelf: "stretch",
 };
 
 const emptyStyle: CSSProperties = {
