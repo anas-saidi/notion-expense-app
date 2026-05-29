@@ -220,28 +220,32 @@ export function CategoriesScreen({
                           style={cardBodyStyle}
                           aria-label={`${cat.name}${isOver ? ", over budget" : isLow ? ", low" : ""}`}
                         >
-                          <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
-                          <span style={cardNameStyle}>{cat.name}</span>
-                          {(isOver || isLow) && (
-                            <span style={cardBadgeStyle(isOver)}>
-                              {isOver ? "OVER" : "LOW"}
-                            </span>
-                          )}
-                          {health !== "noplan" && (
-                            <div style={progressTrackStyle}>
-                              <div style={{
-                                height: "100%",
-                                width: `${progressPct}%`,
-                                borderRadius: 999,
-                                background: health === "over" ? "var(--danger)"
-                                           : health === "low"  ? "var(--warning)"
-                                           :                     "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
-                                transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
-                              }} />
-                            </div>
-                          )}
-                          <span style={cardAmountStyle(health)}>{amountStr}</span>
-                          <span style={cardUnitStyle}>{unitStr}</span>
+                          <div style={cardTopStyle}>
+                            <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
+                            <span style={cardNameStyle}>{cat.name}</span>
+                            {(isOver || isLow) && (
+                              <span style={cardBadgeStyle(isOver)}>
+                                {isOver ? "OVER" : "LOW"}
+                              </span>
+                            )}
+                          </div>
+                          <div style={cardBottomStyle}>
+                            {health !== "noplan" && (
+                              <div style={progressTrackStyle}>
+                                <div style={{
+                                  height: "100%",
+                                  width: `${progressPct}%`,
+                                  borderRadius: 999,
+                                  background: health === "over" ? "var(--danger)"
+                                             : health === "low"  ? "var(--warning)"
+                                             :                     "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
+                                  transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
+                                }} />
+                              </div>
+                            )}
+                            <span style={cardAmountStyle(health)}>{amountStr}</span>
+                            <span style={cardUnitStyle}>{unitStr}</span>
+                          </div>
                         </button>
                       </div>
                     );
@@ -676,14 +680,30 @@ const cardBodyStyle: CSSProperties = {
   flex: 1,
   display: "flex",
   flexDirection: "column",
+  justifyContent: "space-between",
   alignItems: "center",
-  gap: 5,
   padding: "10px 10px 12px",
   border: "none",
   background: "transparent",
   cursor: "pointer",
   width: "100%",
   textAlign: "center",
+  gap: 8,
+};
+
+const cardTopStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 5,
+};
+
+const cardBottomStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 4,
+  width: "100%",
 };
 
 const cardNameStyle: CSSProperties = {
