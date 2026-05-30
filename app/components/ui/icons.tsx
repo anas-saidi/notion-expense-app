@@ -31,6 +31,7 @@ import {
   Scale,
   Shuffle,
   Menu,
+  Landmark,
   User,
   UserRound,
   TrendingUp,
@@ -63,6 +64,7 @@ export const SlidersIcon      = (p: LucideProps) => <SlidersHorizontal size={S} 
 export const ScaleIcon        = (p: LucideProps) => <Scale             size={S} {...p} />;
 export const ShuffleIcon      = (p: LucideProps) => <Shuffle           size={S} {...p} />;
 export const MenuIcon         = (p: LucideProps) => <Menu          size={S} {...p} />;
+export const LandmarkIcon     = (p: LucideProps) => <Landmark      size={S} {...p} />;
 export const UserIcon         = (p: LucideProps) => <User          size={S} {...p} />;
 export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
 export const TrendingUpIcon   = (p: LucideProps) => <TrendingUp    size={S} {...p} />;

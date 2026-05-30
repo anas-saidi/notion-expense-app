@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import type { AppTab } from "./app-types";
 import { BottomNav } from "./BottomNav";
-import { MenuIcon, PlusIcon } from "./ui/icons";
+import { LandmarkIcon, PlusIcon } from "./ui/icons";
 
 export function AppShell({
   tab,
@@ -39,8 +39,8 @@ export function AppShell({
               <p style={greetingEyebrowStyle}>{getGreeting()}</p>
               <h1 style={greetingTitleStyle}>Anas &amp; Salma</h1>
             </div>
-            <button type="button" onClick={onOpenManage} aria-label="Open management menu" style={menuButtonStyle}>
-              <MenuIcon size={18} />
+            <button type="button" onClick={onOpenManage} aria-label="Accounts" style={menuButtonStyle}>
+              <LandmarkIcon size={18} />
             </button>
           </header>
         )}
