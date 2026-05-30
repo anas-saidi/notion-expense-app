@@ -216,7 +216,7 @@ export function CategoriesScreen({
                         </button>
                         <button
                           type="button"
-                          onClick={() => { onSelectCategory(cat); onOpenCategoryDetails(cat); }}
+                          onClick={() => onOpenCategoryDetails(cat)}
                           style={cardBodyStyle}
                           aria-label={`${cat.name}${isOver ? ", over budget" : isLow ? ", low" : ""}`}
                         >
@@ -282,7 +282,7 @@ export function CategoriesScreen({
               >
                 <button
                   type="button"
-                  onClick={() => { onSelectCategory(cat); onOpenCategoryDetails(cat); }}
+                  onClick={() => onOpenCategoryDetails(cat)}
                   style={cardBodyStyle}
                   aria-label={cat.name}
                 >
@@ -391,7 +391,7 @@ function FrozenAllScreen({
                     >
                       <button
                         type="button"
-                        onClick={() => { onSelectCategory(cat); onOpenCategoryDetails(cat); }}
+                        onClick={() => onOpenCategoryDetails(cat)}
                         style={cardBodyStyle}
                         aria-label={cat.name}
                       >

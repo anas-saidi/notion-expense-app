@@ -172,7 +172,20 @@ export function CategoryDetailsSheet({
         <section style={{ display: "grid", gap: 12 }}>
           <span style={sectionLabelStyle}>Activity</span>
 
-          {loading && <div style={panelMessageStyle}>Loading…</div>}
+          {loading && (
+            <div style={{ display: "grid", gap: 12 }}>
+              {[72, 56, 64].map((w, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <div className="skeleton" style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, marginTop: 5 }} />
+                  <div style={{ flex: 1, display: "grid", gap: 6 }}>
+                    <div className="skeleton" style={{ height: 13, width: `${w}%`, borderRadius: 4 }} />
+                    <div className="skeleton" style={{ height: 10, width: "40%", borderRadius: 4 }} />
+                  </div>
+                  <div className="skeleton" style={{ height: 13, width: 48, borderRadius: 4, flexShrink: 0 }} />
+                </div>
+              ))}
+            </div>
+          )}
           {error && !loading && <div style={panelMessageStyle}>{error}</div>}
           {!loading && !error && (data?.timeline?.length ?? 0) === 0 && (
             <div style={panelMessageStyle}>No activity this month.</div>
@@ -230,14 +243,16 @@ export function CategoryDetailsSheet({
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function kindTone(kind: TimelineItem["kind"]): { dot: string; amount: string } {
-  if (kind === "funded" || kind === "moved_in") {
+  if (kind === "funded") {
+    // Income → green
     return { dot: "var(--success)", amount: "var(--success)" };
   }
-  if (kind === "moved_out") {
-    return { dot: "var(--danger)", amount: "var(--danger)" };
+  if (kind === "moved_in" || kind === "moved_out") {
+    // Transfer (in or out) → gray
+    return { dot: "var(--muted)", amount: "var(--muted)" };
   }
-  // expense — neutral, expected spending
-  return { dot: "var(--muted)", amount: "var(--text2)" };
+  // Expense → red
+  return { dot: "var(--danger)", amount: "var(--danger)" };
 }
 
 

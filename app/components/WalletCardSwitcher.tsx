@@ -44,12 +44,6 @@ const SCOPE_WASH: Record<BudgetScope, string> = {
   salma: "color-mix(in srgb, var(--partner-wife) 8%, var(--bg))",
 };
 
-/* Curve stroke color per scope */
-const SCOPE_CURVE_COLOR: Record<BudgetScope, string> = {
-  joint: "var(--accent)",
-  anas:  "var(--partner-husband)",
-  salma: "var(--partner-wife)",
-};
 
 const STATUS_COLOR: Record<string, string> = {
   "On track":  "var(--accent-ink)",
@@ -162,80 +156,43 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
           </div>
         </div>
 
-        {/* Curve chart + caption */}
+        {/* Progress bar + caption */}
         {(() => {
-          const t = progress / 100;
-          const curveColor = isOver
+          const barColor = isOver
             ? "var(--spend-over)"
             : progress >= 85 ? "var(--spend-warn)"
             : progress >= 65 ? "var(--spend-caution)"
-            : SCOPE_CURVE_COLOR[value];
-          // Quadratic bezier M 0,37 Q 120,2 240,37
-          // x(t) = 240t  →  curX = 240 * t
-          // y(t) = 37 - 70*t*(1-t)
-          const curX = 240 * t;
-          const curY = 37 - 70 * t * (1 - t);
+            : getScopeColor(value);
           return (
-            <div style={curveGroupStyle}>
-              <svg
-                viewBox="0 0 240 42"
-                style={{ width: "100%", height: 42, display: "block", overflow: "visible" }}
-                aria-hidden="true"
-              >
-                <defs>
-                  <linearGradient id={`wcs-fill-${value}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={curveColor} stopOpacity="0.28" />
-                    <stop offset="100%" stopColor={curveColor} stopOpacity="0.03" />
-                  </linearGradient>
-                  <clipPath id={`wcs-clip-${value}`}>
-                    <rect x="0" y="0" height="42"
-                      style={{
-                        width: hasPlan ? curX : 0,
-                        transition: "width 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
-                      }}
-                    />
-                  </clipPath>
-                </defs>
-
-                {/* Faint full-arc track */}
-                <path
-                  d="M 0,37 Q 120,2 240,37"
-                  fill="none"
-                  stroke="var(--surface2)"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-
-                {/* Tinted fill under curve, clipped to progress */}
-                <path
-                  d="M 0,37 Q 120,2 240,37 L 240,42 L 0,42 Z"
-                  fill={`url(#wcs-fill-${value})`}
-                  clipPath={`url(#wcs-clip-${value})`}
-                />
-
-                {/* Active stroke, clipped to progress */}
-                <path
-                  d="M 0,37 Q 120,2 240,37"
-                  fill="none"
-                  stroke={curveColor}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  clipPath={`url(#wcs-clip-${value})`}
-                />
-
-                {/* Current position dot */}
-                {hasPlan && progress > 0 && (
-                  <circle
-                    cx={0} cy={0} r="4"
-                    fill={curveColor}
+            <div style={barGroupStyle}>
+              <div style={{ position: "relative" }} aria-hidden="true">
+                <div style={barRailStyle}>
+                  <div
                     style={{
-                      transform: `translate(${curX}px, ${curY}px)`,
-                      transition: "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
+                      ...barFillStyle,
+                      width: hasPlan ? `${progress}%` : "0%",
+                      background: barColor,
                     }}
                   />
+                </div>
+                {hasPlan && progress > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: `${progress}%`,
+                      transform: "translate(-50%, -50%)",
+                      fontSize: 14,
+                      lineHeight: 1,
+                      transition: "left 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
+                      pointerEvents: "none",
+                      userSelect: "none",
+                    }}
+                  >
+                    💸
+                  </span>
                 )}
-              </svg>
-
+              </div>
               <div style={captionRowStyle}>
                 {hasPlan ? (
                   <>
@@ -354,9 +311,23 @@ const unitStyle = (isOver: boolean): CSSProperties => ({
   lineHeight: 1,
 });
 
-const curveGroupStyle: CSSProperties = {
+const barGroupStyle: CSSProperties = {
   display: "grid",
-  gap: 4,
+  gap: 8,
+};
+
+const barRailStyle: CSSProperties = {
+  width: "100%",
+  height: 4,
+  borderRadius: 999,
+  background: "var(--surface2)",
+  overflow: "hidden",
+};
+
+const barFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: 999,
+  transition: "width 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
 const captionRowStyle: CSSProperties = {

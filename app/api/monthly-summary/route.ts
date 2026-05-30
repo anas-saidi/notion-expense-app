@@ -12,15 +12,21 @@ const notionHeaders = (token: string) => ({
 
 const sumByCategory = (pages: any[], valueGetter: (page: any) => number) => {
   const totals = new Map<string, number>();
+  const firstAccount = new Map<string, string | null>();
 
   for (const page of pages) {
     const categoryId = page.properties.Category?.relation?.[0]?.id ?? null;
     if (!categoryId) continue;
-    const nextValue = (totals.get(categoryId) ?? 0) + valueGetter(page);
-    totals.set(categoryId, nextValue);
+    const accountId = page.properties["🏦 Accounts"]?.relation?.[0]?.id ?? null;
+    totals.set(categoryId, (totals.get(categoryId) ?? 0) + valueGetter(page));
+    if (!firstAccount.has(categoryId)) firstAccount.set(categoryId, accountId);
   }
 
-  return Array.from(totals.entries()).map(([categoryId, total]) => ({ categoryId, total }));
+  return Array.from(totals.entries()).map(([categoryId, total]) => ({
+    categoryId,
+    total,
+    accountId: firstAccount.get(categoryId) ?? null,
+  }));
 };
 
 export async function GET(req: NextRequest) {

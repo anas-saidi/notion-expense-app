@@ -51,6 +51,7 @@ export type PendingItem = {
 export type MonthlyCategoryTotal = {
   categoryId: string;
   total: number;
+  accountId?: string | null;
 };
 
 export type MonthlySummary = {

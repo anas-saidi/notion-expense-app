@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type RefObject } from "react";
+import { useState, useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import type { Account, Category } from "./app-types";
 import { evalExpr, fmt, fmtDate, isExpression, shiftDate, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -34,9 +34,11 @@ type AddTransactionSheetProps = {
   categoryUnfunded: boolean;
   categoryOverBudget: boolean;
   canSubmit: boolean;
+  allCategories?: Category[];
   modeVariant?: "create" | "edit";
   onClose: () => void;
   onOpenRebalance?: () => void;
+  onQuickFund?: (sourceCategoryId: string, amount: number) => Promise<void>;
   onAmountChange: (value: string) => void;
   onNameChange: (value: string) => void;
   onToggleDatePicker: () => void;
@@ -53,7 +55,40 @@ type AddTransactionSheetProps = {
 };
 
 export function AddTransactionSheet(props: AddTransactionSheetProps) {
+  const [fundingSourceId, setFundingSourceId] = useState<string | null>(null);
+  const [showFundPicker, setShowFundPicker] = useState(false);
+  const fundPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!props.open) {
+      setShowFundPicker(false);
+      setFundingSourceId(null);
+    }
+  }, [props.open]);
+
+  useEffect(() => {
+    if (!showFundPicker) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-picker-popover="true"]')) return;
+      if (fundPickerRef.current && !fundPickerRef.current.contains(target)) {
+        setShowFundPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showFundPicker]);
+
   if (!props.open) return null;
+
+  const deficit = props.categoryUnfunded
+    ? props.parsedAmount
+    : Math.max(0, props.parsedAmount - (props.selectedCat?.available ?? 0));
+
+  const sourceCandidates = (props.allCategories ?? [])
+    .filter(c => c.id !== props.selectedCat?.id && (c.available ?? 0) > 0)
+    .sort((a, b) => (b.available ?? 0) - (a.available ?? 0))
+    .slice(0, 8);
 
   const isEditMode = props.modeVariant === "edit";
   const todayValue = today();
@@ -307,40 +342,82 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   <span>Suggested: <strong style={{ fontWeight: 600 }}>{props.suggestedCategory.name}</strong></span>
                 </button>
               )}
-              {props.categoryUnfunded && (
+              {(props.categoryUnfunded || props.categoryOverBudget) && props.selectedCat && (
                 <div style={warnStyle}>
-                  <span style={{ fontSize: 12, opacity: 0.75, marginTop: 1 }}>!</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-                    <span style={warnTextStyle}><strong>{props.selectedCat?.name}</strong> has no available budget.</span>
-                    {props.onOpenRebalance && (
-                      <button
-                        type="button"
-                        onClick={() => props.onOpenRebalance!()}
-                        style={rebalanceLinkStyle}
-                      >
-                        Rebalance budget →
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-              {props.categoryOverBudget && props.selectedCat && (
-                <div style={warnStyle}>
-                  <span style={{ fontSize: 12, opacity: 0.75, marginTop: 1 }}>!</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                  <span style={{ fontSize: 12, opacity: 0.75, marginTop: 1, flexShrink: 0 }}>!</span>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 8px", flex: 1, minWidth: 0 }}>
+
                     <span style={warnTextStyle}>
-                      Over budget by <strong><Money value={props.parsedAmount - (props.selectedCat.available ?? 0)} /></strong>. Only{" "}
-                      <strong><Money value={props.selectedCat.available ?? 0} /></strong> left in <strong>{props.selectedCat.name}</strong>.
+                      {props.categoryUnfunded
+                        ? <>No budget in <strong>{props.selectedCat.name}</strong></>
+                        : <>Short <strong>{fmt(deficit)} MAD</strong> in <strong>{props.selectedCat.name}</strong></>
+                      }
                     </span>
+
+                    {/* Fund from dropdown — only shown once amount is entered */}
+                    {props.onQuickFund && sourceCandidates.length > 0 && deficit > 0 && (
+                      <div style={{ position: "relative", flexShrink: 0 }} ref={fundPickerRef}>
+                        <button
+                          type="button"
+                          disabled={!!fundingSourceId}
+                          onClick={() => setShowFundPicker(v => !v)}
+                          aria-label="Move funds from another category"
+                          aria-expanded={showFundPicker}
+                          aria-haspopup="listbox"
+                          style={fundTriggerStyle(!!fundingSourceId)}
+                        >
+                          {fundingSourceId
+                            ? <><span style={{ width: 11, height: 11, border: "1.5px solid color-mix(in srgb, currentColor 30%, transparent)", borderTopColor: "currentColor", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} /> Moving…</>
+                            : <>Move from <ChevronDownIcon size={10} style={{ flexShrink: 0, color: "var(--muted)", transition: "transform 0.15s", transform: showFundPicker ? "rotate(180deg)" : "none" }} /></>
+                          }
+                        </button>
+
+                        <PickerPopover open={showFundPicker} align="left" placement="top" width="min(260px, calc(100vw - 28px))" zIndex={150} anchorRef={fundPickerRef}>
+                          <div role="listbox" aria-label="Source categories" style={{ maxHeight: 220, overflowY: "auto", padding: 6, boxSizing: "border-box" }}>
+                            <div style={{ display: "grid", gap: 2 }}>
+                              {sourceCandidates.map(cat => {
+                                const moveAmount = Math.min(cat.available!, deficit);
+                                const isPartial = moveAmount < deficit;
+                                return (
+                                  <button
+                                    key={cat.id}
+                                    type="button"
+                                    role="option"
+                                    aria-label={`${cat.name}, ${fmt(moveAmount)} MAD${isPartial ? ", partial" : ""}`}
+                                    onClick={async () => {
+                                      setShowFundPicker(false);
+                                      setFundingSourceId(cat.id);
+                                      try {
+                                        await props.onQuickFund!(cat.id, moveAmount);
+                                      } finally {
+                                        setFundingSourceId(null);
+                                      }
+                                    }}
+                                    style={fundPickerRowStyle}
+                                  >
+                                    <div style={{ ...pickerIconStyle, fontSize: 13, width: 28, height: 28, borderRadius: 8 }}>{cat.icon ?? "#"}</div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
+                                      {isPartial && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>partial</div>}
+                                    </div>
+                                    <span style={{ fontSize: 12, color: isPartial ? "var(--warning)" : "var(--success)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
+                                      {fmt(moveAmount)} MAD
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </PickerPopover>
+                      </div>
+                    )}
+
                     {props.onOpenRebalance && (
-                      <button
-                        type="button"
-                        onClick={() => props.onOpenRebalance!()}
-                        style={rebalanceLinkStyle}
-                      >
-                        Rebalance budget →
+                      <button type="button" onClick={() => props.onOpenRebalance!()} style={rebalanceLinkStyle}>
+                        Rebalance
                       </button>
                     )}
+
                   </div>
                 </div>
               )}
@@ -563,16 +640,48 @@ const warnTextStyle: CSSProperties = {
 };
 
 const rebalanceLinkStyle: CSSProperties = {
-  alignSelf: "flex-start",
   padding: 0,
   border: "none",
   background: "transparent",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "color-mix(in srgb, var(--accent-ink) 75%, var(--text2))",
+  fontSize: 11,
+  fontWeight: 500,
+  color: "var(--muted)",
   cursor: "pointer",
   textDecoration: "underline",
   textUnderlineOffset: 2,
+  flexShrink: 0,
+};
+
+const fundTriggerStyle = (loading: boolean): CSSProperties => ({
+  padding: 0,
+  border: "none",
+  background: "transparent",
+  fontFamily: "var(--font-body)",
+  color: loading ? "var(--muted)" : "var(--text2)",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: loading ? "wait" : "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 3,
+  flexShrink: 0,
+  transition: "color 0.15s ease",
+});
+
+const fundPickerRowStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  padding: "8px 10px",
+  background: "transparent",
+  border: "none",
+  borderRadius: 10,
+  color: "var(--text2)",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  cursor: "pointer",
+  textAlign: "left",
+  boxSizing: "border-box",
 };
 
 const exprPreviewStyle: CSSProperties = {

@@ -587,17 +587,10 @@ const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 9
 const balancedTextStyle: CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
 const deltaChipStyle = (isOver: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "center", gap: 2,
-  padding: "2px 7px", borderRadius: 999,
   fontSize: 11, fontWeight: 700, fontFamily: "var(--font-body)",
-  background: isOver
-    ? "color-mix(in srgb, var(--danger) 10%, transparent)"
-    : "color-mix(in srgb, var(--success) 10%, transparent)",
   color: isOver
     ? "color-mix(in srgb, var(--danger) 78%, var(--text2))"
     : "color-mix(in srgb, var(--success) 72%, var(--text2))",
-  border: isOver
-    ? "1px solid color-mix(in srgb, var(--danger) 18%, transparent)"
-    : "1px solid color-mix(in srgb, var(--success) 18%, transparent)",
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
