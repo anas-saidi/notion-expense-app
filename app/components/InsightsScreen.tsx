@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { categoryMatchesScope, getCategoryScope, fmt, fmtDate } from "./app-utils";
+import { categoryMatchesScope, getCategoryScope, transactionMatchesScope, monthBounds, fmt, fmtDate } from "./app-utils";
 import { ArrowLeftIcon, ChevronRightIcon } from "./ui/icons";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
@@ -95,15 +95,28 @@ export function InsightsScreen({
   }, [insightsMonth]);
 
   /* Historical planned — fetched from monthly-summary per viewed month */
-  const [assignedByCategory, setAssignedByCategory] = useState<{ categoryId: string; total: number }[] | null>(null);
+  type SummaryEntry = { categoryId: string; total: number; accountId?: string | null };
+  const [assignedByCategory, setAssignedByCategory] = useState<SummaryEntry[] | null>(null);
+  const [prevMonthTransactions, setPrevMonthTransactions] = useState<Transaction[] | null>(null);
+
+  const prevMonth = useMemo(() => {
+    const [y, m] = insightsMonth.split("-").map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [insightsMonth]);
 
   useEffect(() => {
     setAssignedByCategory(null);
-    fetch(`/api/monthly-summary?month=${insightsMonth}`)
-      .then(r => r.json())
-      .then(data => setAssignedByCategory(data.summary?.assignedByCategory ?? null))
-      .catch(() => {});
-  }, [insightsMonth]);
+    setPrevMonthTransactions(null);
+    const { start: prevStart, end: prevEnd } = monthBounds(`${prevMonth}-01`);
+    Promise.all([
+      fetch(`/api/monthly-summary?month=${insightsMonth}`).then(r => r.json()),
+      fetch(`/api/transactions?start=${prevStart}&end=${prevEnd}`).then(r => r.json()),
+    ]).then(([curr, prevTx]) => {
+      setAssignedByCategory(curr.summary?.assignedByCategory ?? null);
+      setPrevMonthTransactions(prevTx.transactions ?? null);
+    }).catch(() => {});
+  }, [insightsMonth, prevMonth]);
 
   /* Shared derivations */
   const expenses = useMemo(
@@ -119,7 +132,7 @@ export function InsightsScreen({
   const totalPlanned = useMemo(() => {
     if (!assignedByCategory) return 0;
     return assignedByCategory
-      .filter(({ categoryId, accountId }: { categoryId: string; accountId?: string | null; total: number }) => {
+      .filter(({ categoryId, accountId }) => {
         const label = (accountId ? (accounts.find(a => a.id === accountId)?.label ?? "") : "").toLowerCase();
         // Savings accounts are never part of operational planned budget
         if (label.includes("saving")) return false;
@@ -132,7 +145,7 @@ export function InsightsScreen({
         if (!cat) return budgetScope === "joint";
         return getCategoryScope(cat) === budgetScope;
       })
-      .reduce((s: number, { total }: { total: number }) => s + total, 0);
+      .reduce((s, { total }) => s + total, 0);
   }, [assignedByCategory, accounts, categories, budgetScope]);
 
   const spentByCatId = useMemo(() => {
@@ -144,6 +157,14 @@ export function InsightsScreen({
   }, [expenses]);
 
   /* ── 1. Burn Rate ──────────────────────────────────────────────── */
+  const lastMonthTotalSpent = useMemo(() => {
+    if (!prevMonthTransactions) return 0;
+    return prevMonthTransactions
+      .filter(t => t.category && (!t.type || t.type === "Expense"))
+      .filter(t => transactionMatchesScope(t, categories, budgetScope, accounts))
+      .reduce((s, t) => s + t.amount, 0);
+  }, [prevMonthTransactions, categories, budgetScope, accounts]);
+
   const burnRate = useMemo(() => {
     const [y, m] = insightsMonth.split("-").map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
@@ -156,8 +177,11 @@ export function InsightsScreen({
     const isOver  = totalPlanned > 0 && totalSpent > totalPlanned;
     const gapPct  = expectedSpend > 0 ? Math.abs((totalSpent - expectedSpend) / expectedSpend * 100) : 0;
     const daysLeft = daysInMonth - daysElapsed;
-    return { spentPct, expectedPct, isAhead, isOver, gapPct, daysLeft };
-  }, [insightsMonth, totalSpent, totalPlanned, currentMonthStr]);
+    const vsLastMonth = lastMonthTotalSpent > 0
+      ? Math.round(((totalSpent - lastMonthTotalSpent) / lastMonthTotalSpent) * 100)
+      : null;
+    return { spentPct, expectedPct, isAhead, isOver, gapPct, daysLeft, vsLastMonth };
+  }, [insightsMonth, totalSpent, totalPlanned, lastMonthTotalSpent, currentMonthStr]);
 
   /* ── 2. Category Surprise ──────────────────────────────────────── */
   const categorySurprise = useMemo(() => {
@@ -184,12 +208,33 @@ export function InsightsScreen({
       else if (label.includes("wife")) salmaTotal += t.amount;
       else sharedTotal += t.amount;
     }
-    const total    = anasTotal + salmaTotal + sharedTotal;
-    const anasPct  = total > 0 ? (anasTotal  / total) * 100 : 0;
-    const salmaPct = total > 0 ? (salmaTotal / total) * 100 : 0;
-    const sharedPct = total > 0 ? (sharedTotal / total) * 100 : 0;
-    return { anasTotal, salmaTotal, sharedTotal, total, anasPct, salmaPct, sharedPct };
-  }, [expenses, accounts]);
+    const total = anasTotal + salmaTotal + sharedTotal;
+    const personalTotal = anasTotal + salmaTotal;
+
+    // Actual split %
+    const anasActualPct  = personalTotal > 0 ? (anasTotal  / personalTotal) * 100 : 0;
+    const salmaActualPct = personalTotal > 0 ? (salmaTotal / personalTotal) * 100 : 0;
+
+    // Planned split % from assignedByCategory (account-based, same as totalPlanned)
+    let anasPlanTotal = 0, salmaPlanTotal = 0;
+    if (assignedByCategory) {
+      for (const entry of assignedByCategory) {
+        const label = (entry.accountId ? (accounts.find(a => a.id === entry.accountId)?.label ?? "") : "").toLowerCase();
+        if (label.includes("saving")) continue;
+        if (label.includes("hubb")) anasPlanTotal += entry.total;
+        else if (label.includes("wife")) salmaPlanTotal += entry.total;
+      }
+    }
+    const personalPlanTotal = anasPlanTotal + salmaPlanTotal;
+    const anasPlanPct  = personalPlanTotal > 0 ? (anasPlanTotal  / personalPlanTotal) * 100 : null;
+    const salmaPlanPct = personalPlanTotal > 0 ? (salmaPlanTotal / personalPlanTotal) * 100 : null;
+
+    // Delta in percentage points: actual % − planned %
+    const anasDeltaPp  = (anasPlanPct  !== null && personalTotal > 0) ? anasActualPct  - anasPlanPct  : null;
+    const salmaDeltaPp = (salmaPlanPct !== null && personalTotal > 0) ? salmaActualPct - salmaPlanPct : null;
+
+    return { anasTotal, salmaTotal, sharedTotal, total, anasActualPct, salmaActualPct, anasPlanPct, salmaPlanPct, anasDeltaPp, salmaDeltaPp };
+  }, [expenses, accounts, assignedByCategory]);
 
   /* ── 4. Spending Breakdown (donut) ────────────────────────────── */
   const donutData = useMemo(() => {
@@ -301,7 +346,7 @@ export function InsightsScreen({
       <InsightCard emoji="🔥" title="Burn Rate" subtitle="Are you on pace?">
         {assignedByCategory === null || transactionsLoading
           ? <BurnRateSkeleton />
-          : <BurnRateBody burnRate={burnRate} totalSpent={totalSpent} totalPlanned={totalPlanned} />
+          : <BurnRateBody burnRate={burnRate} totalSpent={totalSpent} totalPlanned={totalPlanned} lastMonthTotalSpent={lastMonthTotalSpent} />
         }
       </InsightCard>
 
@@ -467,15 +512,14 @@ function CategorySurpriseSkeleton() {
 
 function TogetherApartSkeleton() {
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <div className="skeleton" style={{ width: "100%", height: 14, borderRadius: 999 }} />
-      <div style={{ display: "grid", gap: 8 }}>
-        {[1, 2, 3].map(i => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div className="skeleton" style={{ width: 10, height: 10, borderRadius: 3 }} />
-            <div className="skeleton" style={{ flex: 1, height: 12, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 70, height: 12, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 28, height: 12, borderRadius: 4 }} />
+    <div style={{ display: "grid", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {[1, 2].map(i => (
+          <div key={i} style={{ borderRadius: 14, padding: "14px 14px 12px", background: "var(--surface2)", display: "grid", gap: 6 }}>
+            <div className="skeleton" style={{ width: 40, height: 10, borderRadius: 4 }} />
+            <div className="skeleton" style={{ width: 70, height: 22, borderRadius: 4 }} />
+            <div className="skeleton" style={{ width: 24, height: 9, borderRadius: 4 }} />
+            <div className="skeleton" style={{ width: 80, height: 10, borderRadius: 4, marginTop: 2 }} />
           </div>
         ))}
       </div>
@@ -523,12 +567,13 @@ function TxRowSkeleton() {
 
 /* ─── 1. Burn Rate body ──────────────────────────────────────────── */
 
-function BurnRateBody({ burnRate, totalSpent, totalPlanned }: {
-  burnRate: { spentPct: number; expectedPct: number; isAhead: boolean; isOver: boolean; gapPct: number; daysLeft: number };
+function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent }: {
+  burnRate: { spentPct: number; expectedPct: number; isAhead: boolean; isOver: boolean; gapPct: number; daysLeft: number; vsLastMonth: number | null };
   totalSpent: number;
   totalPlanned: number;
+  lastMonthTotalSpent: number;
 }) {
-  const { spentPct, expectedPct, isAhead, isOver, gapPct, daysLeft } = burnRate;
+  const { spentPct, expectedPct, isAhead, isOver, gapPct, daysLeft, vsLastMonth } = burnRate;
 
   const fillColor = isOver ? "var(--danger)"
     : isAhead ? "var(--warning)"
@@ -544,10 +589,19 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned }: {
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      {/* Spend number */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+      {/* Spend number + vs last month */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" as const }}>
         <span style={bigNumStyle(isOver)}>{fmt(totalSpent)}</span>
         <span style={bigNumUnitStyle}>MAD spent</span>
+        {vsLastMonth !== null && lastMonthTotalSpent > 0 && (
+          <span style={{
+            fontSize: 11, fontWeight: 600, letterSpacing: 0.2,
+            color: vsLastMonth > 0 ? "var(--warning)" : "color-mix(in srgb, var(--accent) 72%, var(--text2))",
+            marginLeft: 4,
+          }}>
+            {vsLastMonth > 0 ? "↑" : "↓"} {Math.abs(vsLastMonth)}% vs last month
+          </span>
+        )}
       </div>
 
       {/* Bar + pace marker */}
@@ -633,51 +687,72 @@ function CategorySurpriseBody({ surprise }: {
 /* ─── 3. Together vs. Apart body ─────────────────────────────────── */
 
 function TogetherApartBody({ data }: {
-  data: { anasTotal: number; salmaTotal: number; sharedTotal: number; total: number; anasPct: number; salmaPct: number; sharedPct: number };
+  data: {
+    anasTotal: number; salmaTotal: number; sharedTotal: number; total: number;
+    anasActualPct: number; salmaActualPct: number;
+    anasPlanPct: number | null; salmaPlanPct: number | null;
+    anasDeltaPp: number | null; salmaDeltaPp: number | null;
+  };
 }) {
-  const { anasTotal, salmaTotal, sharedTotal, total, anasPct, salmaPct, sharedPct } = data;
+  const { anasTotal, salmaTotal, sharedTotal, total, anasActualPct, salmaActualPct, anasPlanPct, salmaPlanPct, anasDeltaPp, salmaDeltaPp } = data;
 
   if (total === 0) return <p style={emptyBodyStyle}>No expenses recorded this month.</p>;
 
-  const copy = Math.abs(anasPct - salmaPct) < 5
-    ? "Pretty even split this month. Teamwork."
-    : anasTotal >= salmaTotal
-    ? `Anas carried ${Math.round(anasPct)}% of spending this month.`
-    : `Salma carried ${Math.round(salmaPct)}% of spending this month.`;
+  const hasPlan = anasPlanPct !== null && salmaPlanPct !== null;
+
+  const copy = !hasPlan
+    ? "Tracking individual spending patterns."
+    : anasDeltaPp !== null && Math.abs(anasDeltaPp) <= 3
+    ? `On plan — Anas ${Math.round(anasActualPct)}% / Salma ${Math.round(salmaActualPct)}%. Solid balance.`
+    : anasDeltaPp !== null && anasDeltaPp > 3
+    ? `Anas carried ${Math.round(anasActualPct)}% this month, ${Math.round(Math.abs(anasDeltaPp))}pp above the ${Math.round(anasPlanPct!)}% target.`
+    : `Salma carried ${Math.round(salmaActualPct)}% this month, ${Math.round(Math.abs(salmaDeltaPp ?? 0))}pp above the ${Math.round(salmaPlanPct!)}% target.`;
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      {/* Split pill bar */}
-      <div style={splitBarStyle}>
-        {anasPct > 0.5 && <div style={{ width: `${anasPct}%`, background: "var(--partner-husband)", transition: "width 0.6s cubic-bezier(0.22,1,0.36,1)" }} />}
-        {sharedPct > 0.5 && <div style={{ width: `${sharedPct}%`, background: "var(--muted)", opacity: 0.3, transition: "width 0.6s cubic-bezier(0.22,1,0.36,1)" }} />}
-        {salmaPct > 0.5 && <div style={{ width: `${salmaPct}%`, background: "var(--partner-wife)", transition: "width 0.6s cubic-bezier(0.22,1,0.36,1)" }} />}
+    <div style={{ display: "grid", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <PersonBlock name="Anas"  amount={anasTotal}  actualPct={anasActualPct}  color="var(--partner-husband)" />
+        <PersonBlock name="Salma" amount={salmaTotal} actualPct={salmaActualPct} color="var(--partner-wife)" />
       </div>
 
-      {/* Legend rows */}
-      <div style={{ display: "grid", gap: 8 }}>
-        <SplitRow color="var(--partner-husband)" name="Anas"   amount={anasTotal}   pct={anasPct} />
-        {sharedTotal > 0 && <SplitRow color="var(--muted)" name="Shared" amount={sharedTotal} pct={sharedPct} opacity={0.5} />}
-        <SplitRow color="var(--partner-wife)"    name="Salma"  amount={salmaTotal}  pct={salmaPct} />
-      </div>
+      {sharedTotal > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--muted)", opacity: 0.5, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: "var(--muted)", flex: 1 }}>Shared</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{fmt(sharedTotal)} MAD</span>
+        </div>
+      )}
+
+      {hasPlan && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 10, color: "var(--muted)" }}>Target</span>
+          <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>Anas {Math.round(anasPlanPct!)}%</span>
+          <span style={{ fontSize: 10, color: "var(--border2)" }}>·</span>
+          <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>Salma {Math.round(salmaPlanPct!)}%</span>
+        </div>
+      )}
 
       <p style={copySentenceStyle}>{copy}</p>
     </div>
   );
 }
 
-function SplitRow({ color, name, amount, pct, opacity = 1 }: {
-  color: string; name: string; amount: number; pct: number; opacity?: number;
+function PersonBlock({ name, amount, actualPct, color }: {
+  name: string; amount: number; actualPct: number; color: string;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, opacity }}>
-      <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
-      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text2)", flex: 1 }}>{name}</span>
-      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>
-        {fmt(amount)} MAD
+    <div style={{
+      background: `color-mix(in srgb, ${color} 7%, var(--surface))`,
+      borderRadius: 14, padding: "14px 14px 12px",
+      display: "grid", gap: 4,
+    }}>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase" as const, color }}>{name}</span>
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 22, fontWeight: 400, lineHeight: 1.1, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>
+        {fmt(amount)}
       </span>
-      <span style={{ fontSize: 11, color: "var(--muted)", minWidth: 30, textAlign: "right" as const }}>
-        {Math.round(pct)}%
+      <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: 0.2 }}>MAD</span>
+      <span style={{ fontSize: 10, color: "var(--muted)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
+        {Math.round(actualPct)}% of spend
       </span>
     </div>
   );
@@ -865,12 +940,6 @@ const compareAmtStyle: CSSProperties = {
 const compareRailStyle: CSSProperties = {
   height: 8, borderRadius: 999,
   background: "color-mix(in srgb, var(--surface2) 60%, transparent)", overflow: "hidden",
-};
-
-/* Together vs Apart */
-const splitBarStyle: CSSProperties = {
-  height: 14, borderRadius: 999, overflow: "hidden",
-  background: "var(--surface2)", display: "flex",
 };
 
 /* Donut */
