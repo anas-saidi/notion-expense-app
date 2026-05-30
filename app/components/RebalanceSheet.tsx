@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
-import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Category, MonthlySummary } from "./app-types";
 import { today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
@@ -87,109 +85,104 @@ function computeTransfers(
   return transfers;
 }
 
-// ── GroupFilterPicker ─────────────────────────────────────────────────────────
+// ── Scope chip metadata ────────────────────────────────────────────────────────
 
-function GroupFilterPicker({
-  groupTabs,
-  groupFilter,
+const CHIP_META: Record<string, { emoji: string }> = {
+  all:     { emoji: "✦" },
+  joint:   { emoji: "👫" },
+  husband: { emoji: "👨" },
+  wife:    { emoji: "👩" },
+  savings: { emoji: "💰" },
+};
+
+const CHIP_BG: Record<string, string> = {
+  all:     "var(--ink-strong)",
+  joint:   "var(--accent)",
+  husband: "var(--partner-husband)",
+  wife:    "var(--partner-wife)",
+  savings: "var(--warning)",
+};
+
+const CHIP_INK: Record<string, string> = {
+  all:     "var(--bg)",
+  joint:   "var(--accent-ink)",
+  husband: "#ffffff",
+  wife:    "#ffffff",
+  savings: "var(--accent-ink)",
+};
+
+const CHIP_COLOR: Record<string, string> = {
+  all:     "var(--text2)",
+  joint:   "var(--accent)",
+  husband: "var(--partner-husband)",
+  wife:    "var(--partner-wife)",
+  savings: "var(--warning)",
+};
+
+function RebalanceScopeChip({
+  tab,
+  isActive,
   onSelect,
 }: {
-  groupTabs: Array<{ key: string; label: string; count: number }>;
-  groupFilter: GroupFilter;
-  onSelect: (key: GroupFilter) => void;
+  tab: { key: string; label: string };
+  isActive: boolean;
+  onSelect: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const active = groupTabs.find((t) => t.key === groupFilter) ?? groupTabs[0];
-
-  useEffect(() => { setMounted(true); }, []);
-
-  const handleToggle = () => {
-    if (!open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-    }
-    setOpen((o) => !o);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (triggerRef.current?.contains(e.target as Node)) return;
-      if (menuRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const menu = (
-    <div
-      ref={menuRef}
-      role="listbox"
-      aria-label="Filter by group"
-      className="view-picker__menu"
-      style={{ ...gfMenuStyle, position: "fixed", top: menuPos.top, right: menuPos.right, left: "auto" }}
-    >
-      {groupTabs.map((tab) => {
-        const isActive = tab.key === groupFilter;
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="option"
-            aria-selected={isActive}
-            className={`view-picker__option${isActive ? " view-picker__option--active" : ""}`}
-            onClick={() => { onSelect(tab.key as GroupFilter); setOpen(false); }}
-            style={{ ...gfOptionStyle, ...(isActive ? gfOptionActiveStyle : null) }}
-          >
-            <span style={{ ...gfDotStyle, background: gfDotColor(tab.key) }} />
-            <span style={gfOptionTextStyle}>{tab.label}</span>
-            <span style={gfCountStyle}>{tab.count}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
+  const [pressed, setPressed] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const meta = CHIP_META[tab.key] ?? { emoji: "•" };
 
   return (
-    <div className="view-picker" style={gfWrapStyle}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="view-picker__trigger"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label="Filter by group"
-        onClick={handleToggle}
-        style={gfTriggerStyle}
-      >
-        <span style={gfLabelStyle}>{active?.label ?? "All"}</span>
-        <ChevronDown
-          size={12}
-          aria-hidden="true"
-          style={{ ...gfChevronStyle, transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-        />
-      </button>
-      {mounted && open && createPortal(menu, document.body)}
-    </div>
+    <button
+      type="button"
+      role="tab"
+      aria-selected={isActive}
+      onClick={onSelect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      style={isActive ? {
+        height: 38,
+        borderRadius: 12,
+        border: "none",
+        background: CHIP_BG[tab.key] ?? "var(--ink-strong)",
+        color: CHIP_INK[tab.key] ?? "var(--bg)",
+        padding: "0 14px 0 10px",
+        gap: 7,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        transform: pressed ? "scale(0.95)" : "translateY(-1px)",
+        transition: "transform 0.15s cubic-bezier(0.22, 1, 0.36, 1)",
+        animation: "categorySelectIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both",
+        flexShrink: 0,
+      } : {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
+        background: "transparent",
+        color: CHIP_COLOR[tab.key] ?? "var(--text2)",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: pressed ? 0.9 : hovered ? 0.75 : 0.45,
+        transform: pressed ? "scale(0.93)" : hovered ? "translateY(-2px)" : "none",
+        transition: "opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: 18, lineHeight: 1 }}>{meta.emoji}</span>
+      {isActive && (
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
+          {tab.label}
+        </span>
+      )}
+    </button>
   );
 }
-
-const gfDotColor = (key: string): string => {
-  if (key === "wife") return "var(--partner-wife-strong)";
-  if (key === "husband") return "var(--partner-husband-strong)";
-  if (key === "savings") return "var(--warning)";
-  return "var(--text2)";
-};
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -219,48 +212,72 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     return Math.max(0, Math.round(plannedByCategory.get(c.id) ?? c.planned ?? 0));
   };
 
-  const funded = useMemo(
+  // All categories (for display in rebalance — unfrozen, non-archived)
+  const allItems = useMemo(
     () =>
       categories
-        .filter((c) => getAvailable(c) > 0)
         .map((c) => ({ id: c.id, original: getAvailable(c) }))
         .sort((a, b) => b.original - a.original),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [categories, monthCtx, plannedByCategory, spentByCategory],
   );
 
+  // Only categories with available > 0 — used for pool/transfer source computation
+  const funded = useMemo(
+    () => allItems.filter((f) => f.original > 0),
+    [allItems],
+  );
+
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const [allocations, setAllocations] = useState<Record<string, number>>({});
-  const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>(() => {
+    if (typeof window === "undefined") return "joint";
+    const stored = localStorage.getItem("rebalance-last-group") as GroupFilter | null;
+    return (stored && stored !== "all") ? stored : "joint";
+  });
+
+  const handleGroupFilterChange = (next: GroupFilter) => {
+    setGroupFilter(next);
+    if (typeof window !== "undefined") localStorage.setItem("rebalance-last-group", next);
+  };
 
   useEffect(() => {
     if (!open) return;
-    setAllocations(Object.fromEntries(funded.map((f) => [f.id, f.original])));
-    setGroupFilter("all");
-  }, [open, funded]);
+    setAllocations(Object.fromEntries(allItems.map((f) => [f.id, f.original])));
+    const stored = (typeof window !== "undefined" ? localStorage.getItem("rebalance-last-group") : null) as GroupFilter | null;
+    setGroupFilter((stored && stored !== "all") ? stored : "joint");
+  }, [open, allItems]);
 
   // ── Group filtering ──
   const groupCounts = useMemo(() => {
     const counts: Record<Exclude<GroupFilter, "all">, number> = { joint: 0, wife: 0, husband: 0, savings: 0 };
-    for (const f of funded) {
+    for (const f of allItems) {
       const cat = catById.get(f.id);
       if (cat) counts[getCategoryGroup(cat)]++;
     }
     return counts;
-  }, [funded, catById]);
+  }, [allItems, catById]);
 
   const groupTabs = useMemo(
     () => [
-      { key: "all", label: "All", count: funded.length },
       ...(groupCounts.joint > 0 ? [{ key: "joint", label: "Joint", count: groupCounts.joint }] : []),
       ...(groupCounts.wife > 0 ? [{ key: "wife", label: "Salma", count: groupCounts.wife }] : []),
       ...(groupCounts.husband > 0 ? [{ key: "husband", label: "Anas", count: groupCounts.husband }] : []),
       ...(groupCounts.savings > 0 ? [{ key: "savings", label: "Savings", count: groupCounts.savings }] : []),
     ],
-    [funded.length, groupCounts],
+    [groupCounts],
   );
 
+  const visibleItems = useMemo(() => {
+    if (groupFilter === "all") return allItems;
+    return allItems.filter((f) => {
+      const cat = catById.get(f.id);
+      return cat && getCategoryGroup(cat) === groupFilter;
+    });
+  }, [allItems, catById, groupFilter]);
+
+  // Pool = only the funded (available > 0) categories in the current view
   const visibleFunded = useMemo(() => {
     if (groupFilter === "all") return funded;
     return funded.filter((f) => {
@@ -269,9 +286,11 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     });
   }, [funded, catById, groupFilter]);
 
+  // Sum ALL visible items (including over-budget negatives) so the pool matches
+  // how "left to spend" is computed on the home screen for each scope.
   const poolForGroup = useMemo(
-    () => visibleFunded.reduce((s, f) => s + f.original, 0),
-    [visibleFunded],
+    () => visibleItems.reduce((s, f) => s + f.original, 0),
+    [visibleItems],
   );
 
   // ── Build AllocationFlow groups ──
@@ -281,7 +300,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       {
         key: groupFilter,
         label: groupFilter === "all" ? "All" : groupFilter.charAt(0).toUpperCase() + groupFilter.slice(1),
-        items: visibleFunded.map((f): PlanningAllocationItem => {
+        items: visibleItems.map((f): PlanningAllocationItem => {
           const cat = catById.get(f.id)!;
           const amount = allocations[f.id] ?? f.original;
           return {
@@ -307,12 +326,12 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     // The active-category reset effect in AllocationFlow uses `groupKeysSignal`
     // (not the `groups` reference), so it won't fire on every allocation change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groupFilter, visibleFunded, catById, allocations],
+    [groupFilter, visibleItems, catById, allocations],
   );
 
   const liveTransfers = useMemo(
-    () => computeTransfers(funded, allocations),
-    [funded, allocations],
+    () => computeTransfers(allItems, allocations),
+    [allItems, allocations],
   );
 
   const flowPreview = liveTransfers.length === 0 ? undefined : (
@@ -344,8 +363,17 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     </div>
   );
 
-  const headerControls = groupTabs.length > 2 ? (
-    <GroupFilterPicker groupTabs={groupTabs} groupFilter={groupFilter} onSelect={setGroupFilter} />
+  const chipsContent = groupTabs.length > 1 ? (
+    <div style={scopeChipsGroupStyle}>
+      {groupTabs.map((tab) => (
+        <RebalanceScopeChip
+          key={tab.key}
+          tab={tab}
+          isActive={groupFilter === tab.key}
+          onSelect={() => handleGroupFilterChange(tab.key as GroupFilter)}
+        />
+      ))}
+    </div>
   ) : undefined;
 
   const readOnlyBanner = isReadOnly ? (
@@ -372,6 +400,7 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
   return (
     <AllocationFlow
       open={open}
+      mode="screen"
       selectedMonth={homeMonth}
       onCancel={onClose}
       onComplete={onSuccess}
@@ -385,9 +414,12 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}
       flowPreview={flowPreview}
-      headerControls={headerControls}
+      chipsContent={chipsContent}
+      heroPool
+      metaLabel="Before"
+      rebalanceMode
       onSave={async () => {
-        const transfers = computeTransfers(funded, allocations);
+        const transfers = computeTransfers(allItems, allocations);
         await Promise.all(
           transfers.map((t) =>
             fetch("/api/transfer", {
@@ -412,37 +444,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     />
   );
 }
-
-// ── GroupFilterPicker styles ───────────────────────────────────────────────────
-
-const gfWrapStyle: CSSProperties = {
-  position: "relative", display: "inline-flex", alignItems: "center",
-  flexShrink: 0, overflow: "visible", justifySelf: "end",
-};
-const gfTriggerStyle: CSSProperties = {
-  minHeight: 28, padding: 0, border: "none", background: "transparent",
-  color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer",
-  display: "inline-flex", alignItems: "center", gap: 4,
-};
-const gfLabelStyle: CSSProperties = { fontSize: 13, fontWeight: 600 };
-const gfChevronStyle: CSSProperties = { pointerEvents: "none", color: "var(--muted)", transition: "transform 0.16s ease" };
-const gfMenuStyle: CSSProperties = {
-  width: 192, padding: 6, borderRadius: 16,
-  border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)",
-  background: "var(--surface)",
-  boxShadow: "0 18px 36px color-mix(in srgb, var(--ink-strong) 14%, transparent), inset 0 1px 0 color-mix(in srgb, white 55%, transparent)",
-  zIndex: 90, display: "grid", gap: 3,
-};
-const gfOptionStyle: CSSProperties = {
-  minHeight: 44, width: "100%", border: "none", borderRadius: 12,
-  background: "transparent", color: "var(--text2)", cursor: "pointer",
-  display: "grid", gridTemplateColumns: "8px 1fr auto",
-  alignItems: "center", gap: 9, padding: "0 10px", textAlign: "left",
-};
-const gfOptionActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--surface2) 70%, white)" };
-const gfDotStyle: CSSProperties = { width: 7, height: 7, borderRadius: 999 };
-const gfOptionTextStyle: CSSProperties = { fontSize: 13, fontWeight: 700 };
-const gfCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 10, color: "var(--muted)" };
 
 // ── Flow preview styles ───────────────────────────────────────────────────────
 
@@ -512,6 +513,13 @@ const flowMoreStyle: CSSProperties = {
   fontSize: 10,
   color: "var(--muted)",
   textAlign: "center",
+};
+
+// ── Scope chips group container ────────────────────────────────────────────────
+
+const scopeChipsGroupStyle: CSSProperties = {
+  display: "inline-flex",
+  gap: 8,
 };
 
 // ── Context banner styles ──────────────────────────────────────────────────────

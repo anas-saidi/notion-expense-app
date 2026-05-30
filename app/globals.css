@@ -4,6 +4,23 @@
   transition: transform 0.15s ease-out;
 }
 
+/* Skeleton shimmer */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface2) 25%,
+    color-mix(in srgb, var(--surface2) 60%, white) 50%,
+    var(--surface2) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -31,7 +48,7 @@
   --card-border: rgba(14, 15, 12, 0.12);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --font-display: "Fraunces", "Times New Roman", serif;
+  --font-display: "Instrument Sans", "Inter", system-ui, sans-serif;
   --font-body: "Instrument Sans", "Inter", system-ui, sans-serif;
 
   /* Partner identity colors */
@@ -1303,4 +1320,49 @@ button:hover .rebalance-btn-icon {
 .rebalance-slider::-moz-range-track {
   height: 6px;
   border-radius: 999px;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(18px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ── Budget tab — freeze animation ──────────────────────────── */
+@keyframes freezeOut {
+  0%   { transform: scale(1);    opacity: 1;   filter: saturate(1)    brightness(1); }
+  20%  { transform: scale(0.96); opacity: 0.9; filter: saturate(0.12) brightness(1.07); }
+  100% { transform: scale(0.87); opacity: 0;   filter: saturate(0)    brightness(1.13); }
+}
+
+.category-card--freezing {
+  animation: freezeOut 280ms cubic-bezier(0.25, 1, 0.5, 1) both !important;
+  pointer-events: none;
+  will-change: transform, opacity, filter;
+}
+
+.freeze-btn {
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+@media (hover: hover) {
+  .freeze-btn:hover {
+    background: color-mix(in srgb, var(--info) 16%, var(--surface2)) !important;
+    color: var(--info) !important;
+    transform: scale(1.15) rotate(-12deg) translateY(0) !important;
+  }
+}
+
+.freeze-btn:active {
+  transform: scale(0.88) rotate(0deg) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-card--freezing {
+    animation: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.1s ease !important;
+  }
 }

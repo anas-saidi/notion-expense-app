@@ -28,34 +28,47 @@ export async function GET(req: NextRequest) {
     ],
   } : undefined;
 
+  const mapPage = (page: any) => ({
+    id: page.id,
+    name: page.properties.Name?.title?.[0]?.plain_text ?? "",
+    amount: page.properties.Amount?.number ?? 0,
+    date: page.properties.Date?.date?.start ?? "",
+    category: page.properties.Category?.relation?.[0]?.id ?? null,
+    accountId: page.properties.Account?.relation?.[0]?.id ?? null,
+    type: page.properties.Type?.select?.name ?? "Expense",
+    fromCategoryId: page.properties[PROP_BUDGET_OUT]?.relation?.[0]?.id ?? null,
+    toCategoryId:   page.properties[PROP_BUDGET_IN]?.relation?.[0]?.id  ?? null,
+  });
+
   try {
-    const res = await fetch(`https://api.notion.com/v1/databases/${TRANSACTIONS_DB}/query`, {
-      method: "POST",
-      headers: notionHeaders(token),
-      cache: "no-store",
-      body: JSON.stringify({
-        ...(dateFilter ? { filter: dateFilter } : {}),
-        sorts: [{ property: "Date", direction: "descending" }],
-        page_size: pageSize,
-      }),
-    });
+    // When a date range is provided, paginate through all results.
+    // When no date filter (open-ended), respect the explicit page_size cap.
+    const paginate = !!dateFilter;
+    const allResults: any[] = [];
+    let cursor: string | undefined;
 
-    const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
+    do {
+      const res = await fetch(`https://api.notion.com/v1/databases/${TRANSACTIONS_DB}/query`, {
+        method: "POST",
+        headers: notionHeaders(token),
+        cache: "no-store",
+        body: JSON.stringify({
+          ...(dateFilter ? { filter: dateFilter } : {}),
+          sorts: [{ property: "Date", direction: "descending" }],
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {}),
+        }),
+      });
 
-    const transactions = data.results.map((page: any) => ({
-      id: page.id,
-      name: page.properties.Name?.title?.[0]?.plain_text ?? "",
-      amount: page.properties.Amount?.number ?? 0,
-      date: page.properties.Date?.date?.start ?? "",
-      category: page.properties.Category?.relation?.[0]?.id ?? null,
-      accountId: page.properties.Account?.relation?.[0]?.id ?? null,
-      type: page.properties.Type?.select?.name ?? "Expense",
-      fromCategoryId: page.properties[PROP_BUDGET_OUT]?.relation?.[0]?.id ?? null,
-      toCategoryId:   page.properties[PROP_BUDGET_IN]?.relation?.[0]?.id  ?? null,
-    }));
+      const data = await res.json();
+      if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
 
-    return NextResponse.json({ transactions });
+      allResults.push(...data.results);
+      cursor = (paginate && data.has_more) ? data.next_cursor : undefined;
+    } while (cursor);
+
+    const results = paginate ? allResults : allResults.slice(0, pageSize);
+    return NextResponse.json({ transactions: results.map(mapPage) });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

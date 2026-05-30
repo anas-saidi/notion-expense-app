@@ -51,6 +51,7 @@ export type PendingItem = {
 export type MonthlyCategoryTotal = {
   categoryId: string;
   total: number;
+  accountId?: string | null;
 };
 
 export type MonthlySummary = {
@@ -144,4 +145,4 @@ export type CloseMonthStepState = {
   needsAttention: boolean;
 };
 
-export type AppTab = "home" | "plan" | "pending" | "history";
+export type AppTab = "home" | "plan" | "budget" | "history";

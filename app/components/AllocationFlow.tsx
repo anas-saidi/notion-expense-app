@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Save } from "lucide-react";
-import { CalendarIcon, XIcon } from "./ui/icons";
+import { ArrowLeftIcon, CalendarIcon, XIcon } from "./ui/icons";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -21,6 +21,7 @@ export type AllocationGroup = {
 
 type AllocationFlowProps = {
   open: boolean;
+  mode?: "sheet" | "screen";
   selectedMonth: string;
   onSelectedMonthChange?: (nextMonth: string) => void;
   onCancel: () => void;
@@ -37,9 +38,13 @@ type AllocationFlowProps = {
   readOnly?: boolean;
   readOnlyBanner?: ReactNode;
   headerControls?: ReactNode;
+  chipsContent?: ReactNode;
   flowPreview?: ReactNode;
   title?: string;
   balancedLabel?: string;
+  heroPool?: boolean;
+  metaLabel?: string;
+  rebalanceMode?: boolean;
 };
 
 export function AllocationFlow({
@@ -59,9 +64,14 @@ export function AllocationFlow({
   readOnly = false,
   readOnlyBanner,
   headerControls,
+  chipsContent,
   flowPreview,
   title = "Set Monthly Budget",
   balancedLabel = "Fully assigned",
+  mode = "sheet",
+  heroPool = false,
+  metaLabel = "Last month",
+  rebalanceMode = false,
 }: AllocationFlowProps) {
   const monthInputRef = useRef<HTMLInputElement | null>(null);
   const [activeGroup, setActiveGroup] = useState<BudgetGroupKey>(groups[0]?.key ?? "household");
@@ -174,8 +184,8 @@ export function AllocationFlow({
     }
   };
 
-  return (
-    <BottomSheet open={open} onClose={onCancel} showHandle label="Set monthly budget" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
+  const innerContent = (
+    <>
       {onSelectedMonthChange && (
         <input
           ref={monthInputRef}
@@ -188,54 +198,120 @@ export function AllocationFlow({
         />
       )}
 
-      <header style={sheetHeaderStyle}>
-        <h2 style={sheetTitleStyle}>{title}</h2>
-        <button onClick={onCancel} aria-label="Close planning" style={closeButtonStyle}>
-          <XIcon size={14} />
-        </button>
-        {onSelectedMonthChange ? (
-          <button
-            type="button"
-            aria-label="Change planning month"
-            onClick={() => {
-              const input = monthInputRef.current;
-              if (!input) return;
-              if ("showPicker" in HTMLInputElement.prototype) input.showPicker();
-              else input.click();
-            }}
-            style={monthPickerButtonStyle}
-          >
-            <CalendarIcon />
-            <span>{monthLabel}</span>
+      {mode === "screen" ? (
+        <header style={screenHeaderStyle}>
+          <button onClick={onCancel} aria-label="Go back" style={backButtonStyle}>
+            <ArrowLeftIcon size={18} />
           </button>
-        ) : (
-          <span style={monthLabelFallbackStyle}>{monthLabel}</span>
-        )}
-        {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
-      </header>
-
-      <div style={sheetScrollStyle}>
-        <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
-          <div style={{ ...quietAvailableRowStyle, alignItems: "flex-start" }}>
-            <span style={balanceLabelStyle}>{poolLabel}</span>
-            <div style={valueColumnStyle}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={quietAvailableValueStyle}>
-                  <Money value={availablePool} />
-                </span>
-                {isUsingFallbackData && !poolOverride && <span style={estimateBadgeStyle}>Est.</span>}
-              </div>
-              {isBalanced ? (
-                <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-                  ✓ {balancedLabel}
-                </span>
-              ) : (
-                <span key={isOver ? "over" : "under"} style={{ ...deltaChipStyle(isOver), animation: "chipIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both" }}>
-                  {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
-                </span>
-              )}
-            </div>
+          <div>
+            <h2 style={sheetTitleStyle}>{title}</h2>
+            {onSelectedMonthChange ? (
+              <button
+                type="button"
+                aria-label="Change planning month"
+                onClick={() => {
+                  const input = monthInputRef.current;
+                  if (!input) return;
+                  if ("showPicker" in HTMLInputElement.prototype) input.showPicker();
+                  else input.click();
+                }}
+                style={monthPickerButtonStyle}
+              >
+                <CalendarIcon />
+                <span>{monthLabel}</span>
+              </button>
+            ) : (
+              <span style={monthLabelFallbackStyle}>{monthLabel}</span>
+            )}
           </div>
+          {!chipsContent && (
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
+            </div>
+          )}
+        </header>
+      ) : (
+        <header style={sheetHeaderStyle}>
+          <h2 style={sheetTitleStyle}>{title}</h2>
+          <button onClick={onCancel} aria-label="Close" style={closeButtonStyle}>
+            <XIcon size={14} />
+          </button>
+          {onSelectedMonthChange ? (
+            <button
+              type="button"
+              aria-label="Change planning month"
+              onClick={() => {
+                const input = monthInputRef.current;
+                if (!input) return;
+                if ("showPicker" in HTMLInputElement.prototype) input.showPicker();
+                else input.click();
+              }}
+              style={monthPickerButtonStyle}
+            >
+              <CalendarIcon />
+              <span>{monthLabel}</span>
+            </button>
+          ) : (
+            <span style={monthLabelFallbackStyle}>{monthLabel}</span>
+          )}
+          {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
+        </header>
+      )}
+
+      <div style={mode === "screen" ? { ...sheetScrollStyle, flex: 1, minHeight: 0, ...(heroPool ? { paddingTop: 16 } : {}) } : sheetScrollStyle}>
+        {chipsContent && (
+          <div style={chipsContentWrapStyle}>{chipsContent}</div>
+        )}
+        <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
+          {heroPool ? (
+            <div style={heroPoolWrapStyle}>
+              <span style={heroPoolLabelStyle}>{poolLabel}</span>
+              <span style={heroPoolNumberStyle}>
+                <Money value={availablePool} />
+              </span>
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
+                {isBalanced ? (
+                  <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+                    ✓ {balancedLabel}
+                  </span>
+                ) : (
+                  <span key={isOver ? "over" : "under"} style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    letterSpacing: -0.3,
+                    color: isOver
+                      ? "var(--danger)"
+                      : "color-mix(in srgb, var(--success) 72%, var(--text2))",
+                    animation: "chipIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+                  }}>
+                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ ...quietAvailableRowStyle, alignItems: "flex-start" }}>
+              <span style={balanceLabelStyle}>{poolLabel}</span>
+              <div style={valueColumnStyle}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={quietAvailableValueStyle}>
+                    <Money value={availablePool} />
+                  </span>
+                  {isUsingFallbackData && !poolOverride && <span style={estimateBadgeStyle}>Est.</span>}
+                </div>
+                {isBalanced ? (
+                  <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+                    ✓ {balancedLabel}
+                  </span>
+                ) : (
+                  <span key={isOver ? "over" : "under"} style={{ ...deltaChipStyle(isOver), animation: "chipIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both" }}>
+                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           {burstKey > 0 && <BalancedBurst key={burstKey} />}
         </section>
         {readOnlyBanner}
@@ -288,7 +364,7 @@ export function AllocationFlow({
                 />
               </label>
               <div style={metaRowStyle}>
-                <span>Last month <Money value={activeItem.lastMonthSpent ?? 0} /></span>
+                <span>{metaLabel} <Money value={activeItem.lastMonthSpent ?? 0} /></span>
                 <span>Spent <Money value={Math.max(0, activeItem.amount - (activeItem.available ?? activeItem.amount))} /></span>
               </div>
             </div>
@@ -296,9 +372,22 @@ export function AllocationFlow({
 
           <section className="planning-dial-panel" aria-label="Budget control" style={dialPanelStyle(isOver, isBalanced)}>
             <div key={`${activeItem?.categoryId ?? "empty"}-${isBalanced ? "balanced" : isOver ? "over" : "normal"}`} className="planning-dial-copy" style={dialCopyStyle}>
-              <span style={dialStatusStyle}>{isOver ? "Over" : isBalanced ? "Balanced" : "Normal"}</span>
-              <strong style={dialTitleStyle}>{isOver ? "Pull this month back into range" : isBalanced ? "Every dirham has a job" : activeShare >= 0.28 ? "That's a lot" : activeShare <= 0.04 ? "Small but covered" : "Looks normal"}</strong>
-              <span style={dialBodyStyle}>{isOver ? "Reduce this category or move money from another one." : isBalanced ? "You can save the plan or fine tune a category." : activeShare >= 0.28 ? `Sometimes, you can spend big on ${activeItem?.name.toLowerCase() ?? "this category"}.` : "Adjust until the category feels right."}</span>
+              <span style={dialStatusStyle}>{isOver ? "Over" : isBalanced ? "Balanced" : rebalanceMode ? "Rebalance" : "Normal"}</span>
+              <strong style={dialTitleStyle}>
+                {isOver ? "Over budget" :
+                 isBalanced ? "Every dirham has a job" :
+                 rebalanceMode ? "Shift funds" :
+                 activeShare >= 0.28 ? "That's a lot" :
+                 activeShare <= 0.04 ? "Small but covered" :
+                 "Looks normal"}
+              </strong>
+              <span style={dialBodyStyle}>
+                {isOver ? "Reduce this category or pull from another one." :
+                 isBalanced ? (rebalanceMode ? "All funds reallocated — tap Apply to save." : "You can save the plan or fine tune a category.") :
+                 rebalanceMode ? "Drag the slider to move funds between categories." :
+                 activeShare >= 0.28 ? `Sometimes, you can spend big on ${activeItem?.name.toLowerCase() ?? "this category"}.` :
+                 "Adjust until the category feels right."}
+              </span>
             </div>
             <div style={rangeWrapStyle}>
               <div style={tickRailStyle} aria-hidden="true">
@@ -342,9 +431,46 @@ export function AllocationFlow({
           </section>
         </div>
       )}
+    </>
+  );
+
+  if (mode === "screen") {
+    if (!open) return null;
+    return (
+      <div style={screenWrapStyle}>
+        <div style={screenInnerStyle}>
+          {innerContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <BottomSheet open={open} onClose={onCancel} showHandle label="Set monthly budget" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
+      {innerContent}
     </BottomSheet>
   );
 }
+
+const screenWrapStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 80,
+  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  paddingTop: "env(safe-area-inset-top, 0px)",
+};
+const screenInnerStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  borderRadius: "24px 24px 0 0",
+};
 
 // ── Balanced burst ────────────────────────────────────────────────────────────
 type BurstStyleVars = CSSProperties & { "--x": string; "--y": string; "--d": string };
@@ -444,6 +570,8 @@ const gpCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 
 const sheetPanelStyle: CSSProperties = { background: "color-mix(in srgb, var(--bg) 96%, white)", borderRadius: "24px 24px 0 0" };
 const sheetContentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
 const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "16px 20px 14px", flexShrink: 0 };
+const screenHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "44px 1fr auto", alignItems: "center", gap: 8, padding: "14px 16px 12px", flexShrink: 0 };
+const backButtonStyle: CSSProperties = { width: 36, height: 36, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text2)" };
 const sheetScrollStyle: CSSProperties = { overflowY: "auto", overflowX: "hidden", padding: "4px 12px 8px", display: "grid", gap: 8 };
 const monthPickerButtonStyle: CSSProperties = { minHeight: 28, padding: 0, border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" };
@@ -459,17 +587,10 @@ const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 9
 const balancedTextStyle: CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
 const deltaChipStyle = (isOver: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "center", gap: 2,
-  padding: "2px 7px", borderRadius: 999,
   fontSize: 11, fontWeight: 700, fontFamily: "var(--font-body)",
-  background: isOver
-    ? "color-mix(in srgb, var(--danger) 10%, transparent)"
-    : "color-mix(in srgb, var(--success) 10%, transparent)",
   color: isOver
     ? "color-mix(in srgb, var(--danger) 78%, var(--text2))"
     : "color-mix(in srgb, var(--success) 72%, var(--text2))",
-  border: isOver
-    ? "1px solid color-mix(in srgb, var(--danger) 18%, transparent)"
-    : "1px solid color-mix(in srgb, var(--success) 18%, transparent)",
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
@@ -499,3 +620,34 @@ const tickStyle: CSSProperties = { width: 2, borderRadius: 999, transition: "opa
 const rangeStyle: CSSProperties = { width: "100%", accentColor: "white" };
 const saveErrorStyle: CSSProperties = { padding: "10px 12px", borderRadius: 14, background: "rgba(255,255,255,0.16)", color: "white", fontSize: 12, lineHeight: 1.4 };
 const saveButtonStyle: CSSProperties = { justifySelf: "end", minHeight: 48, borderRadius: 18, border: "none", background: "color-mix(in srgb, white 96%, var(--accent-ink))", color: "var(--text2)", padding: "0 16px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "0 10px 22px color-mix(in srgb, var(--ink-strong) 12%, transparent)" };
+
+// ── Chips content wrap ────────────────────────────────────────────────────────
+const chipsContentWrapStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  paddingBottom: 4,
+};
+
+// ── Hero pool styles ──────────────────────────────────────────────────────────
+const heroPoolWrapStyle: CSSProperties = {
+  display: "grid",
+  gap: 4,
+  textAlign: "center",
+  padding: "14px 0 10px",
+};
+const heroPoolLabelStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: 0.5,
+  textTransform: "uppercase",
+  color: "var(--muted)",
+};
+const heroPoolNumberStyle: CSSProperties = {
+  fontSize: "clamp(52px, 14vw, 80px)",
+  fontWeight: 400,
+  lineHeight: 0.9,
+  letterSpacing: "-0.022em",
+  color: "var(--text2)",
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: '"tnum"',
+};

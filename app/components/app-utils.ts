@@ -97,6 +97,34 @@ export const isSavingsAccount = (account: Account) => {
   return value.includes("saving");
 };
 
+export const getBalanceByScope = (accounts: Account[]): Record<BudgetScope, number> => {
+  const norm = (value: string) => value.toLowerCase();
+
+  const salmaTotal = accounts.reduce((sum, account) => {
+    if (isSavingsAccount(account)) return sum;
+    if (!norm(account.label).includes("wife")) return sum;
+    return sum + (account.balance ?? 0);
+  }, 0);
+
+  const anasTotal = accounts.reduce((sum, account) => {
+    if (isSavingsAccount(account)) return sum;
+    if (!norm(account.label).includes("hubb")) return sum;
+    return sum + (account.balance ?? 0);
+  }, 0);
+
+  const jointTotal = accounts.reduce((sum, account) => {
+    if (isSavingsAccount(account)) return sum;
+    if (!norm(account.label).includes("joined")) return sum;
+    return sum + (account.balance ?? 0);
+  }, 0);
+
+  return {
+    joint: jointTotal,
+    salma: salmaTotal,
+    anas: anasTotal,
+  };
+};
+
 export const getLeftToAssignByScope = (accounts: Account[]): Record<BudgetScope, number> => {
   const norm = (value: string) => value.toLowerCase();
   const applyJointDue = (account: Account) => {
@@ -142,7 +170,14 @@ export const getCategoryScope = (category: Category): BudgetScope | null => {
     return "joint";
   }
 
-  return null;
+  // Fall back to category name — catches cases where Owner field isn't set in Notion
+  // but the name itself encodes the owner (e.g. "Hubby Family", "Salma Personal")
+  const name = category.name?.trim().toLowerCase() ?? "";
+  if (name.includes("hubb") || name.includes("husband") || name.startsWith("anas")) return "anas";
+  if (name.includes("wife") || name.startsWith("salma")) return "salma";
+
+  // Default to joint — an uncategorized category is shared, not invisible
+  return "joint";
 };
 
 export const categoryMatchesScope = (category: Category, scope: BudgetScope) =>
@@ -152,11 +187,28 @@ export const transactionMatchesScope = (
   transaction: Transaction,
   categories: Category[],
   scope: BudgetScope,
+  accounts?: Account[],
 ) => {
   if (!transaction.category) return true;
   const category = categories.find((entry) => entry.id === transaction.category);
   if (!category) return true;
-  return categoryMatchesScope(category, scope);
+
+  const catScope = getCategoryScope(category);
+  if (catScope !== null) return catScope === scope;
+
+  // Category has no determinable scope — fall back to the transaction's account label
+  if (transaction.accountId && accounts) {
+    const account = accounts.find(a => a.id === transaction.accountId);
+    if (account) {
+      const label = account.label.toLowerCase();
+      if (label.includes("hubb")) return scope === "anas";
+      if (label.includes("wife")) return scope === "salma";
+      if (label.includes("joined")) return scope === "joint";
+    }
+  }
+
+  // Can't determine scope — include in joint only to avoid polluting personal views
+  return scope === "joint";
 };
 
 export const categoryIdMatchesScope = (

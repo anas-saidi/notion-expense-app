@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import Fuse from "fuse.js";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
-import { HistoryScreen } from "./components/HistoryScreen";
-import { PendingScreen } from "./components/PendingScreen";
+import { InsightsScreen } from "./components/InsightsScreen";
+import { CategoriesScreen } from "./components/CategoriesScreen";
 import { MonthlyPlanningFlow } from "./components/MonthlyPlanningFlow";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
@@ -22,7 +22,9 @@ import {
   categoryIdMatchesScope,
   evalExpr,
   fmtDate,
+  getCategoryScope,
   getLeftToAssignByScope,
+  getBalanceByScope,
   monthBounds,
   shiftDate,
   today,
@@ -99,7 +101,7 @@ export default function App() {
     spentByCategory: [],
   });
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"home" | "plan" | "pending" | "history">("home");
+  const [tab, setTab] = useState<"home" | "plan" | "budget" | "history">("home");
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
   const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
   const [planCompletedMonth, setPlanCompletedMonth] = useState<string | null>(null);
@@ -108,9 +110,9 @@ export default function App() {
   const [plannerMonthlySummary, setPlannerMonthlySummary] = useState<MonthlySummary | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
+  const [detailsCategory, setDetailsCategory] = useState<Category | null>(null);
   const [showRebalance, setShowRebalance] = useState(false);
   const [showManageScreen, setShowManageScreen] = useState(false);
-  const [showHomeCategories, setShowHomeCategories] = useState(false);
   const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | null>(null);
   const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
   const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
@@ -137,12 +139,14 @@ export default function App() {
   const [monthlyTrend, setMonthlyTrend] = useState<Array<{ month: string; totalSpent: number }>>([]);
   const [historyMonth, setHistoryMonth] = useState(formatMonthInput(today()));
   const [historyTransactions, setHistoryTransactions] = useState<Transaction[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const initialAcctApplied = useRef(false);
   const initialCatApplied = useRef(false);
   const plannerMonthHydrated = useRef(false);
   const loadedPendingId = useRef<string | null>(null);
+  const rebalanceReturnToAdd = useRef(false);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,9 +225,11 @@ export default function App() {
   };
 
   const fetchHistoryTransactions = useCallback(async (month: string) => {
+    setHistoryLoading(true);
     const { start, end } = monthBounds(`${month}-01`);
     const data = await fetch(`/api/transactions?start=${start}&end=${end}&page_size=100`).then(r => r.json());
     setHistoryTransactions(data.transactions ?? []);
+    setHistoryLoading(false);
   }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -548,6 +554,7 @@ export default function App() {
     !plannerSummaryReady || plannerMonth !== formatMonthInput(today());
 
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(accounts), [accounts]);
+  const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
   // DEBUG PRINTS for spent on team categories
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -579,7 +586,7 @@ export default function App() {
   };
 
   const openCategoryDetails = (cat: Category) => {
-    selectCategory(cat);
+    setDetailsCategory(cat);
     setShowCategoryDetails(true);
   };
 
@@ -664,12 +671,31 @@ export default function App() {
     });
 
   const getMonthlySummaryForScope = useCallback((scope: BudgetScope): MonthlySummary => {
+    const accountLabel = (entry: { accountId?: string | null }) => {
+      if (!entry.accountId) return "";
+      return (accounts.find(a => a.id === entry.accountId)?.label ?? "").toLowerCase();
+    };
+
+    const assignmentMatchesScope = (entry: { categoryId: string; accountId?: string | null }) => {
+      const label = accountLabel(entry);
+      // Savings accounts are never part of operational planned budget
+      if (label.includes("saving")) return false;
+      // Primary: use account label (ground truth for who made the assignment)
+      if (label.includes("hubb")) return scope === "anas";
+      if (label.includes("wife")) return scope === "salma";
+      if (label.includes("joined")) return scope === "joint";
+      // Fallback: use category scope when account is unknown
+      const cat = categories.find(c => c.id === entry.categoryId);
+      if (!cat) return scope === "joint";
+      const catScope = getCategoryScope(cat);
+      return catScope === scope;
+    };
+
+    const assignedByCategory = monthlySummary.assignedByCategory.filter(assignmentMatchesScope);
+
     const categoryIds = new Set(
-      categories
-        .filter((category) => categoryMatchesScope(category, scope))
-        .map((category) => category.id),
+      categories.filter(c => categoryMatchesScope(c, scope)).map(c => c.id),
     );
-    const assignedByCategory = monthlySummary.assignedByCategory.filter((entry) => categoryIds.has(entry.categoryId));
     const spentByCategory = monthlySummary.spentByCategory.filter((entry) => categoryIds.has(entry.categoryId));
 
     return {
@@ -679,7 +705,7 @@ export default function App() {
       assignedByCategory,
       spentByCategory,
     };
-  }, [categories, monthlySummary]);
+  }, [categories, accounts, monthlySummary]);
 
   const scopedMonthlySummary = useMemo(() => {
     return getMonthlySummaryForScope(budgetScope);
@@ -702,13 +728,13 @@ export default function App() {
   }, [categories]);
 
   const scopedTransactions = useMemo(
-    () => transactions.filter((transaction) => transactionMatchesScope(transaction, categories, budgetScope)),
-    [budgetScope, categories, transactions],
+    () => transactions.filter((transaction) => transactionMatchesScope(transaction, categories, budgetScope, accounts)),
+    [budgetScope, categories, transactions, accounts],
   );
 
   const scopedHistoryTransactions = useMemo(
-    () => historyTransactions.filter(t => transactionMatchesScope(t, categories, budgetScope)),
-    [historyTransactions, categories, budgetScope],
+    () => historyTransactions.filter(t => transactionMatchesScope(t, categories, budgetScope, accounts)),
+    [historyTransactions, categories, budgetScope, accounts],
   );
 
   const scopedPendingItems = useMemo(
@@ -780,7 +806,14 @@ export default function App() {
       if (!isEditing && displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
       fetchMonthlySummary(homeMonth);
+      fetchCategories();
       fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
+      // Re-fetch categories after a short delay — Notion computed properties (formulas/rollups)
+      // may not reflect the new transaction immediately.
+      setTimeout(() => {
+        fetchCategories();
+        fetchMonthlySummary(homeMonth);
+      }, 1500);
 
       if (loadedPendingId.current) {
         dismissPending(loadedPendingId.current);
@@ -832,7 +865,7 @@ export default function App() {
     <AppShell
       tab={tab}
       pendingCount={scopedPendingItems.length}
-      onTabChange={(t) => { setTab(t); if (t !== "home") setShowHomeCategories(false); }}
+      onTabChange={(t) => { setTab(t); }}
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setShowAddModal(true);
@@ -841,22 +874,11 @@ export default function App() {
       toast={microToast}
       showAddButton={tab !== "plan" && !showManageScreen}
       immersive={tab === "plan" || showManageScreen}
-      hideHeader={showHomeCategories}
     >
       {showManageScreen && (
         <ManageScreen
-          categories={categories}
-          frozenCategories={frozenCategories}
           accounts={accounts}
           onClose={() => setShowManageScreen(false)}
-          onNewCategory={openNewCategory}
-          onOpenCategory={(category) => {
-            setShowManageScreen(false);
-            openCategoryDetails(category);
-          }}
-          onFundCategory={openFundCategory}
-          onFreezeCategory={freezeCategory}
-          onReviveCategory={reviveCategory}
           onAddIncome={setIncomeAccount}
           onTransferMoney={setTransferAccount}
         />
@@ -876,18 +898,18 @@ export default function App() {
           }}
           onOpenPlan={() => setTab("plan")}
           onOpenRebalance={() => setShowRebalance(true)}
+          onOpenBudgetTab={() => setTab("budget")}
           onFundCategory={openFundCategory}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
           leftToSpendByScope={leftToSpendByScope}
+          balanceByScope={balanceByScope}
           readyToAssignByScope={readyToAssignByScope}
           budgetScope={budgetScope}
           onBudgetScopeChange={setBudgetScope}
           homeMonth={homeMonth}
           onHomeMonthChange={setHomeMonth}
           planDone={planCompletedMonth === homeMonth}
-          showCategories={showHomeCategories}
-          onShowCategoriesChange={setShowHomeCategories}
           transactions={scopedTransactions}
           pendingItems={scopedPendingItems}
           onOpenHistory={() => setTab("history")}
@@ -914,26 +936,32 @@ export default function App() {
         isUsingFallbackData={plannerUsesFallbackData}
       />}
 
-      {!showManageScreen && tab === "pending" && (
-        <PendingScreen
-          pendingItems={pendingItems}
+      {!showManageScreen && tab === "budget" && (
+        <CategoriesScreen
           categories={categories}
-          mode={mode}
-          budgetScope={budgetScope}
-          onLogItem={loadPending}
-          onDismiss={dismissPending}
-          onAdd={addPendingItem}
-          onClaim={claimPendingItem}
+          frozenCategories={frozenCategories}
+          monthlySummary={monthlySummary}
+          homeMonth={homeMonth}
+          selectedCategoryId={categoryId}
+          onSelectCategory={selectCategory}
+          onOpenCategoryDetails={openCategoryDetails}
+          onOpenRebalance={() => setShowRebalance(true)}
+          onFreezeCategory={freezeCategory}
+          onReviveCategory={reviveCategory}
+          onFundCategory={openFundCategory}
         />
       )}
 
       {!showManageScreen && tab === "history" && (
-        <HistoryScreen
+        <InsightsScreen
           transactions={scopedHistoryTransactions}
           categories={categories}
+          accounts={accounts}
           budgetScope={budgetScope}
-          historyMonth={historyMonth}
-          onHistoryMonthChange={setHistoryMonth}
+          onBudgetScopeChange={setBudgetScope}
+          insightsMonth={historyMonth}
+          onInsightsMonthChange={setHistoryMonth}
+          transactionsLoading={historyLoading}
           onClickTransaction={editTransaction}
           onDeleteTransaction={deleteTransaction}
         />
@@ -965,7 +993,39 @@ export default function App() {
         categoryUnfunded={categoryUnfunded}
         categoryOverBudget={categoryOverBudget}
         canSubmit={canSubmit}
+        allCategories={categories.filter(c => !isSavingsCategory(c))}
         modeVariant={editingTransactionId ? "edit" : "create"}
+        onOpenRebalance={() => {
+          rebalanceReturnToAdd.current = true;
+          setShowAddModal(false);
+          setShowRebalance(true);
+        }}
+        onQuickFund={async (sourceCategoryId, amount) => {
+          try {
+            const res = await fetch("/api/transfer", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fromCategoryId: sourceCategoryId,
+                toCategoryId: categoryId,
+                amount,
+                date: today(),
+                note: "Quick fund",
+              }),
+            });
+            if (!res.ok) {
+              const d = await res.json();
+              throw new Error(d.error ?? "Transfer failed");
+            }
+            // Wait for Notion computed properties to propagate before re-fetching
+            await new Promise<void>(resolve => setTimeout(resolve, 1500));
+            await fetchCategories();
+            fetchMonthlySummary(homeMonth);
+          } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : "Transfer failed");
+            throw e;
+          }
+        }}
         onClose={() => {
           if (editingTransactionId) {
             setAmount("");
@@ -1019,16 +1079,17 @@ export default function App() {
 
       <CategoryDetailsSheet
         open={showCategoryDetails}
-        category={selectedCat ?? null}
+        category={detailsCategory}
         month={(monthlySummary.start || today()).slice(0, 7)}
         onClose={() => setShowCategoryDetails(false)}
         onOpenAdd={() => {
+          if (detailsCategory) selectCategory(detailsCategory);
           setEditingTransactionId(null);
           setShowCategoryDetails(false);
           setShowAddModal(true);
         }}
         onOpenFund={() => {
-          if (selectedCat) openFundCategory(selectedCat);
+          if (detailsCategory) openFundCategory(detailsCategory);
         }}
       />
 
@@ -1060,15 +1121,19 @@ export default function App() {
 
       <RebalanceSheet
         open={showRebalance}
-        onClose={() => setShowRebalance(false)}
+        onClose={() => {
+          setShowRebalance(false);
+          rebalanceReturnToAdd.current = false;
+        }}
         categories={categories}
         homeMonth={homeMonth}
         monthlySummary={monthlySummary}
         onSuccess={() => {
-          fetchMonthlySummary(homeMonth);
-          fetch("/api/categories")
-            .then((r) => r.json())
-            .then((d) => setCategories(d.categories ?? []));
+          refreshBudgetData("Rebalance applied");
+          if (rebalanceReturnToAdd.current) {
+            rebalanceReturnToAdd.current = false;
+            setShowAddModal(true);
+          }
         }}
       />
 

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher } from "./WalletCardSwitcher";
-import { CategoriesScreen } from "./CategoriesScreen";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { ChevronRightIcon } from "./ui/icons";
 import { fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
@@ -16,19 +15,19 @@ type HomeScreenProps = {
   onOpenAdd: () => void;
   onOpenPlan: () => void;
   onOpenRebalance: () => void;
+  onOpenBudgetTab?: () => void;
   onFundCategory?: (category: Category) => void;
   onOpenHistory?: () => void;
   monthlySummary: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   leftToSpendByScope: Record<BudgetScope, number>;
+  balanceByScope?: Record<BudgetScope, number>;
   readyToAssignByScope: Record<BudgetScope, number>;
   budgetScope: BudgetScope;
   onBudgetScopeChange: (scope: BudgetScope) => void;
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
   planDone?: boolean;
-  showCategories: boolean;
-  onShowCategoriesChange: (v: boolean) => void;
   transactions?: Transaction[];
   pendingItems?: PendingItem[];
 };
@@ -44,19 +43,19 @@ export function HomeScreen({
   onOpenAdd,
   onOpenPlan,
   onOpenRebalance,
+  onOpenBudgetTab,
   onFundCategory,
   onOpenHistory,
   monthlySummary,
   walletSummaries,
   leftToSpendByScope,
+  balanceByScope,
   readyToAssignByScope,
   budgetScope,
   onBudgetScopeChange,
   homeMonth,
   onHomeMonthChange,
   planDone,
-  showCategories,
-  onShowCategoriesChange,
   transactions,
   pendingItems,
 }: HomeScreenProps) {
@@ -150,21 +149,6 @@ export function HomeScreen({
   };
 
 
-  if (showCategories) {
-    return (
-      <CategoriesScreen
-        categories={visibleCategories}
-        monthlySummary={monthlySummary}
-        homeMonth={homeMonth}
-        selectedCategoryId={selectedCategoryId}
-        onSelectCategory={onSelectCategory}
-        onOpenCategoryDetails={onOpenCategoryDetails}
-        onOpenRebalance={onOpenRebalance}
-        onBack={() => onShowCategoriesChange(false)}
-      />
-    );
-  }
-
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
 
@@ -176,6 +160,7 @@ export function HomeScreen({
           monthlySummary={monthlySummary}
           walletSummaries={walletSummaries}
           leftToSpendByScope={leftToSpendByScope}
+          balanceByScope={balanceByScope}
         />
       </div>
 
@@ -222,14 +207,16 @@ export function HomeScreen({
           <section aria-label="Categories needing attention" style={{ minWidth: 0 }}>
             <div style={sectionHeaderStyle}>
               <span style={sectionLabelStyle}>Needs attention</span>
-              <button
-                type="button"
-                onClick={() => onShowCategoriesChange(true)}
-                style={seeAllBtnStyle}
-                aria-label="View all categories"
-              >
-                All categories <ChevronRightIcon size={12} style={{ verticalAlign: "middle" }} />
-              </button>
+              {onOpenBudgetTab && (
+                <button
+                  type="button"
+                  onClick={onOpenBudgetTab}
+                  style={seeAllBtnStyle}
+                  aria-label="View all categories"
+                >
+                  All categories <ChevronRightIcon size={12} style={{ verticalAlign: "middle" }} />
+                </button>
+              )}
             </div>
 
             <div className="home-scroll-rail" style={cardsRailStyle}>
