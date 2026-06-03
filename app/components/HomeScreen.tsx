@@ -179,6 +179,11 @@ export function HomeScreen({
           <span style={assignCopyStyle}>
             <span style={assignTitleStyle}>{planningPromptTitle}</span>
             <span style={assignFreeStyle}>{planningPromptMeta}</span>
+            {budgetScope === "joint" && (
+              <span style={assignJointHintStyle}>
+                👨 {fmt(readyToAssignByScope["anas"])} + 👩 {fmt(readyToAssignByScope["salma"])} from personal accounts
+              </span>
+            )}
           </span>
           <span style={assignRightStyle}>
             <span style={assignAmountStyle}>{fmt(readyToAssign)} MAD</span>
@@ -567,6 +572,14 @@ const assignFreeStyle: CSSProperties = {
   fontWeight: 400,
   color: "color-mix(in srgb, var(--accent-ink) 60%, transparent)",
   textAlign: "left",
+};
+
+const assignJointHintStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 500,
+  color: "color-mix(in srgb, var(--accent-ink) 45%, transparent)",
+  textAlign: "left",
+  letterSpacing: 0.1,
 };
 
 const assignActionVisibleStyle: CSSProperties = {

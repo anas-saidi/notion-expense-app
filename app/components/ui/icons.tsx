@@ -15,6 +15,7 @@ import {
   Clock,
   List,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   ArrowDown,
   ArrowLeft,
@@ -50,6 +51,7 @@ export const HomeIcon         = (p: LucideProps) => <Home          size={S} {...
 export const ClockIcon        = (p: LucideProps) => <Clock         size={S} {...p} />;
 export const ListIcon         = (p: LucideProps) => <List          size={S} {...p} />;
 export const ChevronRightIcon = (p: LucideProps) => <ChevronRight  size={S} {...p} />;
+export const ChevronLeftIcon  = (p: LucideProps) => <ChevronLeft   size={S} {...p} />;
 export const ChevronDownIcon  = (p: LucideProps) => <ChevronDown   size={S} {...p} />;
 export const ArrowDownIcon    = (p: LucideProps) => <ArrowDown      size={S} {...p} />;
 export const ArrowLeftIcon    = (p: LucideProps) => <ArrowLeft      size={S} {...p} />;
