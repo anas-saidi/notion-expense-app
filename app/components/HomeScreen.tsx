@@ -3,7 +3,7 @@ import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } 
 import { WalletCardSwitcher } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { ChevronRightIcon } from "./ui/icons";
-import { fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 
 type HomeScreenProps = {
   categories: Category[];
@@ -116,6 +116,14 @@ export function HomeScreen({
   const recentTxns = useMemo(() => (transactions ?? []).slice(0, 5), [transactions]);
 
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
+  const showPlanningPrompt = isCurrentMonth && readyToAssign > 0;
+  const monthLabel = monthShortLabel(homeMonth);
+  const hasMonthPlan = monthlySummary.totalAssigned > 0;
+  const planningPromptTitle = hasMonthPlan
+    ? `${monthLabel} has money left`
+    : `${monthLabel} is ready to plan`;
+  const planningPromptMeta = `${BUDGET_SCOPE_LABELS[budgetScope]} monthly budget`;
+  const planningPromptAction = hasMonthPlan ? "Continue" : "Plan now";
 
   const storageKey = `dismissed-attention-${homeMonth}-${budgetScope}`;
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
@@ -166,11 +174,16 @@ export function HomeScreen({
 
 
       {/* Zone 2: Ready to assign */}
-      {readyToAssign > 0 && (
+      {showPlanningPrompt && (
         <button type="button" onClick={onOpenPlan} style={assignRowStyle}>
-          <span style={assignAmountStyle}>{fmt(readyToAssign)} MAD</span>
-          <span style={assignFreeStyle}>free</span>
-          <span style={assignActionStyle}>Budget now →</span>
+          <span style={assignCopyStyle}>
+            <span style={assignTitleStyle}>{planningPromptTitle}</span>
+            <span style={assignFreeStyle}>{planningPromptMeta}</span>
+          </span>
+          <span style={assignRightStyle}>
+            <span style={assignAmountStyle}>{fmt(readyToAssign)} MAD</span>
+            <span style={assignActionVisibleStyle}>{planningPromptAction} -&gt;</span>
+          </span>
         </button>
       )}
 
@@ -362,6 +375,10 @@ export function HomeScreen({
   );
 }
 
+function monthShortLabel(ym: string): string {
+  return new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${ym}-01`));
+}
+
 /* ─── Styles ──────────────────────────────────────────────────── */
 
 const walletSwitcherWrapStyle: CSSProperties = {
@@ -505,7 +522,7 @@ const assignRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 6,
+  gap: 12,
   width: "100%",
   padding: "14px 16px",
   borderRadius: 14,
@@ -515,6 +532,30 @@ const assignRowStyle: CSSProperties = {
   marginBottom: 16,
 };
 
+const assignCopyStyle: CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gap: 3,
+  textAlign: "left",
+};
+
+const assignTitleStyle: CSSProperties = {
+  minWidth: 0,
+  fontSize: 13,
+  fontWeight: 700,
+  color: "var(--accent-ink)",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
+const assignRightStyle: CSSProperties = {
+  flexShrink: 0,
+  display: "grid",
+  justifyItems: "end",
+  gap: 3,
+};
+
 const assignAmountStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
@@ -522,14 +563,13 @@ const assignAmountStyle: CSSProperties = {
 };
 
 const assignFreeStyle: CSSProperties = {
-  flex: 1,
   fontSize: 13,
   fontWeight: 400,
   color: "color-mix(in srgb, var(--accent-ink) 60%, transparent)",
   textAlign: "left",
 };
 
-const assignActionStyle: CSSProperties = {
+const assignActionVisibleStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 500,
   color: "color-mix(in srgb, var(--accent-ink) 50%, transparent)",

@@ -615,6 +615,11 @@ export default function App() {
     if (message) showToast(message, 1500);
   };
 
+  const openMonthlyPlan = () => {
+    setPlannerMonth(homeMonth);
+    setTab("plan");
+  };
+
   const reviveCategory = async (category: Category) => {
     try {
       const res = await fetch("/api/categories", {
@@ -896,7 +901,7 @@ export default function App() {
             setEditingTransactionId(null);
             setShowAddModal(true);
           }}
-          onOpenPlan={() => setTab("plan")}
+          onOpenPlan={openMonthlyPlan}
           onOpenRebalance={() => setShowRebalance(true)}
           onOpenBudgetTab={() => setTab("budget")}
           onFundCategory={openFundCategory}
@@ -921,7 +926,10 @@ export default function App() {
         selectedMonth={plannerMonth}
         onSelectedMonthChange={setPlannerMonth}
         onCancel={() => setTab("home")}
-        onComplete={() => setPlanCompletedMonth(plannerMonth)}
+        onComplete={() => {
+          setPlanCompletedMonth(plannerMonth);
+          refreshBudgetData("Plan saved");
+        }}
         onOpenAddTransaction={({ accountId: nextAccountId, amount: nextAmount, name: nextName }) => {
           setEditingTransactionId(null);
           setAccountId(nextAccountId);
@@ -932,6 +940,8 @@ export default function App() {
         }}
         accounts={accounts}
         categories={categories}
+        budgetScope={budgetScope}
+        availablePool={readyToAssignByScope[budgetScope] ?? 0}
         assignedByCategory={plannerMonthlySummary?.assignedByCategory ?? []}
         isUsingFallbackData={plannerUsesFallbackData}
       />}

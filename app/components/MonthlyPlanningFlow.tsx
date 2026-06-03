@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
-import type { Account, Category, MonthlyCategoryTotal, PlanningAllocationItem } from "./app-types";
+import type { Account, BudgetScope, Category, MonthlyCategoryTotal, PlanningAllocationItem } from "./app-types";
+import { BUDGET_SCOPE_LABELS, categoryMatchesScope } from "./app-utils";
 
 type MonthlyPlanningFlowProps = {
   open: boolean;
@@ -14,6 +15,8 @@ type MonthlyPlanningFlowProps = {
   accounts: Account[];
   categories: Category[];
   assignedByCategory?: MonthlyCategoryTotal[];
+  budgetScope?: BudgetScope;
+  availablePool?: number;
   isUsingFallbackData: boolean;
 };
 
@@ -38,6 +41,8 @@ export function MonthlyPlanningFlow({
   accounts,
   categories,
   assignedByCategory = [],
+  budgetScope = "joint",
+  availablePool,
   isUsingFallbackData,
 }: MonthlyPlanningFlowProps) {
   const [householdItems, setHouseholdItems] = useState<PlanningAllocationItem[]>([]);
@@ -48,6 +53,7 @@ export function MonthlyPlanningFlow({
   useEffect(() => {
     const plannedByCategory = new Map(assignedByCategory.map((item) => [item.categoryId, item.total]));
     const resolvePlannedAmount = (category: Category) => (plannedByCategory.has(category.id) ? plannedByCategory.get(category.id) ?? 0 : 0);
+    const scopedCategories = categories.filter((category) => categoryMatchesScope(category, budgetScope));
 
     const savingsTypeHints = ["saving", "savings", "sinking", "goal", "fund"];
     const isHouseholdCategory = (category: Category) => {
@@ -65,11 +71,11 @@ export function MonthlyPlanningFlow({
       return types.some((value) => savingsTypeHints.some((hint) => value.includes(hint)));
     };
 
-    const savingsCategories = categories.filter(isSavingsCategory);
-    const householdCategories = categories.filter(isHouseholdCategory);
-    const wifeCategories = categories.filter((category) => !isHouseholdCategory(category) && isWifeCategory(category));
-    const husbandCategories = categories.filter((category) => !isHouseholdCategory(category) && isHusbandCategory(category));
-    const fallbackHouseholdCategories = categories.filter(
+    const savingsCategories = scopedCategories.filter(isSavingsCategory);
+    const householdCategories = scopedCategories.filter(isHouseholdCategory);
+    const wifeCategories = scopedCategories.filter((category) => !isHouseholdCategory(category) && isWifeCategory(category));
+    const husbandCategories = scopedCategories.filter((category) => !isHouseholdCategory(category) && isHusbandCategory(category));
+    const fallbackHouseholdCategories = scopedCategories.filter(
       (category) => !isHouseholdCategory(category) && !isSavingsCategory(category) && !isWifeCategory(category) && !isHusbandCategory(category),
     );
 
@@ -78,14 +84,22 @@ export function MonthlyPlanningFlow({
     setWifeItems(wifeCategories.map(toItem));
     setHusbandItems(husbandCategories.map(toItem));
     setSavingsItems(savingsCategories.map(toItem));
-  }, [categories, assignedByCategory]);
+  }, [categories, assignedByCategory, budgetScope]);
 
-  const groups: AllocationGroup[] = [
+  const allItems = [...householdItems, ...wifeItems, ...husbandItems, ...savingsItems];
+  const existingScopeAssignments = allItems.reduce((sum, item) => sum + item.amount, 0);
+  const scopedPool = typeof availablePool === "number" ? availablePool + existingScopeAssignments : undefined;
+  const scopeLabel = BUDGET_SCOPE_LABELS[budgetScope];
+
+  const plannedGroups: AllocationGroup[] = [
     { key: "household", label: "Joint", items: householdItems, onChange: setHouseholdItems },
     { key: "wife", label: "Salma", items: wifeItems, onChange: setWifeItems },
     { key: "husband", label: "Anas", items: husbandItems, onChange: setHusbandItems },
     { key: "savings", label: "Savings", items: savingsItems, onChange: setSavingsItems },
-  ];
+  ].filter((group) => group.items.length > 0);
+  const groups: AllocationGroup[] = plannedGroups.length
+    ? plannedGroups
+    : [{ key: budgetScope, label: scopeLabel, items: [], onChange: () => undefined }];
 
   return (
     <AllocationFlow
@@ -96,6 +110,10 @@ export function MonthlyPlanningFlow({
       onComplete={onComplete}
       accounts={accounts}
       groups={groups}
+      poolOverride={scopedPool}
+      poolLabel={`${scopeLabel} pool`}
+      title={`Plan ${scopeLabel}`}
+      saveButtonLabel="Save plan"
       isUsingFallbackData={isUsingFallbackData}
       onSave={async ({ month, budgetItems, savingsItems, snapshot }) => {
         const response = await fetch("/api/monthly-planning/save", {
