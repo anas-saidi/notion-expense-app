@@ -36,6 +36,7 @@ export function PickerPopover({
       return;
     }
 
+    let frameId: number | null = null;
     const updatePosition = () => {
       if (!anchorRef.current || !popoverRef.current) return;
 
@@ -69,14 +70,23 @@ export function PickerPopover({
         visibility: "visible",
       });
     };
+    const scheduleUpdate = () => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(updatePosition);
+    };
 
     updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(popoverRef.current);
+    resizeObserver.observe(anchorRef.current);
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("scroll", scheduleUpdate, true);
 
     return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("scroll", scheduleUpdate, true);
     };
   }, [align, anchorRef, open, placement]);
 
