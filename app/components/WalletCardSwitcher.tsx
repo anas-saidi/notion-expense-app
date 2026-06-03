@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
 import { fmt } from "./app-utils";
 
@@ -75,9 +75,32 @@ const getProgress = (available: number | null, planned: number | null) => {
 };
 
 
+type JointView = "balance" | "budgeted" | "spent";
+const JOINT_VIEWS: JointView[] = ["balance", "budgeted", "spent"];
+const JOINT_VIEW_LABEL: Record<JointView, string> = {
+  balance:  "balance",
+  budgeted: "budgeted",
+  spent:    "spent",
+};
+// Each view gets its own accent so the number feels distinct at a glance
+const JOINT_VIEW_COLOR: Record<JointView, string> = {
+  balance:  "var(--accent-ink)",           // default — white/ink on green
+  budgeted: "color-mix(in srgb, var(--accent-ink) 80%, #a8d8ff)",  // cool blue tint
+  spent:    "color-mix(in srgb, var(--accent-ink) 80%, #ffd6a5)",  // warm amber tint
+};
+const JOINT_VIEW_DOT: Record<JointView, string> = {
+  balance:  "color-mix(in srgb, var(--accent-ink) 70%, transparent)",
+  budgeted: "color-mix(in srgb, #a8d8ff 90%, var(--accent-ink))",
+  spent:    "color-mix(in srgb, #ffd6a5 90%, var(--accent-ink))",
+};
+
 export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope }: WalletCardSwitcherProps) {
   const [hovered, setHovered]   = useState<BudgetScope | null>(null);
   const [pressed, setPressed]   = useState<BudgetScope | null>(null);
+  const [jointView, setJointView] = useState<JointView>("balance");
+
+  // Reset cycling when switching scopes
+  useEffect(() => { setJointView("balance"); }, [value]);
 
   const currentSummary = monthlySummary ?? walletSummaries?.[value];
   // Hero number: real account balance by scope (from Notion accounts database)
@@ -89,6 +112,25 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
   const status    = getStatus(balance, planned, value);
   const isOver    = balance !== null && balance < 0;
   const hasPlan   = planned !== null && planned > 0;
+
+  const cycleJointView = () => {
+    setJointView(v => {
+      const idx = JOINT_VIEWS.indexOf(v);
+      return JOINT_VIEWS[(idx + 1) % JOINT_VIEWS.length];
+    });
+  };
+
+  // What to show in the hero number when joint
+  const jointSummary = walletSummaries?.joint;
+  const heroNumber = value === "joint"
+    ? jointView === "budgeted" ? (planned ?? 0)
+    : jointView === "spent"    ? (jointSummary?.totalSpent ?? 0)
+    : Math.abs(balance ?? available ?? 0)
+    : Math.abs(balance ?? available ?? 0);
+
+  const heroUnit = value === "joint"
+    ? (isOver && jointView === "balance") ? "over" : JOINT_VIEW_LABEL[jointView]
+    : isOver ? "over" : "balance";
 
   return (
     <section
@@ -143,18 +185,38 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
       {/* Hero */}
       <div style={heroStyle} key={value}>
 
-        {/* Status + number */}
-        <div style={numberGroupStyle}>
-          <span style={statusStyle(status)}>{status}</span>
-          <div style={amountRowStyle}>
-            <span style={bigNumberStyle(isOver)}>
-              {fmt(Math.abs(balance ?? available ?? 0))}
-            </span>
-            <span style={unitStyle(isOver)}>
-              MAD {isOver ? "over" : "balance"}
-            </span>
+        {/* Status + number — tappable only on joint */}
+        {value === "joint" ? (
+          <button
+            type="button"
+            onClick={cycleJointView}
+            style={numberGroupButtonStyle}
+            aria-label={`Showing ${jointView}. Tap to cycle`}
+          >
+            <span style={statusStyle(status)}>{status}</span>
+            <div style={amountRowStyle}>
+              <span style={{ ...bigNumberStyle(isOver && jointView === "balance"), color: JOINT_VIEW_COLOR[jointView], transition: "color 0.3s ease" }}>
+                {fmt(heroNumber)}
+              </span>
+              <span style={{ ...unitStyle(isOver && jointView === "balance"), color: `color-mix(in srgb, ${JOINT_VIEW_COLOR[jointView]} 60%, transparent)`, transition: "color 0.3s ease" }}>
+                MAD {heroUnit}
+              </span>
+            </div>
+            <div style={jointDotsStyle} aria-hidden="true">
+              {JOINT_VIEWS.map(v => (
+                <div key={v} style={jointDotStyle(v === jointView, JOINT_VIEW_DOT[v])} />
+              ))}
+            </div>
+          </button>
+        ) : (
+          <div style={numberGroupStyle}>
+            <span style={statusStyle(status)}>{status}</span>
+            <div style={amountRowStyle}>
+              <span style={bigNumberStyle(isOver)}>{fmt(Math.abs(balance ?? available ?? 0))}</span>
+              <span style={unitStyle(isOver)}>MAD {isOver ? "over" : "balance"}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Progress bar + caption */}
         {(() => {
@@ -206,6 +268,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
             </div>
           );
         })()}
+
 
       </div>
 
@@ -353,5 +416,31 @@ const captionDimStyle: CSSProperties = {
   color: "var(--muted)",
 };
 
+/* Joint cycling */
 
+const numberGroupButtonStyle: CSSProperties = {
+  display: "grid",
+  gap: 5,
+  background: "transparent",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
+  textAlign: "left",
+};
 
+const jointDotsStyle: CSSProperties = {
+  display: "flex",
+  gap: 5,
+  paddingTop: 2,
+};
+
+const jointDotStyle = (active: boolean, color: string): CSSProperties => ({
+  width: active ? 14 : 4,
+  height: 4,
+  borderRadius: 999,
+  background: active
+    ? color
+    : "color-mix(in srgb, var(--accent-ink) 20%, transparent)",
+  transition: "width 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease",
+  flexShrink: 0,
+});

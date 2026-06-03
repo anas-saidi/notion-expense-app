@@ -183,58 +183,63 @@ export function InsightsScreen({
     return { spentPct, expectedPct, isAhead, isOver, gapPct, daysLeft, vsLastMonth };
   }, [insightsMonth, totalSpent, totalPlanned, lastMonthTotalSpent, currentMonthStr]);
 
-  /* ── 2. Category Surprise ──────────────────────────────────────── */
-  const categorySurprise = useMemo(() => {
-    const candidates = categories
-      .filter(c => categoryMatchesScope(c, budgetScope) && (c.lastMonthSpent ?? 0) > 50)
-      .map(c => {
-        const curr = spentByCatId.get(c.id) ?? 0;
-        const last = c.lastMonthSpent ?? 0;
-        const pct  = ((curr - last) / last) * 100;
-        return { cat: c, curr, last, pct };
-      })
-      .filter(s => Math.abs(s.pct) >= 20)
-      .sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
-    return candidates[0] ?? null;
-  }, [categories, budgetScope, spentByCatId]);
 
   /* ── 3. Together vs. Apart ─────────────────────────────────────── */
   const splitData = useMemo(() => {
-    const byId = new Map(accounts.map(a => [a.id, a]));
-    let anasTotal = 0, salmaTotal = 0, sharedTotal = 0;
+    const acctLabel = (id: string | null | undefined) =>
+      id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
+
+    // Personal accounts
+    const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
+    const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
+
+    // Planned contribution = contribution fraction (0.0–1.0) × joint total planned
+    const anasContribPct  = anasAcc?.contributionPercent  ?? null;
+    const salmaContribPct = salmaAcc?.contributionPercent ?? null;
+    const anasPlan  = anasContribPct  != null ? anasContribPct  * totalPlanned : 0;
+    const salmaPlan = salmaContribPct != null ? salmaContribPct * totalPlanned : 0;
+
+    // Actual: pocket spend + transfers to joint categories
+    let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
     for (const t of expenses) {
-      const label = (t.accountId ? (byId.get(t.accountId)?.label ?? "") : "").toLowerCase();
-      if (label.includes("hubb")) anasTotal += t.amount;
-      else if (label.includes("wife")) salmaTotal += t.amount;
-      else sharedTotal += t.amount;
+      const label = acctLabel(t.accountId);
+      if (label.includes("hubb")) anasPocket += t.amount;
+      else if (label.includes("wife")) salmaPocket += t.amount;
+      else sharedSpend += t.amount;
     }
-    const total = anasTotal + salmaTotal + sharedTotal;
-    const personalTotal = anasTotal + salmaTotal;
 
-    // Actual split %
-    const anasActualPct  = personalTotal > 0 ? (anasTotal  / personalTotal) * 100 : 0;
-    const salmaActualPct = personalTotal > 0 ? (salmaTotal / personalTotal) * 100 : 0;
-
-    // Planned split % from assignedByCategory (account-based, same as totalPlanned)
-    let anasPlanTotal = 0, salmaPlanTotal = 0;
-    if (assignedByCategory) {
-      for (const entry of assignedByCategory) {
-        const label = (entry.accountId ? (accounts.find(a => a.id === entry.accountId)?.label ?? "") : "").toLowerCase();
-        if (label.includes("saving")) continue;
-        if (label.includes("hubb")) anasPlanTotal += entry.total;
-        else if (label.includes("wife")) salmaPlanTotal += entry.total;
-      }
+    // Add transfers from personal accounts into joint account
+    const joinedAccId = accounts.find(a => a.label.toLowerCase().includes("joined"))?.id;
+    let anasFunded = 0, salmaFunded = 0;
+    for (const t of transactions) {
+      if (t.type !== "Transfer") continue;
+      // Must be going into the joined account
+      if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
+      const fromLabel = acctLabel(t.fromAccountId);
+      if (fromLabel.includes("hubb"))       anasFunded  += t.amount;
+      else if (fromLabel.includes("wife"))  salmaFunded += t.amount;
     }
-    const personalPlanTotal = anasPlanTotal + salmaPlanTotal;
-    const anasPlanPct  = personalPlanTotal > 0 ? (anasPlanTotal  / personalPlanTotal) * 100 : null;
-    const salmaPlanPct = personalPlanTotal > 0 ? (salmaPlanTotal / personalPlanTotal) * 100 : null;
 
-    // Delta in percentage points: actual % − planned %
-    const anasDeltaPp  = (anasPlanPct  !== null && personalTotal > 0) ? anasActualPct  - anasPlanPct  : null;
-    const salmaDeltaPp = (salmaPlanPct !== null && personalTotal > 0) ? salmaActualPct - salmaPlanPct : null;
+    const anasActual  = anasPocket + anasFunded;
+    const salmaActual = salmaPocket + salmaFunded;
 
-    return { anasTotal, salmaTotal, sharedTotal, total, anasActualPct, salmaActualPct, anasPlanPct, salmaPlanPct, anasDeltaPp, salmaDeltaPp };
-  }, [expenses, accounts, assignedByCategory]);
+    // Progress % (capped at 100 for the bar)
+    const anasPct  = anasPlan  > 0 ? Math.min(100, (anasActual  / anasPlan)  * 100) : null;
+    const salmaPct = salmaPlan > 0 ? Math.min(100, (salmaActual / salmaPlan) * 100) : null;
+
+    // Delta: positive = over-contributed, negative = short
+    const anasDelta  = anasPlan  > 0 ? anasActual  - anasPlan  : null;
+    const salmaDelta = salmaPlan > 0 ? salmaActual - salmaPlan : null;
+
+    return {
+      anasActual, salmaActual, sharedSpend,
+      anasPlan, salmaPlan,
+      anasPct, salmaPct,
+      anasDelta, salmaDelta,
+      anasContribPct, salmaContribPct,
+      hasPlan: totalPlanned > 0,
+    };
+  }, [expenses, transactions, accounts, categories, totalPlanned]);
 
   /* ── 4. Spending Breakdown (donut) ────────────────────────────── */
   const donutData = useMemo(() => {
@@ -347,14 +352,6 @@ export function InsightsScreen({
         {assignedByCategory === null || transactionsLoading
           ? <BurnRateSkeleton />
           : <BurnRateBody burnRate={burnRate} totalSpent={totalSpent} totalPlanned={totalPlanned} lastMonthTotalSpent={lastMonthTotalSpent} />
-        }
-      </InsightCard>
-
-      {/* ── 2. Category Surprise ── */}
-      <InsightCard emoji="📈" title="Category Surprise" subtitle="What jumped this month?">
-        {transactionsLoading
-          ? <CategorySurpriseSkeleton />
-          : <CategorySurpriseBody surprise={categorySurprise} />
         }
       </InsightCard>
 
@@ -482,31 +479,6 @@ function BurnRateSkeleton() {
   );
 }
 
-/* ─── 2. Category Surprise skeleton ─────────────────────────────── */
-
-function CategorySurpriseSkeleton() {
-  return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div className="skeleton" style={{ width: 22, height: 22, borderRadius: 6 }} />
-        <div className="skeleton" style={{ width: 100, height: 14, borderRadius: 4 }} />
-        <div className="skeleton" style={{ width: 44, height: 20, borderRadius: 8, marginLeft: "auto" }} />
-      </div>
-      <div style={{ display: "grid", gap: 10 }}>
-        {[1, 2].map(i => (
-          <div key={i} style={{ display: "grid", gap: 5 }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <div className="skeleton" style={{ width: 70, height: 11, borderRadius: 4 }} />
-              <div className="skeleton" style={{ width: 60, height: 11, borderRadius: 4 }} />
-            </div>
-            <div className="skeleton" style={{ width: `${i === 1 ? 55 : 80}%`, height: 8, borderRadius: 999 }} />
-          </div>
-        ))}
-      </div>
-      <div className="skeleton" style={{ width: "75%", height: 12, borderRadius: 4 }} />
-    </div>
-  );
-}
 
 /* ─── 3. Together vs. Apart skeleton ────────────────────────────── */
 
@@ -640,95 +612,52 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent 
   );
 }
 
-/* ─── 2. Category Surprise body ──────────────────────────────────── */
-
-function CategorySurpriseBody({ surprise }: {
-  surprise: { cat: Category; curr: number; last: number; pct: number } | null;
-}) {
-  if (!surprise) {
-    return <p style={emptyBodyStyle}>No notable changes vs. last month.</p>;
-  }
-  const { cat, curr, last, pct } = surprise;
-  const isUp = pct > 0;
-  const maxVal = Math.max(curr, last, 1);
-  const copy = isUp
-    ? `${cat.name} is up ${Math.round(Math.abs(pct))}% vs. last month.`
-    : `${cat.name} is down ${Math.round(Math.abs(pct))}% vs. last month. Nice.`;
-
-  return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
-        <span style={surpriseCatNameStyle}>{cat.name}</span>
-        <span style={surpriseBadgeStyle(isUp)}>{isUp ? "+" : ""}{Math.round(pct)}%</span>
-      </div>
-
-      <div style={{ display: "grid", gap: 10 }}>
-        {[{ label: "Last month", value: last, color: "var(--surface2)" as string },
-          { label: "This month", value: curr, color: (isUp ? "var(--warning)" : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)") as string },
-        ].map(({ label, value, color }) => (
-          <div key={label}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-              <span style={compareLabelStyle}>{label}</span>
-              <span style={compareAmtStyle}>{fmt(value)} MAD</span>
-            </div>
-            <div style={compareRailStyle}>
-              <div style={{ height: "100%", borderRadius: 999, background: color, width: `${(value / maxVal) * 100}%`, transition: "width 0.6s cubic-bezier(0.22,1,0.36,1)" }} />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <p style={copySentenceStyle}>{copy}</p>
-    </div>
-  );
-}
 
 /* ─── 3. Together vs. Apart body ─────────────────────────────────── */
 
 function TogetherApartBody({ data }: {
   data: {
-    anasTotal: number; salmaTotal: number; sharedTotal: number; total: number;
-    anasActualPct: number; salmaActualPct: number;
-    anasPlanPct: number | null; salmaPlanPct: number | null;
-    anasDeltaPp: number | null; salmaDeltaPp: number | null;
+    anasActual: number; salmaActual: number; sharedSpend: number;
+    anasPlan: number; salmaPlan: number;
+    anasPct: number | null; salmaPct: number | null;
+    anasDelta: number | null; salmaDelta: number | null;
+    anasContribPct: number | null; salmaContribPct: number | null;
+    hasPlan: boolean;
   };
 }) {
-  const { anasTotal, salmaTotal, sharedTotal, total, anasActualPct, salmaActualPct, anasPlanPct, salmaPlanPct, anasDeltaPp, salmaDeltaPp } = data;
+  const { anasActual, salmaActual, sharedSpend, anasPlan, salmaPlan, anasPct, salmaPct, anasDelta, salmaDelta, anasContribPct, salmaContribPct, hasPlan } = data;
 
-  if (total === 0) return <p style={emptyBodyStyle}>No expenses recorded this month.</p>;
-
-  const hasPlan = anasPlanPct !== null && salmaPlanPct !== null;
+  const hasAnyData = anasActual > 0 || salmaActual > 0 || sharedSpend > 0;
+  if (!hasAnyData) return <p style={emptyBodyStyle}>No expenses recorded this month.</p>;
 
   const copy = !hasPlan
-    ? "Tracking individual spending patterns."
-    : anasDeltaPp !== null && Math.abs(anasDeltaPp) <= 3
-    ? `On plan — Anas ${Math.round(anasActualPct)}% / Salma ${Math.round(salmaActualPct)}%. Solid balance.`
-    : anasDeltaPp !== null && anasDeltaPp > 3
-    ? `Anas carried ${Math.round(anasActualPct)}% this month, ${Math.round(Math.abs(anasDeltaPp))}pp above the ${Math.round(anasPlanPct!)}% target.`
-    : `Salma carried ${Math.round(salmaActualPct)}% this month, ${Math.round(Math.abs(salmaDeltaPp ?? 0))}pp above the ${Math.round(salmaPlanPct!)}% target.`;
+    ? "No contribution plan set — showing pocket spend only."
+    : anasDelta !== null && salmaDelta !== null && Math.abs(anasDelta) < 50 && Math.abs(salmaDelta) < 50
+    ? "Both on track with their planned contributions this month."
+    : anasDelta !== null && anasDelta < -50
+    ? `Anas is ${fmt(Math.abs(anasDelta))} MAD short of his ${anasContribPct != null ? Math.round(anasContribPct * 100) : "?"}% target.`
+    : salmaDelta !== null && salmaDelta < -50
+    ? `Salma is ${fmt(Math.abs(salmaDelta))} MAD short of her ${salmaContribPct != null ? Math.round(salmaContribPct * 100) : "?"}% target.`
+    : "Contributions are on track.";
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <PersonBlock name="Anas"  amount={anasTotal}  actualPct={anasActualPct}  color="var(--partner-husband)" />
-        <PersonBlock name="Salma" amount={salmaTotal} actualPct={salmaActualPct} color="var(--partner-wife)" />
+        <ContribBlock
+          name="Anas" actual={anasActual} plan={anasPlan} pct={anasPct}
+          delta={anasDelta} color="var(--partner-husband)"
+        />
+        <ContribBlock
+          name="Salma" actual={salmaActual} plan={salmaPlan} pct={salmaPct}
+          delta={salmaDelta} color="var(--partner-wife)"
+        />
       </div>
 
-      {sharedTotal > 0 && (
+      {sharedSpend > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--muted)", opacity: 0.5, flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: "var(--muted)", flex: 1 }}>Shared</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{fmt(sharedTotal)} MAD</span>
-        </div>
-      )}
-
-      {hasPlan && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10, color: "var(--muted)" }}>Target</span>
-          <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>Anas {Math.round(anasPlanPct!)}%</span>
-          <span style={{ fontSize: 10, color: "var(--border2)" }}>·</span>
-          <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>Salma {Math.round(salmaPlanPct!)}%</span>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--muted)", opacity: 0.4, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: "var(--muted)", flex: 1 }}>Spent from shared pot</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{fmt(sharedSpend)} MAD</span>
         </div>
       )}
 
@@ -737,9 +666,14 @@ function TogetherApartBody({ data }: {
   );
 }
 
-function PersonBlock({ name, amount, actualPct, color }: {
-  name: string; amount: number; actualPct: number; color: string;
+function ContribBlock({ name, actual, plan, pct, delta, color }: {
+  name: string; actual: number; plan: number; pct: number | null;
+  delta: number | null; color: string;
 }) {
+  const isShort = delta !== null && delta < -50;
+  const isOver  = delta !== null && delta > 50;
+  const deltaColor = isShort ? "var(--danger)" : isOver ? "var(--success)" : "var(--muted)";
+
   return (
     <div style={{
       background: `color-mix(in srgb, ${color} 7%, var(--surface))`,
@@ -748,12 +682,30 @@ function PersonBlock({ name, amount, actualPct, color }: {
     }}>
       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase" as const, color }}>{name}</span>
       <span style={{ fontFamily: "var(--font-body)", fontSize: 22, fontWeight: 400, lineHeight: 1.1, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>
-        {fmt(amount)}
+        {fmt(actual)}
       </span>
       <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: 0.2 }}>MAD</span>
-      <span style={{ fontSize: 10, color: "var(--muted)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
-        {Math.round(actualPct)}% of spend
-      </span>
+
+      {pct !== null && (
+        <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
+          <div style={{ height: 3, borderRadius: 999, background: "var(--surface2)", overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: 999,
+              width: `${pct}%`,
+              background: isShort ? "var(--danger)" : isOver ? "var(--success)" : color,
+              transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
+            }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <span style={{ fontSize: 9, color: "var(--muted)" }}>of {fmt(plan)} planned</span>
+            {delta !== null && Math.abs(delta) > 50 && (
+              <span style={{ fontSize: 9, fontWeight: 600, color: deltaColor }}>
+                {isShort ? `−${fmt(Math.abs(delta))}` : `+${fmt(delta)}`}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -917,30 +869,6 @@ const emptyBodyStyle: CSSProperties = {
   fontSize: 13, color: "var(--muted)", padding: "4px 0",
 };
 
-/* Category Surprise */
-const surpriseCatNameStyle: CSSProperties = {
-  fontSize: 14, fontWeight: 600, color: "var(--text2)",
-  flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-};
-
-const surpriseBadgeStyle = (isUp: boolean): CSSProperties => ({
-  fontSize: 12, fontWeight: 700, flexShrink: 0,
-  color: isUp ? "var(--warning)" : "color-mix(in srgb, var(--success) 72%, var(--text2))",
-});
-
-const compareLabelStyle: CSSProperties = {
-  fontSize: 10, fontWeight: 600, letterSpacing: 0.4,
-  textTransform: "uppercase", color: "var(--muted)",
-};
-
-const compareAmtStyle: CSSProperties = {
-  fontSize: 12, fontWeight: 600, color: "var(--text2)",
-};
-
-const compareRailStyle: CSSProperties = {
-  height: 8, borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface2) 60%, transparent)", overflow: "hidden",
-};
 
 /* Donut */
 const donutCenterStyle: CSSProperties = {

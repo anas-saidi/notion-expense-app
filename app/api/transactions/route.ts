@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
 const NOTION_VERSION = "2022-06-28";
-const PROP_BUDGET_IN  = "\u{1F4B0} budget (in)";
-const PROP_BUDGET_OUT = "\u{1F4B0} budget (out)";
+const PROP_BUDGET_IN   = "\u{1F4B0} budget (in)";
+const PROP_BUDGET_OUT  = "\u{1F4B0} budget (out)";
+const PROP_ACCOUNT_IN  = "\u{1F3E6} account ( in )";
+const PROP_ACCOUNT_OUT = "\u{1F3E6} account ( out )";
 
 const notionHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
@@ -36,8 +38,10 @@ export async function GET(req: NextRequest) {
     category: page.properties.Category?.relation?.[0]?.id ?? null,
     accountId: page.properties.Account?.relation?.[0]?.id ?? null,
     type: page.properties.Type?.select?.name ?? "Expense",
-    fromCategoryId: page.properties[PROP_BUDGET_OUT]?.relation?.[0]?.id ?? null,
-    toCategoryId:   page.properties[PROP_BUDGET_IN]?.relation?.[0]?.id  ?? null,
+    fromCategoryId: page.properties[PROP_BUDGET_OUT]?.relation?.[0]?.id  ?? null,
+    toCategoryId:   page.properties[PROP_BUDGET_IN]?.relation?.[0]?.id   ?? null,
+    fromAccountId:  page.properties[PROP_ACCOUNT_OUT]?.relation?.[0]?.id ?? null,
+    toAccountId:    page.properties[PROP_ACCOUNT_IN]?.relation?.[0]?.id  ?? null,
   });
 
   try {

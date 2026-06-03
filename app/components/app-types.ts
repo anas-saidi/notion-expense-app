@@ -25,6 +25,8 @@ export type Transaction = {
   type?: "Expense" | "Income" | "Transfer";
   fromCategoryId?: string | null;
   toCategoryId?: string | null;
+  fromAccountId?: string | null;
+  toAccountId?: string | null;
 };
 
 export type Account = {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, PlusIcon, XIcon } from "./ui/icons";
+import { FundIcon, PlusIcon, XIcon, ChevronLeftIcon, ChevronRightIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -59,15 +59,22 @@ export function CategoryDetailsSheet({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CategoryActivityPayload | null>(null);
+  const [activeMonth, setActiveMonth] = useState<string>(month);
+
+  // When the sheet opens or the external month changes, reset to that month
+  useEffect(() => {
+    if (open) setActiveMonth(month);
+  }, [open, month]);
 
   useEffect(() => {
-    if (!open || !category?.id || !month) return;
+    if (!open || !category?.id || !activeMonth) return;
 
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setData(null); // clear stale data from previous category
 
-    fetch(`/api/categories/${category.id}/activity?month=${month}&limit=20`)
+    fetch(`/api/categories/${category.id}/activity?month=${activeMonth}&limit=100`)
       .then(async (res) => {
         const payload = await res.json();
         if (!res.ok) throw new Error(payload.error || "Failed to load category details");
@@ -85,7 +92,7 @@ export function CategoryDetailsSheet({
       });
 
     return () => { cancelled = true; };
-  }, [open, category?.id, month]);
+  }, [open, category?.id, activeMonth]);
 
   const details = data?.category;
 
@@ -170,7 +177,29 @@ export function CategoryDetailsSheet({
 
         {/* ── Activity ── */}
         <section style={{ display: "grid", gap: 12 }}>
-          <span style={sectionLabelStyle}>Activity</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={sectionLabelStyle}>Activity</span>
+            <div style={monthNavStyle}>
+              <button
+                type="button"
+                onClick={() => setActiveMonth(shiftMonth(activeMonth, -1))}
+                aria-label="Previous month"
+                style={monthNavBtnStyle}
+              >
+                <ChevronLeftIcon size={12} strokeWidth={2.5} />
+              </button>
+              <span style={monthNavLabelStyle}>{formatMonth(activeMonth)}</span>
+              <button
+                type="button"
+                onClick={() => setActiveMonth(shiftMonth(activeMonth, 1))}
+                aria-label="Next month"
+                disabled={activeMonth >= todayMonth()}
+                style={{ ...monthNavBtnStyle, opacity: activeMonth >= todayMonth() ? 0.3 : 1 }}
+              >
+                <ChevronRightIcon size={12} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
 
           {loading && (
             <div style={{ display: "grid", gap: 12 }}>
@@ -188,7 +217,7 @@ export function CategoryDetailsSheet({
           )}
           {error && !loading && <div style={panelMessageStyle}>{error}</div>}
           {!loading && !error && (data?.timeline?.length ?? 0) === 0 && (
-            <div style={panelMessageStyle}>No activity this month.</div>
+            <div style={panelMessageStyle}>No activity for {formatMonth(activeMonth)}.</div>
           )}
 
           {!loading && !error && (data?.timeline?.length ?? 0) > 0 && (
@@ -241,6 +270,21 @@ export function CategoryDetailsSheet({
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+function todayMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function shiftMonth(m: string, delta: number): string {
+  const [y, mo] = m.split("-").map(Number);
+  const d = new Date(y, mo - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonth(m: string): string {
+  const [y, mo] = m.split("-").map(Number);
+  return new Date(y, mo - 1, 1).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
 
 function kindTone(kind: TimelineItem["kind"]): { dot: string; amount: string } {
   if (kind === "funded") {
@@ -452,4 +496,38 @@ const metaTextStyle: CSSProperties = {
   fontSize: 11,
   color: "var(--muted)",
   letterSpacing: 0.1,
+};
+
+/* Month nav */
+
+const monthNavStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 2,
+  background: "var(--surface2)",
+  borderRadius: 10,
+  padding: "2px 4px",
+};
+
+const monthNavBtnStyle: CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: 7,
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+};
+
+const monthNavLabelStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: "var(--text2)",
+  minWidth: 68,
+  textAlign: "center",
+  letterSpacing: 0.2,
 };
