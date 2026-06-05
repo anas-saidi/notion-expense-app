@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       const currentPlanned = existing.properties.Planned?.number ?? 0;
-      const nextPlanned = shouldIncrement ? currentPlanned + planned : planned;
+      const nextPlanned = Math.max(0, shouldIncrement ? currentPlanned + planned : planned);
       const updateRes = await fetch(`https://api.notion.com/v1/pages/${existing.id}`, {
         method: "PATCH",
         headers: notionHeaders(token),

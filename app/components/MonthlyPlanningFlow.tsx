@@ -49,6 +49,10 @@ export function MonthlyPlanningFlow({
   const [wifeItems, setWifeItems] = useState<PlanningAllocationItem[]>([]);
   const [husbandItems, setHusbandItems] = useState<PlanningAllocationItem[]>([]);
   const [savingsItems, setSavingsItems] = useState<PlanningAllocationItem[]>([]);
+  // Snapshot of already-planned amounts taken at load time (never from live edits).
+  // If this were computed from the mutable items, scopedPool would grow in lockstep
+  // with user edits, keeping leftToAssign constant and making the slider unbounded.
+  const [initialAssignments, setInitialAssignments] = useState(0);
 
   useEffect(() => {
     const plannedByCategory = new Map(assignedByCategory.map((item) => [item.categoryId, item.total]));
@@ -80,22 +84,32 @@ export function MonthlyPlanningFlow({
     );
 
     const toItem = (category: Category) => toAllocationItem(category, resolvePlannedAmount(category));
-    setHouseholdItems([...householdCategories, ...fallbackHouseholdCategories].map(toItem));
-    setWifeItems(wifeCategories.map(toItem));
-    setHusbandItems(husbandCategories.map(toItem));
-    setSavingsItems(savingsCategories.map(toItem));
+    const hh = [...householdCategories, ...fallbackHouseholdCategories].map(toItem);
+    const wf = wifeCategories.map(toItem);
+    const hu = husbandCategories.map(toItem);
+    const sv = savingsCategories.map(toItem);
+
+    setHouseholdItems(hh);
+    setWifeItems(wf);
+    setHusbandItems(hu);
+    setSavingsItems(sv);
+    // Pool = readyToAssign + already-planned budget (non-savings) only.
+    // Savings is a separate commitment managed at joint level — including it here
+    // would require showing savings as editable in this flow so the user could
+    // reduce it to free up money, which creates more complexity than it's worth.
+    setInitialAssignments([...hh, ...wf, ...hu].reduce((s, i) => s + i.amount, 0));
   }, [categories, assignedByCategory, budgetScope]);
 
-  const allItems = [...householdItems, ...wifeItems, ...husbandItems, ...savingsItems];
-  const existingScopeAssignments = allItems.reduce((sum, item) => sum + item.amount, 0);
-  const scopedPool = typeof availablePool === "number" ? availablePool + existingScopeAssignments : undefined;
+  const scopedPool = typeof availablePool === "number" ? availablePool + initialAssignments : undefined;
   const scopeLabel = BUDGET_SCOPE_LABELS[budgetScope];
 
   const plannedGroups: AllocationGroup[] = [
     { key: "household", label: "Joint", items: householdItems, onChange: setHouseholdItems },
     { key: "wife", label: "Salma", items: wifeItems, onChange: setWifeItems },
     { key: "husband", label: "Anas", items: husbandItems, onChange: setHusbandItems },
-    { key: "savings", label: "Savings", items: savingsItems, onChange: setSavingsItems },
+    // Savings excluded: pool = readyToAssign + budget assignments only.
+    // Savings is managed separately at joint level (household savings funds
+    // appear in the household group via isTeamFund / household type).
   ].filter((group) => group.items.length > 0);
   const groups: AllocationGroup[] = plannedGroups.length
     ? plannedGroups

@@ -410,7 +410,6 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       title="Rebalance"
       balancedLabel="Balanced"
       saveButtonLabel="Apply"
-      requireBalanced
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}
       flowPreview={flowPreview}
@@ -419,26 +418,29 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       metaLabel="Before"
       rebalanceMode
       onSave={async () => {
-        const transfers = computeTransfers(allItems, allocations);
+        const changes = allItems.filter(
+          (f) => Math.abs((allocations[f.id] ?? f.original) - f.original) >= 1,
+        );
         await Promise.all(
-          transfers.map((t) =>
-            fetch("/api/transfer", {
+          changes.map((f) => {
+            const delta = (allocations[f.id] ?? f.original) - f.original;
+            return fetch("/api/monthly-planning/funds", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                fromCategoryId: t.fromId,
-                toCategoryId: t.toId,
-                amount: t.amount,
-                date: today(),
-                note: "Budget rebalance",
+                month: homeMonth,
+                categoryId: f.id,
+                planned: delta,
+                mode: "increment",
+                accountId: catById.get(f.id)?.defaultAccount ?? null,
               }),
             }).then(async (r) => {
               if (!r.ok) {
                 const d = await r.json();
-                throw new Error(d.error ?? "Transfer failed");
+                throw new Error(d.error ?? "Failed to update allocation");
               }
-            }),
-          ),
+            });
+          }),
         );
       }}
     />
