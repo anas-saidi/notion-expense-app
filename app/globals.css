@@ -174,49 +174,45 @@ button:not(:disabled):active {
   outline: none;
 }
 
-/* Playhead-style scrubber track — filled left, dim right */
+/* Progress bar track — fill color via --bar-color, rail via --surface2 */
 .planning-dial-range::-webkit-slider-runnable-track {
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
   background: linear-gradient(
     to right,
-    rgba(255, 255, 255, 0.95) var(--range-fill, 0%),
-    rgba(255, 255, 255, 0.32) var(--range-fill, 0%)
+    var(--bar-color, var(--accent)) var(--range-fill, 0%),
+    var(--surface2) var(--range-fill, 0%)
   );
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
 }
 
-/* Thumb — frosted-glass pill with centre grip line */
+/* Thumb — transparent, 💸 emoji provides the visual indicator */
 .planning-dial-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
-  margin-top: -11px;
+  width: 36px;
+  height: 36px;
+  margin-top: -16px;
   border-radius: 999px;
   border: 0;
   background: transparent;
   box-shadow: none;
   cursor: grab;
-  transition: height 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease;
 }
 
 .planning-dial-range:active::-webkit-slider-thumb {
-  height: 34px;
-  margin-top: -14px;
   cursor: grabbing;
-  box-shadow: none;
 }
 
 .planning-dial-range::-moz-range-track {
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.32);
+  background: var(--surface2);
 }
 
 .planning-dial-range::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   border: 0;
   background: transparent;

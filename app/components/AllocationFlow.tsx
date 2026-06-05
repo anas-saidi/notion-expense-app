@@ -171,8 +171,6 @@ export function AllocationFlow({
   const rangeMin = activeItem ? getSpentFloor(activeItem) : 0;
   const rangeMax = activeItem ? Math.max(rangeMin, activeItem.amount + Math.max(0, leftToAssign)) : 0;
   const rangeFill = rangeMax > rangeMin ? Math.max(0, Math.min(100, ((activeItem?.amount ?? 0) - rangeMin) / (rangeMax - rangeMin) * 100)) : 0;
-  const fillTick = Math.round(rangeFill * 22 / 100);
-
   const updateActiveAmount = (nextAmount: number) => {
     if (!activeItem) return;
     setHasInteracted(true);
@@ -409,46 +407,9 @@ export function AllocationFlow({
             </div>
           </div>
 
-          <section className="planning-dial-panel" aria-label="Budget control" style={dialPanelStyle(isOver, isBalanced)}>
-            <div key={`${activeItem?.categoryId ?? "empty"}-${isBalanced ? "balanced" : isOver ? "over" : "normal"}`} className="planning-dial-copy" style={dialCopyStyle}>
-              <span style={dialStatusStyle}>{isOver ? "Over" : isBalanced ? "Balanced" : rebalanceMode ? "Rebalance" : "Normal"}</span>
-              <strong style={dialTitleStyle}>
-                {isOver ? "Over budget" :
-                 isBalanced ? "Every dirham has a job" :
-                 rebalanceMode ? "Shift funds" :
-                 activeShare >= 0.28 ? "That's a lot" :
-                 activeShare <= 0.04 ? "Small but covered" :
-                 "Looks normal"}
-              </strong>
-              <span style={dialBodyStyle}>
-                {isOver ? "Reduce this category or pull from another one." :
-                 isBalanced ? (rebalanceMode ? "All funds reallocated — tap Apply to save." : "You can save the plan or fine tune a category.") :
-                 rebalanceMode ? "Drag the slider to move funds between categories." :
-                 activeShare >= 0.28 ? `Sometimes, you can spend big on ${activeItem?.name.toLowerCase() ?? "this category"}.` :
-                 "Adjust until the category feels right."}
-              </span>
-            </div>
-            <div style={rangeWrapStyle}>
-              <div style={tickRailStyle} aria-hidden="true">
-                {Array.from({ length: 23 }).map((_, index) => {
-                  const played = index <= fillTick;
-                  const isMajor = index % 5 === 0;
-                  const isMid = !isMajor && index % 2 === 0;
-                  return (
-                    <span
-                      key={index}
-                      style={{
-                        ...tickStyle,
-                        height: isMajor ? 18 : isMid ? 10 : 5,
-                        background: played ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.55)",
-                        opacity: played
-                          ? (isMajor ? 1 : isMid ? 0.84 : 0.6)
-                          : (isMajor ? 0.60 : isMid ? 0.40 : 0.20),
-                      }}
-                    />
-                  );
-                })}
-              </div>
+          <div aria-label="Budget control" style={slimBarPanelStyle}>
+            <div style={{ position: "relative" }}>
+              {/* Native range — in flow, CSS class handles track/thumb appearance */}
               <input
                 className="planning-dial-range"
                 type="range"
@@ -459,15 +420,37 @@ export function AllocationFlow({
                 disabled={readOnly}
                 onChange={(event) => updateActiveAmount(Number(event.target.value))}
                 aria-label={`Adjust planned amount for ${activeItem.name}`}
-                style={{ ...rangeStyle, "--range-fill": `${rangeFill.toFixed(1)}%`, ...(readOnly ? { opacity: 0.5 } : null) } as CSSProperties}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  "--range-fill": `${rangeFill.toFixed(1)}%`,
+                  "--bar-color": isOver ? "var(--danger)" : isBalanced ? "var(--success)" : "var(--accent)",
+                } as CSSProperties}
               />
+              {/* 💸 — painted on top (comes after input in DOM), pointer-events: none */}
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: `${rangeFill.toFixed(1)}%`,
+                  transform: "translate(-50%, -50%)",
+                  fontSize: 18,
+                  lineHeight: 1,
+                  pointerEvents: "none",
+                  userSelect: "none",
+                  transition: "left 0.06s linear",
+                }}
+              >
+                💸
+              </span>
             </div>
             {saveError && <div style={saveErrorStyle}>{saveError}</div>}
             <button type="button" onClick={savePlan} disabled={!canSave} className={isBalanced ? "planning-save--balanced" : undefined} style={{ ...saveButtonStyle, opacity: canSave ? 1 : 0.55, cursor: canSave ? "pointer" : "not-allowed" }}>
               <Save size={15} />
               {saveState === "saving" ? "Saving..." : saveButtonLabel}
             </button>
-          </section>
+          </div>
         </div>
       )}
     </>
@@ -653,12 +636,10 @@ const dialCopyStyle: CSSProperties = { display: "grid", gap: 4 };
 const dialStatusStyle: CSSProperties = { fontSize: 11, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.78 };
 const dialTitleStyle: CSSProperties = { fontSize: 15, lineHeight: 1.2, fontWeight: 850 };
 const dialBodyStyle: CSSProperties = { maxWidth: 260, fontSize: 11, lineHeight: 1.35, opacity: 0.78 };
-const rangeWrapStyle: CSSProperties = { display: "grid", gap: 11 };
-const tickRailStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", height: 22, padding: "0 4px" };
-const tickStyle: CSSProperties = { width: 2, borderRadius: 999, transition: "opacity 0.1s ease, background-color 0.1s ease" };
-const rangeStyle: CSSProperties = { width: "100%", accentColor: "white" };
-const saveErrorStyle: CSSProperties = { padding: "10px 12px", borderRadius: 14, background: "rgba(255,255,255,0.16)", color: "white", fontSize: 12, lineHeight: 1.4 };
-const saveButtonStyle: CSSProperties = { justifySelf: "end", minHeight: 48, borderRadius: 18, border: "none", background: "color-mix(in srgb, white 96%, var(--accent-ink))", color: "var(--text2)", padding: "0 16px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "0 10px 22px color-mix(in srgb, var(--ink-strong) 12%, transparent)" };
+const rangeWrapStyle: CSSProperties = { display: "grid", gap: 4 };
+const slimBarPanelStyle: CSSProperties = { display: "grid", gap: 12, padding: `16px 18px calc(16px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)" };
+const saveErrorStyle: CSSProperties = { padding: "10px 12px", borderRadius: 14, background: "color-mix(in srgb, var(--danger) 10%, transparent)", color: "var(--danger)", fontSize: 12, lineHeight: 1.4 };
+const saveButtonStyle: CSSProperties = { justifySelf: "end", minHeight: 48, borderRadius: 18, border: "none", background: "var(--accent)", color: "var(--accent-ink)", padding: "0 20px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "0 8px 20px color-mix(in srgb, var(--accent) 30%, transparent)" };
 
 // ── Chips content wrap ────────────────────────────────────────────────────────
 const chipsContentWrapStyle: CSSProperties = {
