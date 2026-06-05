@@ -74,11 +74,16 @@ export function AllocationFlow({
   rebalanceMode = false,
 }: AllocationFlowProps) {
   const monthInputRef = useRef<HTMLInputElement | null>(null);
+  // Spent-floor per category, snapshotted on first activation.
+  // Must NOT be recomputed from activeItem.amount after edits — that shifts the
+  // range input's `min` mid-drag and causes a runaway feedback loop.
+  const spentFloorRef = useRef<Record<string, number>>({});
   const [activeGroup, setActiveGroup] = useState<BudgetGroupKey>(groups[0]?.key ?? "household");
   const [activeCategoryId, setActiveCategoryId] = useState<string>(groups[0]?.items[0]?.categoryId ?? "");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState("");
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [draftValue, setDraftValue] = useState<string | null>(null);
   const wasBalancedRef = useRef(false);
   const isFirstRenderRef = useRef(true);
   const [burstKey, setBurstKey] = useState(0);
@@ -91,13 +96,19 @@ export function AllocationFlow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth, groupKeysSignal]);
 
-  // Reset interaction tracking when sheet closes
+  // Reset interaction tracking when sheet closes; also clear floor snapshots
+  // so they're re-computed fresh if the sheet re-opens with new data.
   useEffect(() => {
     if (!open) {
       setHasInteracted(false);
+      setDraftValue(null);
       isFirstRenderRef.current = true;
+      spentFloorRef.current = {};
     }
   }, [open]);
+
+  // Discard any in-progress draft when the active category changes.
+  useEffect(() => { setDraftValue(null); }, [activeCategoryId]);
 
   const monthLabel = useMemo(() => {
     if (!/^\d{4}-\d{2}$/.test(selectedMonth)) return "Selected month";
@@ -142,8 +153,22 @@ export function AllocationFlow({
   }, [isBalanced]);
   const activeShare = activeItem ? activeItem.amount / Math.max(1, availablePool) : 0;
 
+  // Stable spent floor — snapshot on first access, never recompute from the
+  // mutable activeItem.amount. Without this, dragging the slider increases
+  // `amount`, which increases `rangeMin`, which shifts the native input's `min`
+  // mid-drag, triggering another onChange → runaway feedback loop.
+  const getSpentFloor = (item: PlanningAllocationItem): number => {
+    if (spentFloorRef.current[item.categoryId] === undefined) {
+      spentFloorRef.current[item.categoryId] = Math.max(
+        0,
+        item.amount - (item.available ?? item.amount),
+      );
+    }
+    return spentFloorRef.current[item.categoryId];
+  };
+
   // Range math
-  const rangeMin = activeItem ? Math.max(0, activeItem.amount - (activeItem.available ?? activeItem.amount)) : 0;
+  const rangeMin = activeItem ? getSpentFloor(activeItem) : 0;
   const rangeMax = activeItem ? Math.max(rangeMin, activeItem.amount + Math.max(0, leftToAssign)) : 0;
   const rangeFill = rangeMax > rangeMin ? Math.max(0, Math.min(100, ((activeItem?.amount ?? 0) - rangeMin) / (rangeMax - rangeMin) * 100)) : 0;
   const fillTick = Math.round(rangeFill * 22 / 100);
@@ -151,7 +176,7 @@ export function AllocationFlow({
   const updateActiveAmount = (nextAmount: number) => {
     if (!activeItem) return;
     setHasInteracted(true);
-    const minAmount = Math.max(0, activeItem.amount - (activeItem.available ?? activeItem.amount));
+    const minAmount = getSpentFloor(activeItem);
     const maxAmount = Math.max(minAmount, activeItem.amount + Math.max(0, leftToAssign));
     const clampedAmount = Math.min(maxAmount, Math.max(minAmount, Math.round(nextAmount)));
     active.onChange(active.items.map((item) => (item.categoryId === activeItem.categoryId ? { ...item, amount: clampedAmount } : item)));
@@ -354,10 +379,24 @@ export function AllocationFlow({
                   type="text"
                   inputMode="decimal"
                   readOnly={readOnly}
-                  value={String(activeItem.amount)}
-                  onChange={(event) => {
-                    const numericValue = Number(event.target.value.replace(/[^0-9.]/g, "")) || 0;
-                    updateActiveAmount(numericValue);
+                  value={draftValue ?? String(activeItem.amount)}
+                  onFocus={() => setDraftValue(String(activeItem.amount))}
+                  onChange={(event) => setDraftValue(event.target.value)}
+                  onBlur={() => {
+                    if (draftValue !== null) {
+                      updateActiveAmount(parseFloat(draftValue.replace(/[^0-9.]/g, "")) || 0);
+                      setDraftValue(null);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      updateActiveAmount(parseFloat((draftValue ?? "").replace(/[^0-9.]/g, "")) || 0);
+                      setDraftValue(null);
+                      event.currentTarget.blur();
+                    } else if (event.key === "Escape") {
+                      setDraftValue(null);
+                      event.currentTarget.blur();
+                    }
                   }}
                   aria-label={`Planned amount for ${activeItem.name}`}
                   style={{ ...amountInputBigStyle(isOver), ...(readOnly ? { opacity: 0.7 } : null) }}
@@ -365,7 +404,7 @@ export function AllocationFlow({
               </label>
               <div style={metaRowStyle}>
                 <span>{metaLabel} <Money value={activeItem.lastMonthSpent ?? 0} /></span>
-                <span>Spent <Money value={Math.max(0, activeItem.amount - (activeItem.available ?? activeItem.amount))} /></span>
+                <span>Spent <Money value={getSpentFloor(activeItem)} /></span>
               </div>
             </div>
           </div>
