@@ -85,9 +85,12 @@ export function AllocationFlow({
   const [hasInteracted, setHasInteracted] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const wasBalancedRef = useRef(false);
   const isFirstRenderRef = useRef(true);
   const [burstKey, setBurstKey] = useState(0);
+
+  useEffect(() => { setMounted(true); }, []);
 
   // Reset active item only when the set of group keys changes (not on every amount update)
   const groupKeysSignal = useMemo(() => groups.map((g) => g.key).join(","), [groups]);
@@ -463,13 +466,14 @@ export function AllocationFlow({
   );
 
   if (mode === "screen") {
-    if (!open) return null;
-    return (
+    if (!open || !mounted) return null;
+    return createPortal(
       <div style={screenWrapStyle}>
         <div style={screenInnerStyle}>
           {innerContent}
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 

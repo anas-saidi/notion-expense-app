@@ -31,7 +31,7 @@ export function AppShell({
       <div
         id={!immersive ? "app-root-shell" : undefined}
         className={immersive ? undefined : "app-content"}
-        style={immersive ? { height: "100%" } : { height: "100%", overflowY: "auto", WebkitOverflowScrolling: "touch" as any, position: "relative" }}
+        style={immersive ? { height: "100%" } : { height: "100%", overflowY: "auto", position: "relative" }}
       >
         {!immersive && !hideHeader && onOpenManage && (
           <header style={headerStyle}>
