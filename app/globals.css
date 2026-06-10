@@ -462,8 +462,9 @@ button:hover .rebalance-btn-icon {
 }
 
 @keyframes categorySelectIn {
-  from { opacity: 0.72; transform: translateY(3px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  0%   { opacity: 0.72; transform: translateY(4px) scale(0.88); }
+  60%  { opacity: 1;    transform: translateY(-2px) scale(1.06); }
+  100% { opacity: 1;    transform: translateY(0) scale(1); }
 }
 
 /* Delta chip — spring pop-in */

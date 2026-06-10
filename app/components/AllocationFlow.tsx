@@ -84,6 +84,7 @@ export function AllocationFlow({
   const [saveError, setSaveError] = useState("");
   const [hasInteracted, setHasInteracted] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const wasBalancedRef = useRef(false);
   const isFirstRenderRef = useRef(true);
   const [burstKey, setBurstKey] = useState(0);
@@ -102,6 +103,7 @@ export function AllocationFlow({
     if (!open) {
       setHasInteracted(false);
       setDraftValue(null);
+      setIsDragging(false);
       isFirstRenderRef.current = true;
       spentFloorRef.current = {};
     }
@@ -419,6 +421,8 @@ export function AllocationFlow({
                 value={activeItem.amount}
                 disabled={readOnly}
                 onChange={(event) => updateActiveAmount(Number(event.target.value))}
+                onPointerDown={() => setIsDragging(true)}
+                onPointerUp={() => setIsDragging(false)}
                 aria-label={`Adjust planned amount for ${activeItem.name}`}
                 style={{
                   display: "block",
@@ -434,12 +438,14 @@ export function AllocationFlow({
                   position: "absolute",
                   top: "50%",
                   left: `${rangeFill.toFixed(1)}%`,
-                  transform: "translate(-50%, -50%)",
+                  transform: `translate(-50%, -50%) scale(${isDragging ? 1.35 : 1})`,
                   fontSize: 18,
                   lineHeight: 1,
                   pointerEvents: "none",
                   userSelect: "none",
-                  transition: "left 0.06s linear",
+                  transition: isDragging
+                    ? "left 0.06s linear, transform 0.12s cubic-bezier(0.22, 1, 0.36, 1)"
+                    : "left 0.06s linear, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
                 💸
