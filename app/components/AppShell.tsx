@@ -27,7 +27,7 @@ export function AppShell({
   children?: ReactNode;
 }) {
   return (
-    <div style={{ height: "100dvh", overflow: "hidden", position: "relative", zIndex: 1 }}>
+    <div style={{ height: "100dvh", overflow: "hidden", position: "relative" }}>
       <div
         id={!immersive ? "app-root-shell" : undefined}
         className={immersive ? undefined : "app-content"}
