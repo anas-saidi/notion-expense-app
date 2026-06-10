@@ -23,6 +23,10 @@ export function PickerPopover({
   anchorRef,
 }: PickerPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
+  // Placement is locked on first open and not re-evaluated while the popover
+  // is open. Without this, filtering the list changes the popover height,
+  // the fit-check flips the direction, and the popover jumps away from anchor.
+  const lockedPlacementRef = useRef<"top" | "bottom" | null>(null);
   const [positionStyle, setPositionStyle] = useState<CSSProperties>({ visibility: "hidden" });
   const [mounted, setMounted] = useState(false);
 
@@ -32,9 +36,11 @@ export function PickerPopover({
   }, []);
 
   useLayoutEffect(() => {
-    if (!open || !anchorRef?.current || !popoverRef.current) {
+    if (!open) {
+      lockedPlacementRef.current = null;
       return;
     }
+    if (!anchorRef?.current || !popoverRef.current) return;
 
     let frameId: number | null = null;
     const updatePosition = () => {
@@ -49,18 +55,26 @@ export function PickerPopover({
       let left = align === "right" ? anchorRect.right - popoverRect.width : anchorRect.left;
       left = Math.min(Math.max(gutter, left), viewportWidth - popoverRect.width - gutter);
 
-      const preferredTop =
-        placement === "bottom"
+      // Lock placement direction on first call. Subsequent calls (triggered by
+      // the popover resizing as the list filters) reuse the locked direction so
+      // the popover never jumps away from the anchor mid-interaction.
+      if (lockedPlacementRef.current === null) {
+        const preferredTop =
+          placement === "bottom"
+            ? anchorRect.bottom + 10
+            : anchorRect.top - popoverRect.height - 10;
+        const preferredFits =
+          preferredTop >= gutter && preferredTop + popoverRect.height <= viewportHeight - gutter;
+        lockedPlacementRef.current = preferredFits
+          ? placement
+          : placement === "bottom" ? "top" : "bottom";
+      }
+
+      const resolvedPlacement = lockedPlacementRef.current;
+      let top =
+        resolvedPlacement === "bottom"
           ? anchorRect.bottom + 10
           : anchorRect.top - popoverRect.height - 10;
-      const fallbackTop =
-        placement === "bottom"
-          ? anchorRect.top - popoverRect.height - 10
-          : anchorRect.bottom + 10;
-
-      const preferredFits =
-        preferredTop >= gutter && preferredTop + popoverRect.height <= viewportHeight - gutter;
-      let top = preferredFits ? preferredTop : fallbackTop;
       top = Math.min(Math.max(gutter, top), viewportHeight - popoverRect.height - gutter);
 
       setPositionStyle({
