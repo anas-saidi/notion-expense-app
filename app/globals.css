@@ -219,6 +219,17 @@ button:not(:disabled):active {
   box-shadow: none;
 }
 
+/* 💸 emoji overlay — transform/transition managed via CSS so class toggling
+   from JS doesn't trigger React re-renders and break native range drag */
+.planning-emoji-overlay {
+  transform: translate(-50%, -50%) scale(1);
+  transition: left 0.06s linear, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.planning-emoji-overlay.is-dragging {
+  transform: translate(-50%, -50%) scale(1.35);
+  transition: left 0.06s linear, transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* ── Planning stack — seamlessly joined amount + dial cards ── */
 .planning-stack {
   border-radius: 28px;
