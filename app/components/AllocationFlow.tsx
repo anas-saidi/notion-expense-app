@@ -84,7 +84,7 @@ export function AllocationFlow({
   const [saveError, setSaveError] = useState("");
   const [hasInteracted, setHasInteracted] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const emojiRef = useRef<HTMLSpanElement>(null);
   const [mounted, setMounted] = useState(false);
   const wasBalancedRef = useRef(false);
   const isFirstRenderRef = useRef(true);
@@ -424,8 +424,8 @@ export function AllocationFlow({
                 value={activeItem.amount}
                 disabled={readOnly}
                 onChange={(event) => updateActiveAmount(Number(event.target.value))}
-                onPointerDown={() => setIsDragging(true)}
-                onPointerUp={() => setIsDragging(false)}
+                onPointerDown={() => emojiRef.current?.classList.add("is-dragging")}
+                onPointerUp={() => emojiRef.current?.classList.remove("is-dragging")}
                 aria-label={`Adjust planned amount for ${activeItem.name}`}
                 style={{
                   display: "block",
@@ -436,19 +436,17 @@ export function AllocationFlow({
               />
               {/* 💸 — painted on top (comes after input in DOM), pointer-events: none */}
               <span
+                ref={emojiRef}
                 aria-hidden="true"
+                className="planning-emoji-overlay"
                 style={{
                   position: "absolute",
                   top: "50%",
                   left: `${rangeFill.toFixed(1)}%`,
-                  transform: `translate(-50%, -50%) scale(${isDragging ? 1.35 : 1})`,
                   fontSize: 18,
                   lineHeight: 1,
                   pointerEvents: "none",
                   userSelect: "none",
-                  transition: isDragging
-                    ? "left 0.06s linear, transform 0.12s cubic-bezier(0.22, 1, 0.36, 1)"
-                    : "left 0.06s linear, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
                 }}
               >
                 💸
