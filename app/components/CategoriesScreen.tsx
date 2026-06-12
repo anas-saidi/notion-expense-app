@@ -131,7 +131,10 @@ export function CategoriesScreen({
   }
 
   return (
-    <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" style={wrapStyle}>
+    <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main" style={wrapStyle}>
+
+      {/* Header row: title left, scope chips + rebalance right on desktop */}
+      <div className="categories-header-row">
 
       {/* Header */}
       <div style={headerStyle}>
@@ -165,6 +168,8 @@ export function CategoriesScreen({
         </button>
       </div>
 
+      </div>{/* end categories-header-row */}
+
       {/* Search */}
       <label style={searchWrapStyle}>
         <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
@@ -181,7 +186,7 @@ export function CategoriesScreen({
       {/* Active groups */}
       {activeGroups.length === 0
         ? <div style={emptyStyle}>No categories found.</div>
-        : <div style={groupsStyle}>
+        : <div className="categories-groups" style={groupsStyle}>
             {activeGroups.map(({ label, items }) => (
               <section key={label} style={{ minWidth: 0 }}>
                 <div style={sectionLabelStyle}>{label}</div>
@@ -379,7 +384,7 @@ function FrozenAllScreen({
       {/* Grouped frozen rails */}
       {groups.length === 0
         ? <div style={emptyStyle}>No frozen categories.</div>
-        : <div style={groupsStyle}>
+        : <div className="categories-groups" style={groupsStyle}>
             {groups.map(({ label, items }) => (
               <section key={label} style={{ minWidth: 0 }}>
                 <div style={sectionLabelStyle}>{label}</div>

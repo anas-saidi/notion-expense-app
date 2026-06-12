@@ -106,7 +106,7 @@ export function AllocationFlow({
     if (!open) {
       setHasInteracted(false);
       setDraftValue(null);
-      setIsDragging(false);
+      emojiRef.current?.classList.remove("is-dragging");
       isFirstRenderRef.current = true;
       spentFloorRef.current = {};
     }
@@ -442,7 +442,7 @@ export function AllocationFlow({
                 style={{
                   position: "absolute",
                   top: "50%",
-                  left: `${rangeFill.toFixed(1)}%`,
+                  left: `clamp(10px, ${rangeFill.toFixed(1)}%, calc(100% - 10px))`,
                   fontSize: 18,
                   lineHeight: 1,
                   pointerEvents: "none",

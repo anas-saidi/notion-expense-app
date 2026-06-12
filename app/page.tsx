@@ -918,6 +918,7 @@ export default function App() {
           transactions={scopedTransactions}
           pendingItems={scopedPendingItems}
           onOpenHistory={() => setTab("history")}
+          onClickTransaction={editTransaction}
         />
       )}
 

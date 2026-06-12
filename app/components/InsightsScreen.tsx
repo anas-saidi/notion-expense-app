@@ -6,6 +6,7 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { categoryMatchesScope, getCategoryScope, transactionMatchesScope, monthBounds, fmt, fmtDate } from "./app-utils";
 import { ArrowLeftIcon, ChevronRightIcon } from "./ui/icons";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart } from "recharts";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -287,157 +288,173 @@ export function InsightsScreen({
   /* ── Render ────────────────────────────────────────────────────── */
 
   return (
-    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" style={wrapStyle}>
+    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" className="categories-main" style={wrapStyle}>
 
-      {/* Header */}
-      <div style={{ paddingTop: 8 }}>
-        <div style={eyebrowStyle}>Analyze</div>
-        <h1 style={titleStyle}>Insights</h1>
-      </div>
+      {/* ── Header row: title + controls ── */}
+      <div className="insights-header-row">
+        <div style={{ paddingTop: 8 }}>
+          <div style={eyebrowStyle}>Analyze</div>
+          <h1 style={titleStyle}>Insights</h1>
+        </div>
 
-      {/* Month nav */}
-      <div style={monthNavStyle}>
-        <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
-          <ArrowLeftIcon size={14} />
-        </button>
-        <span style={monthLabelStyle}>{monthLabel}</span>
-        <button
-          type="button"
-          onClick={() => shiftMonth(1)}
-          style={{ ...monthNavBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
-          disabled={!canGoNext}
-          aria-label="Next month"
-        >
-          <ChevronRightIcon size={14} />
-        </button>
-      </div>
-
-      {/* Scope chips */}
-      <div style={scopeRailStyle}>
-        {SCOPES.map(scope => {
-          const active = scope === budgetScope;
-          return (
-            <button
-              key={scope}
-              type="button"
-              onClick={() => onBudgetScopeChange(scope)}
-              aria-pressed={active}
-              style={active ? {
-                height: 38, borderRadius: 12, border: "none",
-                background: SCOPE_BG[scope], color: SCOPE_INK[scope],
-                padding: "0 14px 0 10px", gap: 7, cursor: "pointer",
-                display: "inline-flex", alignItems: "center", flexShrink: 0,
-                animation: "categorySelectIn 0.2s cubic-bezier(0.22,1,0.36,1) both",
-              } : {
-                width: 38, height: 38, borderRadius: 12,
-                border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
-                background: "transparent", cursor: "pointer",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                opacity: 0.45, flexShrink: 0,
-              }}
-            >
-              <span style={{ fontSize: 18, lineHeight: 1 }}>{SCOPE_EMOJI[scope]}</span>
-              {active && (
-                <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
-                  {SCOPE_LABEL[scope]}
-                </span>
-              )}
+        <div className="insights-controls">
+          {/* Month nav */}
+          <div className="insights-month-nav" style={monthNavStyle}>
+            <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
+              <ArrowLeftIcon size={14} />
             </button>
-          );
-        })}
-      </div>
+            <span style={monthLabelStyle}>{monthLabel}</span>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              style={{ ...monthNavBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
+              disabled={!canGoNext}
+              aria-label="Next month"
+            >
+              <ChevronRightIcon size={14} />
+            </button>
+          </div>
 
-      {/* ── 1. Burn Rate ── */}
-      <InsightCard emoji="🔥" title="Burn Rate" subtitle="Are you on pace?">
-        {assignedByCategory === null || transactionsLoading
-          ? <BurnRateSkeleton />
-          : <BurnRateBody burnRate={burnRate} totalSpent={totalSpent} totalPlanned={totalPlanned} lastMonthTotalSpent={lastMonthTotalSpent} />
-        }
-      </InsightCard>
-
-      {/* ── 3. Together vs. Apart (joint only) ── */}
-      {budgetScope === "joint" && (
-        <InsightCard emoji="👫" title="Together vs. Apart" subtitle="How does the money split?">
-          {transactionsLoading
-            ? <TogetherApartSkeleton />
-            : <TogetherApartBody data={splitData} />
-          }
-        </InsightCard>
-      )}
-
-      {/* ── 4. Spending Breakdown ── */}
-      <InsightCard emoji="🥧" title="Spending Breakdown" subtitle={`By category · ${SCOPE_LABEL[budgetScope]}`}>
-        {transactionsLoading
-          ? <SpendingBreakdownSkeleton />
-          : <SpendingBreakdownBody data={donutData} />
-        }
-      </InsightCard>
-
-      {/* ── Transaction list ── */}
-      {transactionsLoading && (
-        <div style={{ display: "grid", gap: 20, marginTop: 4 }}>
-          <div style={sectionDividerLabelStyle}>History</div>
-          <div style={{ display: "grid", gap: 6 }}>
-            {[1, 2, 3, 4].map(i => <TxRowSkeleton key={i} />)}
+          {/* Scope chips */}
+          <div style={scopeRailStyle}>
+            {SCOPES.map(scope => {
+              const active = scope === budgetScope;
+              return (
+                <button
+                  key={scope}
+                  type="button"
+                  onClick={() => onBudgetScopeChange(scope)}
+                  aria-pressed={active}
+                  style={active ? {
+                    height: 38, borderRadius: 12, border: "none",
+                    background: SCOPE_BG[scope], color: SCOPE_INK[scope],
+                    padding: "0 14px 0 10px", gap: 7, cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", flexShrink: 0,
+                    animation: "categorySelectIn 0.2s cubic-bezier(0.22,1,0.36,1) both",
+                  } : {
+                    width: 38, height: 38, borderRadius: 12,
+                    border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
+                    background: "transparent", cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    opacity: 0.45, flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>{SCOPE_EMOJI[scope]}</span>
+                  {active && (
+                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
+                      {SCOPE_LABEL[scope]}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
-      {!transactionsLoading && txGroups.length > 0 && (
-        <div style={{ display: "grid", gap: 20, marginTop: 4 }}>
-          <div style={sectionDividerLabelStyle}>History</div>
-          {txGroups.map(({ label, items, subtotal }) => (
-            <section key={label}>
-              <div style={groupHeaderStyle}>
-                <span style={groupLabelStyle}>{label}</span>
-                {subtotal > 0 && <span style={groupSubtotalStyle}>{fmt(subtotal)} MAD</span>}
-              </div>
-              <div style={{ display: "grid", gap: 6 }}>
-                {items.map(txn => {
-                  const cat      = categories.find(c => c.id === txn.category);
-                  const fromCat  = categories.find(c => c.id === txn.fromCategoryId);
-                  const toCat    = categories.find(c => c.id === txn.toCategoryId);
-                  const isIncome   = txn.type === "Income";
-                  const isTransfer = txn.type === "Transfer";
-                  const prefix = isIncome ? "+" : isTransfer ? "↔" : "−";
-                  const amtColor = isIncome ? "var(--accent-ink)" : isTransfer ? "var(--muted)" : "var(--text2)";
-                  return (
-                    <SwipeToDelete key={txn.id} onDelete={() => onDeleteTransaction(txn.id)}>
-                      <div onClick={() => onClickTransaction(txn)} className="tx-row">
-                        {isIncome || isTransfer ? (
-                          <span style={txTypeIconStyle(isIncome)}>
-                            {isIncome ? "💰" : "↔"}
-                          </span>
-                        ) : (
-                          <CategoryIcon icon={cat?.icon ?? null} size={22} style={{ flexShrink: 0 }} />
-                        )}
-                        <div style={txMiddleStyle}>
-                          {isTransfer && (fromCat || toCat) ? (
-                            <span style={txNameStyle}>{fromCat?.name ?? "—"} → {toCat?.name ?? "—"}</span>
-                          ) : (
-                            <span style={txNameStyle}>{txn.name}</span>
-                          )}
-                          {!isTransfer && cat && <span style={txCategoryStyle}>{cat.name}</span>}
-                        </div>
-                        <div style={txRightStyle}>
-                          <span style={{ ...txAmountStyle, color: amtColor }}>{prefix}{fmt(txn.amount)} MAD</span>
-                          <span style={txDateStyle}>{fmtDate(txn.date)}</span>
-                        </div>
-                      </div>
-                    </SwipeToDelete>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
+      </div>
 
-      {!transactionsLoading && transactions.length === 0 && (
-        <div style={emptyScreenStyle}>
-          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text2)" }}>Nothing in {monthLabel}</p>
-          <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>No activity recorded for this month.</p>
-        </div>
-      )}
+      {/* ── Insight cards grid ── */}
+      <div className="insights-grid">
+
+        {/* 1. Burn Rate */}
+        <InsightCard emoji="🔥" title="Burn Rate" subtitle="Are you on pace?">
+          {assignedByCategory === null || transactionsLoading
+            ? <BurnRateSkeleton />
+            : <BurnRateBody burnRate={burnRate} totalSpent={totalSpent} totalPlanned={totalPlanned} lastMonthTotalSpent={lastMonthTotalSpent} />
+          }
+        </InsightCard>
+
+        {/* 3. Together vs. Apart (joint only) */}
+        {budgetScope === "joint" && (
+          <InsightCard emoji="👫" title="Together vs. Apart" subtitle="How does the money split?">
+            {transactionsLoading
+              ? <TogetherApartSkeleton />
+              : <TogetherApartBody data={splitData} />
+            }
+          </InsightCard>
+        )}
+
+        {/* 4. Spending Breakdown */}
+        <InsightCard emoji="🥧" title="Spending Breakdown" subtitle={`By category · ${SCOPE_LABEL[budgetScope]}`}>
+          {transactionsLoading
+            ? <SpendingBreakdownSkeleton />
+            : <SpendingBreakdownBody
+                data={donutData}
+                expenses={expenses}
+                insightsMonth={insightsMonth}
+                totalPlanned={totalPlanned}
+              />
+          }
+        </InsightCard>
+
+      </div>
+
+      {/* ── Transaction history — full width ── */}
+      <div className="insights-history">
+        {transactionsLoading && (
+          <div style={{ display: "grid", gap: 20 }}>
+            <div style={sectionDividerLabelStyle}>History</div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {[1, 2, 3, 4].map(i => <TxRowSkeleton key={i} />)}
+            </div>
+          </div>
+        )}
+        {!transactionsLoading && txGroups.length > 0 && (
+          <div style={{ display: "grid", gap: 20 }}>
+            <div style={sectionDividerLabelStyle}>History</div>
+            {txGroups.map(({ label, items, subtotal }) => (
+              <section key={label}>
+                <div style={groupHeaderStyle}>
+                  <span style={groupLabelStyle}>{label}</span>
+                  {subtotal > 0 && <span style={groupSubtotalStyle}>{fmt(subtotal)} MAD</span>}
+                </div>
+                <div className="tx-group-list" style={{ display: "grid", gap: 6 }}>
+                  {items.map(txn => {
+                    const cat      = categories.find(c => c.id === txn.category);
+                    const fromCat  = categories.find(c => c.id === txn.fromCategoryId);
+                    const toCat    = categories.find(c => c.id === txn.toCategoryId);
+                    const isIncome   = txn.type === "Income";
+                    const isTransfer = txn.type === "Transfer";
+                    const prefix = isIncome ? "+" : isTransfer ? "↔" : "−";
+                    const amtColor = isIncome ? "var(--accent-ink)" : isTransfer ? "var(--muted)" : "var(--text2)";
+                    return (
+                      <SwipeToDelete key={txn.id} onDelete={() => onDeleteTransaction(txn.id)}>
+                        <div onClick={() => onClickTransaction(txn)} className="tx-row">
+                          {isIncome || isTransfer ? (
+                            <span style={txTypeIconStyle(isIncome)}>
+                              {isIncome ? "💰" : "↔"}
+                            </span>
+                          ) : (
+                            <CategoryIcon icon={cat?.icon ?? null} size={22} style={{ flexShrink: 0 }} />
+                          )}
+                          <div style={txMiddleStyle}>
+                            {isTransfer && (fromCat || toCat) ? (
+                              <span style={txNameStyle}>{fromCat?.name ?? "—"} → {toCat?.name ?? "—"}</span>
+                            ) : (
+                              <span style={txNameStyle}>{txn.name}</span>
+                            )}
+                            {!isTransfer && cat && <span style={txCategoryStyle}>{cat.name}</span>}
+                          </div>
+                          <div style={txRightStyle}>
+                            <span style={{ ...txAmountStyle, color: amtColor }}>{prefix}{fmt(txn.amount)} MAD</span>
+                            <span style={txDateStyle}>{fmtDate(txn.date)}</span>
+                          </div>
+                        </div>
+                      </SwipeToDelete>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {!transactionsLoading && transactions.length === 0 && (
+          <div style={emptyScreenStyle}>
+            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text2)" }}>Nothing in {monthLabel}</p>
+            <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>No activity recorded for this month.</p>
+          </div>
+        )}
+      </div>
 
     </div>
   );
@@ -449,7 +466,7 @@ function InsightCard({ emoji, title, subtitle, children }: {
   emoji: string; title: string; subtitle: string; children: ReactNode;
 }) {
   return (
-    <div style={cardStyle}>
+    <div className="insights-card" style={cardStyle}>
       <div style={cardHeaderStyle}>
         <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{emoji}</span>
         <div>
@@ -712,15 +729,64 @@ function ContribBlock({ name, actual, plan, pct, delta, color }: {
 
 /* ─── 4. Spending Breakdown body ─────────────────────────────────── */
 
-function SpendingBreakdownBody({ data }: {
+function SpendingBreakdownBody({ data, expenses, insightsMonth, totalPlanned }: {
   data: { items: Array<{ cat: Category; spent: number }>; total: number };
+  expenses: Transaction[];
+  insightsMonth: string;
+  totalPlanned: number;
 }) {
+  const [view, setView] = useState<"donut" | "curve">("donut");
   const { items, total } = data;
 
   if (total === 0 || items.length === 0) {
     return <p style={emptyBodyStyle}>No expenses this month.</p>;
   }
 
+  const cycleView = () => setView(v => v === "donut" ? "curve" : "donut");
+
+  return (
+    <div
+      onClick={cycleView}
+      role="button"
+      tabIndex={0}
+      aria-label={`Switch to ${view === "donut" ? "trend" : "breakdown"} chart`}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") cycleView(); }}
+      style={{ cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
+    >
+      {view === "donut"
+        ? <DonutView items={items} total={total} />
+        : <CurveView
+            expenses={expenses}
+            insightsMonth={insightsMonth}
+            totalPlanned={totalPlanned}
+            totalSpent={total}
+          />
+      }
+
+      {/* Dot indicator — shows current view & that it's tappable */}
+      <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 14 }}>
+        {(["donut", "curve"] as const).map(v => (
+          <span
+            key={v}
+            style={{
+              display: "inline-block",
+              height: 4,
+              width: v === view ? 16 : 4,
+              borderRadius: 999,
+              background: v === view ? "var(--accent)" : "var(--border2)",
+              transition: "width 0.22s cubic-bezier(0.22,1,0.36,1), background 0.18s ease",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DonutView({ items, total }: {
+  items: Array<{ cat: Category; spent: number }>;
+  total: number;
+}) {
   const cx = 70, cy = 70, r = 52, sw = 16;
   const GAP = items.length > 1 ? 3 : 0;
   let angle = -90;
@@ -735,8 +801,6 @@ function SpendingBreakdownBody({ data }: {
 
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-
-      {/* Donut */}
       <div style={{ position: "relative", flexShrink: 0, width: 140, height: 140 }}>
         <svg width={140} height={140} viewBox="0 0 140 140" aria-hidden="true">
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--surface2)" strokeWidth={sw} />
@@ -753,8 +817,6 @@ function SpendingBreakdownBody({ data }: {
           <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 3, letterSpacing: 0.3 }}>MAD</span>
         </div>
       </div>
-
-      {/* Legend */}
       <div style={{ flex: 1, display: "grid", gap: 9, alignContent: "center" as const }}>
         {segments.map(({ cat, spent, color }, i) => (
           <div key={cat.id ?? i} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -767,6 +829,135 @@ function SpendingBreakdownBody({ data }: {
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
+  expenses: Transaction[];
+  insightsMonth: string;
+  totalPlanned: number;
+  totalSpent: number;
+}) {
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const isCurrentMonth  = insightsMonth === currentMonthStr;
+  const [y, m] = insightsMonth.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const todayDay    = isCurrentMonth ? new Date().getDate() : daysInMonth;
+
+  // Build cumulative daily totals
+  const dayTotals = new Array(daysInMonth + 1).fill(0);
+  for (const t of expenses) {
+    if (!t.date) continue;
+    const day = parseInt(t.date.split("-")[2], 10);
+    if (day >= 1 && day <= daysInMonth) dayTotals[day] += t.amount;
+  }
+
+  // Recharts data: one entry per day (0 = start of month)
+  let running = 0;
+  const data = Array.from({ length: todayDay + 1 }, (_, d) => {
+    if (d > 0) running += dayTotals[d];
+    return {
+      day: d,
+      spent: running,
+      budget: totalPlanned > 0 ? Math.round((totalPlanned / daysInMonth) * d) : undefined,
+    };
+  });
+
+  const xTicks = [1, Math.round(daysInMonth / 2), daysInMonth].filter(t => t <= todayDay);
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={150}>
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="sbAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="var(--danger)" stopOpacity={0.22} />
+              <stop offset="95%" stopColor="var(--danger)" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid
+            strokeDasharray="3 4"
+            stroke="var(--border)"
+            vertical={false}
+            strokeOpacity={0.7}
+          />
+
+          <XAxis
+            dataKey="day"
+            ticks={xTicks}
+            tick={{ fontSize: 9, fill: "var(--muted)" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 9, fill: "var(--muted)" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
+            width={38}
+          />
+
+          <Tooltip
+            contentStyle={{
+              background: "var(--surface)",
+              border: "1px solid var(--border2)",
+              borderRadius: 10,
+              fontSize: 11,
+              color: "var(--text2)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            }}
+            formatter={(value, name) => [
+              `${fmt(Number(value))} MAD`,
+              name === "spent" ? "Spent" : "Budget pace",
+            ]}
+            labelFormatter={(day) => `Day ${day}`}
+            cursor={{ stroke: "var(--border2)", strokeWidth: 1 }}
+          />
+
+          {/* Budget pace line */}
+          {totalPlanned > 0 && (
+            <Line
+              type="linear"
+              dataKey="budget"
+              stroke="var(--muted)"
+              strokeWidth={1.5}
+              strokeDasharray="5 3"
+              dot={false}
+              opacity={0.35}
+              strokeOpacity={0.45}
+            />
+          )}
+
+          {/* Spending area */}
+          <Area
+            type="monotone"
+            dataKey="spent"
+            stroke="var(--danger)"
+            strokeWidth={2}
+            fill="url(#sbAreaGrad)"
+            dot={false}
+            activeDot={{ r: 4, fill: "var(--danger)", strokeWidth: 0 }}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 12, height: 2, background: "var(--danger)", borderRadius: 999, display: "inline-block" }} />
+          <span style={{ fontSize: 10, color: "var(--muted)" }}>Spent · {fmt(totalSpent)} MAD</span>
+        </div>
+        {totalPlanned > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <svg width={12} height={4} style={{ flexShrink: 0 }}>
+              <line x1={0} y1={2} x2={12} y2={2} stroke="var(--muted)" strokeWidth={1.5} strokeDasharray="4 2" opacity={0.55} />
+            </svg>
+            <span style={{ fontSize: 10, color: "var(--muted)" }}>Budget · {fmt(totalPlanned)} MAD</span>
+          </div>
+        )}
       </div>
     </div>
   );

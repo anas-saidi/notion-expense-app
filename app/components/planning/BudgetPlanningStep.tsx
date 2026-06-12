@@ -246,7 +246,12 @@ export function BudgetPlanningStep({
       </div>
 
       <div style={rowsWrapStyle}>
-        {active.items.map((item) => (
+        {active.items.map((item) => {
+          const spent = Math.max(0, item.amount - (item.available ?? item.amount));
+          const spentPct = Math.min(100, (spent / Math.max(1, item.amount)) * 100);
+          const sharePct = Math.min(100, (item.amount / totalPool) * 100);
+          const isOverBudget = (item.available ?? 0) < 0;
+          return (
           <div key={item.categoryId} style={rowStyle}>
             <div style={{ display: "grid", gap: 4 }}>
               <strong style={{ color: "var(--text2)", fontSize: 15 }}>
@@ -265,7 +270,7 @@ export function BudgetPlanningStep({
               <div style={inputMetaStyle}>
                 <span style={targetLabelStyle}>Planned</span>
                 <span style={nowLabelStyle}>
-                  Spent <Money value={Math.max(0, item.amount - (item.available ?? item.amount))} />
+                  Spent <Money value={spent} />
                 </span>
               </div>
               <input
@@ -286,7 +291,8 @@ export function BudgetPlanningStep({
                 <div
                   style={{
                     ...spentBarFillStyle,
-                    width: `${Math.min(100, ((Math.max(0, item.amount - (item.available ?? item.amount))) / Math.max(1, item.amount)) * 100)}%`,
+                    width: `${spentPct}%`,
+                    background: getSpentBarColor(spentPct, isOverBudget),
                   }}
                 />
               </div>
@@ -296,17 +302,18 @@ export function BudgetPlanningStep({
                 <div
                   style={{
                     ...sliderFillStyle,
-                    width: `${Math.min(100, (item.amount / totalPool) * 100)}%`,
+                    width: `${sharePct}%`,
                   }}
                 />
                 <div
                   style={{
                     ...sliderThumbStyle,
-                    left: `${Math.min(100, (item.amount / totalPool) * 100)}%`,
+                    left: `calc(${(sharePct / 100).toFixed(6)} * (100% - 16px) + 8px)`,
                   }}
                 />
                 <input
                   type="range"
+                  className="budget-slider"
                   min={resolveSpentFloor(item.amount, item.available ?? null)}
                   max={clampPlannedValue(Number.MAX_SAFE_INTEGER, item.amount, item.available ?? null)}
                   step={10}
@@ -318,7 +325,8 @@ export function BudgetPlanningStep({
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {active.items.length === 0 && (
           <div style={emptyStyle}>No categories in this group yet.</div>
@@ -326,6 +334,13 @@ export function BudgetPlanningStep({
       </div>
     </section>
   );
+}
+
+function getSpentBarColor(pct: number, isOverBudget: boolean): string {
+  if (isOverBudget || pct >= 100) return "color-mix(in srgb, #ef4444 75%, #b91c1c)";
+  if (pct >= 85) return "color-mix(in srgb, #f97316 70%, #ea580c)";
+  if (pct >= 65) return "color-mix(in srgb, #f59e0b 70%, #d97706)";
+  return "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
 }
 
 const toAllocationItem = (category: Category): PlanningAllocationItem => ({
@@ -457,9 +472,9 @@ const chipStyle = {
 };
 
 const chipActiveStyle = {
-  border: "1px solid transparent",
+  border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
   background: "var(--accent-dim)",
-  color: "var(--text2)",
+  color: "var(--accent-ink)",
 };
 
 const chipCountStyle = {
@@ -547,8 +562,7 @@ const spentBarTrackStyle = {
 const spentBarFillStyle = {
   height: "100%",
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
-  transition: "width 0.18s ease",
+  transition: "width 0.18s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease",
 };
 
 const sliderWrapStyle = {
@@ -569,8 +583,8 @@ const sliderFillStyle = {
   height: "100%",
   borderRadius: 999,
   background: "color-mix(in srgb, var(--accent) 85%, #bceaa2)",
-  opacity: 0.28,
-  transition: "width 0.15s ease",
+  opacity: 0.5,
+  transition: "width 0.15s cubic-bezier(0.22, 1, 0.36, 1)",
   pointerEvents: "none" as const,
 };
 
@@ -580,11 +594,11 @@ const sliderThumbStyle = {
   width: 16,
   height: 16,
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface) 70%, white)",
+  background: "color-mix(in srgb, var(--surface) 85%, white)",
   border: "2px solid var(--accent)",
-  transform: "translate(-50%, -50%)",
-  boxShadow: "0 4px 10px rgba(0,0,0,0.08)",
-  transition: "left 0.15s ease",
+  transform: "translateY(-50%)",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.12), 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent)",
+  transition: "left 0.15s cubic-bezier(0.22, 1, 0.36, 1)",
   pointerEvents: "none" as const,
 };
 
@@ -595,7 +609,7 @@ const sliderInputStyle = {
   height: "100%",
   margin: 0,
   opacity: 0,
-  cursor: "pointer",
+  cursor: "grab",
   touchAction: "none" as const,
   zIndex: 2,
 };

@@ -628,6 +628,7 @@ button:hover .rebalance-btn-icon {
   .pressable,
   .cta-save,
   .animate-fadeUp,
+  .budget-slider,
   body {
     animation: none !important;
     transition: none !important;
@@ -1180,15 +1181,79 @@ button:hover .rebalance-btn-icon {
   }
 }
 
+/* ── Desktop scroll-rail → wrapping grid ──────────────────── */
+/* Converts horizontal scroll cards to a wrapping flex grid at 1100px+ */
+@media (min-width: 1100px) {
+  /* Switch from inner-div scroll to native page scroll.
+     On mobile the content div must scroll so the bottom nav stays fixed.
+     On desktop the sidebar is position:fixed — the page can scroll naturally. */
+  html {
+    height: auto;
+  }
+
+  .app-shell-root {
+    height: auto !important;
+    min-height: 100dvh;
+  }
+
+  .app-content {
+    height: auto !important;
+    overflow-y: visible !important;
+  }
+
+  .home-scroll-rail {
+    overflow-x: visible !important;
+    flex-wrap: wrap !important;
+  }
+
+  /* Transaction rows: more comfortable padding on desktop */
+  .home-txn-row {
+    padding: 18px 20px !important;
+    border-radius: 16px !important;
+  }
+
+  /* Attention cards: wider on desktop */
+  .home-attention-card {
+    flex: 0 0 160px !important;
+  }
+
+  /* Section headers: a bit more breathing room */
+  .home-section-hdr {
+    margin-bottom: 14px !important;
+  }
+
+  /* Sidebar nav button hover state */
+  .app-nav-btn:not([aria-selected="true"]):hover {
+    background: color-mix(in srgb, var(--surface2) 70%, transparent) !important;
+    color: var(--text2) !important;
+    transform: none !important;
+  }
+
+  /* Toast: center in content area (right of 220px sidebar) */
+  .app-toast {
+    left: calc(220px + (100vw - 220px) / 2) !important;
+    bottom: 24px !important;
+  }
+}
+
 /* ── Desktop (≥ 1100px) — sidebar nav ─────────────────────── */
 @media (min-width: 1100px) {
   .app-content {
     margin-left: 220px;
-    max-width: 860px;
-    padding-bottom: 48px;
-    padding-left: 40px;
-    padding-right: 40px;
-    padding-top: calc(var(--safe-top) + 32px);
+    max-width: 1100px;
+    padding-bottom: 64px;
+    padding-left: 48px;
+    padding-right: 48px;
+    padding-top: calc(var(--safe-top) + 48px);
+  }
+  /* Collapse mobile bottom padding — app-content handles clearance on desktop */
+  .home-content,
+  .categories-main {
+    padding-bottom: 0 !important;
+  }
+  /* More generous section gap on desktop */
+  .home-content {
+    gap: 32px !important;
   }
   .app-nav-wrap {
     position: fixed;
@@ -1258,6 +1323,136 @@ button:hover .rebalance-btn-icon {
   }
 }
 
+/* ── Insights screen — base (mobile-first) ────────────────── */
+
+/* Header row: stacked on mobile, side-by-side on desktop */
+.insights-header-row {
+  display: grid;
+  gap: 12px;
+}
+
+.insights-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Cards grid: single column on mobile */
+.insights-grid {
+  display: grid;
+  gap: 16px;
+}
+
+/* History section: consistent spacing */
+.insights-history {
+  display: grid;
+  gap: 16px;
+}
+
+/* ── Insights screen — desktop (≥ 1100px) ─────────────────── */
+@media (min-width: 1100px) {
+  /* Header: title left, controls right */
+  .insights-header-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 4px;
+  }
+
+  .insights-controls {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  /* Constrain month nav width so space-between stays compact in the flex row */
+  .insights-month-nav {
+    min-width: 180px;
+  }
+
+  /* Cards: auto-fit columns — 3 cards → 3 cols, 2 cards → 2 cols */
+  /* align-items: stretch (default) makes all cards in a row equal height */
+  .insights-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: stretch;
+  }
+
+  /* Cards: more internal padding; align-content: start keeps content
+     top-aligned inside the card when it's taller than its natural height */
+  .insights-card {
+    padding: 22px !important;
+    gap: 16px !important;
+    align-content: start;
+  }
+
+  /* History: larger section gap */
+  .insights-history {
+    gap: 20px;
+  }
+}
+
+
+/* ── History screen — base (mobile-first) ─────────────────── */
+
+.history-header-bar {
+  display: grid;
+  gap: 12px;
+}
+
+.history-panels-row {
+  display: grid;
+  gap: 16px;
+}
+
+/* ── Categories screen — base (mobile-first) ──────────────── */
+
+.categories-header-row {
+  display: grid;
+  gap: 12px;
+}
+
+/* ── History + Categories — desktop (≥ 1100px) ────────────── */
+@media (min-width: 1100px) {
+  /* History header: month nav + search side-by-side */
+  .history-header-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .history-month-nav {
+    min-width: 180px;
+    flex-shrink: 0;
+  }
+  .history-search {
+    flex: 1;
+  }
+
+  /* Stats panels: spotlight + categories side by side */
+  .history-panels-row {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    align-items: start;
+  }
+
+  /* Transaction groups: 2 columns inside each date group */
+  .tx-group-list {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px !important;
+  }
+
+  /* Categories header: title left, scope chips + rebalance right */
+  .categories-header-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 4px;
+  }
+
+
+}
+
 @media (min-width: 560px) {
   .home-hero__body {
     grid-template-columns: minmax(0, 1.08fr) minmax(180px, 0.92fr) !important;
@@ -1287,6 +1482,18 @@ button:hover .rebalance-btn-icon {
     width: 48px !important;
     height: 48px !important;
   }
+}
+
+/* ── Budget row slider ────────────────────────────────────── */
+.budget-slider {
+  cursor: grab;
+}
+.budget-slider:active {
+  cursor: grabbing;
+}
+.budget-slider:focus-visible {
+  outline: none;
+  /* Focus ring surfaces on the custom thumb via sibling CSS if needed */
 }
 
 /* ── Rebalance slider ─────────────────────────────────────── */
