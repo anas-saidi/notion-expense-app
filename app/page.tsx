@@ -886,8 +886,6 @@ export default function App() {
         <ManageScreen
           accounts={accounts}
           onClose={() => setShowManageScreen(false)}
-          onAddIncome={setIncomeAccount}
-          onTransferMoney={setTransferAccount}
           onOpenDetails={setDetailsAccount}
         />
       )}
@@ -1123,6 +1121,7 @@ export default function App() {
         account={detailsAccount}
         transactions={transactions}
         categories={categories}
+        homeMonth={homeMonth}
         onClose={() => setDetailsAccount(null)}
         onMove={(acct) => { setDetailsAccount(null); setTransferAccount(acct); }}
         onIncome={(acct) => { setDetailsAccount(null); setIncomeAccount(acct); }}

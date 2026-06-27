@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronDown,
   ArrowDown,
+  ArrowUp,
   ArrowLeft,
   ArrowRightLeft,
   Banknote,
@@ -54,6 +55,7 @@ export const ChevronRightIcon = (p: LucideProps) => <ChevronRight  size={S} {...
 export const ChevronLeftIcon  = (p: LucideProps) => <ChevronLeft   size={S} {...p} />;
 export const ChevronDownIcon  = (p: LucideProps) => <ChevronDown   size={S} {...p} />;
 export const ArrowDownIcon    = (p: LucideProps) => <ArrowDown      size={S} {...p} />;
+export const ArrowUpIcon      = (p: LucideProps) => <ArrowUp        size={S} {...p} />;
 export const ArrowLeftIcon    = (p: LucideProps) => <ArrowLeft      size={S} {...p} />;
 export const TransferIcon     = (p: LucideProps) => <ArrowRightLeft size={S} {...p} />;
 export const BanknoteIcon     = (p: LucideProps) => <Banknote       size={S} {...p} />;
