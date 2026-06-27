@@ -18,6 +18,7 @@ type HomeScreenProps = {
   onOpenBudgetTab?: () => void;
   onFundCategory?: (category: Category) => void;
   onOpenHistory?: () => void;
+  onClickTransaction?: (txn: Transaction) => void;
   monthlySummary: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   leftToSpendByScope: Record<BudgetScope, number>;
@@ -46,6 +47,7 @@ export function HomeScreen({
   onOpenBudgetTab,
   onFundCategory,
   onOpenHistory,
+  onClickTransaction,
   monthlySummary,
   walletSummaries,
   leftToSpendByScope,
@@ -172,7 +174,6 @@ export function HomeScreen({
         />
       </div>
 
-
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
         <button type="button" onClick={onOpenPlan} style={assignRowStyle}>
@@ -201,7 +202,6 @@ export function HomeScreen({
           <div className="home-scroll-rail" style={cardsRailStyle}>
             {upcomingBills.map(bill => {
               const isImminent = bill.date === today() || bill.date === shiftDate(today(), 1);
-              const catForBill = bill.categoryId ? categories.find(c => c.id === bill.categoryId) : null;
               return (
                 <div key={bill.id} style={billChipStyle(isImminent)}>
                   <span style={billNameStyle}>{bill.name}</span>
@@ -218,12 +218,12 @@ export function HomeScreen({
         </section>
       )}
 
-      <div style={contentStyle}>
+      <div className="home-content" style={contentStyle}>
 
         {/* Zone 3: Attention — horizontal scroll */}
         {visibleAttentionItems.length > 0 && (
           <section aria-label="Categories needing attention" style={{ minWidth: 0 }}>
-            <div style={sectionHeaderStyle}>
+            <div className="home-section-hdr" style={sectionHeaderStyle}>
               <span style={sectionLabelStyle}>Needs attention</span>
               {onOpenBudgetTab && (
                 <button
@@ -239,8 +239,7 @@ export function HomeScreen({
 
             <div className="home-scroll-rail" style={cardsRailStyle}>
               {visibleAttentionItems.map(({ cat, spent, planned, available, isOver }) => (
-                <div key={cat.id} style={attentionCardStyle}>
-                  {/* Dismiss button */}
+                <div key={cat.id} className="home-attention-card" style={attentionCardStyle}>
                   <button
                     type="button"
                     onClick={() => dismissAttention(cat.id)}
@@ -249,8 +248,6 @@ export function HomeScreen({
                   >
                     ✕
                   </button>
-
-                  {/* Card body — tappable */}
                   <button
                     type="button"
                     onClick={() => { onSelectCategory(cat); onOpenCategoryDetails(cat); }}
@@ -264,8 +261,6 @@ export function HomeScreen({
                     </span>
                     <span style={attentionSubStyle2}>MAD {isOver ? "over" : "left"}</span>
                   </button>
-
-                  {/* Fund action */}
                   {onFundCategory && (
                     <button
                       type="button"
@@ -291,18 +286,13 @@ export function HomeScreen({
           const dashOffset = circ * (1 - goalPct / 100);
           return (
             <section aria-label="Savings goal">
-              <div style={sectionHeaderStyle}>
+              <div className="home-section-hdr" style={sectionHeaderStyle}>
                 <span style={sectionLabelStyle}>Savings goal</span>
               </div>
               <div style={savingsCardStyle}>
                 <div style={savingsRingWrapStyle}>
                   <svg width={52} height={52} viewBox="0 0 52 52" style={{ display: "block" }}>
-                    <circle
-                      cx={26} cy={26} r={radius}
-                      fill="none"
-                      stroke="var(--surface2)"
-                      strokeWidth={5}
-                    />
+                    <circle cx={26} cy={26} r={radius} fill="none" stroke="var(--surface2)" strokeWidth={5} />
                     <circle
                       cx={26} cy={26} r={radius}
                       fill="none"
@@ -330,11 +320,10 @@ export function HomeScreen({
           );
         })()}
 
-
         {/* Zone 6: Recent transactions */}
         {recentTxns.length > 0 && (
           <section aria-label="Recent transactions">
-            <div style={sectionHeaderStyle}>
+            <div className="home-section-hdr" style={sectionHeaderStyle}>
               <span style={sectionLabelStyle}>Recent</span>
               {onOpenHistory && (
                 <button type="button" onClick={onOpenHistory} style={seeAllBtnStyle} aria-label="View all transactions">
@@ -355,7 +344,12 @@ export function HomeScreen({
                   : "var(--text2)";
                 const rowIcon = isIncome ? "💰" : isTransfer ? "↔" : (cat?.icon ?? null);
                 return (
-                  <div key={txn.id} style={recentRowStyle}>
+                  <div
+                    key={txn.id}
+                    className="home-txn-row tx-row"
+                    style={{ ...recentRowStyle, cursor: onClickTransaction ? "pointer" : undefined }}
+                    onClick={onClickTransaction ? () => onClickTransaction(txn) : undefined}
+                  >
                     {isIncome || isTransfer ? (
                       <span style={recentTypeIconStyle(isIncome)}>{rowIcon}</span>
                     ) : (

@@ -134,40 +134,41 @@ export function HistoryScreen({
   }, [groups]);
 
   return (
-    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" style={wrapStyle}>
+    <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" className="categories-main" style={wrapStyle}>
 
-      {/* Month navigation */}
-      <div style={monthNavStyle}>
-        <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
-          <ArrowLeftIcon size={14} />
-        </button>
-        <span style={monthLabelStyle}>{monthLabel}</span>
-        <button
-          type="button"
-          onClick={() => shiftMonth(1)}
-          style={{ ...monthNavBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
-          disabled={!canGoNext}
-          aria-label="Next month"
-        >
-          <ChevronRightIcon size={14} />
-        </button>
+      {/* Header bar: month nav + search side-by-side on desktop */}
+      <div className="history-header-bar">
+        <div className="history-month-nav" style={monthNavStyle}>
+          <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
+            <ArrowLeftIcon size={14} />
+          </button>
+          <span style={monthLabelStyle}>{monthLabel}</span>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            style={{ ...monthNavBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
+            disabled={!canGoNext}
+            aria-label="Next month"
+          >
+            <ChevronRightIcon size={14} />
+          </button>
+        </div>
+
+        <label className="history-search" style={searchWrapStyle}>
+          <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search activity…"
+            style={searchInputStyle}
+            aria-label="Search transactions"
+          />
+          {search && (
+            <button type="button" onClick={() => setSearch("")} style={searchClearStyle} aria-label="Clear search">✕</button>
+          )}
+        </label>
       </div>
-
-      {/* Search */}
-      <label style={searchWrapStyle}>
-        <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search activity…"
-          style={searchInputStyle}
-          aria-label="Search transactions"
-        />
-        {search && (
-          <button type="button" onClick={() => setSearch("")} style={searchClearStyle} aria-label="Clear search">✕</button>
-        )}
-      </label>
 
       {/* Type filter chips */}
       <ChipTabs
@@ -182,53 +183,55 @@ export function HistoryScreen({
         ]}
       />
 
-      {/* Spotlight: income / expenses / net */}
-      {typeFilter === "all" && transactions.length > 0 && (
-        <div style={spotlightStyle}>
-          <div style={spotlightStatStyle}>
-            <span style={spotlightLabelStyle}>Income</span>
-            <span style={{ ...spotlightValueStyle, color: stats.income > 0 ? "var(--accent-ink)" : "var(--muted)" }}>
-              +{fmt(stats.income)}
-            </span>
-            <span style={spotlightCurrencyStyle}>MAD</span>
-          </div>
-          <div style={spotlightDividerStyle} />
-          <div style={spotlightStatStyle}>
-            <span style={spotlightLabelStyle}>Expenses</span>
-            <span style={spotlightValueStyle}>−{fmt(stats.expenses)}</span>
-            <span style={spotlightCurrencyStyle}>MAD</span>
-          </div>
-          <div style={spotlightDividerStyle} />
-          <div style={spotlightStatStyle}>
-            <span style={spotlightLabelStyle}>Net</span>
-            <span style={{ ...spotlightValueStyle, color: stats.net >= 0 ? "var(--accent-ink)" : "var(--danger)" }}>
-              {stats.net >= 0 ? "+" : "−"}{fmt(Math.abs(stats.net))}
-            </span>
-            <span style={spotlightCurrencyStyle}>MAD</span>
-          </div>
-        </div>
-      )}
-
-      {/* Category breakdown */}
-      {typeFilter === "all" && !search && categoryBreakdown.length > 0 && (
-        <section style={{ minWidth: 0 }}>
-          <div style={sectionHeaderStyle}>
-            <span style={sectionLabelStyle}>Top categories</span>
-          </div>
-          <div className="home-scroll-rail" style={breakdownRailStyle}>
-            {categoryBreakdown.map(({ cat, spent, planned, pct, isOver }) => (
-              <div key={cat!.id} style={breakdownCardStyle}>
-                <CategoryIcon icon={cat!.icon} size={22} style={{ flexShrink: 0 }} />
-                <span style={breakdownNameStyle}>{cat!.name}</span>
-                <div style={breakdownBarTrackStyle}>
-                  <div style={{ ...breakdownBarFillStyle, width: `${pct}%`, background: isOver ? "var(--spend-over)" : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)" }} />
-                </div>
-                <span style={{ ...breakdownAmtStyle, color: isOver ? "var(--spend-over)" : "var(--text2)" }}>{fmt(spent)}</span>
-                <span style={breakdownCurrencyStyle}>{planned > 0 ? `of ${fmt(planned)} MAD` : "MAD"}</span>
+      {/* Stats panels: spotlight + top categories — side by side on desktop */}
+      {typeFilter === "all" && (transactions.length > 0 || (!search && categoryBreakdown.length > 0)) && (
+        <div className="history-panels-row">
+          {transactions.length > 0 && (
+            <div style={spotlightStyle}>
+              <div style={spotlightStatStyle}>
+                <span style={spotlightLabelStyle}>Income</span>
+                <span style={{ ...spotlightValueStyle, color: stats.income > 0 ? "var(--accent-ink)" : "var(--muted)" }}>
+                  +{fmt(stats.income)}
+                </span>
+                <span style={spotlightCurrencyStyle}>MAD</span>
               </div>
-            ))}
-          </div>
-        </section>
+              <div style={spotlightDividerStyle} />
+              <div style={spotlightStatStyle}>
+                <span style={spotlightLabelStyle}>Expenses</span>
+                <span style={spotlightValueStyle}>−{fmt(stats.expenses)}</span>
+                <span style={spotlightCurrencyStyle}>MAD</span>
+              </div>
+              <div style={spotlightDividerStyle} />
+              <div style={spotlightStatStyle}>
+                <span style={spotlightLabelStyle}>Net</span>
+                <span style={{ ...spotlightValueStyle, color: stats.net >= 0 ? "var(--accent-ink)" : "var(--danger)" }}>
+                  {stats.net >= 0 ? "+" : "−"}{fmt(Math.abs(stats.net))}
+                </span>
+                <span style={spotlightCurrencyStyle}>MAD</span>
+              </div>
+            </div>
+          )}
+          {!search && categoryBreakdown.length > 0 && (
+            <section style={{ minWidth: 0 }}>
+              <div style={sectionHeaderStyle}>
+                <span style={sectionLabelStyle}>Top categories</span>
+              </div>
+              <div className="home-scroll-rail" style={breakdownRailStyle}>
+                {categoryBreakdown.map(({ cat, spent, planned, pct, isOver }) => (
+                  <div key={cat!.id} style={breakdownCardStyle}>
+                    <CategoryIcon icon={cat!.icon} size={22} style={{ flexShrink: 0 }} />
+                    <span style={breakdownNameStyle}>{cat!.name}</span>
+                    <div style={breakdownBarTrackStyle}>
+                      <div style={{ ...breakdownBarFillStyle, width: `${pct}%`, background: isOver ? "var(--spend-over)" : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)" }} />
+                    </div>
+                    <span style={{ ...breakdownAmtStyle, color: isOver ? "var(--spend-over)" : "var(--text2)" }}>{fmt(spent)}</span>
+                    <span style={breakdownCurrencyStyle}>{planned > 0 ? `of ${fmt(planned)} MAD` : "MAD"}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
 
       {/* Transaction groups */}
@@ -242,7 +245,7 @@ export function HistoryScreen({
                   <span style={groupLabelStyle}>{label}</span>
                   {subtotal > 0 && <span style={groupSubtotalStyle}>{fmt(subtotal)} MAD</span>}
                 </div>
-                <div style={{ display: "grid", gap: 6 }}>
+                <div className="tx-group-list" style={{ display: "grid", gap: 6 }}>
                   {items.map((txn, i) => {
                     const cat      = categories.find(c => c.id === txn.category);
                     const fromCat  = categories.find(c => c.id === txn.fromCategoryId);
