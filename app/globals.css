@@ -375,6 +375,35 @@ input[type="number"] { -moz-appearance: textfield; }
   font-size: clamp(96px, 26vw, 144px) !important;
 }
 
+/*
+  Auto-sizing wrapper for the hero amount input.
+  The ::after ghost mirrors the input value so the container
+  shrinks to exactly content width — cursor always follows the text.
+*/
+.amount-hero-sizer {
+  display: inline-grid;
+  max-width: 100%;
+}
+.amount-hero-sizer::after {
+  content: attr(data-value);
+  visibility: hidden;
+  pointer-events: none;
+  grid-area: 1 / 1;
+  white-space: pre;
+  font-size: clamp(96px, 26vw, 144px);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  line-height: 0.88;
+  letter-spacing: -0.03em;
+}
+.amount-hero-sizer .amount-hero-input {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+}
+
 /* Date picker icon */
 input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
 html[data-mode="wife"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.3) sepia(1) saturate(3) hue-rotate(290deg); }

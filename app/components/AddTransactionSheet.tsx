@@ -127,37 +127,37 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         {/* ── Amount hero ── */}
         <section style={heroWrapStyle}>
           <span style={currencyLabelStyle}>MAD</span>
-          <input
-            type="text"
-            inputMode="text"
-            value={props.amount}
-            onChange={(e) => props.onAmountChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
-            placeholder="0"
-            aria-label="Amount"
-            autoComplete="off"
-            autoFocus
-            className="amount-hero-input"
-            style={{
-              width: "100%",
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              margin: 0,
-              color: "var(--text2)",
-              outline: "none",
-              textAlign: "center",
-              WebkitAppearance: "none",
-              appearance: "none",
-              fontSize: "clamp(96px, 26vw, 144px)",
-              fontFamily: "var(--font-body)",
-              fontWeight: 500,
-              fontVariantNumeric: "tabular-nums",
-              fontFeatureSettings: '"tnum"',
-              lineHeight: 0.88,
-              letterSpacing: "-0.03em",
-            }}
-          />
+          <div className="amount-hero-sizer" data-value={props.amount || "0"}>
+            <input
+              type="text"
+              inputMode="text"
+              value={props.amount}
+              onChange={(e) => props.onAmountChange(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
+              placeholder="0"
+              aria-label="Amount"
+              autoComplete="off"
+              autoFocus
+              className="amount-hero-input"
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                margin: 0,
+                color: "var(--text2)",
+                outline: "none",
+                WebkitAppearance: "none",
+                appearance: "none",
+                fontSize: "clamp(96px, 26vw, 144px)",
+                fontFamily: "var(--font-body)",
+                fontWeight: 500,
+                fontVariantNumeric: "tabular-nums",
+                fontFeatureSettings: '"tnum"',
+                lineHeight: 0.88,
+                letterSpacing: "-0.03em",
+              }}
+            />
+          </div>
           {isExpression(props.amount) && (
             <p style={exprPreviewStyle}>
               = {fmt(evalExpr(props.amount))} MAD
