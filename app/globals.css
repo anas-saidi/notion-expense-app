@@ -1610,3 +1610,28 @@ button:hover .rebalance-btn-icon {
     transition: opacity 0.1s ease !important;
   }
 }
+
+/* ── Donut chart micro-animations ─────────────────────────────── */
+
+/* Staggered slice entrance — sectors scale + fade in from pie centre */
+@keyframes donutSectorIn {
+  from { opacity: 0; transform: scale(0.78); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+
+/* Legend rows — cascade slide up on mount */
+@keyframes legendRowIn {
+  from { transform: translateY(7px); }
+  to   { transform: translateY(0); }
+}
+
+/* Tap ripple — expands outward from click point */
+@keyframes rippleOut {
+  from { transform: scale(0); opacity: 0.45; }
+  to   { transform: scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donut-legend-row { animation: none !important; }
+}

@@ -5,21 +5,8 @@ import type { Account } from "./app-types";
 import { Money } from "./Money";
 import { XIcon } from "./ui/icons";
 import { fmt } from "./app-utils";
-
-/* ── SVG arc helpers ─────────────────────────────────────────────── */
-
-function polar(cx: number, cy: number, r: number, deg: number) {
-  const rad = (deg * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-
-function arcPath(cx: number, cy: number, r: number, startDeg: number, sweepDeg: number): string {
-  const sweep = Math.min(sweepDeg, 359.9);
-  if (sweep <= 0) return "";
-  const s = polar(cx, cy, r, startDeg);
-  const e = polar(cx, cy, r, startDeg + sweep);
-  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
-}
+import { PieChart, Pie, Cell, Sector } from "recharts";
+import type { PieSectorShapeProps } from "recharts";
 
 const CHART_COLORS = [
   "var(--accent)",
@@ -70,7 +57,7 @@ export function ManageScreen({
         </div>
 
         {/* Balance distribution donut */}
-        <AccountBalanceChart accounts={accounts} />
+        <AccountBalanceChart accounts={accounts} onOpenDetails={onOpenDetails} />
 
         <div style={listStyle}>
           {accounts.map((account) => (
@@ -100,7 +87,7 @@ export function ManageScreen({
 
 /* ── Balance distribution chart ─────────────────────────────────── */
 
-function AccountBalanceChart({ accounts }: { accounts: Account[] }) {
+function AccountBalanceChart({ accounts, onOpenDetails }: { accounts: Account[]; onOpenDetails: (account: Account) => void }) {
   const chartData = useMemo(() => {
     const items = accounts
       .filter(a => (a.balance ?? 0) > 0)
@@ -112,32 +99,46 @@ function AccountBalanceChart({ accounts }: { accounts: Account[] }) {
   if (chartData.total === 0 || chartData.items.length === 0) return null;
 
   const { items, total } = chartData;
-  const cx = 70, cy = 70, r = 54, sw = 16;
-  const GAP = items.length > 1 ? 3 : 0;
-  let angle = -90;
-  const segments = items.map((account, i) => {
-    const val = account.balance ?? 0;
-    const fullSweep = (val / total) * 360;
-    const sweep = Math.max(0, fullSweep - GAP);
-    const path = arcPath(cx, cy, r, angle, sweep);
-    angle += fullSweep;
-    return { account, val, path, color: CHART_COLORS[i % CHART_COLORS.length] };
-  });
+  const segments = items.map((account, i) => ({
+    name: account.label,
+    value: account.balance ?? 0,
+    account,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
 
   return (
     <div style={chartWrapStyle}>
       {/* Centered donut */}
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div style={{ position: "relative", width: 140, height: 140 }}>
-          <svg width={140} height={140} viewBox="0 0 140 140" aria-hidden="true">
-            <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--surface2)" strokeWidth={sw} />
-            {segments.map((seg, i) =>
-              seg.path ? (
-                <path key={i} d={seg.path} fill="none" stroke={seg.color} strokeWidth={sw} strokeLinecap="butt" />
-              ) : null
-            )}
-          </svg>
-          <div style={chartCenterStyle}>
+          <PieChart width={140} height={140} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+            <Pie
+              data={segments}
+              cx={70} cy={70}
+              innerRadius={46} outerRadius={62}
+              paddingAngle={items.length > 1 ? 4 : 0}
+              dataKey="value"
+              startAngle={90} endAngle={-270}
+              onClick={(_, index) => onOpenDetails(segments[index].account)}
+              cursor="pointer"
+              stroke="none"
+              isAnimationActive={true}
+              animationBegin={0}
+              animationDuration={750}
+              animationEasing="ease-out"
+              shape={(props: PieSectorShapeProps) => {
+                const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
+                const maxRadius = sweep * 62 * Math.PI / 180 / 2;
+                const cr = Math.min(7, maxRadius);
+                return <Sector {...props} cornerRadius={cr} outerRadius={62} />;
+              }}
+            >
+              {segments.map((seg, i) => (
+                <Cell key={i} fill={seg.color} />
+              ))}
+            </Pie>
+          </PieChart>
+          <div style={{ ...chartCenterStyle, pointerEvents: "none" }}>
             <span style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 800, color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
               {fmt(Math.round(total))}
             </span>
@@ -148,13 +149,24 @@ function AccountBalanceChart({ accounts }: { accounts: Account[] }) {
 
       {/* Legend — 2 columns */}
       <div style={chartLegendStyle}>
-        {segments.map(({ account, val, color }) => (
-          <div key={account.id} style={chartLegendRowStyle}>
+        {segments.map(({ account, value, color }, i) => (
+          <button
+            key={account.id}
+            type="button"
+            onClick={() => onOpenDetails(account)}
+            style={{
+              ...chartLegendRowStyle,
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+            }}
+          >
             <span style={{ width: 7, height: 7, borderRadius: 2, flexShrink: 0, background: color }} />
             <span style={{ fontSize: 13, lineHeight: 1 }}>{account.icon}</span>
             <span style={chartLegendNameStyle}>{account.label}</span>
-            <span style={chartLegendAmtStyle}>{fmt(Math.round(val))}</span>
-          </div>
+            <span style={chartLegendAmtStyle}>{fmt(Math.round(value))}</span>
+          </button>
         ))}
       </div>
     </div>
