@@ -6,7 +6,8 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { categoryMatchesScope, getCategoryScope, transactionMatchesScope, monthBounds, fmt, fmtDate } from "./app-utils";
 import { ArrowLeftIcon, ChevronRightIcon } from "./ui/icons";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, PieChart, Pie, Cell, Sector } from "recharts";
+import type { PieSectorShapeProps } from "recharts";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -47,21 +48,6 @@ const DONUT_COLORS = [
   "#fb923c",
   "#34d399",
 ];
-
-/* ─── SVG arc helpers ────────────────────────────────────────────── */
-
-function polar(cx: number, cy: number, r: number, deg: number) {
-  const rad = (deg * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-
-function arcPath(cx: number, cy: number, r: number, startDeg: number, sweepDeg: number): string {
-  const sweep = Math.min(sweepDeg, 359.9);
-  if (sweep <= 0) return "";
-  const s = polar(cx, cy, r, startDeg);
-  const e = polar(cx, cy, r, startDeg + sweep);
-  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
-}
 
 /* ─── Screen ─────────────────────────────────────────────────────── */
 
@@ -787,39 +773,63 @@ function DonutView({ items, total }: {
   items: Array<{ cat: Category; spent: number }>;
   total: number;
 }) {
-  const cx = 70, cy = 70, r = 52, sw = 16;
-  const GAP = items.length > 1 ? 3 : 0;
-  let angle = -90;
-  const segments = items.map(({ cat, spent }, i) => {
-    const proportion = spent / total;
-    const fullSweep  = proportion * 360;
-    const sweep      = Math.max(0, fullSweep - GAP);
-    const path       = arcPath(cx, cy, r, angle, sweep);
-    angle += fullSweep;
-    return { cat, spent, path, color: DONUT_COLORS[i % DONUT_COLORS.length] };
-  });
+  const segments = items.map(({ cat, spent }, i) => ({
+    name: cat.name,
+    value: spent,
+    spent,
+    cat,
+    color: DONUT_COLORS[i % DONUT_COLORS.length],
+  }));
 
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
       <div style={{ position: "relative", flexShrink: 0, width: 140, height: 140 }}>
-        <svg width={140} height={140} viewBox="0 0 140 140" aria-hidden="true">
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--surface2)" strokeWidth={sw} />
-          {segments.map((seg, i) =>
-            seg.path ? (
-              <path key={i} d={seg.path} fill="none" stroke={seg.color} strokeWidth={sw} strokeLinecap="butt" />
-            ) : null
-          )}
-        </svg>
-        <div style={donutCenterStyle}>
+        <PieChart width={140} height={140} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+          <Pie
+            data={segments}
+            cx={70} cy={70}
+            innerRadius={44} outerRadius={60}
+            paddingAngle={items.length > 1 ? 4 : 0}
+            dataKey="value"
+            startAngle={90} endAngle={-270}
+            stroke="none"
+            isAnimationActive={true}
+            animationBegin={0}
+            animationDuration={750}
+            animationEasing="ease-out"
+            shape={(props: PieSectorShapeProps) => {
+              const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
+              const maxRadius = sweep * 60 * Math.PI / 180 / 2;
+              const cr = Math.min(7, maxRadius);
+              return <Sector {...props} cornerRadius={cr} outerRadius={60} />;
+            }}
+          >
+            {segments.map((seg, i) => (
+              <Cell key={i} fill={seg.color} />
+            ))}
+          </Pie>
+        </PieChart>
+        <div style={{ ...donutCenterStyle, pointerEvents: "none" }}>
           <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 700, color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
             {fmt(total)}
           </span>
           <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 3, letterSpacing: 0.3 }}>MAD</span>
         </div>
       </div>
-      <div style={{ flex: 1, display: "grid", gap: 9, alignContent: "center" as const }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ flex: 1, display: "grid", gap: 9, alignContent: "center" as const }}
+      >
         {segments.map(({ cat, spent, color }, i) => (
-          <div key={cat.id ?? i} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <div
+            key={cat.id ?? i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              minWidth: 0,
+            }}
+          >
             <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
             <span style={{ fontSize: 11, color: "var(--text2)", fontWeight: 500, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
               {cat.name}

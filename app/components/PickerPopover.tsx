@@ -13,6 +13,9 @@ type PickerPopoverProps = {
   anchorRef?: RefObject<HTMLElement | null>;
 };
 
+// Below this width, always pin to bottom of visual viewport (above keyboard on mobile)
+const MOBILE_BREAKPOINT = 600;
+
 export function PickerPopover({
   open,
   children,
@@ -23,9 +26,8 @@ export function PickerPopover({
   anchorRef,
 }: PickerPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
-  // Placement is locked on first open and not re-evaluated while the popover
-  // is open. Without this, filtering the list changes the popover height,
-  // the fit-check flips the direction, and the popover jumps away from anchor.
+  // Placement direction is locked on first open so the popover doesn't jump
+  // while the list re-renders (filtering changes popover height).
   const lockedPlacementRef = useRef<"top" | "bottom" | null>(null);
   const [positionStyle, setPositionStyle] = useState<CSSProperties>({ visibility: "hidden" });
   const [mounted, setMounted] = useState(false);
@@ -48,24 +50,43 @@ export function PickerPopover({
 
       const anchorRect = anchorRef.current.getBoundingClientRect();
       const popoverRect = popoverRef.current.getBoundingClientRect();
+      // Use visualViewport for accurate dimensions when virtual keyboard is open
+      const vv = window.visualViewport;
+      const viewportHeight = vv?.height ?? window.innerHeight;
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const gutter = 12;
+      const gutter = 8;
 
-      let left = align === "right" ? anchorRect.right - popoverRect.width : anchorRect.left;
+      // ── Mobile: pin to the bottom of the visual viewport ──────────────────
+      // On mobile the virtual keyboard shrinks the visual viewport. Anchoring a
+      // popover to a chip while the keyboard is open is unreliable across iOS/
+      // Android PWA. Instead we follow the native pattern: float the picker as
+      // a full-width panel just above the keyboard (bottom: gutter).
+      if (viewportWidth < MOBILE_BREAKPOINT) {
+        setPositionStyle({
+          position: "fixed",
+          left: gutter,
+          right: gutter,
+          bottom: gutter,
+          visibility: "visible",
+        });
+        return;
+      }
+
+      // ── Desktop: anchor to the chip ────────────────────────────────────────
+      let left = align === "right"
+        ? anchorRect.right - popoverRect.width
+        : anchorRect.left;
       left = Math.min(Math.max(gutter, left), viewportWidth - popoverRect.width - gutter);
 
-      // Lock placement direction on first call. Subsequent calls (triggered by
-      // the popover resizing as the list filters) reuse the locked direction so
-      // the popover never jumps away from the anchor mid-interaction.
+      // Lock direction once so filtering the list doesn't flip it mid-session
       if (lockedPlacementRef.current === null) {
         const preferredTop =
           placement === "bottom"
             ? anchorRect.bottom + 10
             : anchorRect.top - popoverRect.height - 10;
-        const preferredFits =
+        const fits =
           preferredTop >= gutter && preferredTop + popoverRect.height <= viewportHeight - gutter;
-        lockedPlacementRef.current = preferredFits
+        lockedPlacementRef.current = fits
           ? placement
           : placement === "bottom" ? "top" : "bottom";
       }
@@ -77,34 +98,40 @@ export function PickerPopover({
           : anchorRect.top - popoverRect.height - 10;
       top = Math.min(Math.max(gutter, top), viewportHeight - popoverRect.height - gutter);
 
-      setPositionStyle({
-        position: "fixed",
-        left,
-        top,
-        visibility: "visible",
-      });
+      setPositionStyle({ position: "fixed", left, top, visibility: "visible" });
     };
+
     const scheduleUpdate = () => {
       if (frameId !== null) cancelAnimationFrame(frameId);
       frameId = requestAnimationFrame(updatePosition);
     };
 
     updatePosition();
-    const resizeObserver = new ResizeObserver(scheduleUpdate);
-    resizeObserver.observe(popoverRef.current);
-    resizeObserver.observe(anchorRef.current);
+
+    const ro = new ResizeObserver(scheduleUpdate);
+    ro.observe(popoverRef.current);
+    ro.observe(anchorRef.current);
     window.addEventListener("resize", scheduleUpdate);
     window.addEventListener("scroll", scheduleUpdate, true);
+    // visualViewport fires when the virtual keyboard opens/closes on mobile
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", scheduleUpdate);
+    vv?.addEventListener("scroll", scheduleUpdate);
 
     return () => {
       if (frameId !== null) cancelAnimationFrame(frameId);
-      resizeObserver.disconnect();
+      ro.disconnect();
       window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("scroll", scheduleUpdate, true);
+      vv?.removeEventListener("resize", scheduleUpdate);
+      vv?.removeEventListener("scroll", scheduleUpdate);
     };
   }, [align, anchorRef, open, placement]);
 
   if (!open || !mounted) return null;
+
+  // On mobile (bottom-pinned), `right` is set so `width` must be "auto"
+  const isMobilePinned = "right" in positionStyle;
 
   return createPortal(
     <div
@@ -112,8 +139,10 @@ export function PickerPopover({
       data-picker-popover="true"
       style={{
         ...positionStyle,
-        width,
-        maxWidth: "min(calc(100vw - 24px), calc(100dvw - 24px))",
+        width: isMobilePinned ? "auto" : width,
+        maxWidth: "min(calc(100vw - 16px), calc(100dvw - 16px))",
+        // On mobile give a sensible max-height so the picker doesn't cover the whole screen
+        maxHeight: isMobilePinned ? "min(380px, 52dvh)" : undefined,
         background: "color-mix(in srgb, var(--surface) 97%, white)",
         border: "1px solid color-mix(in srgb, var(--border2) 64%, transparent)",
         borderRadius: 18,

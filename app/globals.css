@@ -375,6 +375,35 @@ input[type="number"] { -moz-appearance: textfield; }
   font-size: clamp(96px, 26vw, 144px) !important;
 }
 
+/*
+  Auto-sizing wrapper for the hero amount input.
+  The ::after ghost mirrors the input value so the container
+  shrinks to exactly content width — cursor always follows the text.
+*/
+.amount-hero-sizer {
+  display: inline-grid;
+  max-width: 100%;
+}
+.amount-hero-sizer::after {
+  content: attr(data-value);
+  visibility: hidden;
+  pointer-events: none;
+  grid-area: 1 / 1;
+  white-space: pre;
+  font-size: clamp(96px, 26vw, 144px);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  line-height: 0.88;
+  letter-spacing: -0.03em;
+}
+.amount-hero-sizer .amount-hero-input {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+}
+
 /* Date picker icon */
 input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
 html[data-mode="wife"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.3) sepia(1) saturate(3) hue-rotate(290deg); }
@@ -1580,4 +1609,29 @@ button:hover .rebalance-btn-icon {
     opacity: 0 !important;
     transition: opacity 0.1s ease !important;
   }
+}
+
+/* ── Donut chart micro-animations ─────────────────────────────── */
+
+/* Staggered slice entrance — sectors scale + fade in from pie centre */
+@keyframes donutSectorIn {
+  from { opacity: 0; transform: scale(0.78); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+
+/* Legend rows — cascade slide up on mount */
+@keyframes legendRowIn {
+  from { transform: translateY(7px); }
+  to   { transform: translateY(0); }
+}
+
+/* Tap ripple — expands outward from click point */
+@keyframes rippleOut {
+  from { transform: scale(0); opacity: 0.45; }
+  to   { transform: scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donut-legend-row { animation: none !important; }
 }

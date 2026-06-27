@@ -1,25 +1,12 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import type { BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SearchIcon, ShuffleIcon, FreezeIcon, ChevronRightIcon } from "./ui/icons";
 import { fmt, getCategoryScope } from "./app-utils";
-
-/* ─── SVG arc helpers (shared with InsightsScreen style) ────────── */
-
-function polar(cx: number, cy: number, r: number, deg: number) {
-  const rad = (deg * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-
-function arcPath(cx: number, cy: number, r: number, startDeg: number, sweepDeg: number): string {
-  const sweep = Math.min(sweepDeg, 359.9);
-  if (sweep <= 0) return "";
-  const s = polar(cx, cy, r, startDeg);
-  const e = polar(cx, cy, r, startDeg + sweep);
-  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
-}
+import { PieChart, Pie, Cell, Sector } from "recharts";
+import type { PieSectorShapeProps } from "recharts";
 
 const CHART_COLORS = [
   "var(--accent)",
@@ -197,10 +184,12 @@ export function CategoriesScreen({
 
       {/* Budget distribution chart */}
       <BudgetDistributionChart
+        key={scope}
         categories={categories}
         monthlySummary={monthlySummary}
         homeMonth={homeMonth}
         scope={scope}
+        onSelectCategory={onOpenCategoryDetails}
       />
 
       {/* Search */}
@@ -224,70 +213,24 @@ export function CategoriesScreen({
               <section key={label} style={{ minWidth: 0 }}>
                 <div style={sectionLabelStyle}>{label}</div>
                 <div className="home-scroll-rail" style={railStyle}>
-                  {items.map(({ cat, available, spent, planned, health }, i) => {
-                    const isOver    = health === "over";
-                    const isLow     = health === "low";
-                    const amountNum = isOver ? spent - planned : Math.abs(available);
-                    const amountStr = health === "noplan" ? "—" : fmt(amountNum);
-                    const unitStr   = health === "noplan" ? "No plan"
-                                    : isOver              ? "MAD over"
-                                    :                       "MAD left";
-                    const progressPct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
-                    return (
-                      <div
-                        key={cat.id}
-                        className={freezingId === cat.id ? "category-card--freezing" : undefined}
-                        style={{ ...cardStyle, animation: `fadeUp 0.22s ${Math.min(i * 0.025, 0.2)}s ease both` }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFreezingId(cat.id);
-                            setTimeout(() => onFreezeCategory(cat), 260);
-                            setTimeout(() => setFreezingId(null), 420);
-                          }}
-                          aria-label={`Freeze ${cat.name}`}
-                          className="freeze-btn"
-                          style={freezeBtnStyle}
-                        >
-                          <FreezeIcon size={9} strokeWidth={2.5} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onOpenCategoryDetails(cat)}
-                          style={cardBodyStyle}
-                          aria-label={`${cat.name}${isOver ? ", over budget" : isLow ? ", low" : ""}`}
-                        >
-                          <div style={cardTopStyle}>
-                            <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
-                            <span style={cardNameStyle}>{cat.name}</span>
-                            {(isOver || isLow) && (
-                              <span style={cardBadgeStyle(isOver)}>
-                                {isOver ? "OVER" : "LOW"}
-                              </span>
-                            )}
-                          </div>
-                          <div style={cardBottomStyle}>
-                            {health !== "noplan" && (
-                              <div style={progressTrackStyle}>
-                                <div style={{
-                                  height: "100%",
-                                  width: `${progressPct}%`,
-                                  borderRadius: 999,
-                                  background: health === "over" ? "var(--danger)"
-                                             : health === "low"  ? "var(--warning)"
-                                             :                     "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
-                                  transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
-                                }} />
-                              </div>
-                            )}
-                            <span style={cardAmountStyle(health)}>{amountStr}</span>
-                            <span style={cardUnitStyle}>{unitStr}</span>
-                          </div>
-                        </button>
-                      </div>
-                    );
-                  })}
+                  {items.map(({ cat, available, spent, planned, health }, i) => (
+                    <CategoryCard
+                      key={cat.id}
+                      cat={cat}
+                      available={available}
+                      spent={spent}
+                      planned={planned}
+                      health={health}
+                      index={i}
+                      isFreezingId={freezingId === cat.id}
+                      onFreeze={() => {
+                        setFreezingId(cat.id);
+                        setTimeout(() => onFreezeCategory(cat), 260);
+                        setTimeout(() => setFreezingId(null), 420);
+                      }}
+                      onOpenDetails={() => onOpenCategoryDetails(cat)}
+                    />
+                  ))}
                 </div>
               </section>
             ))}
@@ -456,6 +399,95 @@ function FrozenAllScreen({
   );
 }
 
+/* ─── Category card (owns count-up + bar animation) ───────────── */
+
+function CategoryCard({
+  cat, available, spent, planned, health, index, isFreezingId, onFreeze, onOpenDetails,
+}: {
+  cat: import("./app-types").Category;
+  available: number; spent: number; planned: number;
+  health: Health; index: number; isFreezingId: boolean;
+  onFreeze: () => void; onOpenDetails: () => void;
+}) {
+  const isOver = health === "over";
+  const isLow  = health === "low";
+  const amountNum = isOver ? spent - planned : Math.abs(available);
+  const progressPct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
+
+  // Count up from 0 on every mount (scope switch remounts cards with new cat.id keys)
+  const displayAmount = useCountUp(amountNum, 580, 0);
+  const amountStr = health === "noplan" ? "—" : fmt(Math.round(displayAmount));
+  const unitStr   = health === "noplan" ? "No plan" : isOver ? "MAD over" : "MAD left";
+
+  // Progress bar: scaleX from 0 on mount, transition on subsequent updates
+  const [barScale, setBarScale] = useState(0);
+  useEffect(() => { setBarScale(progressPct / 100); }, [progressPct]);
+
+  const barColor = health === "over" ? "var(--danger)"
+                 : health === "low"  ? "var(--warning)"
+                 :                     "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
+
+  return (
+    <div
+      className={isFreezingId ? "category-card--freezing" : undefined}
+      style={{ ...cardStyle, animation: `fadeUp 0.22s ${Math.min(index * 0.025, 0.2)}s ease both` }}
+    >
+      <button type="button" onClick={onFreeze} aria-label={`Freeze ${cat.name}`}
+        className="freeze-btn" style={freezeBtnStyle}>
+        <FreezeIcon size={9} strokeWidth={2.5} />
+      </button>
+      <button type="button" onClick={onOpenDetails} style={cardBodyStyle}
+        aria-label={`${cat.name}${isOver ? ", over budget" : isLow ? ", low" : ""}`}>
+        <div style={cardTopStyle}>
+          <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
+          <span style={cardNameStyle}>{cat.name}</span>
+          {(isOver || isLow) && (
+            <span style={cardBadgeStyle(isOver)}>{isOver ? "OVER" : "LOW"}</span>
+          )}
+        </div>
+        <div style={cardBottomStyle}>
+          {health !== "noplan" && (
+            <div style={progressTrackStyle}>
+              <div style={{
+                height: "100%", width: "100%", borderRadius: 999,
+                background: barColor,
+                transformOrigin: "left center",
+                transform: `scaleX(${barScale})`,
+                transition: "transform 0.65s cubic-bezier(0.22, 1, 0.36, 1)",
+              }} />
+            </div>
+          )}
+          <span style={cardAmountStyle(health)}>{amountStr}</span>
+          <span style={cardUnitStyle}>{unitStr}</span>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+/* ─── Count-up animation hook ──────────────────────────────────── */
+
+function useCountUp(target: number, duration = 750, from = target): number {
+  const [display, setDisplay] = useState(from);
+  const prevTarget = useRef(from);
+  useEffect(() => {
+    const from = prevTarget.current;
+    prevTarget.current = target;
+    if (from === target) return;
+    const startTime = performance.now();
+    let raf: number;
+    function step(now: number) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setDisplay(Math.round(from + eased * (target - from)));
+      if (t < 1) raf = requestAnimationFrame(step);
+    }
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return display;
+}
+
 /* ─── Budget Distribution Chart ───────────────────────────────── */
 
 function BudgetDistributionChart({
@@ -463,12 +495,19 @@ function BudgetDistributionChart({
   monthlySummary,
   homeMonth,
   scope,
+  onSelectCategory,
 }: {
   categories: Category[];
   monthlySummary: MonthlySummary;
   homeMonth: string;
   scope: ScopeChip;
+  onSelectCategory: (cat: Category) => void;
 }) {
+  // All hooks at top — before any conditional return
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const [ripple, setRipple] = useState<{ x: number; y: number; color: string } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
 
   const spentByCategory = useMemo(() => {
@@ -499,55 +538,159 @@ function BudgetDistributionChart({
     return { items, total };
   }, [categories, scope, spentByCategory, plannedByCategory, isCurrentMonth]);
 
-  if (chartData.total === 0 || chartData.items.length === 0) return null;
+  // Segment computation before guard — needed by useCountUp
+  const allSegments = chartData.items.map(({ cat, available }, i) => ({
+    name: cat.name,
+    value: available,
+    available,
+    cat,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+  const visibleSegments = allSegments.filter(s => !hiddenIds.has(s.cat.id));
+  const visibleTotal = visibleSegments.reduce((s, seg) => s + seg.available, 0);
 
-  const { items, total } = chartData;
-  const cx = 90, cy = 90, r = 70, sw = 18;
-  const GAP = items.length > 1 ? 2.5 : 0;
-  let angle = -90;
-  const segments = items.map(({ cat, available }, i) => {
-    const proportion = available / total;
-    const fullSweep = proportion * 360;
-    const sweep = Math.max(0, fullSweep - GAP);
-    const path = arcPath(cx, cy, r, angle, sweep);
-    angle += fullSweep;
-    return { cat, available, path, color: CHART_COLORS[i % CHART_COLORS.length] };
+  // "All good" pulse: every visible category has ≥60% of planned remaining
+  const allHealthy = visibleSegments.length > 0 && visibleSegments.every(s => {
+    const planned = plannedByCategory.get(s.cat.id) ?? 0;
+    return planned > 0 && s.available >= planned * 0.6;
   });
 
+  // Count-up must be called before conditional return (hook rule)
+  const countedTotal = useCountUp(visibleTotal);
+
+  // ── All spent empty state ──────────────────────────────────────
+  if (chartData.total === 0 || chartData.items.length === 0) {
+    return (
+      <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div style={{ position: "relative", width: 180, height: 180 }}>
+            <svg width={180} height={180} viewBox="0 0 180 180" aria-hidden="true">
+              <circle cx={90} cy={90} r={70} fill="none" stroke="var(--accent)"
+                strokeWidth={18} strokeDasharray="5 8" strokeLinecap="round" opacity={0.4} />
+            </svg>
+            <div style={chartCenterStyle}>
+              <span style={{ fontSize: 26, lineHeight: 1 }}>✓</span>
+              <span style={{ fontSize: 10, color: "var(--muted)", marginTop: 6, letterSpacing: 0.3 }}>all used!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function toggleHidden(id: string) {
+    setHiddenIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function handleSliceClick(index: number, e: { clientX: number; clientY: number }) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const color = visibleSegments[index]?.color ?? "var(--accent)";
+      setRipple({ x: e.clientX - rect.left, y: e.clientY - rect.top, color });
+      setTimeout(() => setRipple(null), 280);
+    }
+    onSelectCategory(visibleSegments[index].cat);
+  }
+
   return (
-    <div style={chartWrapStyle}>
+    <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
       {/* Donut — centered */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <div style={{ position: "relative", width: 180, height: 180 }}>
-          <svg width={180} height={180} viewBox="0 0 180 180" aria-hidden="true">
-            <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--surface2)" strokeWidth={sw} />
-            {segments.map((seg, i) =>
-              seg.path ? (
-                <path key={i} d={seg.path} fill="none" stroke={seg.color} strokeWidth={sw} strokeLinecap="butt" />
-              ) : null
-            )}
-          </svg>
-          <div style={chartCenterStyle}>
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800, color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-              {fmt(Math.round(total))}
+        <div ref={containerRef} style={{ position: "relative", width: 180, height: 180, overflow: "hidden" }}>
+          <PieChart width={180} height={180} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+            <Pie
+              data={visibleSegments}
+              cx={90} cy={90}
+              innerRadius={61} outerRadius={79}
+              paddingAngle={visibleSegments.length > 1 ? 4 : 0}
+              dataKey="value"
+              startAngle={90} endAngle={-270}
+              onClick={(_, index, e) => handleSliceClick(index, e)}
+              cursor="pointer"
+              stroke="none"
+              isAnimationActive={true}
+              animationBegin={0}
+              animationDuration={750}
+              animationEasing="ease-out"
+              shape={(props: PieSectorShapeProps) => {
+                const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
+                const cr = Math.min(8, sweep * 79 * Math.PI / 180 / 2);
+                return <Sector {...props} cornerRadius={cr} outerRadius={79} />;
+              }}
+            >
+              {visibleSegments.map((seg, i) => (
+                <Cell key={seg.cat.id ?? i} fill={seg.color} />
+              ))}
+            </Pie>
+          </PieChart>
+
+          {/* Tap ripple */}
+          {ripple && (
+            <div
+              style={{
+                position: "absolute",
+                left: ripple.x - 40,
+                top: ripple.y - 40,
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                background: ripple.color,
+                animation: "rippleOut 280ms ease-out forwards",
+                pointerEvents: "none",
+              }}
+            />
+          )}
+
+          <div style={{ ...chartCenterStyle, pointerEvents: "none" }}>
+            {/* Count-up total; pulses softly when all categories are healthy */}
+            <span style={{
+              fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800,
+              color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1,
+              display: "block",
+              animation: allHealthy ? "dotPulse 3s ease-in-out infinite" : "none",
+            }}>
+              {fmt(countedTotal)}
             </span>
             <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4, letterSpacing: 0.3 }}>MAD left</span>
           </div>
         </div>
       </div>
 
-      {/* Legend — 2-column grid below */}
+      {/* Legend — staggered cascade on mount */}
       <div style={chartLegendStyle}>
-        {segments.map(({ cat, available, color }, i) => (
-          <div key={cat.id ?? i} style={chartLegendRowStyle}>
-            <span style={{ ...chartDotStyle, background: color }} />
-            <span style={chartLegendIconStyle}>
-              <CategoryIcon icon={cat.icon} size={11} />
-            </span>
-            <span style={chartLegendNameStyle}>{cat.name}</span>
-            <span style={chartLegendAmtStyle}>{fmt(Math.round(available))}</span>
-          </div>
-        ))}
+        {allSegments.map(({ cat, available, color }, i) => {
+          const isHidden = hiddenIds.has(cat.id);
+          return (
+            <button
+              key={cat.id ?? i}
+              type="button"
+              onClick={() => toggleHidden(cat.id)}
+              title={isHidden ? `Show ${cat.name}` : `Hide ${cat.name}`}
+              className="donut-legend-row"
+              style={{
+                ...chartLegendRowStyle,
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                opacity: isHidden ? 0.35 : 1,
+                transition: "opacity 0.15s ease",
+                animation: `legendRowIn 0.28s ease-out ${i * 28}ms both`,
+              }}
+            >
+              <span style={{ ...chartDotStyle, background: isHidden ? "var(--muted)" : color }} />
+              <span style={chartLegendIconStyle}>
+                <CategoryIcon icon={cat.icon} size={11} />
+              </span>
+              <span style={{ ...chartLegendNameStyle, textDecoration: isHidden ? "line-through" : "none" }}>{cat.name}</span>
+              <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(available))}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
