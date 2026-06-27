@@ -103,7 +103,8 @@ export function CategoryManageSheet({
             categoryId,
             planned: parsedAmount,
             accountId,
-            mode: "increment",
+            // "add" creates a separate Additional record — keeps original Monthly plan intact
+            mode: isCreate ? "increment" : "add",
           }),
         });
         const fundData = await fundRes.json();

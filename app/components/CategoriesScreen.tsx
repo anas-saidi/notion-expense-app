@@ -6,6 +6,31 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { SearchIcon, ShuffleIcon, FreezeIcon, ChevronRightIcon } from "./ui/icons";
 import { fmt, getCategoryScope } from "./app-utils";
 
+/* ─── SVG arc helpers (shared with InsightsScreen style) ────────── */
+
+function polar(cx: number, cy: number, r: number, deg: number) {
+  const rad = (deg * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function arcPath(cx: number, cy: number, r: number, startDeg: number, sweepDeg: number): string {
+  const sweep = Math.min(sweepDeg, 359.9);
+  if (sweep <= 0) return "";
+  const s = polar(cx, cy, r, startDeg);
+  const e = polar(cx, cy, r, startDeg + sweep);
+  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
+}
+
+const CHART_COLORS = [
+  "var(--accent)",
+  "var(--partner-husband)",
+  "var(--partner-wife)",
+  "#a78bfa",
+  "#fb923c",
+  "#34d399",
+  "#60a5fa",
+];
+
 type Props = {
   categories: Category[];
   frozenCategories: Category[];
@@ -169,6 +194,14 @@ export function CategoriesScreen({
       </div>
 
       </div>{/* end categories-header-row */}
+
+      {/* Budget distribution chart */}
+      <BudgetDistributionChart
+        categories={categories}
+        monthlySummary={monthlySummary}
+        homeMonth={homeMonth}
+        scope={scope}
+      />
 
       {/* Search */}
       <label style={searchWrapStyle}>
@@ -422,6 +455,170 @@ function FrozenAllScreen({
     </div>
   );
 }
+
+/* ─── Budget Distribution Chart ───────────────────────────────── */
+
+function BudgetDistributionChart({
+  categories,
+  monthlySummary,
+  homeMonth,
+  scope,
+}: {
+  categories: Category[];
+  monthlySummary: MonthlySummary;
+  homeMonth: string;
+  scope: ScopeChip;
+}) {
+  const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
+
+  const spentByCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of monthlySummary.spentByCategory ?? []) map.set(e.categoryId, e.total);
+    return map;
+  }, [monthlySummary.spentByCategory]);
+
+  const plannedByCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of monthlySummary.assignedByCategory ?? []) map.set(e.categoryId, e.total);
+    return map;
+  }, [monthlySummary.assignedByCategory]);
+
+  const chartData = useMemo(() => {
+    const items = categories
+      .filter(cat => getCategoryScope(cat) === scope)
+      .map(cat => {
+        const planned = plannedByCategory.get(cat.id) ?? 0;
+        const spent = spentByCategory.get(cat.id) ?? 0;
+        const available = isCurrentMonth ? (cat.available ?? Math.max(0, planned - spent)) : Math.max(0, planned - spent);
+        return { cat, available };
+      })
+      .filter(({ available }) => available > 0)
+      .sort((a, b) => b.available - a.available);
+
+    const total = items.reduce((s, { available }) => s + available, 0);
+    return { items, total };
+  }, [categories, scope, spentByCategory, plannedByCategory, isCurrentMonth]);
+
+  if (chartData.total === 0 || chartData.items.length === 0) return null;
+
+  const { items, total } = chartData;
+  const cx = 90, cy = 90, r = 70, sw = 18;
+  const GAP = items.length > 1 ? 2.5 : 0;
+  let angle = -90;
+  const segments = items.map(({ cat, available }, i) => {
+    const proportion = available / total;
+    const fullSweep = proportion * 360;
+    const sweep = Math.max(0, fullSweep - GAP);
+    const path = arcPath(cx, cy, r, angle, sweep);
+    angle += fullSweep;
+    return { cat, available, path, color: CHART_COLORS[i % CHART_COLORS.length] };
+  });
+
+  return (
+    <div style={chartWrapStyle}>
+      {/* Donut — centered */}
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div style={{ position: "relative", width: 180, height: 180 }}>
+          <svg width={180} height={180} viewBox="0 0 180 180" aria-hidden="true">
+            <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--surface2)" strokeWidth={sw} />
+            {segments.map((seg, i) =>
+              seg.path ? (
+                <path key={i} d={seg.path} fill="none" stroke={seg.color} strokeWidth={sw} strokeLinecap="butt" />
+              ) : null
+            )}
+          </svg>
+          <div style={chartCenterStyle}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800, color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+              {fmt(Math.round(total))}
+            </span>
+            <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4, letterSpacing: 0.3 }}>MAD left</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Legend — 2-column grid below */}
+      <div style={chartLegendStyle}>
+        {segments.map(({ cat, available, color }, i) => (
+          <div key={cat.id ?? i} style={chartLegendRowStyle}>
+            <span style={{ ...chartDotStyle, background: color }} />
+            <span style={chartLegendIconStyle}>
+              <CategoryIcon icon={cat.icon} size={11} />
+            </span>
+            <span style={chartLegendNameStyle}>{cat.name}</span>
+            <span style={chartLegendAmtStyle}>{fmt(Math.round(available))}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const chartWrapStyle: CSSProperties = {
+  borderRadius: 16,
+  background: "var(--surface)",
+  padding: "16px 16px 18px",
+  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
+  display: "grid",
+  gap: 16,
+};
+
+const chartCenterStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const chartLegendStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "8px 12px",
+};
+
+const chartLegendRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  minWidth: 0,
+};
+
+const chartDotStyle: CSSProperties = {
+  width: 7,
+  height: 7,
+  borderRadius: 2,
+  flexShrink: 0,
+};
+
+const chartLegendIconStyle: CSSProperties = {
+  width: 14,
+  height: 14,
+  flexShrink: 0,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const chartLegendNameStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  fontSize: 11,
+  fontWeight: 500,
+  color: "var(--text2)",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
+const chartLegendAmtStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: "var(--text2)",
+  flexShrink: 0,
+  fontVariantNumeric: "tabular-nums",
+  fontFeatureSettings: '"tnum"',
+};
 
 /* ─── Scope chip button ────────────────────────────────────────── */
 

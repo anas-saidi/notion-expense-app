@@ -413,14 +413,14 @@ export function AllocationFlow({
           </div>
 
           <div aria-label="Budget control" style={slimBarPanelStyle}>
-            <div style={{ position: "relative" }}>
+            <div style={{ position: "relative", touchAction: "none" }}>
               {/* Native range — in flow, CSS class handles track/thumb appearance */}
               <input
                 className="planning-dial-range"
                 type="range"
                 min={rangeMin}
-                max={rangeMax}
-                step={10}
+                max={Math.max(rangeMin + 1, rangeMax)}
+                step={1}
                 value={activeItem.amount}
                 disabled={readOnly}
                 onChange={(event) => updateActiveAmount(Number(event.target.value))}
@@ -430,6 +430,7 @@ export function AllocationFlow({
                 style={{
                   display: "block",
                   width: "100%",
+                  touchAction: "none",
                   "--range-fill": `${rangeFill.toFixed(1)}%`,
                   "--bar-color": isOver ? "var(--danger)" : isBalanced ? "var(--success)" : "var(--accent)",
                 } as CSSProperties}

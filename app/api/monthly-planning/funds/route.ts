@@ -22,13 +22,14 @@ const buildFundPayload = (payload: {
   planned: number;
   date: string;
   accountId?: string | null;
+  assignmentType?: string;
 }) => {
   const properties: Record<string, any> = {
     Name: { title: [{ text: { content: `Plan ${payload.date.slice(0, 7)}` } }] },
     Date: { date: { start: payload.date } },
     Planned: { number: payload.planned },
     Category: { relation: [{ id: payload.categoryId }] },
-    "Assignment Type": { select: { name: "Monthly" } },
+    "Assignment Type": { select: { name: payload.assignmentType ?? "Monthly" } },
   };
 
   if (payload.accountId) {
@@ -98,8 +99,43 @@ export async function POST(req: NextRequest) {
   const categoryId = String(body.categoryId);
   const accountId = body.accountId ? String(body.accountId) : null;
   const shouldIncrement = body.mode === "increment" || body.increment === true;
+  // mode:"add" always creates a new "Additional" record — preserves the original Monthly plan
+  const shouldAdd = body.mode === "add";
+
+  if (planned <= 0 && !shouldIncrement) {
+    return NextResponse.json({ fund: null, mode: "skipped" });
+  }
 
   try {
+    // "add" mode: always create a fresh Additional record, never touch the Monthly one
+    if (shouldAdd) {
+      if (planned <= 0) {
+        return NextResponse.json({ fund: null, mode: "skipped" });
+      }
+      const createRes = await fetch("https://api.notion.com/v1/pages", {
+        method: "POST",
+        headers: notionHeaders(token),
+        body: JSON.stringify({
+          parent: { database_id: FUNDS_DB },
+          properties: buildFundPayload({
+            categoryId,
+            planned,
+            date: bounds.start,
+            accountId,
+            assignmentType: "Additional",
+          }),
+        }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        return NextResponse.json({ error: createData.message || "Failed to create fund" }, { status: createRes.status });
+      }
+      return NextResponse.json({
+        fund: { id: createData.id, categoryId, planned },
+        mode: "added",
+      });
+    }
+
     const queryRes = await fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
       method: "POST",
       headers: notionHeaders(token),

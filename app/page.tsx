@@ -13,6 +13,7 @@ import { AccountTransferSheet } from "./components/AccountTransferSheet";
 import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
 import { CategoryManageSheet } from "./components/CategoryManageSheet";
 import { ManageScreen } from "./components/ManageScreen";
+import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
 import { RebalanceSheet } from "./components/RebalanceSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
@@ -117,6 +118,7 @@ export default function App() {
   const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
   const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
   const [transferAccount, setTransferAccount] = useState<Account | null>(null);
+  const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
   const [homeSearch, setHomeSearch] = useState("");
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
 
@@ -753,8 +755,8 @@ export default function App() {
     date === shiftDate(today(), 1) ? "Tomorrow" :
     fmtDate(date);
 
-  const amountAfterBalance = displayedBalance !== null && amount && parseFloat(amount) > 0
-    ? displayedBalance - parseFloat(amount)
+  const amountAfterBalance = displayedBalance !== null && amount && evalExpr(amount) > 0
+    ? displayedBalance - evalExpr(amount)
     : null;
 
   const suggestCategory = (query: string) => {
@@ -785,7 +787,7 @@ export default function App() {
     setErrorMsg("");
     const isEditing = Boolean(editingTransactionId);
     try {
-      const payload = { name, amount: parseFloat(amount), accountId, categoryId, date };
+      const payload = { name, amount: evalExpr(amount), accountId, categoryId, date };
       const res = await fetch(isEditing ? "/api/transactions" : "/api/expense", {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -807,7 +809,7 @@ export default function App() {
         return updated;
       });
 
-      const expAmt = parseFloat(amount);
+      const expAmt = evalExpr(amount);
       if (!isEditing && displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
       fetchTransactions();
       fetchMonthlySummary(homeMonth);
@@ -886,6 +888,7 @@ export default function App() {
           onClose={() => setShowManageScreen(false)}
           onAddIncome={setIncomeAccount}
           onTransferMoney={setTransferAccount}
+          onOpenDetails={setDetailsAccount}
         />
       )}
 
@@ -1113,6 +1116,17 @@ export default function App() {
         defaultScope={budgetScope}
         onClose={() => setCategoryManageMode(null)}
         onSuccess={refreshBudgetData}
+      />
+
+      <AccountDetailsSheet
+        open={detailsAccount !== null}
+        account={detailsAccount}
+        transactions={transactions}
+        categories={categories}
+        onClose={() => setDetailsAccount(null)}
+        onMove={(acct) => { setDetailsAccount(null); setTransferAccount(acct); }}
+        onIncome={(acct) => { setDetailsAccount(null); setIncomeAccount(acct); }}
+        onReconcileSuccess={(msg) => { refreshAccountsData(msg); }}
       />
 
       <AccountIncomeSheet

@@ -14,6 +14,7 @@ type ManageScreenProps = {
   onClose: () => void;
   onAddIncome: (account: Account) => void;
   onTransferMoney: (account: Account) => void;
+  onOpenDetails: (account: Account) => void;
 };
 
 export function ManageScreen({
@@ -21,6 +22,7 @@ export function ManageScreen({
   onClose,
   onAddIncome,
   onTransferMoney,
+  onOpenDetails,
 }: ManageScreenProps) {
   const totalReady = useMemo(
     () => accounts.reduce((sum, account) => sum + (account.readyToAssign ?? 0), 0),
@@ -47,15 +49,22 @@ export function ManageScreen({
         <div style={listStyle}>
           {accounts.map((account) => (
             <article key={account.id} style={accountRowStyle}>
-              <div style={accountIconStyle}>{account.icon}</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <strong style={rowTitleStyle}>{account.label}</strong>
-                <p style={rowMetaStyle}>{account.type ?? "Account"}</p>
-              </div>
-              <div style={amountStackStyle}>
-                <strong><Money value={account.balance ?? 0} /></strong>
-                <span>Ready <Money value={account.readyToAssign ?? 0} /></span>
-              </div>
+              <button
+                type="button"
+                onClick={() => onOpenDetails(account)}
+                aria-label={`View ${account.label} details`}
+                style={accountMainAreaStyle}
+              >
+                <div style={accountIconStyle}>{account.icon}</div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <strong style={rowTitleStyle}>{account.label}</strong>
+                  <p style={rowMetaStyle}>{account.type ?? "Account"}</p>
+                </div>
+                <div style={amountStackStyle}>
+                  <strong><Money value={account.balance ?? 0} /></strong>
+                  <span>Ready <Money value={account.readyToAssign ?? 0} /></span>
+                </div>
+              </button>
               <div style={accountActionsStyle}>
                 <IconActionButton
                   icon={<TransferIcon size={15} strokeWidth={2.2} />}
@@ -224,6 +233,19 @@ const amountStackStyle: CSSProperties = {
   color: "var(--text2)",
   marginLeft: "auto",
   flexShrink: 0,
+};
+
+const accountMainAreaStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  flex: 1,
+  minWidth: 0,
+  background: "transparent",
+  border: "none",
+  cursor: "pointer",
+  padding: 0,
+  textAlign: "left",
 };
 
 const accountActionsStyle: CSSProperties = {
