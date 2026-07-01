@@ -39,7 +39,7 @@ export function ManageScreen({
   );
 
   return (
-    <main style={screenStyle}>
+    <main className="manage-screen" style={screenStyle}>
       <header style={headerStyle}>
         <div>
           <div style={eyebrowStyle}>Manage</div>
@@ -59,7 +59,7 @@ export function ManageScreen({
         {/* Balance distribution donut */}
         <AccountBalanceChart accounts={accounts} onOpenDetails={onOpenDetails} />
 
-        <div style={listStyle}>
+        <div className="manage-account-list" style={listStyle}>
           {accounts.map((account) => (
             <button
               key={account.id}

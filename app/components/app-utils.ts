@@ -156,7 +156,15 @@ export const getLeftToAssignByScope = (accounts: Account[]): Record<BudgetScope,
   };
 };
 
-export const getCategoryScope = (category: Category): BudgetScope | null => {
+export const scopeFromAccountLabel = (label: string): BudgetScope | null => {
+  const l = label.toLowerCase();
+  if (l.includes("hubb") || l.includes("husband") || l.includes("anas")) return "anas";
+  if (l.includes("wife") || l.includes("salma")) return "salma";
+  if (l.includes("joined") || l.includes("joint")) return "joint";
+  return null;
+};
+
+export const getCategoryScope = (category: Category, accounts?: Account[]): BudgetScope | null => {
   if (category.isTeamFund) return "joint";
 
   const owner = category.owner?.trim().toLowerCase();
@@ -175,6 +183,15 @@ export const getCategoryScope = (category: Category): BudgetScope | null => {
   const name = category.name?.trim().toLowerCase() ?? "";
   if (name.includes("hubb") || name.includes("husband") || name.startsWith("anas")) return "anas";
   if (name.includes("wife") || name.startsWith("salma")) return "salma";
+
+  // Fall back to default account label — reliable when Owner field isn't writable
+  if (accounts && category.defaultAccount) {
+    const account = accounts.find((a) => a.id === category.defaultAccount);
+    if (account) {
+      const fromAccount = scopeFromAccountLabel(account.label);
+      if (fromAccount) return fromAccount;
+    }
+  }
 
   // Default to joint — an uncategorized category is shared, not invisible
   return "joint";

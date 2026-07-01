@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import type { Account, Category } from "./app-types";
-import { evalExpr, fmt, fmtDate, isExpression, shiftDate, today } from "./app-utils";
+import { evalExpr, fmt, isExpression, shiftDate, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { PickerPopover } from "./PickerPopover";
@@ -93,13 +93,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const isEditMode = props.modeVariant === "edit";
   const todayValue = today();
   const yesterdayValue = shiftDate(todayValue, -1);
-  const tomorrowValue = shiftDate(todayValue, 1);
   const visibleBalance = props.amountAfterBalance ?? props.displayedBalance;
 
   const dateOptions = [
     { label: "Today", value: todayValue },
     { label: "Yesterday", value: yesterdayValue },
-    { label: "Tomorrow", value: tomorrowValue },
   ];
 
   return (
@@ -310,22 +308,21 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 <ChevronDownIcon size={11} style={{ color: "var(--muted)", flexShrink: 0, transition: "transform 0.18s", transform: props.showDatePicker ? "rotate(180deg)" : "none" }} />
               </button>
 
-              <PickerPopover open={props.showDatePicker} align="right" placement="top" width="min(236px, calc(100vw - 28px))" zIndex={140} anchorRef={props.dateRef}>
+              <PickerPopover open={props.showDatePicker} align="right" placement="top" width="min(196px, calc(100vw - 28px))" zIndex={140} anchorRef={props.dateRef}>
                 <div id="date-picker" style={{ width: "100%", boxSizing: "border-box" }}>
-                  <div style={{ display: "grid", gap: 2, padding: 8, boxSizing: "border-box" }}>
+                  <div style={{ display: "grid", gap: 1, padding: "6px 6px 5px", boxSizing: "border-box" }}>
                     {dateOptions.map((option) => {
                       const selected = option.value === props.date;
                       return (
-                        <button key={option.value} onClick={() => props.onSelectDate(option.value)} style={{ width: "100%", minHeight: 42, padding: "9px 12px", background: selected ? "color-mix(in srgb, var(--accent) 10%, white)" : "transparent", border: "none", borderRadius: 10, color: selected ? "color-mix(in srgb, var(--accent) 76%, var(--text2))" : "var(--text2)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, cursor: "pointer", fontSize: 13, textAlign: "left", boxShadow: selected ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
-                          <span style={{ fontWeight: selected ? 600 : 500 }}>{option.label}</span>
-                          <span style={{ ...monoSmallStyle, color: selected ? "color-mix(in srgb, var(--accent) 62%, var(--text2))" : "var(--muted)" }}>{fmtDate(option.value)}</span>
+                        <button key={option.value} onClick={() => props.onSelectDate(option.value)} style={{ width: "100%", minHeight: 36, padding: "0 10px", background: selected ? "color-mix(in srgb, var(--accent) 9%, white)" : "transparent", border: "none", borderRadius: 8, color: selected ? "color-mix(in srgb, var(--accent) 70%, var(--text2))" : "var(--text2)", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 13, fontWeight: selected ? 600 : 400, textAlign: "left" }}>
+                          {option.label}
                         </button>
                       );
                     })}
                   </div>
-                  <div style={{ padding: "10px 10px 11px", borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)", background: "color-mix(in srgb, var(--surface2) 10%, white)" }}>
-                    <div style={{ minHeight: 44, borderRadius: 12, border: "1px solid transparent", background: "color-mix(in srgb, var(--surface2) 42%, white)", display: "flex", alignItems: "center", padding: "0 12px" }}>
-                      <input type="date" aria-label="Transaction date" value={props.date} onChange={(e) => props.onSelectDate(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", padding: 0, colorScheme: "light", color: "var(--text2)", outline: "none", fontSize: 15 }} />
+                  <div style={{ padding: "5px 6px 7px", borderTop: "1px solid color-mix(in srgb, var(--border) 22%, transparent)" }}>
+                    <div style={{ minHeight: 36, borderRadius: 8, background: "color-mix(in srgb, var(--surface2) 50%, white)", display: "flex", alignItems: "center", padding: "0 10px" }}>
+                      <input type="date" aria-label="Transaction date" value={props.date} onChange={(e) => props.onSelectDate(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", padding: 0, colorScheme: "light", color: "var(--text2)", outline: "none", fontSize: 13 }} />
                     </div>
                   </div>
                 </div>

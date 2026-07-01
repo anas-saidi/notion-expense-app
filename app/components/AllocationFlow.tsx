@@ -358,6 +358,9 @@ export function AllocationFlow({
                       <strong className="planning-category-amount" style={categoryAmountStyle}>
                         <Money value={item.amount} />
                       </strong>
+                      {item.available !== null && (
+                        <span style={categoryAvailableStyle}>{Math.round(item.available).toLocaleString("fr-MA")} avail</span>
+                      )}
                     </>
                   )}
                 </button>
@@ -408,6 +411,9 @@ export function AllocationFlow({
               <div style={metaRowStyle}>
                 <span>{metaLabel} <Money value={activeItem.lastMonthSpent ?? 0} /></span>
                 <span>Spent <Money value={getSpentFloor(activeItem)} /></span>
+                {activeItem.available !== null && (
+                  <span>Available <Money value={activeItem.available} /></span>
+                )}
               </div>
             </div>
           </div>
@@ -626,10 +632,11 @@ const deltaChipStyle = (isOver: boolean): CSSProperties => ({
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
 const categoryPillStyle: CSSProperties = { flex: "0 0 40px", width: 40, minHeight: 40, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border) 32%, transparent)", background: "color-mix(in srgb, var(--surface) 90%, white)", color: "var(--text2)", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 8px 16px color-mix(in srgb, var(--ink-strong) 4%, transparent)", transition: "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.22s ease" };
-const categoryPillActiveStyle: CSSProperties = { flex: "0 0 140px", minHeight: 54, borderRadius: 18, border: "1px solid transparent", background: "linear-gradient(145deg, #39dec7, color-mix(in srgb, #39dec7 70%, var(--accent)))", color: "var(--accent-ink)", padding: "8px 10px", display: "grid", gridTemplateColumns: "30px minmax(0, 1fr)", gridTemplateRows: "auto auto", alignItems: "center", gap: "2px 8px", textAlign: "left", cursor: "pointer", boxShadow: "0 14px 26px color-mix(in srgb, #39dec7 28%, transparent)", animation: "categorySelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both" };
-const categoryIconStyle = (isActive: boolean): CSSProperties => ({ gridColumn: "1 / 2", gridRow: "1 / 3", color: isActive ? "var(--accent-ink)" : "color-mix(in srgb, var(--accent-ink) 78%, var(--text))", flexShrink: 0 });
+const categoryPillActiveStyle: CSSProperties = { flex: "0 0 140px", minHeight: 54, borderRadius: 18, border: "1px solid transparent", background: "linear-gradient(145deg, #39dec7, color-mix(in srgb, #39dec7 70%, var(--accent)))", color: "var(--accent-ink)", padding: "8px 10px", display: "grid", gridTemplateColumns: "30px minmax(0, 1fr)", gridTemplateRows: "auto auto auto", alignItems: "center", gap: "1px 8px", textAlign: "left", cursor: "pointer", boxShadow: "0 14px 26px color-mix(in srgb, #39dec7 28%, transparent)", animation: "categorySelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both" };
+const categoryIconStyle = (isActive: boolean): CSSProperties => ({ gridColumn: "1 / 2", gridRow: isActive ? "1 / 4" : "1 / 3", color: isActive ? "var(--accent-ink)" : "color-mix(in srgb, var(--accent-ink) 78%, var(--text))", flexShrink: 0 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
 const categoryAmountStyle: CSSProperties = { fontSize: 15, lineHeight: 1, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"' };
+const categoryAvailableStyle: CSSProperties = { fontSize: 10, lineHeight: 1, fontWeight: 600, opacity: 0.72, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"' };
 const stackedUnitStyle: CSSProperties = { borderRadius: "24px 0 0 0", overflow: "hidden", flexShrink: 0, background: "var(--surface)" };
 const editorStyle: CSSProperties = { display: "grid" };
 const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gap: 6, minHeight: 120, padding: "12px 10px 10px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };

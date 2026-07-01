@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
-import type { BudgetScope, Category, MonthlySummary } from "./app-types";
+import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SearchIcon, ShuffleIcon, FreezeIcon, ChevronRightIcon } from "./ui/icons";
 import { fmt, getCategoryScope } from "./app-utils";
@@ -21,6 +21,7 @@ const CHART_COLORS = [
 type Props = {
   categories: Category[];
   frozenCategories: Category[];
+  accounts: Account[];
   monthlySummary: MonthlySummary;
   homeMonth: string;
   selectedCategoryId: string;
@@ -30,12 +31,13 @@ type Props = {
   onFreezeCategory: (cat: Category) => void;
   onReviveCategory: (cat: Category) => void;
   onFundCategory: (cat: Category) => void;
+  onOpenNewCategory?: (defaultType: string) => void;
 };
 
 type ScopeChip = BudgetScope;
-type Health = "over" | "low" | "ontrack" | "noplan";
+type Health = "over" | "low" | "funded" | "unfunded";
 
-const HEALTH_SORT: Record<Health, number> = { over: 0, low: 1, ontrack: 2, noplan: 3 };
+const HEALTH_SORT: Record<Health, number> = { over: 0, low: 1, funded: 2, unfunded: 3 };
 
 const SCOPE_CHIPS: { value: ScopeChip; emoji: string; label: string }[] = [
   { value: "joint", emoji: "👫", label: "Joint" },
@@ -61,11 +63,11 @@ const CHIP_COLOR: Record<ScopeChip, string> = {
   salma: "var(--partner-wife)",
 };
 
-function getHealth(spent: number, planned: number): Health {
-  if (planned <= 0) return "noplan";
-  if (spent > planned) return "over";
-  if ((spent / planned) >= 0.82) return "low";
-  return "ontrack";
+function getHealth(spent: number, assigned: number, available: number | null): Health {
+  if (available !== null && available < 0) return "over";
+  if (assigned <= 0) return "unfunded";
+  if ((spent / assigned) >= 0.82) return "low";
+  return "funded";
 }
 
 /* ─── Main screen ─────────────────────────────────────────────── */
@@ -73,6 +75,7 @@ function getHealth(spent: number, planned: number): Health {
 export function CategoriesScreen({
   categories,
   frozenCategories,
+  accounts,
   monthlySummary,
   homeMonth,
   onSelectCategory,
@@ -81,6 +84,7 @@ export function CategoriesScreen({
   onFreezeCategory,
   onReviveCategory,
   onFundCategory,
+  onOpenNewCategory,
 }: Props) {
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<ScopeChip>("joint");
@@ -106,16 +110,16 @@ export function CategoriesScreen({
     const items = categories
       .filter(cat => {
         if (q && !cat.name.toLowerCase().includes(q) && !cat.type.some(t => t.toLowerCase().includes(q))) return false;
-        if (getCategoryScope(cat) !== scope) return false;
+        if (getCategoryScope(cat, accounts) !== scope) return false;
         return true;
       })
       .map(cat => {
-        const planned = plannedByCategory.get(cat.id) ?? 0;
+        const assigned = plannedByCategory.get(cat.id) ?? 0;  // this month's Funds DB
         const spent = spentByCategory.get(cat.id) ?? 0;
-        const available = isCurrentMonth ? (cat.available ?? planned - spent) : planned - spent;
-        const health = getHealth(spent, planned);
+        const available = cat.available;                       // Notion formula, no math
+        const health = getHealth(spent, assigned, cat.available);
         const section = cat.type[0] ?? "Other";
-        return { cat, planned, spent, available, health, section };
+        return { cat, planned: assigned, spent, available, health, section };
       })
       .sort((a, b) => HEALTH_SORT[a.health] - HEALTH_SORT[b.health]);
 
@@ -231,6 +235,17 @@ export function CategoriesScreen({
                       onOpenDetails={() => onOpenCategoryDetails(cat)}
                     />
                   ))}
+                  {onOpenNewCategory && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenNewCategory(label)}
+                      aria-label={`Add new ${label} category`}
+                      className="ghost-card"
+                      style={ghostCardStyle}
+                    >
+                      <span style={{ fontSize: 22, lineHeight: 1, color: "var(--muted)", opacity: 0.5 }}>＋</span>
+                    </button>
+                  )}
                 </div>
               </section>
             ))}
@@ -405,19 +420,17 @@ function CategoryCard({
   cat, available, spent, planned, health, index, isFreezingId, onFreeze, onOpenDetails,
 }: {
   cat: import("./app-types").Category;
-  available: number; spent: number; planned: number;
+  available: number | null; spent: number; planned: number;
   health: Health; index: number; isFreezingId: boolean;
   onFreeze: () => void; onOpenDetails: () => void;
 }) {
-  const isOver = health === "over";
-  const isLow  = health === "low";
-  const amountNum = isOver ? spent - planned : Math.abs(available);
+  const amountNum = Math.abs(available ?? 0);
   const progressPct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
 
   // Count up from 0 on every mount (scope switch remounts cards with new cat.id keys)
   const displayAmount = useCountUp(amountNum, 580, 0);
-  const amountStr = health === "noplan" ? "—" : fmt(Math.round(displayAmount));
-  const unitStr   = health === "noplan" ? "No plan" : isOver ? "MAD over" : "MAD left";
+  const amountStr = available === null ? "—" : fmt(Math.round(displayAmount));
+  const unitStr   = available === null ? "" : "MAD";
 
   // Progress bar: scaleX from 0 on mount, transition on subsequent updates
   const [barScale, setBarScale] = useState(0);
@@ -437,16 +450,16 @@ function CategoryCard({
         <FreezeIcon size={9} strokeWidth={2.5} />
       </button>
       <button type="button" onClick={onOpenDetails} style={cardBodyStyle}
-        aria-label={`${cat.name}${isOver ? ", over budget" : isLow ? ", low" : ""}`}>
+        aria-label={`${cat.name}${health === "over" ? ", overbudget" : health === "low" ? ", low" : health === "funded" ? ", funded" : ", unfunded"}`}>
         <div style={cardTopStyle}>
           <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
           <span style={cardNameStyle}>{cat.name}</span>
-          {(isOver || isLow) && (
-            <span style={cardBadgeStyle(isOver)}>{isOver ? "OVER" : "LOW"}</span>
-          )}
+          <span style={cardBadgeStyle(health)}>
+            {health === "over" ? "Overbudget" : health === "low" ? "Low" : health === "funded" ? "Funded" : "Unfunded"}
+          </span>
         </div>
         <div style={cardBottomStyle}>
-          {health !== "noplan" && (
+          {(health === "funded" || health === "low" || health === "over") && (
             <div style={progressTrackStyle}>
               <div style={{
                 height: "100%", width: "100%", borderRadius: 999,
@@ -471,19 +484,22 @@ function useCountUp(target: number, duration = 750, from = target): number {
   const [display, setDisplay] = useState(from);
   const prevTarget = useRef(from);
   useEffect(() => {
-    const from = prevTarget.current;
+    const startFrom = prevTarget.current;
     prevTarget.current = target;
-    if (from === target) return;
+    if (startFrom === target) return;
     const startTime = performance.now();
     let raf: number;
     function step(now: number) {
       const t = Math.min((now - startTime) / duration, 1);
       const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
-      setDisplay(Math.round(from + eased * (target - from)));
+      setDisplay(Math.round(startFrom + eased * (target - startFrom)));
       if (t < 1) raf = requestAnimationFrame(step);
     }
     raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      prevTarget.current = startFrom; // reset so effect re-runs (e.g. Strict Mode) restart the animation
+    };
   }, [target, duration]);
   return display;
 }
@@ -526,33 +542,31 @@ function BudgetDistributionChart({
     const items = categories
       .filter(cat => getCategoryScope(cat) === scope)
       .map(cat => {
-        const planned = plannedByCategory.get(cat.id) ?? 0;
-        const spent = spentByCategory.get(cat.id) ?? 0;
-        const available = isCurrentMonth ? (cat.available ?? Math.max(0, planned - spent)) : Math.max(0, planned - spent);
-        return { cat, available };
+        const allocated = plannedByCategory.get(cat.id) ?? 0;
+        return { cat, allocated };
       })
-      .filter(({ available }) => available > 0)
-      .sort((a, b) => b.available - a.available);
+      .filter(({ allocated }) => allocated > 0)
+      .sort((a, b) => b.allocated - a.allocated);
 
-    const total = items.reduce((s, { available }) => s + available, 0);
+    const total = items.reduce((s, { allocated }) => s + allocated, 0);
     return { items, total };
-  }, [categories, scope, spentByCategory, plannedByCategory, isCurrentMonth]);
+  }, [categories, scope, plannedByCategory]);
 
   // Segment computation before guard — needed by useCountUp
-  const allSegments = chartData.items.map(({ cat, available }, i) => ({
+  const allSegments = chartData.items.map(({ cat, allocated }, i) => ({
     name: cat.name,
-    value: available,
-    available,
+    value: allocated,
+    allocated,
     cat,
     color: CHART_COLORS[i % CHART_COLORS.length],
   }));
   const visibleSegments = allSegments.filter(s => !hiddenIds.has(s.cat.id));
-  const visibleTotal = visibleSegments.reduce((s, seg) => s + seg.available, 0);
+  const visibleTotal = visibleSegments.reduce((s, seg) => s + seg.allocated, 0);
 
   // "All good" pulse: every visible category has ≥60% of planned remaining
   const allHealthy = visibleSegments.length > 0 && visibleSegments.every(s => {
-    const planned = plannedByCategory.get(s.cat.id) ?? 0;
-    return planned > 0 && s.available >= planned * 0.6;
+    const available = s.cat.available ?? 0;
+    return s.allocated > 0 && available >= s.allocated * 0.6;
   });
 
   // Count-up must be called before conditional return (hook rule)
@@ -655,14 +669,14 @@ function BudgetDistributionChart({
             }}>
               {fmt(countedTotal)}
             </span>
-            <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4, letterSpacing: 0.3 }}>MAD left</span>
+            <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4, letterSpacing: 0.3 }}>MAD allocated</span>
           </div>
         </div>
       </div>
 
       {/* Legend — staggered cascade on mount */}
       <div style={chartLegendStyle}>
-        {allSegments.map(({ cat, available, color }, i) => {
+        {allSegments.map(({ cat, allocated, color }, i) => {
           const isHidden = hiddenIds.has(cat.id);
           return (
             <button
@@ -687,7 +701,7 @@ function BudgetDistributionChart({
                 <CategoryIcon icon={cat.icon} size={11} />
               </span>
               <span style={{ ...chartLegendNameStyle, textDecoration: isHidden ? "line-through" : "none" }}>{cat.name}</span>
-              <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(available))}</span>
+              <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(allocated))}</span>
             </button>
           );
         })}
@@ -990,6 +1004,21 @@ const seeAllBtnStyle: CSSProperties = {
   opacity: 0.65,
 };
 
+/* ─── Ghost add card ────────────────────────────────────────────── */
+
+const ghostCardStyle: CSSProperties = {
+  flex: "0 0 120px",
+  minHeight: 90,
+  borderRadius: 16,
+  border: "1.5px dashed color-mix(in srgb, var(--border) 55%, transparent)",
+  background: "transparent",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "border-color 0.15s ease, background 0.15s ease",
+};
+
 /* ─── Card ─────────────────────────────────────────────────────── */
 
 const cardStyle: CSSProperties = {
@@ -1019,6 +1048,7 @@ const freezeBtnStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   flexShrink: 0,
+  zIndex: 1,
 };
 
 const cardBodyStyle: CSSProperties = {
@@ -1063,12 +1093,15 @@ const cardNameStyle: CSSProperties = {
   textAlign: "center",
 };
 
-const cardBadgeStyle = (isOver: boolean): CSSProperties => ({
+const cardBadgeStyle = (health: Health): CSSProperties => ({
   fontSize: 8,
   fontWeight: 700,
   letterSpacing: 1.1,
   textTransform: "uppercase",
-  color: isOver ? "var(--danger)" : "var(--warning)",
+  color: health === "over"      ? "var(--danger)"
+       : health === "low"       ? "var(--warning)"
+       : health === "funded"    ? "var(--accent)"
+       :                          "var(--warning)",
   lineHeight: 1,
 });
 
@@ -1077,10 +1110,10 @@ const cardAmountStyle = (health: Health): CSSProperties => ({
   fontSize: 15,
   fontWeight: 500,
   lineHeight: 1,
-  color: health === "over"   ? "var(--danger)"
-       : health === "low"    ? "var(--warning)"
-       : health === "noplan" ? "var(--muted)"
-       :                       "var(--text2)",
+  color: health === "over"      ? "var(--danger)"
+       : health === "low"       ? "var(--warning)"
+       : health === "unfunded"  ? "var(--muted)"
+       :                          "var(--text2)",
 });
 
 const cardUnitStyle: CSSProperties = {

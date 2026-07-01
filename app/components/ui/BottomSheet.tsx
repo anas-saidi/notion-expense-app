@@ -10,6 +10,8 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { createPortal } from "react-dom";
 
+const DESKTOP_BREAKPOINT = 600;
+
 type BottomSheetProps = {
   open: boolean;
   onClose: () => void;
@@ -32,6 +34,8 @@ type BottomSheetProps = {
   detent?: "default" | "content";
   /** "bottom" = slides up from bottom edge; "center" = centered wider layout. */
   align?: "bottom" | "center";
+  /** Desktop only: fill the full viewport (width 100vw, height 100dvh, no border-radius). */
+  desktopFullscreen?: boolean;
 };
 
 export function BottomSheet({
@@ -52,9 +56,18 @@ export function BottomSheet({
   initialSnap = 1,
   detent = "default",
   align = "bottom",
+  desktopFullscreen = false,
 }: BottomSheetProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Height for the outer animation wrapper (only for "default" detent with snap points).
   // For "content" detent, the consumer sets height via panelStyle.
@@ -77,7 +90,7 @@ export function BottomSheet({
       <motion.div
         key="sheet-backdrop"
         initial={{ opacity: 0 }}
-        animate={{ opacity: backdropStrength }}
+        animate={{ opacity: isDesktop ? Math.max(backdropStrength, 0.25) : backdropStrength }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.22 }}
         onClick={onClose}
@@ -93,35 +106,73 @@ export function BottomSheet({
        * Outer motion.div — owns position:fixed + the slide animation.
        * Kept separate from panelStyle so the consumer's `position:"relative"`
        * (or any other positional style) never clobbers our fixed layout.
+       *
+       * Desktop (≥ 600px): centered modal with fade+scale animation, no drag.
+       * Mobile (< 600px): bottom sheet with slide-up animation and drag-to-close.
        */}
       <motion.div
         key="sheet-panel"
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 380, damping: 38 }}
-        drag="y"
-        dragConstraints={{ top: 0 }}
-        dragElastic={{ top: 0.05, bottom: 0.4 }}
-        dragMomentum={false}
-        onDragEnd={(_, info) => {
-          if (info.offset.y > 80 || info.velocity.y > 450) {
-            onClose();
-          }
-          // If threshold not met, motion auto-springs back to animate target (y:0)
-        }}
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: "50%",
-          x: "-50%",          // motion transform — centers without conflicting with y animation
-          width: `min(${maxWidth}, 100vw)`,
-          height: wrapperHeight,
-          maxHeight: wrapperMaxHeight,
-          zIndex,
-          display: "flex",
-          flexDirection: "column",
-        }}
+        initial={isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
+        animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
+        exit={isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
+        transition={
+          isDesktop
+            ? { type: "spring", stiffness: 400, damping: 32 }
+            : { type: "spring", stiffness: 380, damping: 38 }
+        }
+        {...(!isDesktop && {
+          drag: "y" as const,
+          dragConstraints: { top: 0 },
+          dragElastic: { top: 0.05, bottom: 0.4 },
+          dragMomentum: false,
+          onDragEnd: (_: unknown, info: { offset: { y: number }; velocity: { y: number } }) => {
+            if (info.offset.y > 80 || info.velocity.y > 450) {
+              onClose();
+            }
+          },
+        })}
+        style={
+          isDesktop
+            ? desktopFullscreen
+              ? {
+                  position: "fixed",
+                  inset: 0,
+                  width: "100vw",
+                  height: "100dvh",
+                  borderRadius: 0,
+                  zIndex,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }
+              : {
+                  position: "fixed",
+                  top: "50%",
+                  left: "50%",
+                  x: "-50%",
+                  y: "-50%",
+                  width: `min(${maxWidth}, calc(100vw - 48px))`,
+                  height: "auto",
+                  maxHeight: "calc(100dvh - 80px)",
+                  borderRadius: 20,
+                  zIndex,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }
+            : {
+                position: "fixed",
+                bottom: 0,
+                left: "50%",
+                x: "-50%",
+                width: `min(${maxWidth}, 100vw)`,
+                height: wrapperHeight,
+                maxHeight: wrapperMaxHeight,
+                zIndex,
+                display: "flex",
+                flexDirection: "column",
+              }
+        }
       >
         {/*
          * Inner div — receives panelStyle from the consumer.
@@ -140,9 +191,10 @@ export function BottomSheet({
             flexDirection: "column",
             overflow: "hidden",
             ...panelStyle,
+            ...(desktopFullscreen && isDesktop ? { borderRadius: 0 } : {}),
           }}
         >
-          {showHandle && (
+          {showHandle && !isDesktop && (
             <div
               style={{
                 display: "flex",

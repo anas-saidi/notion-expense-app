@@ -64,7 +64,7 @@ const buildFundProperties = (allocation: AllocationItem, date: string) => {
   };
 
   if (allocation.defaultAccount) {
-    properties["ðŸ¦ Accounts"] = { relation: [{ id: allocation.defaultAccount }] };
+    properties["🏦 Accounts"] = { relation: [{ id: allocation.defaultAccount }] };
   }
 
   return properties;
@@ -95,6 +95,11 @@ async function upsertFund(token: string, allocation: AllocationItem, date: strin
   const properties = buildFundProperties(allocation, date);
 
   if (existing) {
+    // Never overwrite an existing fund with 0 — skip instead
+    if (allocation.amount <= 0) {
+      return { id: existing.id, categoryId: allocation.categoryId, planned: existing.properties.Planned?.number ?? 0, mode: "skipped" };
+    }
+
     const updateRes = await fetch(`https://api.notion.com/v1/pages/${existing.id}`, {
       method: "PATCH",
       headers: notionHeaders(token),

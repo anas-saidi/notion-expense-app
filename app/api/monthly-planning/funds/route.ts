@@ -49,26 +49,34 @@ export async function GET(req: NextRequest) {
   if (!bounds) return NextResponse.json({ error: "month must be YYYY-MM" }, { status: 400 });
 
   try {
-    const res = await fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
-      method: "POST",
-      headers: notionHeaders(token),
-      cache: "no-store",
-      body: JSON.stringify({
-        filter: {
-          and: [
-            { property: "Date", date: { on_or_after: bounds.start } },
-            { property: "Date", date: { on_or_before: bounds.end } },
-            { property: "Category", relation: { is_not_empty: true } },
-          ],
-        },
-        page_size: 100,
-      }),
-    });
+    const results: any[] = [];
+    let cursor: string | undefined;
 
-    const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data.message || "Failed to load funds" }, { status: res.status });
+    do {
+      const res = await fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
+        method: "POST",
+        headers: notionHeaders(token),
+        cache: "no-store",
+        body: JSON.stringify({
+          filter: {
+            and: [
+              { property: "Date", date: { on_or_after: bounds.start } },
+              { property: "Date", date: { on_or_before: bounds.end } },
+            ],
+          },
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {}),
+        }),
+      });
 
-    const funds = (data.results ?? []).map((page: any) => ({
+      const data = await res.json();
+      if (!res.ok) return NextResponse.json({ error: data.message || "Failed to load funds" }, { status: res.status });
+
+      results.push(...(data.results ?? []));
+      cursor = data.has_more ? data.next_cursor : undefined;
+    } while (cursor);
+
+    const funds = results.map((page: any) => ({
       id: page.id,
       categoryId: page.properties.Category?.relation?.[0]?.id ?? null,
       planned: page.properties.Planned?.number ?? 0,
@@ -163,6 +171,12 @@ export async function POST(req: NextRequest) {
     if (existing) {
       const currentPlanned = existing.properties.Planned?.number ?? 0;
       const nextPlanned = Math.max(0, shouldIncrement ? currentPlanned + planned : planned);
+
+      // Never overwrite an existing fund with 0 — skip instead
+      if (nextPlanned <= 0) {
+        return NextResponse.json({ fund: { id: existing.id, categoryId, planned: currentPlanned }, mode: "skipped" });
+      }
+
       const updateRes = await fetch(`https://api.notion.com/v1/pages/${existing.id}`, {
         method: "PATCH",
         headers: notionHeaders(token),

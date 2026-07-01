@@ -42,25 +42,34 @@ const scopeToType = (scope: string, kind: string) => {
   return "Budget";
 };
 
+/** Find a property value by case-insensitive name match, trying formula/rollup/number types. */
+const readNumericProp = (props: Record<string, any>, name: string): number | null => {
+  const key = Object.keys(props).find(k => k.toLowerCase() === name.toLowerCase());
+  if (!key) return null;
+  const p = props[key];
+  return p?.formula?.number ?? p?.rollup?.number ?? p?.number ?? null;
+};
+
 const mapCategoryPage = (page: any) => {
-  const isTeamFund = page.properties["Team Fund"]?.formula?.boolean ?? false;
-  const typeValues = page.properties.Type?.multi_select?.map((t: any) => t.name) ?? [];
+  const props = page.properties ?? {};
+  const isTeamFund = props["Team Fund"]?.formula?.boolean ?? false;
+  const typeValues = props.Type?.multi_select?.map((t: any) => t.name) ?? [];
   return {
     id: page.id,
-    name: page.properties.Category?.title?.[0]?.plain_text ?? "Unnamed",
+    name: props.Category?.title?.[0]?.plain_text ?? "Unnamed",
     icon: page.icon?.emoji ?? null,
     type: typeValues,
     owner:
-      page.properties.Owner?.select?.name ??
-      page.properties.Owner?.people?.[0]?.name ??
+      props.Owner?.select?.name ??
+      props.Owner?.people?.[0]?.name ??
       null,
-    defaultAccount: page.properties.Default?.relation?.[0]?.id ?? null,
-    available: page.properties["Available"]?.formula?.number ?? null,
-    planned: page.properties.Planned?.number ?? null,
-    lastMonthSpent: page.properties["Last month spent"]?.formula?.number ?? null,
+    defaultAccount: props.Default?.relation?.[0]?.id ?? null,
+    available: readNumericProp(props, "Available"),
+    planned: props.Planned?.number ?? null,
+    lastMonthSpent: readNumericProp(props, "Last month spent"),
     isTeamFund,
-    snoozed: page.properties.Snooze?.checkbox ?? false,
-    archived: page.properties.Archived?.checkbox ?? false,
+    snoozed: props.Snooze?.checkbox ?? false,
+    archived: props.Archived?.checkbox ?? false,
   };
 };
 
@@ -84,9 +93,7 @@ export async function GET(req: NextRequest) {
       headers: notionHeaders(token),
       cache: "no-store",
       body: JSON.stringify({
-        filter: {
-          and: filters,
-        },
+        filter: { and: filters },
         sorts: [{ property: "Category", direction: "ascending" }],
         page_size: 100,
       }),
@@ -95,7 +102,20 @@ export async function GET(req: NextRequest) {
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
 
-    const categories = data.results.map(mapCategoryPage);
+    // Notion bulk query returns stale formula values; fetch each page individually
+    // in parallel so the `Available` formula is freshly computed.
+    const freshPages = await Promise.all(
+      (data.results as any[]).map((page: any) =>
+        fetch(`https://api.notion.com/v1/pages/${page.id}`, {
+          headers: notionHeaders(token),
+          cache: "no-store",
+        })
+          .then((r) => r.json())
+          .catch(() => page) // fall back to query result if individual fetch fails
+      )
+    );
+
+    const categories = freshPages.map(mapCategoryPage);
 
     return NextResponse.json({ categories });
   } catch (err: any) {
@@ -138,7 +158,7 @@ export async function POST(req: NextRequest) {
   const name = typeof body?.name === "string" ? body.name.trim() : "";
   const icon = typeof body?.icon === "string" ? body.icon.trim() : "";
   const scope = normalizeScope(body?.scope);
-  const kind = body?.kind === "savings" ? "savings" : "budget";
+  const categoryType = typeof body?.type === "string" ? body.type.trim() : "";
   const accountId = typeof body?.accountId === "string" && body.accountId ? body.accountId : null;
 
   if (!name) return NextResponse.json({ error: "Missing category name" }, { status: 400 });
@@ -170,8 +190,8 @@ export async function POST(req: NextRequest) {
       [titleKey]: { title: [{ text: { content: name } }] },
     };
 
-    if (typeKey) {
-      properties[typeKey] = { multi_select: [{ name: scopeToType(scope, kind) }] };
+    if (typeKey && categoryType) {
+      properties[typeKey] = { multi_select: [{ name: categoryType }] };
     }
 
     const owner = scopeToOwner(scope);
@@ -204,7 +224,7 @@ export async function POST(req: NextRequest) {
         id: data.id,
         name,
         icon: data.icon?.emoji ?? (icon || null),
-        type: typeKey ? [scopeToType(scope, kind)] : [],
+        type: typeKey && categoryType ? [categoryType] : [],
         owner,
         defaultAccount: accountId,
         available: null,

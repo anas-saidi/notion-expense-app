@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category, BudgetScope } from "./app-types";
+import { scopeFromAccountLabel } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -14,15 +15,12 @@ type CategoryManageSheetProps = {
   month: string;
   accounts: Account[];
   defaultScope: BudgetScope;
+  availableTypes?: string[];
+  defaultType?: string;
   onClose: () => void;
   onSuccess: (message: string) => void;
+  zIndex?: number;
 };
-
-const SCOPE_OPTIONS: Array<{ value: BudgetScope; label: string }> = [
-  { value: "joint", label: "Joint" },
-  { value: "anas", label: "Anas" },
-  { value: "salma", label: "Salma" },
-];
 
 export function CategoryManageSheet({
   open,
@@ -31,17 +29,25 @@ export function CategoryManageSheet({
   month,
   accounts,
   defaultScope,
+  availableTypes,
+  defaultType,
   onClose,
   onSuccess,
+  zIndex,
 }: CategoryManageSheetProps) {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("🧾");
-  const [scope, setScope] = useState<BudgetScope>(defaultScope);
-  const [kind, setKind] = useState<"budget" | "savings">("budget");
+  const [categoryType, setCategoryType] = useState(defaultType ?? availableTypes?.[0] ?? "");
   const [accountId, setAccountId] = useState("");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [error, setError] = useState("");
+
+  // Scope is always derived from the selected account — never manually set
+  const scope: BudgetScope = useMemo(() => {
+    const account = accounts.find((a) => a.id === accountId);
+    return (account ? scopeFromAccountLabel(account.label) : null) ?? defaultScope;
+  }, [accountId, accounts, defaultScope]);
 
   useEffect(() => {
     if (!open) return;
@@ -49,11 +55,10 @@ export function CategoryManageSheet({
     setError("");
     setName("");
     setIcon(category?.icon ?? "🧾");
-    setScope(defaultScope);
-    setKind("budget");
+    setCategoryType(defaultType ?? availableTypes?.[0] ?? "");
     setAccountId(category?.defaultAccount ?? accounts[0]?.id ?? "");
     setAmount("");
-  }, [accounts, category, defaultScope, open]);
+  }, [accounts, availableTypes, category, defaultType, open]);
 
   const isCreate = mode === "create";
   const selectedAccount = accounts.find((account) => account.id === accountId) ?? null;
@@ -85,7 +90,7 @@ export function CategoryManageSheet({
         const createRes = await fetch("/api/categories", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), icon, scope, kind, accountId }),
+          body: JSON.stringify({ name: name.trim(), icon, scope, type: categoryType, accountId }),
         });
         const createData = await createRes.json();
         if (!createRes.ok) throw new Error(createData.error || "Failed to create category");
@@ -132,6 +137,7 @@ export function CategoryManageSheet({
       maxHeight="calc(100dvh - 20px)"
       panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0 }}
+      zIndex={zIndex}
     >
       <div style={innerStyle}>
         <header style={headerStyle}>
@@ -166,29 +172,15 @@ export function CategoryManageSheet({
               </label>
               <label style={fieldStyle}>
                 <span style={labelStyle}>Type</span>
-                <select value={kind} onChange={(event) => setKind(event.target.value as "budget" | "savings")} style={inputStyle}>
-                  <option value="budget">Budget</option>
-                  <option value="savings">Savings</option>
+                <select value={categoryType} onChange={(event) => setCategoryType(event.target.value)} style={inputStyle}>
+                  {(availableTypes ?? []).map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                  {!availableTypes?.length && <option value="">No types</option>}
                 </select>
               </label>
             </div>
 
-            <div style={fieldStyle}>
-              <span style={labelStyle}>Scope</span>
-              <div style={segmentedStyle}>
-                {SCOPE_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setScope(option.value)}
-                    aria-pressed={scope === option.value}
-                    style={{ ...segmentStyle, ...(scope === option.value ? segmentActiveStyle : null) }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </section>
         )}
 
@@ -319,33 +311,6 @@ const twoColStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 0.72fr) minmax(0, 1fr)",
   gap: 10,
-};
-
-const segmentedStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 6,
-  padding: 4,
-  borderRadius: 16,
-  background: "color-mix(in srgb, var(--surface2) 44%, white)",
-  border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
-};
-
-const segmentStyle: CSSProperties = {
-  minHeight: 40,
-  border: "none",
-  borderRadius: 12,
-  background: "transparent",
-  color: "var(--muted)",
-  fontSize: 13,
-  fontWeight: 750,
-  cursor: "pointer",
-};
-
-const segmentActiveStyle: CSSProperties = {
-  background: "var(--surface)",
-  color: "var(--text2)",
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 7%, transparent)",
 };
 
 const amountWrapStyle: CSSProperties = {

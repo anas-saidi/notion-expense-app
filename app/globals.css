@@ -364,6 +364,68 @@ button:disabled {
   filter: saturate(0.85);
 }
 
+/* ── Month Start Planner range slider ─────────────────────────────── */
+.mprange {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.mprange:focus,
+.mprange:focus-visible { outline: none; }
+
+.mprange::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--bar-color, var(--accent)) var(--range-fill, 0%),
+    color-mix(in srgb, var(--surface2) 90%, transparent) var(--range-fill, 0%)
+  );
+}
+
+.mprange::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7.5px;
+  border-radius: 50%;
+  background: var(--bar-color, var(--accent));
+  border: 2.5px solid var(--surface);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--ink-strong) 16%, transparent);
+  cursor: grab;
+  transition: transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mprange:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.2);
+}
+
+.mprange::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface2);
+}
+
+.mprange::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid var(--surface);
+  background: var(--bar-color, var(--accent));
+  cursor: grab;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mprange::-webkit-slider-thumb { transition: none; }
+}
+
 /* Hide number input spinners */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -845,6 +907,15 @@ button:hover .rebalance-btn-icon {
 @media (hover: hover) {
   .tx-row:hover {
     transform: translateY(-1px);
+  }
+
+  .ghost-card:hover {
+    border-color: var(--accent) !important;
+    background: color-mix(in srgb, var(--accent) 6%, transparent) !important;
+  }
+  .ghost-card:hover span {
+    opacity: 0.85 !important;
+    color: var(--accent-ink) !important;
   }
 
   .tx-delete-btn:hover {
@@ -1350,6 +1421,38 @@ button:hover .rebalance-btn-icon {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
   }
+
+  /* Transaction list: 2-column grid on desktop */
+  .home-txn-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* ManageScreen: strip its own padding — app-content already provides 48px */
+  .manage-screen {
+    padding-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Account list: 2-column grid on desktop */
+  .manage-account-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* ── Desktop type scale ─────────────────────────────────────── */
+  /* Inline styles use px, so !important is required here.        */
+
+  /* Sidebar nav labels: 10px caption → readable 13px label */
+  .nav-label {
+    font-size: 13px !important;
+    letter-spacing: 0.2px !important;
+    text-transform: none !important;
+  }
+
+  /* Section divider labels: 11px → 12px */
+  .section-label {
+    font-size: 12px !important;
+  }
 }
 
 /* ── Insights screen — base (mobile-first) ────────────────── */
@@ -1480,6 +1583,24 @@ button:hover .rebalance-btn-icon {
   }
 
 
+}
+
+/* ── Plan-now planner — desktop (≥ 600px, matches BottomSheet DESKTOP_BREAKPOINT) ── */
+@media (min-width: 600px) {
+  /* Constrain the inner column and center it in the full-screen panel */
+  .planner-wrap {
+    max-width: 700px;
+    width: 100%;
+    align-self: center;
+  }
+
+  /* Keep action buttons at a comfortable width — not stretched 700px wide */
+  .planner-footer-row {
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
 }
 
 @media (min-width: 560px) {
