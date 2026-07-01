@@ -1,0 +1,111 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+npm run dev        # Start dev server at http://localhost:3000
+npm run build      # Production build
+npx tsc --noEmit   # Type-check without emitting (run before every commit)
+```
+
+There is no test suite. TypeScript (`npx tsc --noEmit`) is the primary correctness check — always run it after changes.
+
+## Environment
+
+The app requires a single env var for local dev:
+
+```
+NOTION_TOKEN=<internal integration token>
+```
+
+Copy `.env.example` to `.env.local` and fill it in. The auth route (`app/api/auth/[...nextauth]/route.ts`) is a stub — OAuth is unused; the app relies entirely on `NOTION_TOKEN` as a server-side secret.
+
+## Architecture Overview
+
+**Single-page client app backed by Next.js API routes.**
+
+`app/page.tsx` is the entire frontend. It is one large `"use client"` component that:
+- Fetches all data (categories, accounts, transactions, pending items) on mount and on month change
+- Holds all UI state: active tab, open sheets, form values, selected month
+- Passes data and callbacks down to screen/sheet components — no global state library
+
+**Tabs** (`AppTab = "home" | "plan" | "budget" | "history"`) switch between:
+- `HomeScreen` — overview with budget sliders and spend summary
+- `CategoriesScreen` — category budget list with donut chart
+- `InsightsScreen` — monthly spend breakdown charts
+- `MonthlyPlanningFlow` — guided month-close/open workflow
+
+**Sheets** are full-screen or bottom-sheet overlays controlled by boolean state in `page.tsx`:
+- `AddTransactionSheet` — add/edit expense, with quick-fund flow
+- `CategoryDetailsSheet` — category drill-down (transactions + fund/move actions)
+- `AccountDetailsSheet` — account drill-down (running balance chart per month)
+- `ManageScreen` — account list with balance donut; rendered as a portal-pushed screen
+- `RebalanceSheet`, `AccountTransferSheet`, `AccountIncomeSheet` — money movement flows
+
+## Notion Data Model
+
+All persistence is Notion. API routes in `app/api/` are thin proxies — they authenticate with `NOTION_TOKEN` and call Notion's REST API directly.
+
+**Notion DB IDs** are hardcoded in each route file (some also readable via `process.env.NOTION_*_DB`):
+
+| Database | ID |
+|---|---|
+| Transactions | `1926a2be-8922-80be-968a-efa6e6dace95` |
+| Categories | `1926a2be-8922-8029-9b90-c7d8bb55fabd` |
+| Accounts | `1926a2be-8922-8014-bb54-d9f5e9d1234b` |
+| Pending | `d2db101b-faec-467d-8c57-eee6d8780311` |
+| Funds | `1936a2be89228058990dc549172f1d45` |
+
+**Transaction types** (`Transaction.type`):
+- `"Expense"` — standard spend; uses `accountId` + `category`
+- `"Income"` — money in; uses `accountId`
+- `"Transfer"` — budget rebalance or account move; uses emoji-named relation properties:
+  - `💰 budget (in)` / `💰 budget (out)` → `toCategoryId` / `fromCategoryId`
+  - `🏦 account ( in )` / `🏦 account ( out )` → `toAccountId` / `fromAccountId`
+
+When filtering transactions for a specific account, always check both `t.accountId === id` (Expense/Income) **and** `t.fromAccountId === id || t.toAccountId === id` (Transfer).
+
+## Key Utilities (`app/components/app-utils.ts`)
+
+- `evalExpr(str)` — safe arithmetic parser (no `eval`); used for the amount input so users can type `50+30`
+- `monthBounds(dateStr)` — returns `{ start, end }` for a "YYYY-MM" string
+- `fmt(n)` — formats numbers in Moroccan locale (`fr-MA`) — currency is MAD throughout
+- `getCategoryScope(category)` — derives `BudgetScope` ("joint" | "anas" | "salma") from category fields; falls back through owner → type → name heuristics
+- `getBalanceByScope` / `getLeftToAssignByScope` — aggregate account balances by scope using label heuristics ("wife", "hubb", "joined")
+
+## Design System
+
+All styling is inline `CSSProperties` objects — no CSS modules, no Tailwind. `globals.css` defines CSS custom properties (tokens) only.
+
+**Core tokens:**
+- `--accent` / `--accent-ink` — primary green (`#9fe870` husband, `#86de66` wife)
+- `--surface` / `--surface2` / `--bg` — layered backgrounds
+- `--text` / `--text2` / `--muted` — text hierarchy
+- `--danger`, `--success`, `--warning`, `--info` — semantic colors
+- `--partner-husband` (`#6aa6e6`) / `--partner-wife` (`#e86c95`) — identity colors
+- `--font-display` / `--font-body` — both resolve to Instrument Sans
+
+**Mode** (`html[data-mode="husband|wife"]`) shifts `--accent` and `--bg` slightly. Set on `<html>` element.
+
+**Touch targets**: minimum 44×44 px on all interactive elements (enforced manually per component).
+
+**Donut charts** are hand-drawn SVG arcs using `polar()` + `arcPath()` helpers defined inline in each screen file (no chart library for donuts). Recharts (`ComposedChart` + `Area`) is used for line/area charts in `InsightsScreen` and `AccountDetailsSheet`.
+
+## Component Conventions
+
+**`PickerPopover`** — portal-based floating dropdown. On mobile (`< 600px`) it pins to `bottom: 8px` above the virtual keyboard instead of anchoring to the trigger chip. Pass `anchorRef` pointing to the trigger element for desktop positioning.
+
+**`BottomSheet`** — wraps `react-modal-sheet`; always rendered via `createPortal` to `document.body`.
+
+**`ui/icons.tsx`** — single re-export file for all lucide-react icons, defaulting to `size=18`. Import from here, not directly from `lucide-react`.
+
+**Amount hero input** (`AddTransactionSheet`) uses a CSS grid size-mirror trick (`.amount-hero-sizer` in `globals.css`) so the input shrinks to text width and the cursor lands at the end of digits, not the visual center.
+
+## API Route Patterns
+
+- Most routes read `NOTION_TOKEN` from `process.env` and return early with a 500 if missing
+- `GET /api/transactions` — when `start`+`end` query params are provided it paginates through all Notion results; without them it caps at `page_size` (default 10, max 100)
+- `lib/notion-api.ts` — shared `notionFetchJson()` helper with retry logic (2 retries, exponential backoff, 15 s timeout); used by newer routes; older routes call `fetch` directly
+- Notion "delete" is implemented as archiving (`{ archived: true }`) via PATCH, not a true delete

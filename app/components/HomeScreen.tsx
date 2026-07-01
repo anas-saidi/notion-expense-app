@@ -28,7 +28,7 @@ type HomeScreenProps = {
   onBudgetScopeChange: (scope: BudgetScope) => void;
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
-  planDone?: boolean;
+  plannedScopes?: Record<"joint" | "anas" | "salma", boolean>;
   transactions?: Transaction[];
   pendingItems?: PendingItem[];
 };
@@ -57,7 +57,7 @@ export function HomeScreen({
   onBudgetScopeChange,
   homeMonth,
   onHomeMonthChange,
-  planDone,
+  plannedScopes,
   transactions,
   pendingItems,
 }: HomeScreenProps) {
@@ -120,6 +120,28 @@ export function HomeScreen({
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
   const showPlanningPrompt = isCurrentMonth && readyToAssign > 0;
   const monthLabel = monthShortLabel(homeMonth);
+
+  // Month-end planning alert: show 2 days before month end until plan is locked
+  const { daysUntilMonthEnd, nextMonthLabel: planningNextMonthLabel } = useMemo(() => {
+    if (!isCurrentMonth) return { daysUntilMonthEnd: 99, nextMonthLabel: "" };
+    const [y, m] = homeMonth.split("-").map(Number);
+    const lastDay = new Date(y, m, 0); // last day of month m
+    const todayDate = new Date(today());
+    const diff = Math.round((lastDay.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+    const nextMonth = new Date(y, m, 1);
+    return {
+      daysUntilMonthEnd: diff,
+      nextMonthLabel: new Intl.DateTimeFormat("en", { month: "long" }).format(nextMonth),
+    };
+  }, [homeMonth, isCurrentMonth]);
+
+  const allScopesPlanned = plannedScopes
+    ? Object.values(plannedScopes).every(Boolean)
+    : false;
+  const plannedCount = plannedScopes
+    ? Object.values(plannedScopes).filter(Boolean).length
+    : 0;
+  const showMonthEndAlert = isCurrentMonth && daysUntilMonthEnd <= 2 && !allScopesPlanned;
   const hasMonthPlan = monthlySummary.totalAssigned > 0;
   const planningPromptTitle = hasMonthPlan
     ? `${monthLabel} has money left`
@@ -193,11 +215,28 @@ export function HomeScreen({
         </button>
       )}
 
+      {/* Zone 2.5a: Month-end planning alert */}
+      {showMonthEndAlert && (
+        <button type="button" onClick={onOpenPlan} style={monthEndAlertStyle}>
+          <span style={assignCopyStyle}>
+            <span style={assignTitleStyle}>
+              {plannedCount > 0 ? `${planningNextMonthLabel} · ${plannedCount}/3 scopes` : `Plan ${planningNextMonthLabel}`}
+            </span>
+            <span style={assignFreeStyle}>
+              {daysUntilMonthEnd <= 0
+                ? "Last day of the month"
+                : `${daysUntilMonthEnd} day${daysUntilMonthEnd === 1 ? "" : "s"} left`}
+            </span>
+          </span>
+          <span style={assignActionVisibleStyle}>{plannedCount > 0 ? "Continue →" : "Plan now →"}</span>
+        </button>
+      )}
+
       {/* Zone 2.5: Upcoming bills strip */}
       {upcomingBills.length > 0 && (
         <section aria-label="Upcoming bills" style={upcomingWrapStyle}>
           <div style={sectionHeaderStyle}>
-            <span style={sectionLabelStyle}>Upcoming · next 7 days</span>
+            <span className="section-label" style={sectionLabelStyle}>Upcoming · next 7 days</span>
           </div>
           <div className="home-scroll-rail" style={cardsRailStyle}>
             {upcomingBills.map(bill => {
@@ -224,7 +263,7 @@ export function HomeScreen({
         {visibleAttentionItems.length > 0 && (
           <section aria-label="Categories needing attention" style={{ minWidth: 0 }}>
             <div className="home-section-hdr" style={sectionHeaderStyle}>
-              <span style={sectionLabelStyle}>Needs attention</span>
+              <span className="section-label" style={sectionLabelStyle}>Needs attention</span>
               {onOpenBudgetTab && (
                 <button
                   type="button"
@@ -287,7 +326,7 @@ export function HomeScreen({
           return (
             <section aria-label="Savings goal">
               <div className="home-section-hdr" style={sectionHeaderStyle}>
-                <span style={sectionLabelStyle}>Savings goal</span>
+                <span className="section-label" style={sectionLabelStyle}>Savings goal</span>
               </div>
               <div style={savingsCardStyle}>
                 <div style={savingsRingWrapStyle}>
@@ -324,17 +363,19 @@ export function HomeScreen({
         {recentTxns.length > 0 && (
           <section aria-label="Recent transactions">
             <div className="home-section-hdr" style={sectionHeaderStyle}>
-              <span style={sectionLabelStyle}>Recent</span>
+              <span className="section-label" style={sectionLabelStyle}>Recent</span>
               {onOpenHistory && (
                 <button type="button" onClick={onOpenHistory} style={seeAllBtnStyle} aria-label="View all transactions">
                   All activity <ChevronRightIcon size={12} style={{ verticalAlign: "middle" }} />
                 </button>
               )}
             </div>
-            <div style={recentListStyle}>
+            <div className="home-txn-list" style={recentListStyle}>
               {recentTxns.map((txn) => {
-                const cat = categories.find(c => c.id === txn.category);
-                const isIncome = txn.type === "Income";
+                const cat      = categories.find(c => c.id === txn.category);
+                const fromCat  = categories.find(c => c.id === txn.fromCategoryId);
+                const toCat    = categories.find(c => c.id === txn.toCategoryId);
+                const isIncome   = txn.type === "Income";
                 const isTransfer = txn.type === "Transfer";
                 const amountPrefix = isIncome ? "+" : isTransfer ? "↔" : "−";
                 const amountColor = isIncome
@@ -342,20 +383,26 @@ export function HomeScreen({
                   : isTransfer
                   ? "var(--muted)"
                   : "var(--text2)";
-                const rowIcon = isIncome ? "💰" : isTransfer ? "↔" : (cat?.icon ?? null);
                 return (
                   <div
                     key={txn.id}
                     className="home-txn-row tx-row"
-                    style={{ ...recentRowStyle, cursor: onClickTransaction ? "pointer" : undefined }}
+                    style={{ cursor: onClickTransaction ? "pointer" : undefined }}
                     onClick={onClickTransaction ? () => onClickTransaction(txn) : undefined}
                   >
                     {isIncome || isTransfer ? (
-                      <span style={recentTypeIconStyle(isIncome)}>{rowIcon}</span>
+                      <span style={recentTypeIconStyle(isIncome)}>{isIncome ? "💰" : "↔"}</span>
                     ) : (
                       <CategoryIcon icon={cat?.icon ?? null} size={22} style={{ flexShrink: 0 }} />
                     )}
-                    <span style={recentNameStyle}>{txn.name}</span>
+                    <div style={recentMiddleStyle}>
+                      {isTransfer && (fromCat || toCat) ? (
+                        <span style={recentNameStyle}>{fromCat?.name ?? "—"} → {toCat?.name ?? "—"}</span>
+                      ) : (
+                        <span style={recentNameStyle}>{txn.name}</span>
+                      )}
+                      {!isTransfer && cat && <span style={recentCategoryStyle}>{cat.name}</span>}
+                    </div>
                     <div style={recentRightStyle}>
                       <span style={{ ...recentAmountStyle, color: amountColor }}>
                         {amountPrefix}{fmt(txn.amount)} MAD
@@ -516,6 +563,20 @@ const dismissBtnStyle: CSSProperties = {
 
 
 /* Ready to assign row */
+
+const monthEndAlertStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  width: "100%",
+  padding: "14px 16px",
+  borderRadius: 14,
+  border: "1.5px solid color-mix(in srgb, var(--accent) 45%, transparent)",
+  background: "color-mix(in srgb, var(--accent) 14%, var(--surface))",
+  cursor: "pointer",
+  marginBottom: 16,
+};
 
 const assignRowStyle: CSSProperties = {
   display: "flex",
@@ -695,18 +756,8 @@ const savingsGoalLabelStyle: CSSProperties = {
 /* Recent transactions */
 
 const recentListStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
+  display: "grid",
   gap: 6,
-};
-
-const recentRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  padding: "16px 14px",
-  background: "var(--surface)",
-  borderRadius: 14,
 };
 
 const recentTypeIconStyle = (isIncome: boolean): CSSProperties => ({
@@ -725,11 +776,27 @@ const recentTypeIconStyle = (isIncome: boolean): CSSProperties => ({
   color: isIncome ? "var(--accent-ink)" : "var(--muted)",
 });
 
-const recentNameStyle: CSSProperties = {
+const recentMiddleStyle: CSSProperties = {
   flex: 1,
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+};
+
+const recentNameStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 500,
   color: "var(--text2)",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
+const recentCategoryStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 400,
+  color: "var(--muted)",
   overflow: "hidden",
   whiteSpace: "nowrap",
   textOverflow: "ellipsis",

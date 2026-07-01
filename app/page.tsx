@@ -15,6 +15,7 @@ import { CategoryManageSheet } from "./components/CategoryManageSheet";
 import { ManageScreen } from "./components/ManageScreen";
 import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
 import { RebalanceSheet } from "./components/RebalanceSheet";
+import { MonthStartPlanner } from "./components/MonthStartPlanner";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
@@ -26,6 +27,7 @@ import {
   getCategoryScope,
   getLeftToAssignByScope,
   getBalanceByScope,
+  isSavingsAccount,
   monthBounds,
   shiftDate,
   today,
@@ -105,7 +107,7 @@ export default function App() {
   const [tab, setTab] = useState<"home" | "plan" | "budget" | "history">("home");
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
   const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
-  const [planCompletedMonth, setPlanCompletedMonth] = useState<string | null>(null);
+  const [nextMonthFunds, setNextMonthFunds] = useState<{ categoryId: string; planned: number }[]>([]);
   const [homeMonth, setHomeMonth] = useState(formatMonthInput(today()));
   const [plannerSummaryReady, setPlannerSummaryReady] = useState(false);
   const [plannerMonthlySummary, setPlannerMonthlySummary] = useState<MonthlySummary | null>(null);
@@ -114,8 +116,10 @@ export default function App() {
   const [detailsCategory, setDetailsCategory] = useState<Category | null>(null);
   const [showRebalance, setShowRebalance] = useState(false);
   const [showManageScreen, setShowManageScreen] = useState(false);
+  const [showMonthStartPlanner, setShowMonthStartPlanner] = useState(false);
   const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | null>(null);
   const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
+  const [categoryManageDefaultType, setCategoryManageDefaultType] = useState<string | undefined>(undefined);
   const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
   const [transferAccount, setTransferAccount] = useState<Account | null>(null);
   const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
@@ -329,6 +333,7 @@ export default function App() {
     fetchTransactions();
     fetchPending();
     fetchMonthlyTrend();
+    fetchNextMonthFunds(); // eslint-disable-line react-hooks/exhaustive-deps
   }, []);
 
   // Refetch monthly summary whenever the viewed home month changes
@@ -557,6 +562,29 @@ export default function App() {
 
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(accounts), [accounts]);
   const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
+  const savingPool = useMemo(
+    () => accounts.filter(isSavingsAccount).reduce((sum, a) => sum + (a.readyToAssign ?? 0), 0),
+    [accounts],
+  );
+
+  // Derive which scopes have been planned for next month (based on existing fund records)
+  const plannedScopes = useMemo((): Record<"joint" | "anas" | "salma", boolean> => {
+    if (!nextMonthFunds.length) return { joint: false, anas: false, salma: false };
+    const fundedIds = new Set(nextMonthFunds.filter((f) => f.planned > 0).map((f) => f.categoryId));
+    const all = [...categories, ...frozenCategories];
+    return {
+      joint: all.filter((c) => getCategoryScope(c) === "joint").some((c) => fundedIds.has(c.id)),
+      anas:  all.filter((c) => getCategoryScope(c) === "anas").some((c) => fundedIds.has(c.id)),
+      salma: all.filter((c) => getCategoryScope(c) === "salma").some((c) => fundedIds.has(c.id)),
+    };
+  }, [nextMonthFunds, categories, frozenCategories]);
+
+  // Planning is always for the NEXT month (we close the current month and plan the upcoming one)
+  const monthStartPlannerMonth = useMemo(() => {
+    const [y, m] = homeMonth.split("-").map(Number);
+    const d = new Date(y, m, 1); // month m = next month (JS months 0-indexed)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, [homeMonth]);
   // DEBUG PRINTS for spent on team categories
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -598,8 +626,19 @@ export default function App() {
     setCategoryManageMode("fund");
   };
 
-  const openNewCategory = () => {
+  const availableCategoryTypes = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const cat of categories) {
+      const t = cat.type[0];
+      if (t && !seen.has(t)) { seen.add(t); result.push(t); }
+    }
+    return result;
+  }, [categories]);
+
+  const openNewCategory = (defaultType?: string) => {
     setCategoryManageCategory(null);
+    setCategoryManageDefaultType(defaultType);
     setCategoryManageMode("create");
   };
 
@@ -617,9 +656,17 @@ export default function App() {
     if (message) showToast(message, 1500);
   };
 
+  const fetchNextMonthFunds = async () => {
+    try {
+      const data = await fetch(`/api/monthly-planning/funds?month=${monthStartPlannerMonth}`).then((r) => r.json());
+      setNextMonthFunds(data.funds ?? []);
+    } catch {
+      setNextMonthFunds([]);
+    }
+  };
+
   const openMonthlyPlan = () => {
-    setPlannerMonth(homeMonth);
-    setTab("plan");
+    setShowMonthStartPlanner(true);
   };
 
   const reviveCategory = async (category: Category) => {
@@ -872,7 +919,7 @@ export default function App() {
     <AppShell
       tab={tab}
       pendingCount={scopedPendingItems.length}
-      onTabChange={(t) => { setTab(t); }}
+      onTabChange={(t) => { setTab(t); setShowManageScreen(false); }}
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setShowAddModal(true);
@@ -889,6 +936,22 @@ export default function App() {
           onOpenDetails={setDetailsAccount}
         />
       )}
+
+      <MonthStartPlanner
+        open={showMonthStartPlanner}
+        onClose={() => setShowMonthStartPlanner(false)}
+        onComplete={() => {
+          refreshBudgetData();
+          fetchNextMonthFunds(); // eslint-disable-line react-hooks/exhaustive-deps
+        }}
+        categories={categories.filter((c) => !c.snoozed && !c.archived)}
+        frozenCategories={frozenCategories}
+        accounts={accounts}
+        planningMonth={monthStartPlannerMonth}
+        readyToAssignByScope={readyToAssignByScope}
+        savingPool={savingPool}
+        onOpenNewCategory={openNewCategory}
+      />
 
       {!showManageScreen && tab === "home" && (
         <HomeScreen
@@ -915,7 +978,7 @@ export default function App() {
           onBudgetScopeChange={setBudgetScope}
           homeMonth={homeMonth}
           onHomeMonthChange={setHomeMonth}
-          planDone={planCompletedMonth === homeMonth}
+          plannedScopes={plannedScopes}
           transactions={scopedTransactions}
           pendingItems={scopedPendingItems}
           onOpenHistory={() => setTab("history")}
@@ -929,8 +992,8 @@ export default function App() {
         onSelectedMonthChange={setPlannerMonth}
         onCancel={() => setTab("home")}
         onComplete={() => {
-          setPlanCompletedMonth(plannerMonth);
           refreshBudgetData("Plan saved");
+          fetchNextMonthFunds(); // eslint-disable-line react-hooks/exhaustive-deps
         }}
         onOpenAddTransaction={({ accountId: nextAccountId, amount: nextAmount, name: nextName }) => {
           setEditingTransactionId(null);
@@ -952,6 +1015,7 @@ export default function App() {
         <CategoriesScreen
           categories={categories}
           frozenCategories={frozenCategories}
+          accounts={accounts}
           monthlySummary={monthlySummary}
           homeMonth={homeMonth}
           selectedCategoryId={categoryId}
@@ -961,6 +1025,7 @@ export default function App() {
           onFreezeCategory={freezeCategory}
           onReviveCategory={reviveCategory}
           onFundCategory={openFundCategory}
+          onOpenNewCategory={openNewCategory}
         />
       )}
 
@@ -1112,8 +1177,11 @@ export default function App() {
         month={homeMonth}
         accounts={accounts}
         defaultScope={budgetScope}
+        availableTypes={availableCategoryTypes}
+        defaultType={categoryManageDefaultType}
         onClose={() => setCategoryManageMode(null)}
         onSuccess={refreshBudgetData}
+        zIndex={95}
       />
 
       <AccountDetailsSheet

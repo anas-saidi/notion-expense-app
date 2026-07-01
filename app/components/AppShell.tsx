@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { AppTab } from "./app-types";
 import { BottomNav } from "./BottomNav";
 import { LandmarkIcon, PlusIcon } from "./ui/icons";
@@ -26,12 +26,24 @@ export function AppShell({
   hideHeader?: boolean;
   children?: ReactNode;
 }) {
+  // On desktop (≥ 1100px) the sidebar is always visible — immersive mode only
+  // applies on mobile where the bottom nav needs to be hidden.
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1100);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  // effectiveImmersive drives layout/nav; the original immersive drives header visibility.
+  const effectiveImmersive = immersive && !isDesktop;
+
   return (
     <div className="app-shell-root" style={{ height: "100dvh", position: "relative" }}>
       <div
-        id={!immersive ? "app-root-shell" : undefined}
-        className={immersive ? undefined : "app-content"}
-        style={immersive ? { height: "100%" } : { height: "100%", overflowY: "auto", position: "relative" }}
+        id={!effectiveImmersive ? "app-root-shell" : undefined}
+        className={effectiveImmersive ? undefined : "app-content"}
+        style={effectiveImmersive ? { height: "100%" } : { height: "100%", overflowY: "auto", position: "relative" }}
       >
         {!immersive && !hideHeader && onOpenManage && (
           <header style={headerStyle}>
@@ -47,7 +59,7 @@ export function AppShell({
         {children}
       </div>
 
-      {!immersive && (
+      {!effectiveImmersive && (
         <div className="app-nav-wrap">
           <BottomNav tab={tab} pendingCount={pendingCount} onTabChange={onTabChange} />
 
@@ -86,7 +98,7 @@ export function AppShell({
           style={{
             position: "fixed",
             left: "50%",
-            bottom: immersive ? "calc(20px + env(safe-area-inset-bottom, 0px))" : "calc(64px + env(safe-area-inset-bottom, 0px))",
+            bottom: effectiveImmersive ? "calc(20px + env(safe-area-inset-bottom, 0px))" : "calc(64px + env(safe-area-inset-bottom, 0px))",
             transform: "translateX(-50%)",
             zIndex: 80,
             background: "var(--surface2)",

@@ -180,11 +180,8 @@ export function InsightsScreen({
     const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
     const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
 
-    // Planned contribution = contribution fraction (0.0–1.0) × joint total planned
     const anasContribPct  = anasAcc?.contributionPercent  ?? null;
     const salmaContribPct = salmaAcc?.contributionPercent ?? null;
-    const anasPlan  = anasContribPct  != null ? anasContribPct  * totalPlanned : 0;
-    const salmaPlan = salmaContribPct != null ? salmaContribPct * totalPlanned : 0;
 
     // Actual: pocket spend + transfers to joint categories
     let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
@@ -200,12 +197,21 @@ export function InsightsScreen({
     let anasFunded = 0, salmaFunded = 0;
     for (const t of transactions) {
       if (t.type !== "Transfer") continue;
-      // Must be going into the joined account
       if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
       const fromLabel = acctLabel(t.fromAccountId);
       if (fromLabel.includes("hubb"))       anasFunded  += t.amount;
       else if (fromLabel.includes("wife"))  salmaFunded += t.amount;
     }
+
+    // Organic balance = what was in the joined account independent of this month's
+    // personal contributions. Back out transfers in, add back spending out.
+    // This keeps contribution targets stable as people transfer money in.
+    const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
+    const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
+    const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
+    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
+    const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
+    const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
 
     const anasActual  = anasPocket + anasFunded;
     const salmaActual = salmaPocket + salmaFunded;
@@ -378,7 +384,7 @@ export function InsightsScreen({
       <div className="insights-history">
         {transactionsLoading && (
           <div style={{ display: "grid", gap: 20 }}>
-            <div style={sectionDividerLabelStyle}>History</div>
+            <div className="section-label" style={sectionDividerLabelStyle}>History</div>
             <div style={{ display: "grid", gap: 6 }}>
               {[1, 2, 3, 4].map(i => <TxRowSkeleton key={i} />)}
             </div>
@@ -386,7 +392,7 @@ export function InsightsScreen({
         )}
         {!transactionsLoading && txGroups.length > 0 && (
           <div style={{ display: "grid", gap: 20 }}>
-            <div style={sectionDividerLabelStyle}>History</div>
+            <div className="section-label" style={sectionDividerLabelStyle}>History</div>
             {txGroups.map(({ label, items, subtotal }) => (
               <section key={label}>
                 <div style={groupHeaderStyle}>
@@ -631,10 +637,12 @@ function TogetherApartBody({ data }: {
   const { anasActual, salmaActual, sharedSpend, anasPlan, salmaPlan, anasPct, salmaPct, anasDelta, salmaDelta, anasContribPct, salmaContribPct, hasPlan } = data;
 
   const hasAnyData = anasActual > 0 || salmaActual > 0 || sharedSpend > 0;
-  if (!hasAnyData) return <p style={emptyBodyStyle}>No expenses recorded this month.</p>;
+  if (!hasAnyData && !hasPlan) return <p style={emptyBodyStyle}>No expenses recorded this month.</p>;
 
   const copy = !hasPlan
     ? "No contribution plan set — showing pocket spend only."
+    : !hasAnyData
+    ? `Planned for the month — Anas ${fmt(anasPlan)} MAD, Salma ${fmt(salmaPlan)} MAD.`
     : anasDelta !== null && salmaDelta !== null && Math.abs(anasDelta) < 50 && Math.abs(salmaDelta) < 50
     ? "Both on track with their planned contributions this month."
     : anasDelta !== null && anasDelta < -50
