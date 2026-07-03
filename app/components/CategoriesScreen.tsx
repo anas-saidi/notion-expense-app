@@ -577,10 +577,10 @@ function BudgetDistributionChart({
     return (
       <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <div style={{ position: "relative", width: 180, height: 180 }}>
-            <svg width={180} height={180} viewBox="0 0 180 180" aria-hidden="true">
-              <circle cx={90} cy={90} r={70} fill="none" stroke="var(--accent)"
-                strokeWidth={18} strokeDasharray="5 8" strokeLinecap="round" opacity={0.4} />
+          <div style={{ position: "relative", width: 220, height: 220 }}>
+            <svg width={220} height={220} viewBox="0 0 220 220" aria-hidden="true">
+              <circle cx={110} cy={110} r={85} fill="none" stroke="var(--accent)"
+                strokeWidth={20} strokeDasharray="5 8" strokeLinecap="round" opacity={0.4} />
             </svg>
             <div style={chartCenterStyle}>
               <span style={{ fontSize: 26, lineHeight: 1 }}>✓</span>
@@ -614,12 +614,12 @@ function BudgetDistributionChart({
     <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
       {/* Donut — centered */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <div ref={containerRef} style={{ position: "relative", width: 180, height: 180, overflow: "hidden" }}>
-          <PieChart width={180} height={180} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <div ref={containerRef} style={{ position: "relative", width: 220, height: 220, overflow: "hidden" }}>
+          <PieChart width={220} height={220} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
             <Pie
               data={visibleSegments}
-              cx={90} cy={90}
-              innerRadius={61} outerRadius={79}
+              cx={110} cy={110}
+              innerRadius={74} outerRadius={96}
               paddingAngle={visibleSegments.length > 1 ? 4 : 0}
               dataKey="value"
               startAngle={90} endAngle={-270}
@@ -632,8 +632,8 @@ function BudgetDistributionChart({
               animationEasing="ease-out"
               shape={(props: PieSectorShapeProps) => {
                 const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
-                const cr = Math.min(8, sweep * 79 * Math.PI / 180 / 2);
-                return <Sector {...props} cornerRadius={cr} outerRadius={79} />;
+                const cr = Math.min(8, sweep * 96 * Math.PI / 180 / 2);
+                return <Sector {...props} cornerRadius={cr} outerRadius={96} />;
               }}
             >
               {visibleSegments.map((seg, i) => (
@@ -662,7 +662,7 @@ function BudgetDistributionChart({
           <div style={{ ...chartCenterStyle, pointerEvents: "none" }}>
             {/* Count-up total; pulses softly when all categories are healthy */}
             <span style={{
-              fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 800,
+              fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800,
               color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1,
               display: "block",
               animation: allHealthy ? "dotPulse 3s ease-in-out infinite" : "none",
