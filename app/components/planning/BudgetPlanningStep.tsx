@@ -337,10 +337,10 @@ export function BudgetPlanningStep({
 }
 
 function getSpentBarColor(pct: number, isOverBudget: boolean): string {
-  if (isOverBudget || pct >= 100) return "color-mix(in srgb, #ef4444 75%, #b91c1c)";
-  if (pct >= 85) return "color-mix(in srgb, #f97316 70%, #ea580c)";
-  if (pct >= 65) return "color-mix(in srgb, #f59e0b 70%, #d97706)";
-  return "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
+  if (isOverBudget || pct >= 100) return "color-mix(in srgb, var(--spend-over) 75%, var(--spend-over-deep))";
+  if (pct >= 85) return "color-mix(in srgb, var(--spend-warn) 70%, var(--spend-warn-deep))";
+  if (pct >= 65) return "color-mix(in srgb, var(--spend-caution) 70%, var(--spend-caution-deep))";
+  return "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
 }
 
 const toAllocationItem = (category: Category): PlanningAllocationItem => ({
@@ -379,7 +379,7 @@ const addButtonStyle = {
   borderRadius: 999,
   padding: "6px 12px",
   border: "1px solid transparent",
-  background: "color-mix(in srgb, var(--surface2) 60%, white)",
+  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
   color: "var(--text2)",
   fontSize: 12,
   fontWeight: 600,
@@ -461,7 +461,7 @@ const chipStyle = {
   borderRadius: 999,
   padding: "6px 12px",
   border: "1px solid transparent",
-  background: "color-mix(in srgb, var(--surface2) 60%, white)",
+  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
   color: "var(--text2)",
   fontSize: 12,
   display: "inline-flex",
@@ -554,7 +554,7 @@ const inputWrapStyle = {
 const spentBarTrackStyle = {
   height: 6,
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface2) 65%, white)",
+  background: "color-mix(in srgb, var(--surface2) 65%, var(--surface))",
   overflow: "hidden",
   boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 45%, transparent)",
 };
@@ -594,7 +594,7 @@ const sliderThumbStyle = {
   width: 16,
   height: 16,
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface) 85%, white)",
+  background: "color-mix(in srgb, var(--surface) 85%, var(--surface))",
   border: "2px solid var(--accent)",
   transform: "translateY(-50%)",
   boxShadow: "0 2px 8px rgba(0,0,0,0.12), 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent)",

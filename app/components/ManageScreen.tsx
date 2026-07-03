@@ -254,7 +254,7 @@ const rowMetaStyle: CSSProperties = {
 const summaryBandStyle: CSSProperties = {
   minHeight: 58,
   borderRadius: 14,
-  background: "color-mix(in srgb, var(--accent) 9%, white)",
+  background: "color-mix(in srgb, var(--accent) 9%, var(--surface))",
   color: "var(--text2)",
   display: "flex",
   alignItems: "center",
@@ -283,7 +283,7 @@ const accountIconStyle: CSSProperties = {
   width: 40,
   height: 40,
   borderRadius: 14,
-  background: "color-mix(in srgb, var(--surface2) 58%, white)",
+  background: "color-mix(in srgb, var(--surface2) 58%, var(--surface))",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",

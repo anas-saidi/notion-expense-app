@@ -50,7 +50,7 @@ const chipStyle: CSSProperties = {
   borderRadius: 999,
   padding: "0 12px",
   border: "1px solid transparent",
-  background: "color-mix(in srgb, var(--surface2) 60%, white)",
+  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
   color: "var(--text2)",
   fontSize: 12,
   display: "inline-flex",

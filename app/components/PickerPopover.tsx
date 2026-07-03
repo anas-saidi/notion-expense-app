@@ -143,7 +143,7 @@ export function PickerPopover({
         maxWidth: "min(calc(100vw - 16px), calc(100dvw - 16px))",
         // On mobile give a sensible max-height so the picker doesn't cover the whole screen
         maxHeight: isMobilePinned ? "min(380px, 52dvh)" : undefined,
-        background: "color-mix(in srgb, var(--surface) 97%, white)",
+        background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
         border: "1px solid color-mix(in srgb, var(--border2) 64%, transparent)",
         borderRadius: 18,
         overflow: "hidden",

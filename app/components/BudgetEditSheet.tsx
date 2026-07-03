@@ -333,7 +333,7 @@ const sheetStyle: CSSProperties = {
   maxHeight: "calc(100dvh - 20px - 88px - env(safe-area-inset-bottom, 0px))",
   overflow: "hidden",
   borderRadius: 20,
-  background: "color-mix(in srgb, var(--surface) 96%, white)",
+  background: "color-mix(in srgb, var(--surface) 96%, var(--surface))",
   boxShadow: "var(--card-shadow)",
   animation: "fadeUp 0.24s ease both",
   display: "flex",

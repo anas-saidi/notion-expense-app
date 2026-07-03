@@ -41,12 +41,6 @@ const LOADING_LINES = [
   "Counting coins quietly...",
 ];
 
-const SAVE_LINES = [
-  "Saved. Tiny win unlocked.",
-  "Logged and looking sharp.",
-  "Done. Budget still in control.",
-  "Synced. You are on a roll.",
-];
 
 const FALLBACK_ACCOUNTS: Account[] = [];
 
@@ -90,6 +84,7 @@ function SectionHeader({
 export default function App() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<"wife" | "husband">("husband");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [categories, setCategories] = useState<Category[]>([]);
   const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
@@ -138,7 +133,7 @@ export default function App() {
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [loadingLineIdx, setLoadingLineIdx] = useState(0);
-  const [showSaveBurst, setShowSaveBurst] = useState(false);
+
   const [microToast, setMicroToast] = useState<string | null>(null);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
@@ -155,7 +150,7 @@ export default function App() {
   const rebalanceReturnToAdd = useRef(false);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const balanceAnimRef = useRef<number | null>(null);
   const fuseRef = useRef<Fuse<{ description: string; categoryId: string }> | null>(null);
   const dateRef = useRef<HTMLDivElement>(null);
@@ -175,12 +170,26 @@ export default function App() {
     if (savedScope === "joint" || savedScope === "anas" || savedScope === "salma") {
       setBudgetScope(savedScope);
     }
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark" || savedTheme === "light") {
+      setTheme(savedTheme);
+      document.documentElement.dataset.theme = savedTheme;
+    }
     setMounted(true);
   }, []);
 
   useEffect(() => {
     if (mode) document.documentElement.dataset.mode = mode;
   }, [mode]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem("theme", next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -190,7 +199,6 @@ export default function App() {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
       if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
     };
   }, []);
@@ -240,8 +248,8 @@ export default function App() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (tab === "history") fetchHistoryTransactions(historyMonth);
-  }, [tab, historyMonth, fetchHistoryTransactions]);
+    fetchHistoryTransactions(historyMonth);
+  }, [historyMonth, fetchHistoryTransactions]);
 
   const fetchMonthlySummary = async (month?: string) => {
     try {
@@ -796,6 +804,61 @@ export default function App() {
     [budgetScope, categories, pendingItems],
   );
 
+  // Joint contribution status — single source of truth for Home + Insights.
+  // Uses historyTransactions (month-filtered, all transactions for the month).
+  const contribStatus = useMemo(() => {
+    if (budgetScope !== "joint" || !accounts.length) return null;
+    const jointSummary = getMonthlySummaryForScope("joint");
+    const totalPlanned = jointSummary.totalAssigned;
+    if (totalPlanned <= 0) return null;
+
+    const acctLabel = (id: string | null | undefined) =>
+      id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
+
+    const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
+    const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
+    const anasContribPct  = anasAcc?.contributionPercent  ?? null;
+    const salmaContribPct = salmaAcc?.contributionPercent ?? null;
+    if (anasContribPct == null && salmaContribPct == null) return null;
+
+    // Use scope-filtered history transactions — joint scope includes:
+    // personal-account expenses on joint categories + all category-less transfers
+    const jointTxns = historyTransactions.filter(t => transactionMatchesScope(t, categories, "joint", accounts));
+    const expenseTxns = jointTxns.filter(t => t.category && (!t.type || t.type === "Expense"));
+
+    let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
+    for (const t of expenseTxns) {
+      const label = acctLabel(t.accountId);
+      if (label.includes("hubb")) anasPocket += t.amount;
+      else if (label.includes("wife")) salmaPocket += t.amount;
+      else sharedSpend += t.amount;
+    }
+
+    const joinedAccId = accounts.find(a => a.label.toLowerCase().includes("joined"))?.id;
+    let anasFunded = 0, salmaFunded = 0;
+    for (const t of jointTxns) {
+      if (t.type !== "Transfer") continue;
+      if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
+      const fromLabel = acctLabel(t.fromAccountId);
+      if (fromLabel.includes("hubb"))      anasFunded  += t.amount;
+      else if (fromLabel.includes("wife")) salmaFunded += t.amount;
+    }
+
+    const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
+    const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
+    const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
+    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
+
+    const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
+    const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
+
+    return {
+      anasPlan, salmaPlan,
+      anasActual: anasPocket + anasFunded,
+      salmaActual: salmaPocket + salmaFunded,
+    };
+  }, [budgetScope, accounts, historyTransactions, categories, getMonthlySummaryForScope]);
+
   const selectedDateLabel =
     date === today() ? "Today" :
     date === shiftDate(today(), -1) ? "Yesterday" :
@@ -844,10 +907,7 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || "Failed");
 
       setStatus("success");
-      setShowSaveBurst(true);
-      if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
-      burstTimerRef.current = setTimeout(() => setShowSaveBurst(false), 850);
-      showToast(isEditing ? "Transaction updated" : SAVE_LINES[Math.floor(Math.random() * SAVE_LINES.length)], 1500);
+      showToast(isEditing ? "Transaction updated" : "Saved", 1500);
 
       const newEntry = { description: name.trim(), categoryId };
       setCorpus((prev) => {
@@ -925,6 +985,8 @@ export default function App() {
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
+      theme={theme}
+      onToggleTheme={toggleTheme}
       toast={microToast}
       showAddButton={tab !== "plan" && !showManageScreen}
       immersive={tab === "plan" || showManageScreen}
@@ -969,6 +1031,7 @@ export default function App() {
           onOpenRebalance={() => setShowRebalance(true)}
           onOpenBudgetTab={() => setTab("budget")}
           onFundCategory={openFundCategory}
+          contribStatus={contribStatus}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
           leftToSpendByScope={leftToSpendByScope}
@@ -1056,7 +1119,7 @@ export default function App() {
         showAccountPicker={showAccountPicker}
         status={status}
         errorMsg={errorMsg}
-        showSaveBurst={showSaveBurst}
+
         selectedDateLabel={selectedDateLabel}
         selectedCat={selectedCat}
         suggestedCategory={suggestedCategory}
@@ -1168,6 +1231,7 @@ export default function App() {
         onOpenFund={() => {
           if (detailsCategory) openFundCategory(detailsCategory);
         }}
+        onFreeze={detailsCategory ? () => freezeCategory(detailsCategory) : undefined}
       />
 
       <CategoryManageSheet

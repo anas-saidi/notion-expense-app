@@ -305,12 +305,13 @@ export function MonthStartPlanner({
     [frozenCategories, revivedInSession, frozenInSession],
   );
 
-  // Free money already sitting in joint accounts (doesn't need to come from either spouse)
+  // Full balance in joint accounts — all of it covers the planned budget,
+  // whether assigned to categories or not, so it doesn't need personal contributions.
   const jointFreePool = useMemo(() => {
     return accounts.reduce((sum, account) => {
       if (isSavingsAccount(account)) return sum;
       if (!account.label.toLowerCase().includes("joined")) return sum;
-      return sum + Math.max(0, account.readyToAssign ?? 0);
+      return sum + Math.max(0, account.balance ?? 0);
     }, 0);
   }, [accounts]);
 
@@ -904,7 +905,7 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
 /* ─── Styles ──────────────────────────────────────────────────────── */
 
 const sheetPanelStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  background: "color-mix(in srgb, var(--bg) 96%, var(--surface))",
   borderRadius: "24px 24px 0 0",
 };
 
@@ -1051,7 +1052,7 @@ const catIconWrapStyle: CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: 11,
-  background: "color-mix(in srgb, var(--surface2) 55%, white)",
+  background: "color-mix(in srgb, var(--surface2) 55%, var(--surface))",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",

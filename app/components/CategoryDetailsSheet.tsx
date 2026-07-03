@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, PlusIcon, XIcon, ChevronLeftIcon, ChevronRightIcon } from "./ui/icons";
+import { FundIcon, PlusIcon, FreezeIcon, XIcon, ChevronLeftIcon, ChevronRightIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -46,6 +46,7 @@ type CategoryDetailsSheetProps = {
   onClose: () => void;
   onOpenAdd: () => void;
   onOpenFund: () => void;
+  onFreeze?: () => void;
 };
 
 export function CategoryDetailsSheet({
@@ -55,6 +56,7 @@ export function CategoryDetailsSheet({
   onClose,
   onOpenAdd,
   onOpenFund,
+  onFreeze,
 }: CategoryDetailsSheetProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,9 +130,16 @@ export function CategoryDetailsSheet({
             <CategoryIcon icon={category.icon} style={{ fontSize: 26, flexShrink: 0 }} />
             <h2 style={titleStyle}>{details?.name ?? category.name}</h2>
           </div>
-          <button onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
-            <XIcon strokeWidth={2.2} />
-          </button>
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            {onFreeze && (
+              <button onClick={onFreeze} aria-label="Freeze category" style={headerIconBtnStyle}>
+                <FreezeIcon size={16} strokeWidth={2} />
+              </button>
+            )}
+            <button onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
+              <XIcon strokeWidth={2.2} />
+            </button>
+          </div>
         </header>
 
         {/* ── Stats + bar ── */}
@@ -164,15 +173,21 @@ export function CategoryDetailsSheet({
         </section>
 
         {/* ── Actions ── */}
-        <div style={actionRowStyle}>
-          <button type="button" onClick={onOpenAdd} style={secondaryActionStyle}>
-            <PlusIcon size={14} strokeWidth={2.3} />
-            Add
-          </button>
-          <button type="button" onClick={onOpenFund} style={primaryActionStyle}>
-            <FundIcon size={14} strokeWidth={2.3} />
-            Fund
-          </button>
+        <div style={actionsRowStyle}>
+          <ActionBtn
+            icon={<PlusIcon size={18} strokeWidth={2.2} />}
+            ariaLabel="Add expense"
+            bg="color-mix(in srgb, var(--action-transfer) 11%, var(--surface))"
+            ink="var(--action-transfer)"
+            onClick={onOpenAdd}
+          />
+          <ActionBtn
+            icon={<FundIcon size={18} strokeWidth={2.2} />}
+            ariaLabel="Fund category"
+            bg="color-mix(in srgb, var(--action-income) 11%, var(--surface))"
+            ink="var(--action-income)"
+            onClick={onOpenFund}
+          />
         </div>
 
         {/* ── Activity ── */}
@@ -269,6 +284,31 @@ export function CategoryDetailsSheet({
   );
 }
 
+function ActionBtn({
+  icon,
+  ariaLabel,
+  onClick,
+  bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
+  ink = "var(--text2)",
+}: {
+  icon: React.ReactNode;
+  ariaLabel: string;
+  onClick: () => void;
+  bg?: string;
+  ink?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={{ ...actionBtnStyle, background: bg, color: ink }}
+    >
+      <span style={actionIconStyle}>{icon}</span>
+    </button>
+  );
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function todayMonth(): string {
@@ -317,7 +357,7 @@ function eventKindLabel(kind: TimelineItem["kind"]) {
 const sheetStyle: CSSProperties = {
   position: "relative",
   overflow: "hidden",
-  background: "color-mix(in srgb, var(--surface) 97%, white)",
+  background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
   display: "flex",
   flexDirection: "column",
   borderRadius: 20,
@@ -371,9 +411,7 @@ const statsWrapStyle: CSSProperties = {
 const spotlightStyle: CSSProperties = {
   display: "flex",
   alignItems: "stretch",
-  background: "var(--surface2)",
-  borderRadius: 14,
-  padding: "12px 0",
+  padding: "4px 0",
 };
 
 const statItemStyle: CSSProperties = {
@@ -426,39 +464,48 @@ const progressRailStyle: CSSProperties = {
 const progressFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
+  background: "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))",
   transition: "width 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
 /* Actions */
 
-const actionRowStyle: CSSProperties = {
-  display: "flex",
+const actionsRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, 1fr)",
   gap: 8,
 };
 
-const primaryActionStyle: CSSProperties = {
-  flex: 1,
-  minHeight: 42,
-  padding: "0 12px",
-  borderRadius: 12,
+const actionBtnStyle: CSSProperties = {
+  height: 52,
+  borderRadius: 14,
   border: "none",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontWeight: 700,
-  fontSize: 13,
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 6,
+  transition: "background 0.15s ease, color 0.15s ease",
 };
 
-const secondaryActionStyle: CSSProperties = {
-  ...primaryActionStyle,
-  flex: "0 0 auto",
-  background: "var(--surface2)",
-  color: "var(--text2)",
+const actionIconStyle: CSSProperties = {
+  width: 22,
+  height: 22,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const headerIconBtnStyle: CSSProperties = {
+  width: 40,
+  height: 40,
+  border: "none",
+  background: "transparent",
+  color: "var(--muted)",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
 };
 
 /* Activity */

@@ -518,7 +518,7 @@ const confirmCheckboxBaseStyle: CSSProperties = {
   height: 22,
   borderRadius: 999,
   border: "1.5px solid color-mix(in srgb, var(--success) 28%, var(--border2))",
-  background: "color-mix(in srgb, var(--surface2) 70%, white)",
+  background: "color-mix(in srgb, var(--surface2) 70%, var(--surface))",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -527,7 +527,7 @@ const confirmCheckboxBaseStyle: CSSProperties = {
 };
 
 const confirmCheckboxCheckedStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--success) 55%, white)",
+  background: "color-mix(in srgb, var(--success) 55%, var(--surface))",
   boxShadow: "0 0 0 2px color-mix(in srgb, var(--success) 14%, transparent)",
   borderColor: "color-mix(in srgb, var(--success) 35%, var(--border2))",
 };
@@ -600,7 +600,7 @@ const repairButtonStyle: CSSProperties = {
   padding: 0,
   borderRadius: 12,
   border: "none",
-  background: "color-mix(in srgb, var(--surface2) 52%, white)",
+  background: "color-mix(in srgb, var(--surface2) 52%, var(--surface))",
   color: "var(--text2)",
 };
 
@@ -617,7 +617,7 @@ const repairMenuStyle: CSSProperties = {
   minWidth: 180,
   padding: 8,
   borderRadius: 18,
-  background: "color-mix(in srgb, var(--surface) 94%, white)",
+  background: "color-mix(in srgb, var(--surface) 94%, var(--surface))",
   boxShadow: "0 0 0 1px color-mix(in srgb, var(--ink-strong) 10%, transparent)",
   zIndex: 10,
 };
@@ -629,7 +629,7 @@ const repairOptionStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: 12,
   border: "none",
-  background: "color-mix(in srgb, var(--surface2) 38%, white)",
+  background: "color-mix(in srgb, var(--surface2) 38%, var(--surface))",
   color: "var(--text2)",
 };
 
@@ -653,7 +653,7 @@ const repairInputStyle: CSSProperties = {
   padding: "0 12px",
   borderRadius: 12,
   border: "none",
-  background: "color-mix(in srgb, var(--surface2) 58%, white)",
+  background: "color-mix(in srgb, var(--surface2) 58%, var(--surface))",
   color: "var(--text2)",
   fontSize: 15,
 };

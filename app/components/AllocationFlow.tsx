@@ -86,9 +86,6 @@ export function AllocationFlow({
   const [draftValue, setDraftValue] = useState<string | null>(null);
   const emojiRef = useRef<HTMLSpanElement>(null);
   const [mounted, setMounted] = useState(false);
-  const wasBalancedRef = useRef(false);
-  const isFirstRenderRef = useRef(true);
-  const [burstKey, setBurstKey] = useState(0);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -107,7 +104,6 @@ export function AllocationFlow({
       setHasInteracted(false);
       setDraftValue(null);
       emojiRef.current?.classList.remove("is-dragging");
-      isFirstRenderRef.current = true;
       spentFloorRef.current = {};
     }
   }, [open]);
@@ -146,16 +142,6 @@ export function AllocationFlow({
     !readOnly &&
     (!requireBalanced || (isBalanced && hasInteracted));
 
-  // Burst animation when balance is first achieved after user interaction
-  useEffect(() => {
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false;
-      wasBalancedRef.current = isBalanced;
-      return;
-    }
-    if (isBalanced && !wasBalancedRef.current) setBurstKey((k) => k + 1);
-    wasBalancedRef.current = isBalanced;
-  }, [isBalanced]);
   const activeShare = activeItem ? activeItem.amount / Math.max(1, availablePool) : 0;
 
   // Stable spent floor — snapshot on first access, never recompute from the
@@ -340,7 +326,6 @@ export function AllocationFlow({
               </div>
             </div>
           )}
-          {burstKey > 0 && <BalancedBurst key={burstKey} />}
         </section>
         {readOnlyBanner}
         {flowPreview}
@@ -493,7 +478,7 @@ const screenWrapStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
   zIndex: 80,
-  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  background: "color-mix(in srgb, var(--bg) 96%, var(--surface))",
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -505,28 +490,11 @@ const screenInnerStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
-  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  background: "color-mix(in srgb, var(--bg) 96%, var(--surface))",
   borderRadius: "24px 24px 0 0",
 };
 
-// ── Balanced burst ────────────────────────────────────────────────────────────
-type BurstStyleVars = CSSProperties & { "--x": string; "--y": string; "--d": string };
 
-function BalancedBurst() {
-  const PARTICLES: { x: number; y: number; d: number; size: number }[] = [
-    { x: 0, y: -36, d: 0, size: 10 }, { x: 28, y: -24, d: 55, size: 8 },
-    { x: 36, y: 4, d: 25, size: 10 }, { x: 20, y: 30, d: 75, size: 7 },
-    { x: -28, y: -24, d: 15, size: 8 }, { x: -36, y: 4, d: 60, size: 10 },
-    { x: -16, y: 32, d: 40, size: 7 }, { x: 10, y: -44, d: 35, size: 6 },
-  ];
-  return (
-    <>
-      {PARTICLES.map((p, i) => (
-        <span key={i} className="save-burst" style={{ "--x": `${p.x}px`, "--y": `${p.y}px`, "--d": `${p.d}ms`, color: "var(--accent)", fontSize: p.size } as BurstStyleVars}>✦</span>
-      ))}
-    </>
-  );
-}
 
 // GroupPicker and styles (copied/encapsulated for reusability)
 function GroupPicker({ groups, activeGroup, onSelect }: { groups: AllocationGroup[]; activeGroup: BudgetGroupKey; onSelect: (key: BudgetGroupKey) => void; }) {
@@ -599,12 +567,12 @@ const gpLabelStyle: CSSProperties = { fontSize: 13, fontWeight: 600 };
 const gpChevronStyle: CSSProperties = { pointerEvents: "none", color: "var(--muted)", transition: "transform 0.16s ease" };
 const gpMenuStyle: CSSProperties = { width: 192, padding: 6, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)", background: "var(--surface)", boxShadow: "0 18px 36px color-mix(in srgb, var(--ink-strong) 14%, transparent), inset 0 1px 0 color-mix(in srgb, white 55%, transparent)", zIndex: 90, display: "grid", gap: 3 };
 const gpOptionStyle: CSSProperties = { minHeight: 44, width: "100%", border: "none", borderRadius: 12, background: "transparent", color: "var(--text2)", cursor: "pointer", display: "grid", gridTemplateColumns: "8px 1fr auto", alignItems: "center", gap: 9, padding: "0 10px", textAlign: "left" };
-const gpOptionActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--surface2) 70%, white)" };
+const gpOptionActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--surface2) 70%, var(--surface))" };
 const gpDotStyle: CSSProperties = { width: 7, height: 7, borderRadius: 999 };
 const gpOptionTextStyle: CSSProperties = { fontSize: 13, fontWeight: 700 };
 const gpCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 10, color: "var(--muted)" };
 
-const sheetPanelStyle: CSSProperties = { background: "color-mix(in srgb, var(--bg) 96%, white)", borderRadius: "24px 24px 0 0" };
+const sheetPanelStyle: CSSProperties = { background: "color-mix(in srgb, var(--bg) 96%, var(--surface))", borderRadius: "24px 24px 0 0" };
 const sheetContentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
 const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "16px 20px 14px", flexShrink: 0 };
 const screenHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "44px 1fr auto", alignItems: "center", gap: 8, padding: "14px 16px 12px", flexShrink: 0 };
@@ -620,7 +588,7 @@ const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "ce
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };
 const quietAvailableValueStyle: CSSProperties = { color: "var(--text2)", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', letterSpacing: -0.5 };
-const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 999, padding: "5px 9px", background: "color-mix(in srgb, var(--warning-dim) 70%, white)", color: "color-mix(in srgb, var(--warning) 82%, black)", fontSize: 11, fontWeight: 750 };
+const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 999, padding: "5px 9px", background: "color-mix(in srgb, var(--warning-dim) 70%, var(--surface))", color: "color-mix(in srgb, var(--warning) 82%, black)", fontSize: 11, fontWeight: 750 };
 const balancedTextStyle: CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
 const deltaChipStyle = (isOver: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "center", gap: 2,
@@ -631,7 +599,7 @@ const deltaChipStyle = (isOver: boolean): CSSProperties => ({
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
-const categoryPillStyle: CSSProperties = { flex: "0 0 40px", width: 40, minHeight: 40, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border) 32%, transparent)", background: "color-mix(in srgb, var(--surface) 90%, white)", color: "var(--text2)", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 8px 16px color-mix(in srgb, var(--ink-strong) 4%, transparent)", transition: "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.22s ease" };
+const categoryPillStyle: CSSProperties = { flex: "0 0 40px", width: 40, minHeight: 40, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border) 32%, transparent)", background: "color-mix(in srgb, var(--surface) 90%, var(--surface))", color: "var(--text2)", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 8px 16px color-mix(in srgb, var(--ink-strong) 4%, transparent)", transition: "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.22s ease" };
 const categoryPillActiveStyle: CSSProperties = { flex: "0 0 140px", minHeight: 54, borderRadius: 18, border: "1px solid transparent", background: "linear-gradient(145deg, #39dec7, color-mix(in srgb, #39dec7 70%, var(--accent)))", color: "var(--accent-ink)", padding: "8px 10px", display: "grid", gridTemplateColumns: "30px minmax(0, 1fr)", gridTemplateRows: "auto auto auto", alignItems: "center", gap: "1px 8px", textAlign: "left", cursor: "pointer", boxShadow: "0 14px 26px color-mix(in srgb, #39dec7 28%, transparent)", animation: "categorySelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both" };
 const categoryIconStyle = (isActive: boolean): CSSProperties => ({ gridColumn: "1 / 2", gridRow: isActive ? "1 / 4" : "1 / 3", color: isActive ? "var(--accent-ink)" : "color-mix(in srgb, var(--accent-ink) 78%, var(--text))", flexShrink: 0 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };

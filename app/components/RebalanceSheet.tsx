@@ -5,6 +5,7 @@ import type { Category, MonthlySummary } from "./app-types";
 import { today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { ScopeChipBar, type ScopeChipItem } from "./ui/ScopeChipBar";
 import type { PlanningAllocationItem } from "./app-types";
 
 type RebalanceSheetProps = {
@@ -87,102 +88,13 @@ function computeTransfers(
 
 // ── Scope chip metadata ────────────────────────────────────────────────────────
 
-const CHIP_META: Record<string, { emoji: string }> = {
-  all:     { emoji: "✦" },
-  joint:   { emoji: "👫" },
-  husband: { emoji: "👨" },
-  wife:    { emoji: "👩" },
-  savings: { emoji: "💰" },
+const CHIP_EMOJI: Record<string, string> = {
+  all:     "✦",
+  joint:   "👫",
+  husband: "👨",
+  wife:    "👩",
+  savings: "💰",
 };
-
-const CHIP_BG: Record<string, string> = {
-  all:     "var(--ink-strong)",
-  joint:   "var(--accent)",
-  husband: "var(--partner-husband)",
-  wife:    "var(--partner-wife)",
-  savings: "var(--warning)",
-};
-
-const CHIP_INK: Record<string, string> = {
-  all:     "var(--bg)",
-  joint:   "var(--accent-ink)",
-  husband: "#ffffff",
-  wife:    "#ffffff",
-  savings: "var(--accent-ink)",
-};
-
-const CHIP_COLOR: Record<string, string> = {
-  all:     "var(--text2)",
-  joint:   "var(--accent)",
-  husband: "var(--partner-husband)",
-  wife:    "var(--partner-wife)",
-  savings: "var(--warning)",
-};
-
-function RebalanceScopeChip({
-  tab,
-  isActive,
-  onSelect,
-}: {
-  tab: { key: string; label: string };
-  isActive: boolean;
-  onSelect: () => void;
-}) {
-  const [pressed, setPressed] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const meta = CHIP_META[tab.key] ?? { emoji: "•" };
-
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={isActive}
-      onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      style={isActive ? {
-        height: 38,
-        borderRadius: 12,
-        border: "none",
-        background: CHIP_BG[tab.key] ?? "var(--ink-strong)",
-        color: CHIP_INK[tab.key] ?? "var(--bg)",
-        padding: "0 14px 0 10px",
-        gap: 7,
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        transform: pressed ? "scale(0.95)" : "translateY(-1px)",
-        transition: "transform 0.15s cubic-bezier(0.22, 1, 0.36, 1)",
-        animation: "categorySelectIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both",
-        flexShrink: 0,
-      } : {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
-        background: "transparent",
-        color: CHIP_COLOR[tab.key] ?? "var(--text2)",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: pressed ? 0.9 : hovered ? 0.75 : 0.45,
-        transform: pressed ? "scale(0.93)" : hovered ? "translateY(-2px)" : "none",
-        transition: "opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
-        flexShrink: 0,
-      }}
-    >
-      <span style={{ fontSize: 18, lineHeight: 1 }}>{meta.emoji}</span>
-      {isActive && (
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
-          {tab.label}
-        </span>
-      )}
-    </button>
-  );
-}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -363,25 +275,30 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     </div>
   );
 
-  const chipsContent = groupTabs.length > 1 ? (
-    <div style={scopeChipsGroupStyle}>
-      {groupTabs.map((tab) => (
-        <RebalanceScopeChip
-          key={tab.key}
-          tab={tab}
-          isActive={groupFilter === tab.key}
-          onSelect={() => handleGroupFilterChange(tab.key as GroupFilter)}
-        />
-      ))}
-    </div>
+  const scopeChips: ScopeChipItem[] = useMemo(
+    () => groupTabs.map(tab => ({
+      key: tab.key,
+      emoji: CHIP_EMOJI[tab.key] ?? "•",
+      label: tab.label,
+    })),
+    [groupTabs],
+  );
+
+  const chipsContent = scopeChips.length > 1 ? (
+    <ScopeChipBar
+      chips={scopeChips}
+      value={groupFilter}
+      onChange={k => handleGroupFilterChange(k as GroupFilter)}
+      ariaLabel="Rebalance scope"
+    />
   ) : undefined;
 
   const readOnlyBanner = isReadOnly ? (
     <div style={{
       ...contextBannerStyle,
       background: monthCtx === "past"
-        ? "color-mix(in srgb, var(--surface2) 55%, white)"
-        : "color-mix(in srgb, var(--info-dim) 60%, white)",
+        ? "color-mix(in srgb, var(--surface2) 55%, var(--surface))"
+        : "color-mix(in srgb, var(--info-dim) 60%, var(--surface))",
       borderColor: monthCtx === "past"
         ? "color-mix(in srgb, var(--border2) 35%, transparent)"
         : "color-mix(in srgb, var(--info) 22%, transparent)",
@@ -517,12 +434,6 @@ const flowMoreStyle: CSSProperties = {
   textAlign: "center",
 };
 
-// ── Scope chips group container ────────────────────────────────────────────────
-
-const scopeChipsGroupStyle: CSSProperties = {
-  display: "inline-flex",
-  gap: 8,
-};
 
 // ── Context banner styles ──────────────────────────────────────────────────────
 
