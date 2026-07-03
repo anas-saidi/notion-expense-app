@@ -577,10 +577,10 @@ function BudgetDistributionChart({
     return (
       <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <div style={{ position: "relative", width: 220, height: 220 }}>
-            <svg width={220} height={220} viewBox="0 0 220 220" aria-hidden="true">
-              <circle cx={110} cy={110} r={85} fill="none" stroke="var(--accent)"
-                strokeWidth={20} strokeDasharray="5 8" strokeLinecap="round" opacity={0.4} />
+          <div style={{ position: "relative", width: 260, height: 260 }}>
+            <svg width={260} height={260} viewBox="0 0 260 260" aria-hidden="true">
+              <circle cx={130} cy={130} r={101} fill="none" stroke="var(--accent)"
+                strokeWidth={22} strokeDasharray="5 8" strokeLinecap="round" opacity={0.4} />
             </svg>
             <div style={chartCenterStyle}>
               <span style={{ fontSize: 26, lineHeight: 1 }}>✓</span>
@@ -614,12 +614,12 @@ function BudgetDistributionChart({
     <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
       {/* Donut — centered */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <div ref={containerRef} style={{ position: "relative", width: 220, height: 220, overflow: "hidden" }}>
-          <PieChart width={220} height={220} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <div ref={containerRef} style={{ position: "relative", width: 260, height: 260, overflow: "hidden" }}>
+          <PieChart width={260} height={260} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
             <Pie
               data={visibleSegments}
-              cx={110} cy={110}
-              innerRadius={74} outerRadius={96}
+              cx={130} cy={130}
+              innerRadius={88} outerRadius={114}
               paddingAngle={visibleSegments.length > 1 ? 4 : 0}
               dataKey="value"
               startAngle={90} endAngle={-270}
@@ -632,10 +632,9 @@ function BudgetDistributionChart({
               animationEasing="ease-out"
               shape={(props: PieSectorShapeProps) => {
                 const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
-                const arcLen = (sweep * Math.PI / 180) * 96;
-                // Scale down for small arcs so Recharts doesn't square them off
-                const cr = Math.min(10, arcLen / 3);
-                return <Sector {...props} cornerRadius={cr} outerRadius={96} />;
+                const arcLen = (sweep * Math.PI / 180) * 114;
+                const cr = Math.min(11, arcLen / 3);
+                return <Sector {...props} cornerRadius={cr} outerRadius={114} />;
               }}
             >
               {visibleSegments.map((seg, i) => (
