@@ -31,7 +31,6 @@ type HomeScreenProps = {
   onHomeMonthChange: (month: string) => void;
   plannedScopes?: Record<"joint" | "anas" | "salma", boolean>;
   transactions?: Transaction[];
-  allTransactions?: Transaction[];
   pendingItems?: PendingItem[];
 };
 
@@ -62,7 +61,6 @@ export function HomeScreen({
   onHomeMonthChange,
   plannedScopes,
   transactions,
-  allTransactions,
   pendingItems,
 }: HomeScreenProps) {
 
@@ -184,13 +182,13 @@ export function HomeScreen({
     });
   };
 
-  // Joint contribution status — uses ALL transactions (not scope-filtered) so we
-  // can see personal pocket spending and personal→joined transfers correctly.
-  // totalPlanned comes from the joint wallet summary to match InsightsScreen.
+  // Joint contribution status — uses scope-filtered transactions (same as Insights).
+  // Joint scope already includes personal-account spending on joint categories
+  // and category-less transfers, which is exactly what we need.
   const contribData = useMemo(() => {
     if (budgetScope !== "joint" || !accountsProp?.length) return null;
     const accounts = accountsProp;
-    const allTxns = allTransactions ?? [];
+    const allTxns = transactions ?? [];
     const acctLabel = (id: string | null | undefined) =>
       id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
 
