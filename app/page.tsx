@@ -981,6 +981,7 @@ export default function App() {
           onHomeMonthChange={setHomeMonth}
           plannedScopes={plannedScopes}
           transactions={scopedTransactions}
+          allTransactions={transactions}
           pendingItems={scopedPendingItems}
           onOpenHistory={() => setTab("history")}
           onClickTransaction={editTransaction}
