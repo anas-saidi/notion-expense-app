@@ -631,8 +631,8 @@ function BudgetDistributionChart({
               animationDuration={750}
               animationEasing="ease-out"
               shape={(props: PieSectorShapeProps) => {
-                const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
-                const cr = Math.min(8, sweep * 96 * Math.PI / 180 / 2);
+                const thickness = 96 - 74; // outerRadius - innerRadius
+                const cr = thickness / 2;  // fully rounded ends — half the ring width
                 return <Sector {...props} cornerRadius={cr} outerRadius={96} />;
               }}
             >
