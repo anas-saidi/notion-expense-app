@@ -969,6 +969,7 @@ export default function App() {
           onOpenRebalance={() => setShowRebalance(true)}
           onOpenBudgetTab={() => setTab("budget")}
           onFundCategory={openFundCategory}
+          accounts={accounts}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
           leftToSpendByScope={leftToSpendByScope}

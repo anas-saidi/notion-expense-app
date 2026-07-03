@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
+import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { ChevronRightIcon } from "./ui/icons";
@@ -19,6 +19,7 @@ type HomeScreenProps = {
   onFundCategory?: (category: Category) => void;
   onOpenHistory?: () => void;
   onClickTransaction?: (txn: Transaction) => void;
+  accounts?: Account[];
   monthlySummary: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   leftToSpendByScope: Record<BudgetScope, number>;
@@ -48,6 +49,7 @@ export function HomeScreen({
   onFundCategory,
   onOpenHistory,
   onClickTransaction,
+  accounts: accountsProp,
   monthlySummary,
   walletSummaries,
   leftToSpendByScope,
@@ -180,6 +182,55 @@ export function HomeScreen({
     });
   };
 
+  // Joint contribution status — only computed when viewing joint scope with a plan
+  const contribData = useMemo(() => {
+    if (budgetScope !== "joint" || !hasMonthPlan || !accountsProp?.length) return null;
+    const accounts = accountsProp;
+    const allTxns = transactions ?? [];
+    const acctLabel = (id: string | null | undefined) =>
+      id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
+
+    const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
+    const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
+    const anasContribPct  = anasAcc?.contributionPercent  ?? null;
+    const salmaContribPct = salmaAcc?.contributionPercent ?? null;
+    if (anasContribPct == null && salmaContribPct == null) return null;
+
+    const totalPlanned = monthlySummary.totalAssigned;
+
+    // Pocket spending from personal accounts on joint categories
+    const expenseTxns = allTxns.filter(t => t.category && (!t.type || t.type === "Expense"));
+    let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
+    for (const t of expenseTxns) {
+      const label = acctLabel(t.accountId);
+      if (label.includes("hubb")) anasPocket += t.amount;
+      else if (label.includes("wife")) salmaPocket += t.amount;
+      else sharedSpend += t.amount;
+    }
+
+    // Transfers from personal accounts into joined account
+    const joinedAccId = accounts.find(a => a.label.toLowerCase().includes("joined"))?.id;
+    let anasFunded = 0, salmaFunded = 0;
+    for (const t of allTxns) {
+      if (t.type !== "Transfer") continue;
+      if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
+      const fromLabel = acctLabel(t.fromAccountId);
+      if (fromLabel.includes("hubb"))      anasFunded  += t.amount;
+      else if (fromLabel.includes("wife")) salmaFunded += t.amount;
+    }
+
+    const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
+    const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
+    const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
+    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
+
+    const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
+    const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
+    const anasActual  = anasPocket + anasFunded;
+    const salmaActual = salmaPocket + salmaFunded;
+
+    return { anasPlan, salmaPlan, anasActual, salmaActual };
+  }, [budgetScope, hasMonthPlan, accountsProp, transactions, monthlySummary.totalAssigned]);
 
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
@@ -195,6 +246,21 @@ export function HomeScreen({
           balanceByScope={balanceByScope}
         />
       </div>
+
+      {/* Joint contribution status */}
+      {contribData && (contribData.anasPlan > 0 || contribData.salmaPlan > 0) && (
+        <div style={contribRowStyle}>
+          <ContribPill
+            emoji="👨" actual={contribData.anasActual} plan={contribData.anasPlan}
+            color="var(--partner-husband)"
+          />
+          <span style={{ color: "var(--muted)", opacity: 0.25, fontSize: 11 }}>·</span>
+          <ContribPill
+            emoji="👩" actual={contribData.salmaActual} plan={contribData.salmaPlan}
+            color="var(--partner-wife)"
+          />
+        </div>
+      )}
 
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
@@ -421,6 +487,26 @@ export function HomeScreen({
   );
 }
 
+function ContribPill({ emoji, actual, plan, color }: {
+  emoji: string; actual: number; plan: number; color: string;
+}) {
+  const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
+  const done = pct >= 99;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      fontSize: 12, fontVariantNumeric: "tabular-nums", fontWeight: 600,
+      color: done ? "var(--accent)" : color,
+    }}>
+      <span style={{ fontSize: 13 }}>{emoji}</span>
+      {done
+        ? <span style={{ fontWeight: 700 }}>Done</span>
+        : <><span>{fmt(Math.round(actual))}</span><span style={{ fontWeight: 400, opacity: 0.45 }}>/ {fmt(Math.round(plan))}</span></>
+      }
+    </span>
+  );
+}
+
 function monthShortLabel(ym: string): string {
   return new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${ym}-01`));
 }
@@ -430,6 +516,14 @@ function monthShortLabel(ym: string): string {
 const walletSwitcherWrapStyle: CSSProperties = {
   paddingTop: 8,
   paddingBottom: 16,
+};
+
+const contribRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+  padding: "0 0 12px",
 };
 
 const contentStyle: CSSProperties = {

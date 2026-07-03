@@ -542,31 +542,31 @@ function BudgetDistributionChart({
     const items = categories
       .filter(cat => getCategoryScope(cat) === scope)
       .map(cat => {
-        const allocated = plannedByCategory.get(cat.id) ?? 0;
-        return { cat, allocated };
+        const available = Math.max(0, cat.available ?? 0);
+        return { cat, available };
       })
-      .filter(({ allocated }) => allocated > 0)
-      .sort((a, b) => b.allocated - a.allocated);
+      .filter(({ available }) => available > 0)
+      .sort((a, b) => b.available - a.available);
 
-    const total = items.reduce((s, { allocated }) => s + allocated, 0);
+    const total = items.reduce((s, { available }) => s + available, 0);
     return { items, total };
-  }, [categories, scope, plannedByCategory]);
+  }, [categories, scope]);
 
   // Segment computation before guard — needed by useCountUp
-  const allSegments = chartData.items.map(({ cat, allocated }, i) => ({
+  const allSegments = chartData.items.map(({ cat, available }, i) => ({
     name: cat.name,
-    value: allocated,
-    allocated,
+    value: available,
+    available,
     cat,
     color: CHART_COLORS[i % CHART_COLORS.length],
   }));
   const visibleSegments = allSegments.filter(s => !hiddenIds.has(s.cat.id));
-  const visibleTotal = visibleSegments.reduce((s, seg) => s + seg.allocated, 0);
+  const visibleTotal = visibleSegments.reduce((s, seg) => s + seg.available, 0);
 
   // "All good" pulse: every visible category has ≥60% of planned remaining
   const allHealthy = visibleSegments.length > 0 && visibleSegments.every(s => {
-    const available = s.cat.available ?? 0;
-    return s.allocated > 0 && available >= s.allocated * 0.6;
+    const planned = plannedByCategory.get(s.cat.id) ?? 0;
+    return planned > 0 && s.available >= planned * 0.6;
   });
 
   // Count-up must be called before conditional return (hook rule)
@@ -669,14 +669,14 @@ function BudgetDistributionChart({
             }}>
               {fmt(countedTotal)}
             </span>
-            <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4, letterSpacing: 0.3 }}>MAD allocated</span>
+            <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4, letterSpacing: 0.3 }}>MAD available</span>
           </div>
         </div>
       </div>
 
       {/* Legend — staggered cascade on mount */}
       <div style={chartLegendStyle}>
-        {allSegments.map(({ cat, allocated, color }, i) => {
+        {allSegments.map(({ cat, available, color }, i) => {
           const isHidden = hiddenIds.has(cat.id);
           return (
             <button
@@ -701,7 +701,7 @@ function BudgetDistributionChart({
                 <CategoryIcon icon={cat.icon} size={11} />
               </span>
               <span style={{ ...chartLegendNameStyle, textDecoration: isHidden ? "line-through" : "none" }}>{cat.name}</span>
-              <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(allocated))}</span>
+              <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(available))}</span>
             </button>
           );
         })}
