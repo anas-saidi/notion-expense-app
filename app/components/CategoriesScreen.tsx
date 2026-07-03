@@ -631,11 +631,10 @@ function BudgetDistributionChart({
               animationDuration={750}
               animationEasing="ease-out"
               shape={(props: PieSectorShapeProps) => {
-                const thickness = 96 - 74;
                 const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
                 const arcLen = (sweep * Math.PI / 180) * 96;
-                // As round as possible: half ring width, but never more than half arc length
-                const cr = Math.min(thickness / 2, arcLen / 2);
+                // Scale down for small arcs so Recharts doesn't square them off
+                const cr = Math.min(10, arcLen / 3);
                 return <Sector {...props} cornerRadius={cr} outerRadius={96} />;
               }}
             >
