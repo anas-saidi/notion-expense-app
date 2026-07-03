@@ -2,6 +2,11 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
 import { fmt } from "./app-utils";
 
+export type ContribStatus = {
+  anasPlan: number; salmaPlan: number;
+  anasActual: number; salmaActual: number;
+};
+
 type WalletCardSwitcherProps = {
   value: BudgetScope;
   onChange: (scope: BudgetScope) => void;
@@ -9,6 +14,7 @@ type WalletCardSwitcherProps = {
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   leftToSpendByScope?: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
+  contribStatus?: ContribStatus | null;
 };
 
 const SCOPES: BudgetScope[] = ["joint", "anas", "salma"];
@@ -94,7 +100,7 @@ const JOINT_VIEW_DOT: Record<JointView, string> = {
   spent:    "color-mix(in srgb, #ffd6a5 90%, var(--accent-ink))",
 };
 
-export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope, contribStatus }: WalletCardSwitcherProps) {
   const [hovered, setHovered]   = useState<BudgetScope | null>(null);
   const [pressed, setPressed]   = useState<BudgetScope | null>(null);
   const [jointView, setJointView] = useState<JointView>("balance");
@@ -269,6 +275,14 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
           );
         })()}
 
+        {/* Joint contribution status */}
+        {value === "joint" && contribStatus && (contribStatus.anasPlan > 0 || contribStatus.salmaPlan > 0) && (
+          <div style={contribRowStyle}>
+            <ContribPill emoji="👨" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} />
+            <span style={{ opacity: 0.2, fontSize: 11 }}>·</span>
+            <ContribPill emoji="👩" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} />
+          </div>
+        )}
 
       </div>
 
@@ -432,6 +446,32 @@ const jointDotsStyle: CSSProperties = {
   display: "flex",
   gap: 5,
   paddingTop: 2,
+};
+
+function ContribPill({ emoji, actual, plan }: {
+  emoji: string; actual: number; plan: number;
+}) {
+  const done = plan > 0 && actual >= plan * 0.99;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      fontSize: 11, fontVariantNumeric: "tabular-nums",
+      color: "color-mix(in srgb, var(--accent-ink) 65%, transparent)",
+    }}>
+      <span style={{ fontSize: 12 }}>{emoji}</span>
+      {done
+        ? <span style={{ fontWeight: 700, color: "var(--accent-ink)" }}>Done</span>
+        : <><span style={{ fontWeight: 600 }}>{fmt(Math.round(actual))}</span><span style={{ opacity: 0.5, fontWeight: 400 }}>/ {fmt(Math.round(plan))}</span></>
+      }
+    </span>
+  );
+}
+
+const contribRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
 };
 
 const jointDotStyle = (active: boolean, color: string): CSSProperties => ({

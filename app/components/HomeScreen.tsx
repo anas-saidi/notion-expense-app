@@ -244,23 +244,9 @@ export function HomeScreen({
           walletSummaries={walletSummaries}
           leftToSpendByScope={leftToSpendByScope}
           balanceByScope={balanceByScope}
+          contribStatus={contribData}
         />
       </div>
-
-      {/* Joint contribution status */}
-      {contribData && (contribData.anasPlan > 0 || contribData.salmaPlan > 0) && (
-        <div style={contribRowStyle}>
-          <ContribPill
-            emoji="👨" actual={contribData.anasActual} plan={contribData.anasPlan}
-            color="var(--partner-husband)"
-          />
-          <span style={{ color: "var(--muted)", opacity: 0.25, fontSize: 11 }}>·</span>
-          <ContribPill
-            emoji="👩" actual={contribData.salmaActual} plan={contribData.salmaPlan}
-            color="var(--partner-wife)"
-          />
-        </div>
-      )}
 
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
@@ -487,26 +473,6 @@ export function HomeScreen({
   );
 }
 
-function ContribPill({ emoji, actual, plan, color }: {
-  emoji: string; actual: number; plan: number; color: string;
-}) {
-  const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
-  const done = pct >= 99;
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5,
-      fontSize: 12, fontVariantNumeric: "tabular-nums", fontWeight: 600,
-      color: done ? "var(--accent)" : color,
-    }}>
-      <span style={{ fontSize: 13 }}>{emoji}</span>
-      {done
-        ? <span style={{ fontWeight: 700 }}>Done</span>
-        : <><span>{fmt(Math.round(actual))}</span><span style={{ fontWeight: 400, opacity: 0.45 }}>/ {fmt(Math.round(plan))}</span></>
-      }
-    </span>
-  );
-}
-
 function monthShortLabel(ym: string): string {
   return new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${ym}-01`));
 }
@@ -516,14 +482,6 @@ function monthShortLabel(ym: string): string {
 const walletSwitcherWrapStyle: CSSProperties = {
   paddingTop: 8,
   paddingBottom: 16,
-};
-
-const contribRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 10,
-  padding: "0 0 12px",
 };
 
 const contentStyle: CSSProperties = {
