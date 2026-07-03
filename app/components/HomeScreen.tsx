@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
-import { WalletCardSwitcher } from "./WalletCardSwitcher";
+import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
+import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { ChevronRightIcon } from "./ui/icons";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
@@ -19,7 +19,7 @@ type HomeScreenProps = {
   onFundCategory?: (category: Category) => void;
   onOpenHistory?: () => void;
   onClickTransaction?: (txn: Transaction) => void;
-  accounts?: Account[];
+  contribStatus?: ContribStatus | null;
   monthlySummary: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   leftToSpendByScope: Record<BudgetScope, number>;
@@ -49,7 +49,7 @@ export function HomeScreen({
   onFundCategory,
   onOpenHistory,
   onClickTransaction,
-  accounts: accountsProp,
+  contribStatus,
   monthlySummary,
   walletSummaries,
   leftToSpendByScope,
@@ -182,59 +182,6 @@ export function HomeScreen({
     });
   };
 
-  // Joint contribution status — uses scope-filtered transactions (same as Insights).
-  // Joint scope already includes personal-account spending on joint categories
-  // and category-less transfers, which is exactly what we need.
-  const contribData = useMemo(() => {
-    if (budgetScope !== "joint" || !accountsProp?.length) return null;
-    const accounts = accountsProp;
-    const allTxns = transactions ?? [];
-    const acctLabel = (id: string | null | undefined) =>
-      id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
-
-    const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
-    const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
-    const anasContribPct  = anasAcc?.contributionPercent  ?? null;
-    const salmaContribPct = salmaAcc?.contributionPercent ?? null;
-    if (anasContribPct == null && salmaContribPct == null) return null;
-
-    const totalPlanned = walletSummaries?.joint?.totalAssigned ?? monthlySummary.totalAssigned;
-    if (totalPlanned <= 0) return null;
-
-    // Pocket spending + shared spending from ALL transactions
-    const expenseTxns = allTxns.filter(t => t.category && (!t.type || t.type === "Expense"));
-    let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
-    for (const t of expenseTxns) {
-      const label = acctLabel(t.accountId);
-      if (label.includes("hubb")) anasPocket += t.amount;
-      else if (label.includes("wife")) salmaPocket += t.amount;
-      else sharedSpend += t.amount;
-    }
-
-    // Transfers from personal accounts into joined account
-    const joinedAccId = accounts.find(a => a.label.toLowerCase().includes("joined"))?.id;
-    let anasFunded = 0, salmaFunded = 0;
-    for (const t of allTxns) {
-      if (t.type !== "Transfer") continue;
-      if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
-      const fromLabel = acctLabel(t.fromAccountId);
-      if (fromLabel.includes("hubb"))      anasFunded  += t.amount;
-      else if (fromLabel.includes("wife")) salmaFunded += t.amount;
-    }
-
-    const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
-    const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
-    const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
-    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
-
-    const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
-    const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
-    const anasActual  = anasPocket + anasFunded;
-    const salmaActual = salmaPocket + salmaFunded;
-
-    return { anasPlan, salmaPlan, anasActual, salmaActual };
-  }, [budgetScope, hasMonthPlan, accountsProp, transactions, monthlySummary.totalAssigned]);
-
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
 
@@ -247,7 +194,7 @@ export function HomeScreen({
           walletSummaries={walletSummaries}
           leftToSpendByScope={leftToSpendByScope}
           balanceByScope={balanceByScope}
-          contribStatus={contribData}
+          contribStatus={contribStatus}
         />
       </div>
 

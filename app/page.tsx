@@ -240,8 +240,8 @@ export default function App() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (tab === "history") fetchHistoryTransactions(historyMonth);
-  }, [tab, historyMonth, fetchHistoryTransactions]);
+    fetchHistoryTransactions(historyMonth);
+  }, [historyMonth, fetchHistoryTransactions]);
 
   const fetchMonthlySummary = async (month?: string) => {
     try {
@@ -796,6 +796,61 @@ export default function App() {
     [budgetScope, categories, pendingItems],
   );
 
+  // Joint contribution status — single source of truth for Home + Insights.
+  // Uses historyTransactions (month-filtered, all transactions for the month).
+  const contribStatus = useMemo(() => {
+    if (budgetScope !== "joint" || !accounts.length) return null;
+    const jointSummary = getMonthlySummaryForScope("joint");
+    const totalPlanned = jointSummary.totalAssigned;
+    if (totalPlanned <= 0) return null;
+
+    const acctLabel = (id: string | null | undefined) =>
+      id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
+
+    const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
+    const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
+    const anasContribPct  = anasAcc?.contributionPercent  ?? null;
+    const salmaContribPct = salmaAcc?.contributionPercent ?? null;
+    if (anasContribPct == null && salmaContribPct == null) return null;
+
+    // Use scope-filtered history transactions — joint scope includes:
+    // personal-account expenses on joint categories + all category-less transfers
+    const jointTxns = historyTransactions.filter(t => transactionMatchesScope(t, categories, "joint", accounts));
+    const expenseTxns = jointTxns.filter(t => t.category && (!t.type || t.type === "Expense"));
+
+    let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
+    for (const t of expenseTxns) {
+      const label = acctLabel(t.accountId);
+      if (label.includes("hubb")) anasPocket += t.amount;
+      else if (label.includes("wife")) salmaPocket += t.amount;
+      else sharedSpend += t.amount;
+    }
+
+    const joinedAccId = accounts.find(a => a.label.toLowerCase().includes("joined"))?.id;
+    let anasFunded = 0, salmaFunded = 0;
+    for (const t of jointTxns) {
+      if (t.type !== "Transfer") continue;
+      if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
+      const fromLabel = acctLabel(t.fromAccountId);
+      if (fromLabel.includes("hubb"))      anasFunded  += t.amount;
+      else if (fromLabel.includes("wife")) salmaFunded += t.amount;
+    }
+
+    const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
+    const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
+    const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
+    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
+
+    const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
+    const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
+
+    return {
+      anasPlan, salmaPlan,
+      anasActual: anasPocket + anasFunded,
+      salmaActual: salmaPocket + salmaFunded,
+    };
+  }, [budgetScope, accounts, historyTransactions, categories, getMonthlySummaryForScope]);
+
   const selectedDateLabel =
     date === today() ? "Today" :
     date === shiftDate(today(), -1) ? "Yesterday" :
@@ -969,7 +1024,7 @@ export default function App() {
           onOpenRebalance={() => setShowRebalance(true)}
           onOpenBudgetTab={() => setTab("budget")}
           onFundCategory={openFundCategory}
-          accounts={accounts}
+          contribStatus={contribStatus}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
           leftToSpendByScope={leftToSpendByScope}
