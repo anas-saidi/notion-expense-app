@@ -72,10 +72,10 @@ export function BudgetRow({
 }
 
 function getBarColor(pct: number, isOverBudget: boolean): string {
-  if (isOverBudget || pct >= 100) return "color-mix(in srgb, #ef4444 75%, #b91c1c)";
-  if (pct >= 85) return "color-mix(in srgb, #f97316 70%, #ea580c)";
-  if (pct >= 65) return "color-mix(in srgb, #f59e0b 70%, #d97706)";
-  return "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
+  if (isOverBudget || pct >= 100) return "color-mix(in srgb, var(--spend-over) 75%, var(--spend-over-deep))";
+  if (pct >= 85) return "color-mix(in srgb, var(--spend-warn) 70%, var(--spend-warn-deep))";
+  if (pct >= 65) return "color-mix(in srgb, var(--spend-caution) 70%, var(--spend-caution-deep))";
+  return "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
 }
 
 const rowStyle: CSSProperties = {

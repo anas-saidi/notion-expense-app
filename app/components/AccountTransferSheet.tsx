@@ -197,7 +197,7 @@ function BalanceTile({ label, account, nextBalance }: { label: string; account: 
 }
 
 const sheetStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 98%, white)",
+  background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",
   borderRadius: 20,
   overflow: "hidden",
 };
@@ -252,7 +252,7 @@ const balanceGridStyle: CSSProperties = {
 const balanceTileStyle: CSSProperties = {
   minWidth: 0,
   borderRadius: 16,
-  background: "color-mix(in srgb, var(--accent) 7%, white)",
+  background: "color-mix(in srgb, var(--accent) 7%, var(--surface))",
   padding: 13,
   display: "grid",
   gap: 7,
@@ -295,7 +295,7 @@ const inputStyle: CSSProperties = {
   borderRadius: 14,
   border: "1px solid transparent",
   boxShadow: "inset 0 0 0 1.5px var(--border2)",
-  background: "color-mix(in srgb, var(--surface2) 34%, white)",
+  background: "color-mix(in srgb, var(--surface2) 34%, var(--surface))",
   color: "var(--text2)",
   padding: "0 13px",
   fontSize: 15,
@@ -334,7 +334,7 @@ const currencyStyle: CSSProperties = {
 
 const errorStyle: CSSProperties = {
   borderRadius: 14,
-  background: "color-mix(in srgb, var(--danger) 9%, white)",
+  background: "color-mix(in srgb, var(--danger) 9%, var(--surface))",
   color: "color-mix(in srgb, var(--danger) 54%, var(--text))",
   padding: "11px 12px",
   fontSize: 12,

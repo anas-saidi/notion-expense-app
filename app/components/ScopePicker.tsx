@@ -187,7 +187,7 @@ const optionStyle: CSSProperties = {
 };
 
 const optionActiveStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface2) 70%, white)",
+  background: "color-mix(in srgb, var(--surface2) 70%, var(--surface))",
 };
 
 const dotStyle: CSSProperties = {

@@ -20,7 +20,6 @@ type AddTransactionSheetProps = {
   showAccountPicker: boolean;
   status: "idle" | "saving" | "success" | "error";
   errorMsg: string;
-  showSaveBurst: boolean;
   selectedDateLabel: string;
   selectedCat?: Category;
   suggestedCategory?: Category;
@@ -216,7 +215,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 <div id="account-picker" style={{ maxHeight: 236, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
                   <div style={{ display: "grid", gap: 2 }}>
                     {props.filteredAccounts.map((acct) => (
-                      <button key={acct.id} onClick={() => props.onSelectAccount(acct.id)} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, white)" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                      <button key={acct.id} onClick={() => props.onSelectAccount(acct.id)} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
                         <div style={pickerIconStyle}>
                           {acct.icon ?? "$"}
                         </div>
@@ -260,7 +259,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       {props.filteredCats.map((cat) => {
                         const meta = [cat.type[0] ?? null, cat.id === props.lastUsedCatId ? "Last used" : null].filter(Boolean).join(" / ");
                         return (
-                          <button key={cat.id} onClick={() => props.onSelectCategory(cat)} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, white)" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                          <button key={cat.id} onClick={() => props.onSelectCategory(cat)} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
                             <div style={pickerIconStyle}>
                               {cat.icon ?? "#"}
                             </div>
@@ -281,8 +280,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       )}
                     </div>
                   </div>
-                  <div style={{ padding: "10px 10px 11px", borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)", background: "color-mix(in srgb, var(--surface2) 10%, white)" }}>
-                    <div style={{ minHeight: 44, borderRadius: 12, border: "1px solid transparent", background: "color-mix(in srgb, var(--surface2) 42%, white)", display: "flex", alignItems: "center", gap: 8, padding: "0 12px" }}>
+                  <div style={{ padding: "10px 10px 11px", borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)", background: "color-mix(in srgb, var(--surface2) 10%, var(--surface))" }}>
+                    <div style={{ minHeight: 44, borderRadius: 12, border: "1px solid transparent", background: "color-mix(in srgb, var(--surface2) 42%, var(--surface))", display: "flex", alignItems: "center", gap: 8, padding: "0 12px" }}>
                       <span aria-hidden="true" style={{ fontSize: 12, color: "var(--muted)" }}>/</span>
                       <input type="text" aria-label="Search categories" value={props.catSearch} onChange={(e) => props.onCatSearchChange(e.target.value)} placeholder="Search categories" autoFocus style={{ width: "100%", background: "transparent", border: "none", padding: 0, color: "var(--text2)", outline: "none", fontSize: 15 }} />
                     </div>
@@ -314,15 +313,15 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     {dateOptions.map((option) => {
                       const selected = option.value === props.date;
                       return (
-                        <button key={option.value} onClick={() => props.onSelectDate(option.value)} style={{ width: "100%", minHeight: 36, padding: "0 10px", background: selected ? "color-mix(in srgb, var(--accent) 9%, white)" : "transparent", border: "none", borderRadius: 8, color: selected ? "color-mix(in srgb, var(--accent) 70%, var(--text2))" : "var(--text2)", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 13, fontWeight: selected ? 600 : 400, textAlign: "left" }}>
+                        <button key={option.value} onClick={() => props.onSelectDate(option.value)} style={{ width: "100%", minHeight: 36, padding: "0 10px", background: selected ? "color-mix(in srgb, var(--accent) 9%, var(--surface))" : "transparent", border: "none", borderRadius: 8, color: selected ? "color-mix(in srgb, var(--accent) 70%, var(--text2))" : "var(--text2)", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 13, fontWeight: selected ? 600 : 400, textAlign: "left" }}>
                           {option.label}
                         </button>
                       );
                     })}
                   </div>
                   <div style={{ padding: "5px 6px 7px", borderTop: "1px solid color-mix(in srgb, var(--border) 22%, transparent)" }}>
-                    <div style={{ minHeight: 36, borderRadius: 8, background: "color-mix(in srgb, var(--surface2) 50%, white)", display: "flex", alignItems: "center", padding: "0 10px" }}>
-                      <input type="date" aria-label="Transaction date" value={props.date} onChange={(e) => props.onSelectDate(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", padding: 0, colorScheme: "light", color: "var(--text2)", outline: "none", fontSize: 13 }} />
+                    <div style={{ minHeight: 36, borderRadius: 8, background: "color-mix(in srgb, var(--surface2) 50%, var(--surface))", display: "flex", alignItems: "center", padding: "0 10px" }}>
+                      <input type="date" aria-label="Transaction date" value={props.date} onChange={(e) => props.onSelectDate(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", padding: 0, color: "var(--text2)", outline: "none", fontSize: 13 }} />
                     </div>
                   </div>
                 </div>
@@ -438,8 +437,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               borderRadius: 14,
               border: "none",
               background:
-                props.status === "success" ? "color-mix(in srgb, var(--success) 12%, white)"
-                : props.status === "error" ? "color-mix(in srgb, var(--danger) 10%, white)"
+                props.status === "success" ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
+                : props.status === "error" ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
                 : "var(--accent)",
               color:
                 props.status === "success" ? "var(--success)"
@@ -476,7 +475,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const panelStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 97%, white)",
+  background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
@@ -627,7 +626,7 @@ const warnStyle: CSSProperties = {
   gap: 10,
   padding: "11px 12px",
   borderRadius: 16,
-  background: "color-mix(in srgb, var(--danger) 8%, white)",
+  background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
 };
 
 const warnTextStyle: CSSProperties = {

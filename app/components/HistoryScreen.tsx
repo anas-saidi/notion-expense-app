@@ -222,7 +222,7 @@ export function HistoryScreen({
                     <CategoryIcon icon={cat!.icon} size={22} style={{ flexShrink: 0 }} />
                     <span style={breakdownNameStyle}>{cat!.name}</span>
                     <div style={breakdownBarTrackStyle}>
-                      <div style={{ ...breakdownBarFillStyle, width: `${pct}%`, background: isOver ? "var(--spend-over)" : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)" }} />
+                      <div style={{ ...breakdownBarFillStyle, width: `${pct}%`, background: isOver ? "var(--spend-over)" : "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))" }} />
                     </div>
                     <span style={{ ...breakdownAmtStyle, color: isOver ? "var(--spend-over)" : "var(--text2)" }}>{fmt(spent)}</span>
                     <span style={breakdownCurrencyStyle}>{planned > 0 ? `of ${fmt(planned)} MAD` : "MAD"}</span>
@@ -502,7 +502,7 @@ const breakdownBarTrackStyle: CSSProperties = {
 const breakdownBarFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--accent) 65%, #d8f3c9)",
+  background: "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))",
   transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
 };
 

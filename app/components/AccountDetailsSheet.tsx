@@ -306,7 +306,7 @@ export function AccountDetailsSheet({
               style={{
                 ...chartToggleBtnStyle,
                 background: showChart
-                  ? "color-mix(in srgb, var(--accent) 12%, white)"
+                  ? "color-mix(in srgb, var(--accent) 12%, var(--surface))"
                   : "transparent",
                 color: showChart ? "var(--accent-ink)" : "var(--muted)",
               }}
@@ -412,7 +412,7 @@ export function AccountDetailsSheet({
                     <span style={{
                       fontSize: 10,
                       fontWeight: 700,
-                      color: chartData.netChange > 0 ? "#10b981" : "var(--danger)",
+                      color: chartData.netChange > 0 ? "var(--action-income)" : "var(--danger)",
                     }}>
                       {chartData.netChange > 0 ? "+" : ""}{fmt(chartData.netChange)} this month
                     </span>
@@ -427,15 +427,15 @@ export function AccountDetailsSheet({
         {showChart && (totalSpentFromAcct > 0 || totalIncomeToAcct > 0) && (
           <div style={statsRowStyle}>
             {totalSpentFromAcct > 0 && (
-              <div style={{ ...statPillStyle, background: "color-mix(in srgb, var(--danger) 8%, white)" }}>
+              <div style={{ ...statPillStyle, background: "color-mix(in srgb, var(--danger) 8%, var(--surface))" }}>
                 <ArrowDownIcon size={13} strokeWidth={2.5} style={{ color: "var(--danger)", flexShrink: 0 }} />
                 <strong style={{ ...statValueStyle, color: "var(--danger)" }}><Money value={totalSpentFromAcct} /></strong>
               </div>
             )}
             {totalIncomeToAcct > 0 && (
-              <div style={{ ...statPillStyle, background: "color-mix(in srgb, #10b981 8%, white)" }}>
-                <ArrowUpIcon size={13} strokeWidth={2.5} style={{ color: "#10b981", flexShrink: 0 }} />
-                <strong style={{ ...statValueStyle, color: "#10b981" }}><Money value={totalIncomeToAcct} /></strong>
+              <div style={{ ...statPillStyle, background: "color-mix(in srgb, var(--action-income) 8%, var(--surface))" }}>
+                <ArrowUpIcon size={13} strokeWidth={2.5} style={{ color: "var(--action-income)", flexShrink: 0 }} />
+                <strong style={{ ...statValueStyle, color: "var(--action-income)" }}><Money value={totalIncomeToAcct} /></strong>
               </div>
             )}
           </div>
@@ -446,23 +446,23 @@ export function AccountDetailsSheet({
           <ActionBtn
             icon={<TransferIcon size={18} strokeWidth={2.2} />}
             ariaLabel="Move money"
-            bg="color-mix(in srgb, #3b82f6 11%, white)"
-            ink="#3b82f6"
+            bg="color-mix(in srgb, var(--action-transfer) 11%, var(--surface))"
+            ink="var(--action-transfer)"
             onClick={() => { handleClose(); onMove(account); }}
           />
           <ActionBtn
             icon={<BanknoteIcon size={18} strokeWidth={2.2} />}
             ariaLabel="Add income"
-            bg="color-mix(in srgb, #10b981 11%, white)"
-            ink="#10b981"
+            bg="color-mix(in srgb, var(--action-income) 11%, var(--surface))"
+            ink="var(--action-income)"
             onClick={() => { handleClose(); onIncome(account); }}
           />
           <ActionBtn
             icon={<ScaleIcon size={18} strokeWidth={2.2} />}
             ariaLabel="Reconcile balance"
             bg={showReconcile
-              ? "color-mix(in srgb, var(--accent) 12%, white)"
-              : "color-mix(in srgb, var(--surface2) 54%, white)"}
+              ? "color-mix(in srgb, var(--accent) 12%, var(--surface))"
+              : "color-mix(in srgb, var(--surface2) 54%, var(--surface))"}
             ink={showReconcile ? "var(--accent-ink)" : "var(--text2)"}
             onClick={() => setShowReconcile(v => !v)}
           />
@@ -520,9 +520,9 @@ export function AccountDetailsSheet({
                 ...reconcileSubmitStyle,
                 opacity: !Number.isFinite(parsedActual) ? 0.42 : 1,
                 background: reconcileStatus === "success"
-                  ? "color-mix(in srgb, var(--success) 12%, white)"
+                  ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
                   : reconcileStatus === "error"
-                  ? "color-mix(in srgb, var(--danger) 10%, white)"
+                  ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
                   : "var(--accent)",
                 color: reconcileStatus === "success"
                   ? "var(--success)"
@@ -601,7 +601,7 @@ export function AccountDetailsSheet({
                     const isTransferOut = t.type === "Transfer" && t.fromAccountId === acctId;
                     const isPositive = isIncome || isTransferIn;
                     const prefix = isPositive ? "+" : "−";
-                    const amtColor = isIncome ? "#10b981" : isTransferIn ? "#10b981" : isTransferOut ? "var(--danger)" : "var(--text2)";
+                    const amtColor = isIncome ? "var(--action-income)" : isTransferIn ? "var(--action-income)" : isTransferOut ? "var(--danger)" : "var(--text2)";
                     return (
                       <div key={t.id} style={txRowStyle}>
                         {isIncome || isTransferIn || isTransferOut ? (
@@ -634,7 +634,7 @@ function ActionBtn({
   icon,
   ariaLabel,
   onClick,
-  bg = "color-mix(in srgb, var(--surface2) 54%, white)",
+  bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
   ink = "var(--text2)",
 }: {
   icon: React.ReactNode;
@@ -658,7 +658,7 @@ function ActionBtn({
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const panelStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 97%, white)",
+  background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
   borderRadius: 20,
   overflow: "hidden",
 };
@@ -686,7 +686,7 @@ const iconCircleStyle: CSSProperties = {
   width: 44,
   height: 44,
   borderRadius: 14,
-  background: "color-mix(in srgb, var(--surface2) 60%, white)",
+  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -766,7 +766,7 @@ const chartNavBtnStyle: CSSProperties = {
   height: 30,
   borderRadius: 8,
   border: "none",
-  background: "color-mix(in srgb, var(--surface2) 60%, white)",
+  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
   color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
@@ -830,7 +830,7 @@ const statPillStyle: CSSProperties = {
   flex: 1,
   minHeight: 46,
   borderRadius: 14,
-  background: "color-mix(in srgb, var(--surface2) 46%, white)",
+  background: "color-mix(in srgb, var(--surface2) 46%, var(--surface))",
   display: "flex",
   alignItems: "center",
   gap: 8,
@@ -873,7 +873,7 @@ const actionIconStyle: CSSProperties = {
 const reconcilePanelStyle: CSSProperties = {
   padding: "16px 16px 18px",
   borderRadius: 16,
-  background: "color-mix(in srgb, var(--surface2) 40%, white)",
+  background: "color-mix(in srgb, var(--surface2) 40%, var(--surface))",
   border: "1px solid color-mix(in srgb, var(--border) 30%, transparent)",
   display: "grid",
   gap: 14,
@@ -914,7 +914,7 @@ const reconcileLabelStyle: CSSProperties = {
 const reconcileReadonlyStyle: CSSProperties = {
   minHeight: 48,
   borderRadius: 12,
-  background: "color-mix(in srgb, var(--surface2) 50%, white)",
+  background: "color-mix(in srgb, var(--surface2) 50%, var(--surface))",
   display: "flex",
   alignItems: "center",
   padding: "0 13px",
@@ -958,10 +958,10 @@ const differenceBandStyle = (diff: number): CSSProperties => ({
   minHeight: 40,
   borderRadius: 10,
   background: diff === 0
-    ? "color-mix(in srgb, var(--success) 10%, white)"
+    ? "color-mix(in srgb, var(--success) 10%, var(--surface))"
     : diff > 0
-    ? "color-mix(in srgb, var(--accent) 9%, white)"
-    : "color-mix(in srgb, var(--danger) 8%, white)",
+    ? "color-mix(in srgb, var(--accent) 9%, var(--surface))"
+    : "color-mix(in srgb, var(--danger) 8%, var(--surface))",
   color: diff === 0
     ? "var(--success)"
     : diff > 0
@@ -986,7 +986,7 @@ const differenceLabelStyle: CSSProperties = {
 const reconcileErrorStyle: CSSProperties = {
   borderRadius: 10,
   padding: "10px 12px",
-  background: "color-mix(in srgb, var(--danger) 9%, white)",
+  background: "color-mix(in srgb, var(--danger) 9%, var(--surface))",
   color: "var(--danger)",
   fontSize: 12,
 };
@@ -1057,7 +1057,7 @@ const catIconWrapStyle: CSSProperties = {
   width: 32,
   height: 32,
   borderRadius: 9,
-  background: "color-mix(in srgb, var(--surface2) 64%, white)",
+  background: "color-mix(in srgb, var(--surface2) 64%, var(--surface))",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

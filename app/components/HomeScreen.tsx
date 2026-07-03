@@ -298,9 +298,8 @@ export function HomeScreen({
                     <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
                     <span style={attentionNameStyle}>{cat.name}</span>
                     <span style={attentionSubStyle}>
-                      {isOver ? `+${fmt(spent - planned)}` : `${fmt(available)}`}
+                      {isOver ? `+${fmt(spent - planned)} MAD over` : `${fmt(available)} MAD left`}
                     </span>
-                    <span style={attentionSubStyle2}>MAD {isOver ? "over" : "left"}</span>
                   </button>
                   {onFundCategory && (
                     <button
@@ -322,39 +321,24 @@ export function HomeScreen({
           const goalPlanned = savingsGoal.planned ?? 1;
           const goalAvailable = savingsGoal.available ?? 0;
           const goalPct = Math.min(100, Math.max(0, (goalAvailable / goalPlanned) * 100));
-          const radius = 21;
-          const circ = 2 * Math.PI * radius;
-          const dashOffset = circ * (1 - goalPct / 100);
           return (
             <section aria-label="Savings goal">
               <div className="home-section-hdr" style={sectionHeaderStyle}>
                 <span className="section-label" style={sectionLabelStyle}>Savings goal</span>
               </div>
               <div style={savingsCardStyle}>
-                <div style={savingsRingWrapStyle}>
-                  <svg width={52} height={52} viewBox="0 0 52 52" style={{ display: "block" }}>
-                    <circle cx={26} cy={26} r={radius} fill="none" stroke="var(--surface2)" strokeWidth={5} />
-                    <circle
-                      cx={26} cy={26} r={radius}
-                      fill="none"
-                      stroke="var(--accent)"
-                      strokeWidth={5}
-                      strokeLinecap="round"
-                      strokeDasharray={circ}
-                      strokeDashoffset={dashOffset}
-                      transform="rotate(-90 26 26)"
-                      style={{ transition: "stroke-dashoffset 0.4s cubic-bezier(0.22,1,0.36,1)" }}
-                    />
-                  </svg>
-                  <span style={ringPctStyle}>{Math.round(goalPct)}%</span>
-                </div>
                 <div style={savingsTextStyle}>
                   <span style={savingsNameStyle}>
                     {savingsGoal.icon && <span style={{ marginRight: 5 }}>{savingsGoal.icon}</span>}
                     {savingsGoal.name}
                   </span>
-                  <span style={savingsSavedStyle}>{fmt(goalAvailable)} MAD saved</span>
-                  <span style={savingsGoalLabelStyle}>goal: {fmt(goalPlanned)} MAD</span>
+                  <div style={savingsBarTrackStyle}>
+                    <div style={{ ...savingsBarFillStyle, width: `${goalPct}%` }} />
+                  </div>
+                  <div style={savingsMetaRowStyle}>
+                    <span style={savingsSavedStyle}>{fmt(goalAvailable)} MAD saved</span>
+                    <span style={savingsGoalLabelStyle}>{Math.round(goalPct)}% of {fmt(goalPlanned)}</span>
+                  </div>
                 </div>
               </div>
             </section>
@@ -526,12 +510,6 @@ const attentionSubStyle: CSSProperties = {
   lineHeight: 1,
 };
 
-const attentionSubStyle2: CSSProperties = {
-  fontSize: 9,
-  fontWeight: 400,
-  color: "var(--muted)",
-  lineHeight: 1,
-};
 
 const fundBtnStyle: CSSProperties = {
   width: "100%",
@@ -605,7 +583,7 @@ const assignTitleStyle: CSSProperties = {
   minWidth: 0,
   fontSize: 13,
   fontWeight: 700,
-  color: "var(--accent-ink)",
+  color: "var(--text)",
   overflow: "hidden",
   whiteSpace: "nowrap",
   textOverflow: "ellipsis",
@@ -621,20 +599,20 @@ const assignRightStyle: CSSProperties = {
 const assignAmountStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
-  color: "var(--accent-ink)",
+  color: "var(--text)",
 };
 
 const assignFreeStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 400,
-  color: "color-mix(in srgb, var(--accent-ink) 60%, transparent)",
+  color: "var(--muted)",
   textAlign: "left",
 };
 
 const assignJointHintStyle: CSSProperties = {
   fontSize: 10,
   fontWeight: 500,
-  color: "color-mix(in srgb, var(--accent-ink) 45%, transparent)",
+  color: "var(--muted)",
   textAlign: "left",
   letterSpacing: 0.1,
 };
@@ -642,7 +620,7 @@ const assignJointHintStyle: CSSProperties = {
 const assignActionVisibleStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 500,
-  color: "color-mix(in srgb, var(--accent-ink) 50%, transparent)",
+  color: "var(--muted)",
   flexShrink: 0,
 };
 
@@ -695,36 +673,34 @@ const savingsCardStyle: CSSProperties = {
   background: "var(--surface)",
   borderRadius: 16,
   padding: "14px 16px",
-  display: "flex",
-  alignItems: "center",
-  gap: 16,
   boxShadow: "0 1px 0 color-mix(in srgb, var(--border) 50%, transparent)",
 };
 
-const savingsRingWrapStyle: CSSProperties = {
-  position: "relative",
-  flexShrink: 0,
-  width: 52,
-  height: 52,
+const savingsBarTrackStyle: CSSProperties = {
+  width: "100%",
+  height: 4,
+  borderRadius: 999,
+  background: "var(--surface2)",
+  overflow: "hidden",
 };
 
-const ringPctStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
+const savingsBarFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: 999,
+  background: "var(--accent)",
+  transition: "width 0.4s cubic-bezier(0.22,1,0.36,1)",
+};
+
+const savingsMetaRowStyle: CSSProperties = {
   display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontFamily: "var(--font-body)",
-  fontSize: 10,
-  fontWeight: 700,
-  color: "var(--text2)",
-  lineHeight: 1,
+  justifyContent: "space-between",
+  alignItems: "baseline",
 };
 
 const savingsTextStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: 3,
+  gap: 6,
   minWidth: 0,
 };
 

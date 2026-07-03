@@ -905,7 +905,7 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
 /* ─── Styles ──────────────────────────────────────────────────────── */
 
 const sheetPanelStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--bg) 96%, white)",
+  background: "color-mix(in srgb, var(--bg) 96%, var(--surface))",
   borderRadius: "24px 24px 0 0",
 };
 
@@ -1052,7 +1052,7 @@ const catIconWrapStyle: CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: 11,
-  background: "color-mix(in srgb, var(--surface2) 55%, white)",
+  background: "color-mix(in srgb, var(--surface2) 55%, var(--surface))",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",

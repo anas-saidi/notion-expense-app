@@ -37,6 +37,8 @@ import {
   User,
   UserRound,
   TrendingUp,
+  Moon,
+  Sun,
   TriangleAlert,
   type LucideProps,
 } from "lucide-react";
@@ -74,6 +76,8 @@ export const UserIcon         = (p: LucideProps) => <User          size={S} {...
 export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
 export const TrendingUpIcon      = (p: LucideProps) => <TrendingUp    size={S} {...p} />;
 export const AlertTriangleIcon   = (p: LucideProps) => <TriangleAlert size={S} {...p} />;
+export const MoonIcon            = (p: LucideProps) => <Moon          size={S} {...p} />;
+export const SunIcon             = (p: LucideProps) => <Sun           size={S} {...p} />;
 
 /** Switches between Maximize2 (enter) and Minimize2 (exit). */
 export function FullScreenIcon({

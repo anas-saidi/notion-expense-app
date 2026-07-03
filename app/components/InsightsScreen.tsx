@@ -6,6 +6,7 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { categoryMatchesScope, getCategoryScope, transactionMatchesScope, monthBounds, fmt, fmtDate } from "./app-utils";
 import { ArrowLeftIcon, ChevronRightIcon } from "./ui/icons";
+import { BudgetScopeBar, BUDGET_SCOPE_CHIPS } from "./ui/ScopeChipBar";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, PieChart, Pie, Cell, Sector } from "recharts";
 import type { PieSectorShapeProps } from "recharts";
 
@@ -26,19 +27,6 @@ type Props = {
 
 /* ─── Constants ──────────────────────────────────────────────────── */
 
-const SCOPES: BudgetScope[] = ["joint", "anas", "salma"];
-const SCOPE_LABEL: Record<BudgetScope, string> = { joint: "Couple", anas: "Anas", salma: "Salma" };
-const SCOPE_EMOJI: Record<BudgetScope, string> = { joint: "👫", anas: "👨", salma: "👩" };
-const SCOPE_BG: Record<BudgetScope, string> = {
-  joint: "var(--accent)",
-  anas:  "var(--partner-husband)",
-  salma: "var(--partner-wife)",
-};
-const SCOPE_INK: Record<BudgetScope, string> = {
-  joint: "var(--accent-ink)",
-  anas:  "#ffffff",
-  salma: "#ffffff",
-};
 
 const DONUT_COLORS = [
   "var(--accent)",
@@ -282,66 +270,25 @@ export function InsightsScreen({
   return (
     <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" className="categories-main" style={wrapStyle}>
 
-      {/* ── Header row: title + controls ── */}
-      <div className="insights-header-row">
-        <div style={{ paddingTop: 8 }}>
-          <div style={eyebrowStyle}>Analyze</div>
-          <h1 style={titleStyle}>Insights</h1>
+      {/* ── Controls: month nav + scope chips ── */}
+      <div style={controlsRowStyle}>
+        <div className="insights-month-nav" style={monthNavStyle}>
+          <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
+            <ArrowLeftIcon size={14} />
+          </button>
+          <span style={monthLabelStyle}>{monthLabel}</span>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            style={{ ...monthNavBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
+            disabled={!canGoNext}
+            aria-label="Next month"
+          >
+            <ChevronRightIcon size={14} />
+          </button>
         </div>
-
-        <div className="insights-controls">
-          {/* Month nav */}
-          <div className="insights-month-nav" style={monthNavStyle}>
-            <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
-              <ArrowLeftIcon size={14} />
-            </button>
-            <span style={monthLabelStyle}>{monthLabel}</span>
-            <button
-              type="button"
-              onClick={() => shiftMonth(1)}
-              style={{ ...monthNavBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
-              disabled={!canGoNext}
-              aria-label="Next month"
-            >
-              <ChevronRightIcon size={14} />
-            </button>
-          </div>
-
-          {/* Scope chips */}
-          <div style={scopeRailStyle}>
-            {SCOPES.map(scope => {
-              const active = scope === budgetScope;
-              return (
-                <button
-                  key={scope}
-                  type="button"
-                  onClick={() => onBudgetScopeChange(scope)}
-                  aria-pressed={active}
-                  style={active ? {
-                    height: 38, borderRadius: 12, border: "none",
-                    background: SCOPE_BG[scope], color: SCOPE_INK[scope],
-                    padding: "0 14px 0 10px", gap: 7, cursor: "pointer",
-                    display: "inline-flex", alignItems: "center", flexShrink: 0,
-                    animation: "categorySelectIn 0.2s cubic-bezier(0.22,1,0.36,1) both",
-                  } : {
-                    width: 38, height: 38, borderRadius: 12,
-                    border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
-                    background: "transparent", cursor: "pointer",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    opacity: 0.45, flexShrink: 0,
-                  }}
-                >
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>{SCOPE_EMOJI[scope]}</span>
-                  {active && (
-                    <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
-                      {SCOPE_LABEL[scope]}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <div style={{ flex: 1 }} />
+        <BudgetScopeBar value={budgetScope} onChange={onBudgetScopeChange} ariaLabel="Insights scope" />
       </div>
 
       {/* ── Insight cards grid ── */}
@@ -366,7 +313,7 @@ export function InsightsScreen({
         )}
 
         {/* 4. Spending Breakdown */}
-        <InsightCard emoji="🥧" title="Spending Breakdown" subtitle={`By category · ${SCOPE_LABEL[budgetScope]}`}>
+        <InsightCard emoji="🥧" title="Spending Breakdown" subtitle={`By category · ${BUDGET_SCOPE_CHIPS.find(c => c.key === budgetScope)?.label ?? budgetScope}`}>
           {transactionsLoading
             ? <SpendingBreakdownSkeleton />
             : <SpendingBreakdownBody
@@ -558,7 +505,7 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent 
 
   const fillColor = isOver ? "var(--danger)"
     : isAhead ? "var(--warning)"
-    : "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
+    : "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
 
   const copy = totalPlanned === 0
     ? "No budget planned this month."
@@ -991,14 +938,10 @@ const wrapStyle: CSSProperties = {
   animation: "fadeUp 0.2s ease both",
 };
 
-const eyebrowStyle: CSSProperties = {
-  fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase",
-  color: "var(--muted)", fontFamily: "var(--font-body)",
-};
-
-const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)", fontSize: 34, lineHeight: 0.95,
-  color: "var(--text)", margin: "4px 0 0",
+const controlsRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
 };
 
 const monthNavStyle: CSSProperties = {
@@ -1015,7 +958,6 @@ const monthLabelStyle: CSSProperties = {
   fontSize: 15, fontWeight: 600, color: "var(--text2)", letterSpacing: "-0.01em",
 };
 
-const scopeRailStyle: CSSProperties = { display: "flex", gap: 8 };
 
 /* Card */
 const cardStyle: CSSProperties = {

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { AppTab } from "./app-types";
 import { BottomNav } from "./BottomNav";
-import { LandmarkIcon, PlusIcon } from "./ui/icons";
+import { LandmarkIcon, MoonIcon, SunIcon, PlusIcon } from "./ui/icons";
 
 export function AppShell({
   tab,
@@ -9,6 +9,8 @@ export function AppShell({
   onTabChange,
   onOpenAdd,
   onOpenManage,
+  theme = "light",
+  onToggleTheme,
   toast,
   showAddButton = true,
   immersive = false,
@@ -20,6 +22,8 @@ export function AppShell({
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
   onOpenManage?: () => void;
+  theme?: "light" | "dark";
+  onToggleTheme?: () => void;
   toast?: string | null;
   showAddButton?: boolean;
   immersive?: boolean;
@@ -47,13 +51,26 @@ export function AppShell({
       >
         {!immersive && !hideHeader && onOpenManage && (
           <header style={headerStyle}>
-            <div aria-label="Couple greeting">
-              <p style={greetingEyebrowStyle}>{getGreeting()}</p>
-              <h1 style={greetingTitleStyle}>Anas &amp; Salma</h1>
+            <div>
+              {tab === "home" ? (
+                <>
+                  <p style={headerEyebrowStyle}>{getGreeting()}</p>
+                  <h1 style={headerTitleStyle}>Anas &amp; Salma</h1>
+                </>
+              ) : (
+                <h1 style={headerTitleStyle}>{TAB_TITLE[tab]}</h1>
+              )}
             </div>
-            <button type="button" onClick={onOpenManage} aria-label="Accounts" style={menuButtonStyle}>
-              <LandmarkIcon size={18} />
-            </button>
+            <div style={{ display: "flex", gap: 2 }}>
+              {onToggleTheme && (
+                <button type="button" onClick={onToggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} style={menuButtonStyle}>
+                  {theme === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
+                </button>
+              )}
+              <button type="button" onClick={onOpenManage} aria-label="Accounts" style={menuButtonStyle}>
+                <LandmarkIcon size={18} />
+              </button>
+            </div>
           </header>
         )}
         {children}
@@ -121,6 +138,13 @@ export function AppShell({
   );
 }
 
+const TAB_TITLE: Record<AppTab, string> = {
+  home: "Home",
+  plan: "Plan",
+  budget: "Budget",
+  history: "Insights",
+};
+
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 12) return "Good morning,";
@@ -152,7 +176,7 @@ const headerStyle = {
   paddingRight: 4,
 };
 
-const greetingEyebrowStyle = {
+const headerEyebrowStyle = {
   fontFamily: "var(--font-body)",
   fontSize: 10,
   fontWeight: 500,
@@ -162,7 +186,7 @@ const greetingEyebrowStyle = {
   margin: "0 0 3px",
 };
 
-const greetingTitleStyle = {
+const headerTitleStyle = {
   fontFamily: "var(--font-display)",
   fontSize: 18,
   lineHeight: 1,

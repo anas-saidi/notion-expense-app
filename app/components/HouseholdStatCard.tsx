@@ -110,7 +110,7 @@ const scopeTabStyle: CSSProperties = {
   minHeight: 44,
   borderRadius: 12,
   border: "1px solid transparent",
-  background: "color-mix(in srgb, var(--surface2) 62%, white)",
+  background: "color-mix(in srgb, var(--surface2) 62%, var(--surface))",
   color: "var(--muted)",
   fontSize: 12,
   fontWeight: 650,

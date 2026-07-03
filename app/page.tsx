@@ -41,12 +41,6 @@ const LOADING_LINES = [
   "Counting coins quietly...",
 ];
 
-const SAVE_LINES = [
-  "Saved. Tiny win unlocked.",
-  "Logged and looking sharp.",
-  "Done. Budget still in control.",
-  "Synced. You are on a roll.",
-];
 
 const FALLBACK_ACCOUNTS: Account[] = [];
 
@@ -90,6 +84,7 @@ function SectionHeader({
 export default function App() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<"wife" | "husband">("husband");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [categories, setCategories] = useState<Category[]>([]);
   const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
@@ -138,7 +133,7 @@ export default function App() {
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [loadingLineIdx, setLoadingLineIdx] = useState(0);
-  const [showSaveBurst, setShowSaveBurst] = useState(false);
+
   const [microToast, setMicroToast] = useState<string | null>(null);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
@@ -155,7 +150,7 @@ export default function App() {
   const rebalanceReturnToAdd = useRef(false);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const balanceAnimRef = useRef<number | null>(null);
   const fuseRef = useRef<Fuse<{ description: string; categoryId: string }> | null>(null);
   const dateRef = useRef<HTMLDivElement>(null);
@@ -175,12 +170,26 @@ export default function App() {
     if (savedScope === "joint" || savedScope === "anas" || savedScope === "salma") {
       setBudgetScope(savedScope);
     }
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark" || savedTheme === "light") {
+      setTheme(savedTheme);
+      document.documentElement.dataset.theme = savedTheme;
+    }
     setMounted(true);
   }, []);
 
   useEffect(() => {
     if (mode) document.documentElement.dataset.mode = mode;
   }, [mode]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem("theme", next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -190,7 +199,6 @@ export default function App() {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
       if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
     };
   }, []);
@@ -899,10 +907,7 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || "Failed");
 
       setStatus("success");
-      setShowSaveBurst(true);
-      if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
-      burstTimerRef.current = setTimeout(() => setShowSaveBurst(false), 850);
-      showToast(isEditing ? "Transaction updated" : SAVE_LINES[Math.floor(Math.random() * SAVE_LINES.length)], 1500);
+      showToast(isEditing ? "Transaction updated" : "Saved", 1500);
 
       const newEntry = { description: name.trim(), categoryId };
       setCorpus((prev) => {
@@ -980,6 +985,8 @@ export default function App() {
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
+      theme={theme}
+      onToggleTheme={toggleTheme}
       toast={microToast}
       showAddButton={tab !== "plan" && !showManageScreen}
       immersive={tab === "plan" || showManageScreen}
@@ -1112,7 +1119,7 @@ export default function App() {
         showAccountPicker={showAccountPicker}
         status={status}
         errorMsg={errorMsg}
-        showSaveBurst={showSaveBurst}
+
         selectedDateLabel={selectedDateLabel}
         selectedCat={selectedCat}
         suggestedCategory={suggestedCategory}
@@ -1224,6 +1231,7 @@ export default function App() {
         onOpenFund={() => {
           if (detailsCategory) openFundCategory(detailsCategory);
         }}
+        onFreeze={detailsCategory ? () => freezeCategory(detailsCategory) : undefined}
       />
 
       <CategoryManageSheet

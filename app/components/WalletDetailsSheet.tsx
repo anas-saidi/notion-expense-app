@@ -291,7 +291,7 @@ const progressTrackStyle: CSSProperties = {
   width: "100%",
   height: 5,
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface2) 70%, white)",
+  background: "color-mix(in srgb, var(--surface2) 70%, var(--surface))",
   overflow: "hidden",
   marginTop: 4,
 };
@@ -365,7 +365,7 @@ const catIconWrapStyle: CSSProperties = {
   width: 34,
   height: 34,
   borderRadius: 10,
-  background: "color-mix(in srgb, var(--surface2) 70%, white)",
+  background: "color-mix(in srgb, var(--surface2) 70%, var(--surface))",
   boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
   display: "flex",
   alignItems: "center",
@@ -404,7 +404,7 @@ const catBarTrackStyle: CSSProperties = {
   width: "100%",
   height: 4,
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--surface2) 60%, white)",
+  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
   overflow: "hidden",
 };
 

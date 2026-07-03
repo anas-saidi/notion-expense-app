@@ -4,6 +4,7 @@ import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react"
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SearchIcon, ShuffleIcon, FreezeIcon, ChevronRightIcon } from "./ui/icons";
+import { BudgetScopeBar } from "./ui/ScopeChipBar";
 import { fmt, getCategoryScope } from "./app-utils";
 import { PieChart, Pie, Cell, Sector } from "recharts";
 import type { PieSectorShapeProps } from "recharts";
@@ -39,29 +40,6 @@ type Health = "over" | "low" | "funded" | "unfunded";
 
 const HEALTH_SORT: Record<Health, number> = { over: 0, low: 1, funded: 2, unfunded: 3 };
 
-const SCOPE_CHIPS: { value: ScopeChip; emoji: string; label: string }[] = [
-  { value: "joint", emoji: "👫", label: "Joint" },
-  { value: "anas",  emoji: "👨", label: "Anas" },
-  { value: "salma", emoji: "👩", label: "Salma" },
-];
-
-const CHIP_BG: Record<ScopeChip, string> = {
-  joint: "var(--accent)",
-  anas:  "var(--partner-husband)",
-  salma: "var(--partner-wife)",
-};
-
-const CHIP_INK: Record<ScopeChip, string> = {
-  joint: "var(--accent-ink)",
-  anas:  "#ffffff",
-  salma: "#ffffff",
-};
-
-const CHIP_COLOR: Record<ScopeChip, string> = {
-  joint: "var(--accent)",
-  anas:  "var(--partner-husband)",
-  salma: "var(--partner-wife)",
-};
 
 function getHealth(spent: number, assigned: number, available: number | null): Health {
   if (available !== null && available < 0) return "over";
@@ -88,7 +66,6 @@ export function CategoriesScreen({
 }: Props) {
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<ScopeChip>("joint");
-  const [freezingId, setFreezingId] = useState<string | null>(null);
   const [showFrozenAll, setShowFrozenAll] = useState(false);
 
   const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
@@ -149,30 +126,8 @@ export function CategoriesScreen({
   return (
     <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main" style={wrapStyle}>
 
-      {/* Header row: title left, scope chips + rebalance right on desktop */}
-      <div className="categories-header-row">
-
-      {/* Header */}
-      <div style={headerStyle}>
-        <div>
-          <div style={eyebrowStyle}>Manage</div>
-          <h1 style={titleStyle}>Budget</h1>
-        </div>
-      </div>
-
-      {/* Scope chips + Rebalance on same row */}
-      <div style={pillRailStyle} role="tablist" aria-label="Budget scope">
-        {SCOPE_CHIPS.map(({ value, emoji, label }) => (
-          <ScopeChipBtn
-            key={value}
-            value={value}
-            emoji={emoji}
-            label={label}
-            active={scope === value}
-            onClick={() => setScope(value)}
-          />
-        ))}
-        <div style={{ flex: 1 }} />
+      {/* Rebalance + Scope chips */}
+      <div style={pillRailStyle}>
         <button
           type="button"
           onClick={onOpenRebalance}
@@ -182,9 +137,9 @@ export function CategoriesScreen({
           <ShuffleIcon size={14} />
           <span style={{ fontSize: 12, fontWeight: 600 }}>Rebalance</span>
         </button>
+        <div style={{ flex: 1 }} />
+        <BudgetScopeBar value={scope} onChange={setScope} ariaLabel="Budget scope" />
       </div>
-
-      </div>{/* end categories-header-row */}
 
       {/* Budget distribution chart */}
       <BudgetDistributionChart
@@ -226,12 +181,6 @@ export function CategoriesScreen({
                       planned={planned}
                       health={health}
                       index={i}
-                      isFreezingId={freezingId === cat.id}
-                      onFreeze={() => {
-                        setFreezingId(cat.id);
-                        setTimeout(() => onFreezeCategory(cat), 260);
-                        setTimeout(() => setFreezingId(null), 420);
-                      }}
                       onOpenDetails={() => onOpenCategoryDetails(cat)}
                     />
                   ))}
@@ -417,18 +366,18 @@ function FrozenAllScreen({
 /* ─── Category card (owns count-up + bar animation) ───────────── */
 
 function CategoryCard({
-  cat, available, spent, planned, health, index, isFreezingId, onFreeze, onOpenDetails,
+  cat, available, spent, planned, health, index, onOpenDetails,
 }: {
   cat: import("./app-types").Category;
   available: number | null; spent: number; planned: number;
-  health: Health; index: number; isFreezingId: boolean;
-  onFreeze: () => void; onOpenDetails: () => void;
+  health: Health; index: number;
+  onOpenDetails: () => void;
 }) {
   const amountNum = Math.abs(available ?? 0);
   const progressPct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
 
-  // Count up from 0 on every mount (scope switch remounts cards with new cat.id keys)
-  const displayAmount = useCountUp(amountNum, 580, 0);
+  // Animate between values on updates; show instantly on mount
+  const displayAmount = useCountUp(amountNum, 580);
   const amountStr = available === null ? "—" : fmt(Math.round(displayAmount));
   const unitStr   = available === null ? "" : "MAD";
 
@@ -438,17 +387,12 @@ function CategoryCard({
 
   const barColor = health === "over" ? "var(--danger)"
                  : health === "low"  ? "var(--warning)"
-                 :                     "color-mix(in srgb, var(--accent) 65%, #d8f3c9)";
+                 :                     "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
 
   return (
     <div
-      className={isFreezingId ? "category-card--freezing" : undefined}
       style={{ ...cardStyle, animation: `fadeUp 0.22s ${Math.min(index * 0.025, 0.2)}s ease both` }}
     >
-      <button type="button" onClick={onFreeze} aria-label={`Freeze ${cat.name}`}
-        className="freeze-btn" style={freezeBtnStyle}>
-        <FreezeIcon size={9} strokeWidth={2.5} />
-      </button>
       <button type="button" onClick={onOpenDetails} style={cardBodyStyle}
         aria-label={`${cat.name}${health === "over" ? ", overbudget" : health === "low" ? ", low" : health === "funded" ? ", funded" : ", unfunded"}`}>
         <div style={cardTopStyle}>
@@ -521,22 +465,6 @@ function BudgetDistributionChart({
 }) {
   // All hooks at top — before any conditional return
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-  const [ripple, setRipple] = useState<{ x: number; y: number; color: string } | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
-
-  const spentByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of monthlySummary.spentByCategory ?? []) map.set(e.categoryId, e.total);
-    return map;
-  }, [monthlySummary.spentByCategory]);
-
-  const plannedByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of monthlySummary.assignedByCategory ?? []) map.set(e.categoryId, e.total);
-    return map;
-  }, [monthlySummary.assignedByCategory]);
 
   const chartData = useMemo(() => {
     const items = categories
@@ -562,12 +490,6 @@ function BudgetDistributionChart({
   }));
   const visibleSegments = allSegments.filter(s => !hiddenIds.has(s.cat.id));
   const visibleTotal = visibleSegments.reduce((s, seg) => s + seg.available, 0);
-
-  // "All good" pulse: every visible category has ≥60% of planned remaining
-  const allHealthy = visibleSegments.length > 0 && visibleSegments.every(s => {
-    const planned = plannedByCategory.get(s.cat.id) ?? 0;
-    return planned > 0 && s.available >= planned * 0.6;
-  });
 
   // Count-up must be called before conditional return (hook rule)
   const countedTotal = useCountUp(visibleTotal);
@@ -600,13 +522,7 @@ function BudgetDistributionChart({
     });
   }
 
-  function handleSliceClick(index: number, e: { clientX: number; clientY: number }) {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (rect) {
-      const color = visibleSegments[index]?.color ?? "var(--accent)";
-      setRipple({ x: e.clientX - rect.left, y: e.clientY - rect.top, color });
-      setTimeout(() => setRipple(null), 280);
-    }
+  function handleSliceClick(index: number) {
     onSelectCategory(visibleSegments[index].cat);
   }
 
@@ -614,7 +530,7 @@ function BudgetDistributionChart({
     <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
       {/* Donut — centered */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <div ref={containerRef} style={{ position: "relative", width: 260, height: 260, overflow: "hidden" }}>
+        <div style={{ position: "relative", width: 260, height: 260, overflow: "hidden" }}>
           <PieChart width={260} height={260} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
             <Pie
               data={visibleSegments}
@@ -623,7 +539,7 @@ function BudgetDistributionChart({
               paddingAngle={visibleSegments.length > 1 ? 4 : 0}
               dataKey="value"
               startAngle={90} endAngle={-270}
-              onClick={(_, index, e) => handleSliceClick(index, e)}
+              onClick={(_, index) => handleSliceClick(index)}
               cursor="pointer"
               stroke="none"
               isAnimationActive={true}
@@ -643,30 +559,11 @@ function BudgetDistributionChart({
             </Pie>
           </PieChart>
 
-          {/* Tap ripple */}
-          {ripple && (
-            <div
-              style={{
-                position: "absolute",
-                left: ripple.x - 40,
-                top: ripple.y - 40,
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                background: ripple.color,
-                animation: "rippleOut 280ms ease-out forwards",
-                pointerEvents: "none",
-              }}
-            />
-          )}
-
           <div style={{ ...chartCenterStyle, pointerEvents: "none" }}>
-            {/* Count-up total; pulses softly when all categories are healthy */}
             <span style={{
               fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800,
               color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1,
               display: "block",
-              animation: allHealthy ? "dotPulse 3s ease-in-out infinite" : "none",
             }}>
               {fmt(countedTotal)}
             </span>
@@ -694,7 +591,7 @@ function BudgetDistributionChart({
                 cursor: "pointer",
                 opacity: isHidden ? 0.35 : 1,
                 transition: "opacity 0.15s ease",
-                animation: `legendRowIn 0.28s ease-out ${i * 28}ms both`,
+                animation: `legendRowIn 0.28s ease-out ${i * 12}ms both`,
               }}
             >
               <span style={{ ...chartDotStyle, background: isHidden ? "var(--muted)" : color }} />
@@ -779,75 +676,6 @@ const chartLegendAmtStyle: CSSProperties = {
 };
 
 /* ─── Scope chip button ────────────────────────────────────────── */
-
-function ScopeChipBtn({
-  value,
-  emoji,
-  label,
-  active,
-  onClick,
-}: {
-  value: ScopeChip;
-  emoji: string;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
-
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      aria-label={active ? `${label}, selected` : `Filter by ${label}`}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      style={active ? {
-        height: 38,
-        borderRadius: 12,
-        border: "none",
-        background: CHIP_BG[value],
-        color: CHIP_INK[value],
-        padding: "0 14px 0 10px",
-        gap: 7,
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        transform: pressed ? "scale(0.95)" : "translateY(-1px)",
-        transition: "transform 0.15s cubic-bezier(0.22, 1, 0.36, 1)",
-        animation: "categorySelectIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both",
-        flexShrink: 0,
-      } : {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
-        background: "transparent",
-        color: CHIP_COLOR[value],
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: pressed ? 0.9 : hovered ? 0.75 : 0.45,
-        transform: pressed ? "scale(0.93)" : hovered ? "translateY(-2px)" : "none",
-        transition: "opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
-        flexShrink: 0,
-      }}
-    >
-      <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
-      {active && (
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
-          {label}
-        </span>
-      )}
-    </button>
-  );
-}
 
 /* ─── Styles ──────────────────────────────────────────────────── */
 
@@ -1034,23 +862,6 @@ const cardStyle: CSSProperties = {
   overflow: "hidden",
 };
 
-const freezeBtnStyle: CSSProperties = {
-  position: "absolute",
-  top: 7,
-  right: 7,
-  width: 22,
-  height: 22,
-  borderRadius: 99,
-  border: "none",
-  background: "var(--info)",
-  color: "white",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-  zIndex: 1,
-};
 
 const cardBodyStyle: CSSProperties = {
   flex: 1,
