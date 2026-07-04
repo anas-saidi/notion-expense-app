@@ -196,13 +196,15 @@ button:not(:disabled):active {
 
 .planning-scroll-rail,
 .home-scroll-rail,
-.categories-scroll-rail {
+.categories-scroll-rail,
+.donut-legend-scroll {
   scrollbar-width: none;
 }
 
 .planning-scroll-rail::-webkit-scrollbar,
 .home-scroll-rail::-webkit-scrollbar,
-.categories-scroll-rail::-webkit-scrollbar {
+.categories-scroll-rail::-webkit-scrollbar,
+.donut-legend-scroll::-webkit-scrollbar {
   display: none;
 }
 

@@ -187,7 +187,7 @@ export function HomeScreen({
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
 
       {/* Scope picker — right-aligned, matching Budget/Insights */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
         <BudgetScopeBar value={budgetScope} onChange={onBudgetScopeChange} ariaLabel="Home scope" />
       </div>
 
@@ -420,7 +420,7 @@ function monthShortLabel(ym: string): string {
 /* ─── Styles ──────────────────────────────────────────────────── */
 
 const walletSwitcherWrapStyle: CSSProperties = {
-  paddingTop: 8,
+  paddingTop: 16,
   paddingBottom: 16,
 };
 
