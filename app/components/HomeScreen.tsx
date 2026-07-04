@@ -3,6 +3,7 @@ import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } 
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { ChevronRightIcon } from "./ui/icons";
+import { BudgetScopeBar } from "./ui/ScopeChipBar";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 
 type HomeScreenProps = {
@@ -184,6 +185,11 @@ export function HomeScreen({
 
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
+
+      {/* Scope picker — right-aligned, matching Budget/Insights */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <BudgetScopeBar value={budgetScope} onChange={onBudgetScopeChange} ariaLabel="Home scope" />
+      </div>
 
       {/* Zone 1: Hero */}
       <div style={walletSwitcherWrapStyle}>

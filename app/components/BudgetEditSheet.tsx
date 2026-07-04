@@ -193,22 +193,18 @@ export function BudgetEditSheet({
       clearTimeout(fundUpdateTimersRef.current[categoryId]);
     }
 
-    const delta = targetPlanned - currentPlanned;
+    if (targetPlanned === currentPlanned) return;
 
     fundUpdateTimersRef.current[categoryId] = setTimeout(() => {
       const category = categoryById.get(categoryId);
-      const reverse = delta < 0;
-      const planned = Math.abs(delta);
-      if (planned === 0) return;
       fetch("/api/monthly-planning/funds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           month: selectedMonth,
           categoryId,
-              planned,
+          planned: targetPlanned,
           accountId: category?.defaultAccount ?? null,
-          reverse,
         }),
       })
         .then((res) => res.json())
