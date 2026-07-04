@@ -465,6 +465,24 @@ function BudgetDistributionChart({
 }) {
   // All hooks at top — before any conditional return
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const legendRef = useRef<HTMLDivElement>(null);
+  const [canScrollLegend, setCanScrollLegend] = useState(false);
+  const [legendAtBottom, setLegendAtBottom] = useState(false);
+
+  useEffect(() => {
+    const el = legendRef.current;
+    if (!el) return;
+    const check = () => {
+      const overflows = el.scrollHeight > el.clientHeight + 2;
+      setCanScrollLegend(overflows);
+      setLegendAtBottom(overflows && el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
+    };
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
+  });
 
   const chartData = useMemo(() => {
     const items = categories
@@ -572,37 +590,42 @@ function BudgetDistributionChart({
         </div>
       </div>
 
-      {/* Legend — staggered cascade on mount */}
-      <div style={chartLegendStyle}>
-        {allSegments.map(({ cat, available, color }, i) => {
-          const isHidden = hiddenIds.has(cat.id);
-          return (
-            <button
-              key={cat.id ?? i}
-              type="button"
-              onClick={() => toggleHidden(cat.id)}
-              title={isHidden ? `Show ${cat.name}` : `Hide ${cat.name}`}
-              className="donut-legend-row"
-              style={{
-                ...chartLegendRowStyle,
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                opacity: isHidden ? 0.35 : 1,
-                transition: "opacity 0.15s ease",
-                animation: `legendRowIn 0.28s ease-out ${i * 12}ms both`,
-              }}
-            >
-              <span style={{ ...chartDotStyle, background: isHidden ? "var(--muted)" : color }} />
-              <span style={chartLegendIconStyle}>
-                <CategoryIcon icon={cat.icon} size={11} />
-              </span>
-              <span style={{ ...chartLegendNameStyle, textDecoration: isHidden ? "line-through" : "none" }}>{cat.name}</span>
-              <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(available))}</span>
-            </button>
-          );
-        })}
+      {/* Legend — scrollable with fade hint */}
+      <div style={{ position: "relative" }}>
+        <div ref={legendRef} className="donut-legend-scroll" style={chartLegendStyle}>
+          {allSegments.map(({ cat, available, color }, i) => {
+            const isHidden = hiddenIds.has(cat.id);
+            return (
+              <button
+                key={cat.id ?? i}
+                type="button"
+                onClick={() => toggleHidden(cat.id)}
+                title={isHidden ? `Show ${cat.name}` : `Hide ${cat.name}`}
+                className="donut-legend-row"
+                style={{
+                  ...chartLegendRowStyle,
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  opacity: isHidden ? 0.35 : 1,
+                  transition: "opacity 0.15s ease",
+                  animation: `legendRowIn 0.28s ease-out ${i * 12}ms both`,
+                }}
+              >
+                <span style={{ ...chartDotStyle, background: isHidden ? "var(--muted)" : color }} />
+                <span style={chartLegendIconStyle}>
+                  <CategoryIcon icon={cat.icon} size={11} />
+                </span>
+                <span style={{ ...chartLegendNameStyle, textDecoration: isHidden ? "line-through" : "none" }}>{cat.name}</span>
+                <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(available))}</span>
+              </button>
+            );
+          })}
+        </div>
+        {canScrollLegend && !legendAtBottom && (
+          <div style={legendFadeStyle} aria-hidden="true" />
+        )}
       </div>
     </div>
   );
@@ -630,6 +653,20 @@ const chartLegendStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
   gap: "8px 12px",
+  maxHeight: 90,
+  overflowY: "auto",
+  scrollbarWidth: "none",
+};
+
+const legendFadeStyle: CSSProperties = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  height: 28,
+  background: "linear-gradient(to bottom, transparent, var(--surface))",
+  pointerEvents: "none",
+  borderRadius: "0 0 8px 8px",
 };
 
 const chartLegendRowStyle: CSSProperties = {
@@ -743,6 +780,7 @@ const backBtnStyle: CSSProperties = {
 
 const pillRailStyle: CSSProperties = {
   display: "flex",
+  alignItems: "center",
   gap: 8,
 };
 

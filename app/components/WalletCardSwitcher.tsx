@@ -1,7 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
 import { fmt } from "./app-utils";
-import { BudgetScopeBar } from "./ui/ScopeChipBar";
 
 export type ContribStatus = {
   anasPlan: number; salmaPlan: number;
@@ -102,11 +101,6 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
       style={wrapStyle}
       aria-label="Wallet overview"
     >
-
-      {/* Scope switcher */}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <BudgetScopeBar value={value} onChange={onChange} ariaLabel="Budget view" />
-      </div>
 
       {/* Hero */}
       <div style={heroStyle} key={value}>
