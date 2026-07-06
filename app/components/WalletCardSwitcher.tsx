@@ -326,7 +326,15 @@ function ContribRow({ name, actual, plan, color }: {
 
   return (
     <div style={contribRowStyle}>
-      <span style={{ ...contribNameStyle, color }}>{name}</span>
+      <div style={contribHeaderStyle}>
+        <span style={{ ...contribNameStyle, color }}>{name}</span>
+        <span style={contribValueStyle}>
+          {done
+            ? <span style={{ color: "var(--accent)", fontWeight: 600 }}>Done</span>
+            : <><span style={{ fontWeight: 600, color: "var(--text2)" }}>{fmt(Math.round(left))}</span> left</>
+          }
+        </span>
+      </div>
       <div style={contribBarRailStyle}>
         <div style={{
           ...contribBarFillStyle,
@@ -334,26 +342,25 @@ function ContribRow({ name, actual, plan, color }: {
           background: done ? "var(--accent)" : color,
         }} />
       </div>
-      <span style={contribValueStyle}>
-        {done
-          ? <span style={{ color: "var(--accent)", fontWeight: 600 }}>Done</span>
-          : <><span style={{ fontWeight: 600, color: "var(--text2)" }}>{fmt(Math.round(left))}</span> left</>
-        }
-      </span>
     </div>
   );
 }
 
 const contribSectionStyle: CSSProperties = {
   display: "grid",
-  gap: 10,
+  gridTemplateColumns: "1fr 1fr",
+  gap: 12,
 };
 
 const contribRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "auto 1fr auto",
-  alignItems: "center",
-  gap: 10,
+  gap: 6,
+};
+
+const contribHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
 };
 
 const contribNameStyle: CSSProperties = {
@@ -361,7 +368,6 @@ const contribNameStyle: CSSProperties = {
   fontWeight: 700,
   letterSpacing: 0.6,
   textTransform: "uppercase",
-  width: 42,
 };
 
 const contribBarRailStyle: CSSProperties = {
@@ -381,8 +387,6 @@ const contribValueStyle: CSSProperties = {
   fontSize: 10,
   color: "var(--muted)",
   fontVariantNumeric: "tabular-nums",
-  textAlign: "right",
-  minWidth: 60,
 };
 
 const jointDotStyle = (active: boolean): CSSProperties => ({
