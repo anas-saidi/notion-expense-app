@@ -189,12 +189,11 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
           );
         })()}
 
-        {/* Joint contribution status */}
+        {/* Joint contribution — inline within the card */}
         {value === "joint" && contribStatus && (contribStatus.anasPlan > 0 || contribStatus.salmaPlan > 0) && (
-          <div style={contribRowStyle}>
-            <ContribPill emoji="👨" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} />
-            <span style={{ opacity: 0.2, fontSize: 11 }}>·</span>
-            <ContribPill emoji="👩" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} />
+          <div style={contribSectionStyle}>
+            <ContribRow name="Anas" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} color="var(--partner-husband)" />
+            <ContribRow name="Salma" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} color="var(--partner-wife)" />
           </div>
         )}
 
@@ -318,30 +317,72 @@ const jointDotsStyle: CSSProperties = {
   paddingTop: 2,
 };
 
-function ContribPill({ emoji, actual, plan }: {
-  emoji: string; actual: number; plan: number;
+function ContribRow({ name, actual, plan, color }: {
+  name: string; actual: number; plan: number; color: string;
 }) {
+  const left = Math.max(0, plan - actual);
   const done = plan > 0 && actual >= plan * 0.99;
+  const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
+
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      fontSize: 11, fontVariantNumeric: "tabular-nums",
-      color: "color-mix(in srgb, var(--text2) 65%, transparent)",
-    }}>
-      <span style={{ fontSize: 12 }}>{emoji}</span>
-      {done
-        ? <span style={{ fontWeight: 700, color: "var(--accent)" }}>Done</span>
-        : <><span style={{ fontWeight: 600 }}>{fmt(Math.round(actual))}</span><span style={{ opacity: 0.5, fontWeight: 400 }}>/ {fmt(Math.round(plan))}</span></>
-      }
-    </span>
+    <div style={contribRowStyle}>
+      <span style={{ ...contribNameStyle, color }}>{name}</span>
+      <div style={contribBarRailStyle}>
+        <div style={{
+          ...contribBarFillStyle,
+          width: `${pct}%`,
+          background: done ? "var(--accent)" : color,
+        }} />
+      </div>
+      <span style={contribValueStyle}>
+        {done
+          ? <span style={{ color: "var(--accent)", fontWeight: 600 }}>Done</span>
+          : <><span style={{ fontWeight: 600, color: "var(--text2)" }}>{fmt(Math.round(left))}</span> left</>
+        }
+      </span>
+    </div>
   );
 }
 
-const contribRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
+const contribSectionStyle: CSSProperties = {
+  display: "grid",
   gap: 10,
+};
+
+const contribRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto 1fr auto",
+  alignItems: "center",
+  gap: 10,
+};
+
+const contribNameStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: 0.6,
+  textTransform: "uppercase",
+  width: 42,
+};
+
+const contribBarRailStyle: CSSProperties = {
+  height: 4,
+  borderRadius: 999,
+  background: "var(--surface2)",
+  overflow: "hidden",
+};
+
+const contribBarFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: 999,
+  transition: "width 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
+};
+
+const contribValueStyle: CSSProperties = {
+  fontSize: 10,
+  color: "var(--muted)",
+  fontVariantNumeric: "tabular-nums",
+  textAlign: "right",
+  minWidth: 60,
 };
 
 const jointDotStyle = (active: boolean): CSSProperties => ({
