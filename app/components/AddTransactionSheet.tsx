@@ -127,7 +127,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           <div className="amount-hero-sizer" data-value={props.amount || "0"}>
             <input
               type="text"
-              inputMode="decimal"
               value={props.amount}
               onChange={(e) => props.onAmountChange(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}

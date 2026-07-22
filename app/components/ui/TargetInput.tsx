@@ -38,7 +38,6 @@ export function TargetInput({
       </div>
       <input
         type="text"
-        inputMode="decimal"
         value={String(value)}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={onKeyDown}

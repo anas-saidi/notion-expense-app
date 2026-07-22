@@ -570,7 +570,6 @@ export function PendingScreen({
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
                 <input
                   type="text"
-                  inputMode="decimal"
                   aria-label="Amount (optional)"
                   value={formAmount}
                   onChange={(e) =>

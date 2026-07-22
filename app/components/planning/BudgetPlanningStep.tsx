@@ -275,7 +275,6 @@ export function BudgetPlanningStep({
               </div>
               <input
                 type="text"
-                inputMode="decimal"
                 value={String(item.amount)}
                 onChange={(event) => updateAmount(item.categoryId, event.target.value, item.amount, item.available ?? null)}
                 onKeyDown={(event) => handleKeyAdjust(event, item.categoryId, item.amount, item.available ?? null)}

@@ -100,7 +100,6 @@ export function IncomeStep({
                 </div>
                 <input
                   type="text"
-                  inputMode="decimal"
                   value={String(item.amount)}
                   onChange={(event) => updateAmount(item.id, event.target.value)}
                   aria-label={`Income amount for ${item.name}`}

@@ -153,7 +153,6 @@ export function AccountTransferSheet({ open, account, accounts, onClose, onSucce
                   const cleaned = event.target.value.replace(/[^0-9.]/g, "");
                   if ((cleaned.match(/\./g) || []).length <= 1) setAmount(cleaned);
                 }}
-                inputMode="decimal"
                 placeholder="0"
                 style={amountInputStyle}
               />

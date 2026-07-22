@@ -202,7 +202,6 @@ export function CategoryManageSheet({
                 value={amount}
                 onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder={isCreate ? "Optional" : "0"}
-                inputMode="decimal"
                 style={amountInputStyle}
               />
               <span style={currencyStyle}>MAD</span>

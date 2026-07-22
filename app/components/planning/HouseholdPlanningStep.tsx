@@ -32,7 +32,6 @@ export function HouseholdPlanningStep({ items, onChange }: HouseholdPlanningStep
             </div>
             <input
               type="text"
-              inputMode="decimal"
               value={String(item.amount)}
               onChange={(event) => updateAmount(item.categoryId, event.target.value)}
               aria-label={`Planned household amount for ${item.name}`}

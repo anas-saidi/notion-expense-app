@@ -335,29 +335,27 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       metaLabel="Before"
       rebalanceMode
       onSave={async () => {
-        const changes = allItems.filter(
-          (f) => Math.abs((allocations[f.id] ?? f.original) - f.original) >= 1,
-        );
+        if (liveTransfers.length === 0) return;
+        const date = today();
         await Promise.all(
-          changes.map((f) => {
-            const delta = (allocations[f.id] ?? f.original) - f.original;
-            return fetch("/api/monthly-planning/funds", {
+          liveTransfers.map((t) =>
+            fetch("/api/transfer", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                month: homeMonth,
-                categoryId: f.id,
-                planned: delta,
-                mode: "increment",
-                accountId: catById.get(f.id)?.defaultAccount ?? null,
+                fromCategoryId: t.fromId,
+                toCategoryId: t.toId,
+                amount: t.amount,
+                date,
+                note: "Budget rebalance",
               }),
             }).then(async (r) => {
               if (!r.ok) {
                 const d = await r.json();
-                throw new Error(d.error ?? "Failed to update allocation");
+                throw new Error(d.error ?? "Failed to create transfer");
               }
-            });
-          }),
+            }),
+          ),
         );
       }}
     />
