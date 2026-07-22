@@ -390,7 +390,6 @@ function AccountRepairRow({
                 <span style={repairFieldLabelStyle}>Real amount</span>
                 <input
                   type="text"
-                  inputMode="decimal"
                   value={actualAmount}
                   onChange={(event) => setActualAmount(event.target.value)}
                   placeholder="0"

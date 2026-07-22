@@ -487,7 +487,6 @@ export function AccountDetailsSheet({
                 <div style={reconcileInputWrapStyle}>
                   <input
                     type="text"
-                    inputMode="decimal"
                     value={actualBalance}
                     onChange={e => setActualBalance(e.target.value)}
                     placeholder="0"

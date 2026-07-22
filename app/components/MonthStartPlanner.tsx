@@ -853,7 +853,6 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
         </div>
         <input
           type="text"
-          inputMode="numeric"
           value={draft ?? (amount > 0 ? String(Math.round(amount)) : "")}
           placeholder="—"
           onFocus={() => setDraft(String(Math.round(amount)))}

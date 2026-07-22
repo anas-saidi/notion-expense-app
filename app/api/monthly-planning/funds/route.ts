@@ -172,8 +172,8 @@ export async function POST(req: NextRequest) {
       const currentPlanned = existing.properties.Planned?.number ?? 0;
       const nextPlanned = Math.max(0, shouldIncrement ? currentPlanned + planned : planned);
 
-      // Never overwrite an existing fund with 0 — skip instead
-      if (nextPlanned <= 0) {
+      // Skip if already at 0 and result would remain 0
+      if (nextPlanned <= 0 && currentPlanned <= 0) {
         return NextResponse.json({ fund: { id: existing.id, categoryId, planned: currentPlanned }, mode: "skipped" });
       }
 

@@ -32,7 +32,6 @@ export function SavingsStep({ items, onChange }: SavingsStepProps) {
             </div>
             <input
               type="text"
-              inputMode="decimal"
               value={String(item.amount)}
               onChange={(event) => updateAmount(item.categoryId, event.target.value)}
               aria-label={`Planned savings amount for ${item.name}`}

@@ -103,7 +103,6 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
               <input
                 value={amount}
                 onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
-                inputMode="decimal"
                 placeholder="0"
                 style={amountInputStyle}
               />

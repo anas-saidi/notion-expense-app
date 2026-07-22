@@ -368,7 +368,6 @@ export function AllocationFlow({
                 <input
                   className="planning-amount-input"
                   type="text"
-                  inputMode="decimal"
                   readOnly={readOnly}
                   value={draftValue ?? String(activeItem.amount)}
                   onFocus={() => setDraftValue(String(activeItem.amount))}
