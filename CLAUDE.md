@@ -20,9 +20,32 @@ The app requires a single env var for local dev:
 NOTION_TOKEN=<internal integration token>
 ```
 
-Copy `.env.example` to `.env.local` and fill it in. The auth route (`app/api/auth/[...nextauth]/route.ts`) is a stub — OAuth is unused; the app relies entirely on `NOTION_TOKEN` as a server-side secret.
+Copy `.env.example` to `.env.local` and fill it in. `NOTION_TOKEN` is the
+server-side secret used for all data access to Notion's API and is unrelated
+to sign-in.
+
+Sign-in is gated separately via a **Notion OAuth "identity check"** — it only
+answers "is this one of the two authorized people?" and never touches the
+data layer. Additional env vars for this: `NOTION_OAUTH_CLIENT_ID`,
+`NOTION_OAUTH_CLIENT_SECRET`, `APP_URL`, `SESSION_SECRET`,
+`ALLOWED_NOTION_EMAILS` (see `.env.example`).
+
+`NOTION_TRANSACTIONS_DB` / `NOTION_CATEGORIES_DB` / `NOTION_ACCOUNTS_DB` must
+be left **unset**, not set to an empty string — every route falls back to a
+hardcoded default DB ID via `?? "..."`, which only triggers on `undefined`.
+An empty-but-present env var overrides the default with `""` and breaks
+every Notion API call in that route.
 
 ## Architecture Overview
+
+**Auth gate.** `middleware.ts` runs on every request (excluding static
+assets) and checks a signed `session` JWT cookie (`lib/auth.ts`, via `jose`
+— Edge-compatible). Missing/invalid session → redirect to `/login` for
+pages, `401 JSON` for `/api/*`. `/login` and `/api/auth/*` are the only
+public paths. Sign-in itself goes through Notion OAuth
+(`/api/auth/login` → `/api/auth/callback`), checked against
+`ALLOWED_NOTION_EMAILS`; the resulting session cookie is purely an identity
+gate and never touches `NOTION_TOKEN` or the data layer.
 
 **Single-page client app backed by Next.js API routes.**
 

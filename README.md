@@ -15,14 +15,19 @@ A minimal, frictionless web app to log expenses directly into your Notion financ
 
 ### 1. Create a Notion OAuth App
 
+The app uses two separate Notion integrations: an **Internal** one for
+`NOTION_TOKEN` (all data access), and a **Public** one purely to gate sign-in
+to the two authorized people.
+
 1. Go to [notion.so/profile/integrations](https://notion.so/profile/integrations)
 2. Click **"New integration"** → choose type **"Public"** (not Internal)
 3. Fill in:
    - Name: `Expense Tracker`
-   - Redirect URI: `https://YOUR-VERCEL-URL.vercel.app/api/auth/callback/notion`
-4. Copy **Client ID** and **Client Secret**
-
-> **Note:** For an Internal integration (simpler, only you), skip OAuth — just paste your token as `NOTION_TOKEN` and remove the auth flow.
+   - Redirect URI: `https://YOUR-VERCEL-URL.vercel.app/api/auth/callback`
+4. Under **Capabilities**, enable **"User information with email addresses"**
+   (needed so the callback can check the signed-in email against
+   `ALLOWED_NOTION_EMAILS`)
+5. Copy **Client ID** and **Client Secret**
 
 ### 2. Share your databases with the integration
 
@@ -44,10 +49,11 @@ In Notion, open:
 
 | Variable | Value |
 |---|---|
-| `NOTION_CLIENT_ID` | From your Notion OAuth app |
-| `NOTION_CLIENT_SECRET` | From your Notion OAuth app |
-| `NEXTAUTH_SECRET` | Run: `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | Your Vercel URL e.g. `https://myapp.vercel.app` |
+| `NOTION_OAUTH_CLIENT_ID` | From your Notion OAuth app |
+| `NOTION_OAUTH_CLIENT_SECRET` | From your Notion OAuth app |
+| `APP_URL` | Your Vercel URL e.g. `https://myapp.vercel.app` (no trailing slash) |
+| `SESSION_SECRET` | Run: `openssl rand -base64 32` |
+| `ALLOWED_NOTION_EMAILS` | Comma-separated list of the two allowed Notion account emails |
 
 ### 5. Add to iPhone Home Screen
 
@@ -63,7 +69,7 @@ In Notion, open:
 
 Before running locally, open your Notion integration settings and add a **second** redirect URI:
 ```
-http://localhost:3000/api/auth/callback/notion
+http://localhost:3000/api/auth/callback
 ```
 You need both — the `localhost` one for local dev and your Vercel URL for production.
 
@@ -77,10 +83,11 @@ Then edit `.env.local` and fill in:
 
 | Variable | How to get it |
 |---|---|
-| `NOTION_CLIENT_ID` | Notion integration settings |
-| `NOTION_CLIENT_SECRET` | Notion integration settings |
-| `NEXTAUTH_SECRET` | Run: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
-| `NEXTAUTH_URL` | Leave as `http://localhost:3000` for local dev |
+| `NOTION_OAUTH_CLIENT_ID` | Notion integration settings |
+| `NOTION_OAUTH_CLIENT_SECRET` | Notion integration settings |
+| `APP_URL` | Leave as `http://localhost:3000` for local dev |
+| `SESSION_SECRET` | Run: `openssl rand -base64 32` |
+| `ALLOWED_NOTION_EMAILS` | Comma-separated list of the two allowed Notion account emails |
 
 ### 3. Install dependencies and run
 
@@ -89,6 +96,6 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The sign-in button will redirect you through Notion OAuth and back to `localhost`.
+Open [http://localhost:3000](http://localhost:3000). You'll be redirected to `/login`; the sign-in button redirects you through Notion OAuth and back to `localhost`.
 
-> **Tip:** If you get a "redirect_uri mismatch" error from Notion, double-check that `http://localhost:3000/api/auth/callback/notion` is saved in your Notion integration's redirect URIs list.
+> **Tip:** If you get a "redirect_uri mismatch" error from Notion, double-check that `http://localhost:3000/api/auth/callback` is saved in your Notion integration's redirect URIs list.

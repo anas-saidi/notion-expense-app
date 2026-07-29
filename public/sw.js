@@ -1,4 +1,4 @@
-const CACHE_NAME = "expense-app-v1";
+const CACHE_NAME = "expense-app-v2";
 const SHELL_ASSETS = ["/"];
 
 self.addEventListener("install", (event) => {
