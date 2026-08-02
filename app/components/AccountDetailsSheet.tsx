@@ -31,9 +31,18 @@ type AccountDetailsSheetProps = {
   onMove: (account: Account) => void;
   onIncome: (account: Account) => void;
   onReconcileSuccess: (message: string) => void;
+  onTransactionsChanged?: () => void;
 };
 
 type ReconcileStatus = "idle" | "saving" | "success" | "error";
+
+type AddedTxn = {
+  id: string;
+  name: string;
+  amount: number;
+  type: "Expense" | "Income";
+  date: string;
+};
 
 const CURRENT_MONTH = () => new Date().toISOString().slice(0, 7);
 
@@ -52,11 +61,22 @@ export function AccountDetailsSheet({
   onMove,
   onIncome,
   onReconcileSuccess,
+  onTransactionsChanged,
 }: AccountDetailsSheetProps) {
   const [showReconcile, setShowReconcile] = useState(false);
   const [actualBalance, setActualBalance] = useState("");
   const [reconcileStatus, setReconcileStatus] = useState<ReconcileStatus>("idle");
   const [reconcileError, setReconcileError] = useState("");
+  const [liveBalance, setLiveBalance] = useState(0);
+  const [addedTxns, setAddedTxns] = useState<AddedTxn[]>([]);
+  const [showAddTxn, setShowAddTxn] = useState(false);
+  const [txnType, setTxnType] = useState<"Expense" | "Income">("Expense");
+  const [txnAmount, setTxnAmount] = useState("");
+  const [txnName, setTxnName] = useState("");
+  const [txnCategoryId, setTxnCategoryId] = useState("");
+  const [txnDate, setTxnDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [txnSaving, setTxnSaving] = useState(false);
+  const [txnError, setTxnError] = useState("");
 
   // Balance history chart
   const [showChart, setShowChart] = useState(false);
@@ -74,8 +94,21 @@ export function AccountDetailsSheet({
       setShowChart(false);
       setChartTxns([]);
       setShowAllActivity(false);
+      setLiveBalance(account?.balance ?? 0);
+      setShowReconcile(false);
+      setActualBalance("");
+      setReconcileStatus("idle");
+      setReconcileError("");
+      setAddedTxns([]);
+      setShowAddTxn(false);
+      setTxnType("Expense");
+      setTxnAmount("");
+      setTxnName("");
+      setTxnCategoryId("");
+      setTxnDate(new Date().toISOString().slice(0, 10));
+      setTxnError("");
     }
-  }, [open, homeMonth]);
+  }, [open, homeMonth, account?.id]);
 
   // Fetch transactions for the chart month
   useEffect(() => {
@@ -159,6 +192,9 @@ export function AccountDetailsSheet({
     setShowChart(false);
     setChartTxns([]);
     setShowAllActivity(false);
+    setShowAddTxn(false);
+    setAddedTxns([]);
+    setTxnError("");
     onClose();
   };
 
@@ -229,8 +265,13 @@ export function AccountDetailsSheet({
 
   // Reconcile
   const parsedActual = parseFloat(actualBalance.replace(/[^0-9.\-]/g, ""));
-  const currentBalance = account?.balance ?? 0;
-  const difference = Number.isFinite(parsedActual) ? parsedActual - currentBalance : null;
+  const difference = Number.isFinite(parsedActual) ? parsedActual - liveBalance : null;
+  const isFullyReconciled = difference !== null && Math.abs(difference) < 0.01;
+
+  const activeCategories = useMemo(
+    () => categories.filter(c => !c.snoozed && !c.archived),
+    [categories],
+  );
 
   const submitReconcile = async () => {
     if (!account || !Number.isFinite(parsedActual)) return;
@@ -243,7 +284,7 @@ export function AccountDetailsSheet({
         body: JSON.stringify({
           accountId: account.id,
           actualBalance: parsedActual,
-          currentBalance,
+          currentBalance: liveBalance,
           date: new Date().toISOString().slice(0, 10),
         }),
       });
@@ -255,6 +296,8 @@ export function AccountDetailsSheet({
         setShowReconcile(false);
         setActualBalance("");
         setReconcileStatus("idle");
+        setAddedTxns([]);
+        setShowAddTxn(false);
       }, 1800);
     } catch (e: unknown) {
       setReconcileStatus("error");
@@ -262,9 +305,66 @@ export function AccountDetailsSheet({
     }
   };
 
+  const submitAddTxn = async () => {
+    if (!account) return;
+    const amt = parseFloat(txnAmount.replace(/[^0-9.\-]/g, ""));
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setTxnError("Enter a valid amount");
+      return;
+    }
+    if (txnType === "Expense" && !txnCategoryId) {
+      setTxnError("Pick a category");
+      return;
+    }
+    setTxnSaving(true);
+    setTxnError("");
+    const name = txnName.trim() || (txnType === "Expense" ? "Missed expense" : "Missed income");
+    try {
+      const res = await fetch(txnType === "Expense" ? "/api/expense" : "/api/monthly-income", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          txnType === "Expense"
+            ? { name, amount: amt, accountId: account.id, categoryId: txnCategoryId, date: txnDate }
+            : { name, amount: amt, accountId: account.id, date: txnDate },
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to add transaction");
+      const id = txnType === "Expense" ? data.id : data.income?.id;
+      setAddedTxns(prev => [...prev, { id, name, amount: amt, type: txnType, date: txnDate }]);
+      setLiveBalance(prev => prev + (txnType === "Income" ? amt : -amt));
+      setTxnAmount("");
+      setTxnName("");
+      onTransactionsChanged?.();
+    } catch (e: unknown) {
+      setTxnError(e instanceof Error ? e.message : "Failed to add transaction");
+    } finally {
+      setTxnSaving(false);
+    }
+  };
+
+  const undoAddedTxn = async (id: string) => {
+    const removed = addedTxns.find(t => t.id === id);
+    if (!removed) return;
+    setAddedTxns(prev => prev.filter(t => t.id !== id));
+    setLiveBalance(prev => prev - (removed.type === "Income" ? removed.amount : -removed.amount));
+    try {
+      await fetch("/api/transactions", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      onTransactionsChanged?.();
+    } catch {
+      // Best-effort undo — the transaction may still exist in Notion even though it's
+      // no longer shown here; a background refresh will reconcile the discrepancy.
+    }
+  };
+
   if (!account) return null;
 
-  const isNegative = (account.balance ?? 0) < 0;
+  const isNegative = liveBalance < 0;
 
   return (
     <BottomSheet
@@ -315,7 +415,7 @@ export function AccountDetailsSheet({
             </button>
           </div>
           <p style={{ ...heroValueStyle, color: isNegative ? "var(--danger)" : "var(--text)" }}>
-            <Money value={account.balance ?? 0} absolute={isNegative} />
+            <Money value={liveBalance} absolute={isNegative} />
           </p>
           {account.readyToAssign != null && (
             <p style={heroSubStyle}>
@@ -479,7 +579,7 @@ export function AccountDetailsSheet({
               <label style={reconcileFieldStyle}>
                 <span style={reconcileLabelStyle}>App balance</span>
                 <div style={reconcileReadonlyStyle}>
-                  <Money value={currentBalance} />
+                  <Money value={liveBalance} />
                 </div>
               </label>
               <label style={reconcileFieldStyle}>
@@ -506,6 +606,118 @@ export function AccountDetailsSheet({
                 </strong>
               </div>
             )}
+
+            {/* Add missed transaction — shrinks the difference above instead of reconciling it away */}
+            <div style={addTxnSectionStyle}>
+              <div style={addTxnHeaderRowStyle}>
+                <p style={addTxnHintStyle}>Missed a transaction? Add it instead of reconciling it away.</p>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }}
+                  style={addTxnToggleStyle}
+                >
+                  {showAddTxn ? "Cancel" : "+ Add"}
+                </button>
+              </div>
+
+              {showAddTxn && (
+                <div style={addTxnFormStyle}>
+                  <div style={txnTypeToggleStyle}>
+                    <button
+                      type="button"
+                      onClick={() => setTxnType("Expense")}
+                      style={txnTypePillStyle(txnType === "Expense")}
+                    >
+                      Expense
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTxnType("Income")}
+                      style={txnTypePillStyle(txnType === "Income")}
+                    >
+                      Income
+                    </button>
+                  </div>
+
+                  <div style={reconcileInputWrapStyle}>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={txnAmount}
+                      onChange={e => setTxnAmount(e.target.value)}
+                      placeholder="Amount"
+                      style={reconcileInputStyle}
+                    />
+                    <span style={reconcileCurrencyStyle}>MAD</span>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={txnName}
+                    onChange={e => setTxnName(e.target.value)}
+                    placeholder={txnType === "Expense" ? "What was it? (optional)" : "Source (optional)"}
+                    style={txnTextInputStyle}
+                  />
+
+                  {txnType === "Expense" && (
+                    <select
+                      value={txnCategoryId}
+                      onChange={e => setTxnCategoryId(e.target.value)}
+                      style={txnSelectStyle}
+                    >
+                      <option value="">Category…</option>
+                      {activeCategories.map(c => (
+                        <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  <input
+                    type="date"
+                    value={txnDate}
+                    onChange={e => setTxnDate(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                    style={txnSelectStyle}
+                  />
+
+                  {txnError && <div style={reconcileErrorStyle}>{txnError}</div>}
+
+                  <button
+                    type="button"
+                    onClick={submitAddTxn}
+                    disabled={txnSaving || reconcileStatus === "saving" || reconcileStatus === "success"}
+                    style={{ ...txnAddBtnStyle, opacity: txnSaving ? 0.7 : 1 }}
+                  >
+                    {txnSaving && <span style={spinnerStyle} />}
+                    {txnSaving ? "Adding…" : `Add ${txnType.toLowerCase()}`}
+                  </button>
+                </div>
+              )}
+
+              {addedTxns.length > 0 && (
+                <div style={addedListStyle}>
+                  {addedTxns.map(t => (
+                    <div key={t.id} style={addedRowStyle}>
+                      <span style={addedNameStyle}>{t.name}</span>
+                      <span style={{
+                        ...addedAmtStyle,
+                        color: t.type === "Income" ? "var(--action-income)" : "var(--text2)",
+                      }}>
+                        {t.type === "Income" ? "+" : "−"}{fmt(t.amount)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => undoAddedTxn(t.id)}
+                        aria-label={`Remove ${t.name}`}
+                        style={undoBtnStyle}
+                      >
+                        <XIcon size={13} strokeWidth={2.2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {reconcileError && (
               <div style={reconcileErrorStyle}>{reconcileError}</div>
@@ -537,6 +749,8 @@ export function AccountDetailsSheet({
               {reconcileStatus === "saving" ? "Saving..." :
                reconcileStatus === "success" ? "Reconciled" :
                reconcileStatus === "error" ? "Try again" :
+               isFullyReconciled ? "Mark as reconciled" :
+               difference !== null ? `Reconcile remaining ${difference > 0 ? "+" : ""}${fmt(Math.round(difference * 100) / 100)} MAD` :
                "Save reconciliation"}
             </button>
           </div>
@@ -988,6 +1202,140 @@ const reconcileErrorStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--danger) 9%, var(--surface))",
   color: "var(--danger)",
   fontSize: 12,
+};
+
+// Add-transaction (inline, inside reconcile panel)
+const addTxnSectionStyle: CSSProperties = {
+  display: "grid",
+  gap: 10,
+};
+
+const addTxnHeaderRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+};
+
+const addTxnHintStyle: CSSProperties = {
+  fontSize: 12,
+  color: "var(--muted)",
+  lineHeight: 1.4,
+};
+
+const addTxnToggleStyle: CSSProperties = {
+  minHeight: 44,
+  padding: "0 12px",
+  borderRadius: 10,
+  border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)",
+  background: "var(--surface)",
+  color: "var(--text2)",
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+  flexShrink: 0,
+  whiteSpace: "nowrap",
+};
+
+const addTxnFormStyle: CSSProperties = {
+  display: "grid",
+  gap: 8,
+};
+
+const txnTypeToggleStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 6,
+};
+
+const txnTypePillStyle = (active: boolean): CSSProperties => ({
+  minHeight: 40,
+  borderRadius: 10,
+  border: active ? "none" : "1px solid color-mix(in srgb, var(--border2) 55%, transparent)",
+  background: active ? "var(--accent)" : "var(--surface)",
+  color: active ? "var(--accent-ink)" : "var(--text2)",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+});
+
+const txnTextInputStyle: CSSProperties = {
+  minHeight: 44,
+  borderRadius: 12,
+  border: "1.5px solid color-mix(in srgb, var(--border2) 60%, transparent)",
+  background: "var(--surface)",
+  padding: "0 13px",
+  fontSize: 14,
+  fontWeight: 500,
+  color: "var(--text2)",
+  outline: "none",
+  width: "100%",
+  boxSizing: "border-box",
+};
+
+const txnSelectStyle: CSSProperties = {
+  ...txnTextInputStyle,
+};
+
+const txnAddBtnStyle: CSSProperties = {
+  minHeight: 44,
+  borderRadius: 12,
+  border: "none",
+  background: "color-mix(in srgb, var(--action) 12%, var(--surface))",
+  color: "var(--action)",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+};
+
+const addedListStyle: CSSProperties = {
+  display: "grid",
+  gap: 6,
+};
+
+const addedRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  minHeight: 44,
+  padding: "0 4px 0 10px",
+  borderRadius: 10,
+  background: "var(--surface)",
+};
+
+const addedNameStyle: CSSProperties = {
+  flex: 1,
+  fontSize: 12,
+  fontWeight: 500,
+  color: "var(--text2)",
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+};
+
+const addedAmtStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  fontVariantNumeric: "tabular-nums",
+  flexShrink: 0,
+};
+
+const undoBtnStyle: CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: 8,
+  border: "none",
+  background: "transparent",
+  color: "var(--muted)",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
 };
 
 const reconcileSubmitStyle: CSSProperties = {

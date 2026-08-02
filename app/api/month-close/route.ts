@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 const ACCOUNTS_DB = process.env.NOTION_ACCOUNTS_DB ?? "1926a2be-8922-8014-bb54-d9f5e9d1234b";
 const PENDING_DB = process.env.NOTION_PENDING_DB ?? "d2db101b-faec-467d-8c57-eee6d8780311";
-const RECONCILIATIONS_DB = process.env.NOTION_RECONCILIATIONS_DB ?? "";
+const RECONCILIATIONS_DB = process.env.NOTION_RECONCILIATIONS_DB ?? "30c6a2be-8922-80b5-b9d7-db4e707b2276";
 
 type NotionProp = { name: string; type: string };
 type NotionPage = Record<string, any>;
@@ -250,7 +250,7 @@ export async function GET(req: NextRequest) {
         ? getDatabaseKeys(token, RECONCILIATIONS_DB, [
             { name: "account", type: "relation", aliases: ["Account", "Accounts"] },
             { name: "date", type: "date", aliases: ["Date", "Sync Date", "Reconciled At"] },
-            { name: "balance", type: "number", aliases: ["Balance", "Closing Balance", "Synced Balance"] },
+            { name: "balance", type: "number", aliases: ["Real Balance", "Actual Balance", "Balance", "Closing Balance", "Synced Balance"] },
           ])
         : Promise.resolve(null),
     ]);

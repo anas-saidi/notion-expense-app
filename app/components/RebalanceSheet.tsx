@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { Category, MonthlySummary } from "./app-types";
-import { today } from "./app-utils";
+import type { BudgetScope, Category, MonthlySummary } from "./app-types";
+import { fmt, today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { ScopeChipBar, type ScopeChipItem } from "./ui/ScopeChipBar";
@@ -15,11 +15,17 @@ type RebalanceSheetProps = {
   onSuccess: () => void;
   homeMonth: string;         // "YYYY-MM"
   monthlySummary: MonthlySummary;
+  // Unassigned money that can be pulled in on top of what's already allocated —
+  // only meaningful (and only ever non-zero) for the current month.
+  readyToAssignByScope?: Record<BudgetScope, number>;
+  jointUnassigned?: number;
+  savingPool?: number;
 };
 
 type MonthContext = "past" | "current" | "future";
 type GroupFilter = "all" | "joint" | "wife" | "husband" | "savings";
 type Transfer = { fromId: string; toId: string; amount: number };
+type TopUp = { id: string; amount: number };
 
 function getMonthContext(homeMonth: string): MonthContext {
   const current = new Date().toISOString().slice(0, 7);
@@ -57,11 +63,16 @@ function getCategoryGroup(cat: Category): Exclude<GroupFilter, "all"> {
   return "joint";
 }
 
-/** Greedy pairing of sources (reduced) → destinations (increased). */
-function computeTransfers(
+/**
+ * Greedy pairing of sources (reduced) → destinations (increased), plus any
+ * destination growth that isn't covered by a reduction elsewhere. That
+ * leftover is money pulled in from the unallocated pool rather than moved
+ * between categories, so it's reported separately as `topUps`.
+ */
+function computeTransfersAndTopUps(
   funded: { id: string; original: number }[],
   allocations: Record<string, number>,
-): Transfer[] {
+): { transfers: Transfer[]; topUps: TopUp[] } {
   const sources: { id: string; rem: number }[] = [];
   const dests: { id: string; rem: number }[] = [];
 
@@ -83,7 +94,13 @@ function computeTransfers(
     if (sources[si].rem < 1) si++;
     if (dests[di].rem < 1) di++;
   }
-  return transfers;
+
+  const topUps: TopUp[] = [];
+  for (let k = di; k < dests.length; k++) {
+    if (dests[k].rem >= 1) topUps.push({ id: dests[k].id, amount: Math.round(dests[k].rem) });
+  }
+
+  return { transfers, topUps };
 }
 
 // ── Scope chip metadata ────────────────────────────────────────────────────────
@@ -98,7 +115,17 @@ const CHIP_EMOJI: Record<string, string> = {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth, monthlySummary }: RebalanceSheetProps) {
+export function RebalanceSheet({
+  open,
+  onClose,
+  categories,
+  onSuccess,
+  homeMonth,
+  monthlySummary,
+  readyToAssignByScope,
+  jointUnassigned = 0,
+  savingPool = 0,
+}: RebalanceSheetProps) {
   const monthCtx = useMemo(() => getMonthContext(homeMonth), [homeMonth]);
   const isReadOnly = monthCtx !== "current";
 
@@ -200,10 +227,28 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
 
   // Sum ALL visible items (including over-budget negatives) so the pool matches
   // how "left to spend" is computed on the home screen for each scope.
-  const poolForGroup = useMemo(
+  const alreadyAllocatedForGroup = useMemo(
     () => visibleItems.reduce((s, f) => s + f.original, 0),
     [visibleItems],
   );
+
+  // Money that hasn't been assigned to any category yet — only pulled in for
+  // the current month, since it reflects real-time account state.
+  const unallocatedForGroup = useMemo(() => {
+    if (isReadOnly) return 0;
+    const jointVal = Math.max(0, jointUnassigned);
+    const wifeVal = Math.max(0, readyToAssignByScope?.salma ?? 0);
+    const husbandVal = Math.max(0, readyToAssignByScope?.anas ?? 0);
+    const savingsVal = Math.max(0, savingPool);
+    if (groupFilter === "all") return jointVal + wifeVal + husbandVal + savingsVal;
+    if (groupFilter === "joint") return jointVal;
+    if (groupFilter === "wife") return wifeVal;
+    if (groupFilter === "husband") return husbandVal;
+    if (groupFilter === "savings") return savingsVal;
+    return 0;
+  }, [isReadOnly, groupFilter, jointUnassigned, readyToAssignByScope, savingPool]);
+
+  const poolForGroup = alreadyAllocatedForGroup + unallocatedForGroup;
 
   // ── Build AllocationFlow groups ──
   // `available = amount` keeps rangeMin = 0 so the user can reduce any category to zero.
@@ -241,37 +286,62 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
     [groupFilter, visibleItems, catById, allocations],
   );
 
-  const liveTransfers = useMemo(
-    () => computeTransfers(allItems, allocations),
+  const { transfers: liveTransfers, topUps: liveTopUps } = useMemo(
+    () => computeTransfersAndTopUps(allItems, allocations),
     [allItems, allocations],
   );
 
-  const flowPreview = liveTransfers.length === 0 ? undefined : (
+  type FlowRow = { key: string; fromLabel: string; fromIcon: string | null; toLabel: string; toIcon: string | null; amount: number };
+
+  const flowRows = useMemo<FlowRow[]>(() => {
+    const rows: FlowRow[] = [];
+    for (const t of liveTransfers) {
+      const from = catById.get(t.fromId);
+      const to = catById.get(t.toId);
+      if (!from || !to) continue;
+      rows.push({ key: `t-${t.fromId}-${t.toId}`, fromLabel: from.name, fromIcon: from.icon, toLabel: to.name, toIcon: to.icon, amount: t.amount });
+    }
+    for (const tu of liveTopUps) {
+      const to = catById.get(tu.id);
+      if (!to) continue;
+      rows.push({ key: `u-${tu.id}`, fromLabel: "Unallocated", fromIcon: null, toLabel: to.name, toIcon: to.icon, amount: tu.amount });
+    }
+    return rows;
+  }, [liveTransfers, liveTopUps, catById]);
+
+  const unallocatedHint = unallocatedForGroup > 0 ? (
+    <div style={unallocatedHintStyle}>
+      <span style={unallocatedHintDotStyle} />
+      <span style={unallocatedHintTextStyle}>+{fmt(Math.round(unallocatedForGroup))} MAD unallocated — available to use here</span>
+    </div>
+  ) : null;
+
+  const flowPreview = (!unallocatedHint && flowRows.length === 0) ? undefined : (
     <div style={flowWrapStyle}>
-      <span style={flowHeadStyle}>Moving</span>
-      <div style={flowListStyle}>
-        {liveTransfers.slice(0, 5).map((t, i) => {
-          const from = catById.get(t.fromId);
-          const to   = catById.get(t.toId);
-          if (!from || !to) return null;
-          return (
-            <div key={i} style={flowRowStyle}>
-              <div style={flowFromStyle}>
-                <CategoryIcon icon={from.icon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
-                <span style={flowNameStyle}>{from.name}</span>
+      {unallocatedHint}
+      {flowRows.length > 0 && (
+        <>
+          <span style={flowHeadStyle}>Moving</span>
+          <div style={flowListStyle}>
+            {flowRows.slice(0, 5).map((row) => (
+              <div key={row.key} style={flowRowStyle}>
+                <div style={flowFromStyle}>
+                  {row.fromIcon && <CategoryIcon icon={row.fromIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
+                  <span style={flowNameStyle}>{row.fromLabel}</span>
+                </div>
+                <span style={flowArrowStyle}>→ {row.amount} MAD</span>
+                <div style={flowToStyle}>
+                  <span style={flowNameStyle}>{row.toLabel}</span>
+                  {row.toIcon && <CategoryIcon icon={row.toIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
+                </div>
               </div>
-              <span style={flowArrowStyle}>→ {t.amount} MAD</span>
-              <div style={flowToStyle}>
-                <span style={flowNameStyle}>{to.name}</span>
-                <CategoryIcon icon={to.icon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
-              </div>
-            </div>
-          );
-        })}
-        {liveTransfers.length > 5 && (
-          <span style={flowMoreStyle}>+{liveTransfers.length - 5} more moves</span>
-        )}
-      </div>
+            ))}
+            {flowRows.length > 5 && (
+              <span style={flowMoreStyle}>+{flowRows.length - 5} more moves</span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 
@@ -335,10 +405,10 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
       metaLabel="Before"
       rebalanceMode
       onSave={async () => {
-        if (liveTransfers.length === 0) return;
+        if (liveTransfers.length === 0 && liveTopUps.length === 0) return;
         const date = today();
-        await Promise.all(
-          liveTransfers.map((t) =>
+        await Promise.all([
+          ...liveTransfers.map((t) =>
             fetch("/api/transfer", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -356,7 +426,28 @@ export function RebalanceSheet({ open, onClose, categories, onSuccess, homeMonth
               }
             }),
           ),
-        );
+          // Top-ups pull from the unallocated pool rather than another category,
+          // so they're funded directly (bump this month's Planned) instead of transferred.
+          ...liveTopUps.map((tu) => {
+            const cat = catById.get(tu.id);
+            const nextPlanned = Math.max(0, (cat?.planned ?? 0) + tu.amount);
+            return fetch("/api/monthly-planning/funds", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                month: homeMonth,
+                categoryId: tu.id,
+                planned: nextPlanned,
+                accountId: cat?.defaultAccount ?? null,
+              }),
+            }).then(async (r) => {
+              if (!r.ok) {
+                const d = await r.json();
+                throw new Error(d.error ?? "Failed to fund category");
+              }
+            });
+          }),
+        ]);
       }}
     />
   );
@@ -430,6 +521,32 @@ const flowMoreStyle: CSSProperties = {
   fontSize: 10,
   color: "var(--muted)",
   textAlign: "center",
+};
+
+const unallocatedHintStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "8px 12px",
+  borderRadius: 12,
+  background: "color-mix(in srgb, var(--accent) 12%, var(--surface))",
+  border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+};
+
+const unallocatedHintDotStyle: CSSProperties = {
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  background: "var(--accent)",
+  flexShrink: 0,
+};
+
+const unallocatedHintTextStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: 11,
+  fontWeight: 700,
+  color: "var(--text2)",
+  letterSpacing: 0.1,
 };
 
 

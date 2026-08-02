@@ -33,6 +33,8 @@ type HomeScreenProps = {
   plannedScopes?: Record<"joint" | "anas" | "salma", boolean>;
   transactions?: Transaction[];
   pendingItems?: PendingItem[];
+  jointUnassigned?: number;
+  onOpenJointAllocate?: () => void;
 };
 
 
@@ -63,6 +65,8 @@ export function HomeScreen({
   plannedScopes,
   transactions,
   pendingItems,
+  jointUnassigned,
+  onOpenJointAllocate,
 }: HomeScreenProps) {
 
   const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
@@ -122,6 +126,7 @@ export function HomeScreen({
 
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
   const showPlanningPrompt = isCurrentMonth && readyToAssign > 0;
+  const showJointUnassignedPrompt = isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
   const monthLabel = monthShortLabel(homeMonth);
 
   // Month-end planning alert: show 2 days before month end until plan is locked
@@ -201,6 +206,7 @@ export function HomeScreen({
           leftToSpendByScope={leftToSpendByScope}
           balanceByScope={balanceByScope}
           contribStatus={contribStatus}
+          onOpenJointAllocate={isCurrentMonth ? onOpenJointAllocate : undefined}
         />
       </div>
 
@@ -219,6 +225,20 @@ export function HomeScreen({
           <span style={assignRightStyle}>
             <span style={assignAmountStyle}>{fmt(readyToAssign)} MAD</span>
             <span style={assignActionVisibleStyle}>{planningPromptAction} -&gt;</span>
+          </span>
+        </button>
+      )}
+
+      {/* Zone 2a: Joint account has unassigned money */}
+      {showJointUnassignedPrompt && (
+        <button type="button" onClick={onOpenJointAllocate} style={assignRowStyle}>
+          <span style={assignCopyStyle}>
+            <span style={assignTitleStyle}>Joint account has unassigned money</span>
+            <span style={assignFreeStyle}>Sitting in the joint account, not yet budgeted</span>
+          </span>
+          <span style={assignRightStyle}>
+            <span style={assignAmountStyle}>{fmt(jointUnassigned ?? 0)} MAD</span>
+            <span style={assignActionVisibleStyle}>Allocate -&gt;</span>
           </span>
         </button>
       )}

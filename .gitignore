@@ -35,3 +35,4 @@ yarn-error.log*
 # Dev server logs
 .next-dev.out.log
 .next-dev.err.log
+.env*

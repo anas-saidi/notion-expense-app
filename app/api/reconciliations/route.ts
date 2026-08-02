@@ -3,7 +3,7 @@ import { notionFetchJson } from "@/lib/notion-api";
 
 export const dynamic = "force-dynamic";
 
-const RECONCILIATIONS_DB = process.env.NOTION_RECONCILIATIONS_DB ?? "";
+const RECONCILIATIONS_DB = process.env.NOTION_RECONCILIATIONS_DB ?? "30c6a2be-8922-80b5-b9d7-db4e707b2276";
 
 type NotionProperty = { name: string; type: string };
 

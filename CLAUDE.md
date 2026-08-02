@@ -80,6 +80,7 @@ All persistence is Notion. API routes in `app/api/` are thin proxies — they au
 | Accounts | `1926a2be-8922-8014-bb54-d9f5e9d1234b` |
 | Pending | `d2db101b-faec-467d-8c57-eee6d8780311` |
 | Funds | `1936a2be89228058990dc549172f1d45` |
+| Reconciliations | `30c6a2be-8922-80b5-b9d7-db4e707b2276` |
 
 **Transaction types** (`Transaction.type`):
 - `"Expense"` — standard spend; uses `accountId` + `category`

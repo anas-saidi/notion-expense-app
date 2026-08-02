@@ -156,6 +156,21 @@ export const getLeftToAssignByScope = (accounts: Account[]): Record<BudgetScope,
   };
 };
 
+/**
+ * Money literally sitting in the joint bank account(s) that hasn't been
+ * assigned to any category yet — distinct from `getLeftToAssignByScope`,
+ * which sums the *personal* accounts' ready-to-assign (money each partner
+ * could still contribute to joint budgets).
+ */
+export const getJointAccountUnassigned = (accounts: Account[]): number => {
+  const norm = (value: string) => value.toLowerCase();
+  return accounts.reduce((sum, account) => {
+    if (isSavingsAccount(account)) return sum;
+    if (!norm(account.label).includes("joined")) return sum;
+    return sum + Math.max(0, account.readyToAssign ?? 0);
+  }, 0);
+};
+
 export const scopeFromAccountLabel = (label: string): BudgetScope | null => {
   const l = label.toLowerCase();
   if (l.includes("hubb") || l.includes("husband") || l.includes("anas")) return "anas";

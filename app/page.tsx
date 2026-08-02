@@ -16,6 +16,7 @@ import { ManageScreen } from "./components/ManageScreen";
 import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
 import { RebalanceSheet } from "./components/RebalanceSheet";
 import { MonthStartPlanner } from "./components/MonthStartPlanner";
+import { JointAllocateSheet } from "./components/JointAllocateSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
@@ -27,6 +28,7 @@ import {
   getCategoryScope,
   getLeftToAssignByScope,
   getBalanceByScope,
+  getJointAccountUnassigned,
   isSavingsAccount,
   monthBounds,
   shiftDate,
@@ -110,6 +112,7 @@ export default function App() {
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [detailsCategory, setDetailsCategory] = useState<Category | null>(null);
   const [showRebalance, setShowRebalance] = useState(false);
+  const [showJointAllocate, setShowJointAllocate] = useState(false);
   const [showManageScreen, setShowManageScreen] = useState(false);
   const [showMonthStartPlanner, setShowMonthStartPlanner] = useState(false);
   const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | null>(null);
@@ -349,6 +352,14 @@ export default function App() {
     fetchMonthlySummary(homeMonth); // eslint-disable-line react-hooks/exhaustive-deps
   }, [homeMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep the open account-details sheet pointed at the freshest account snapshot
+  // instead of the one captured when the sheet was opened.
+  useEffect(() => {
+    if (!detailsAccount) return;
+    const fresh = accounts.find((a) => a.id === detailsAccount.id);
+    if (fresh && fresh !== detailsAccount) setDetailsAccount(fresh);
+  }, [accounts, detailsAccount]);
+
   useEffect(() => {
     if (initialCatApplied.current) return;
     if (!lastUsedCatId || !categories.length) return;
@@ -570,6 +581,7 @@ export default function App() {
 
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(accounts), [accounts]);
   const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
+  const jointUnassigned = useMemo(() => getJointAccountUnassigned(accounts), [accounts]);
   const savingPool = useMemo(
     () => accounts.filter(isSavingsAccount).reduce((sum, a) => sum + (a.readyToAssign ?? 0), 0),
     [accounts],
@@ -1046,8 +1058,21 @@ export default function App() {
           pendingItems={scopedPendingItems}
           onOpenHistory={() => setTab("history")}
           onClickTransaction={editTransaction}
+          jointUnassigned={jointUnassigned}
+          onOpenJointAllocate={() => setShowJointAllocate(true)}
         />
       )}
+
+      <JointAllocateSheet
+        open={showJointAllocate}
+        onClose={() => setShowJointAllocate(false)}
+        onComplete={() => refreshBudgetData("Joint balance allocated")}
+        accounts={accounts}
+        categories={categories}
+        assignedByCategory={monthlySummary.assignedByCategory}
+        selectedMonth={homeMonth}
+        jointUnassigned={jointUnassigned}
+      />
 
       {!showManageScreen && <MonthlyPlanningFlow
         open={tab === "plan"}
@@ -1258,6 +1283,7 @@ export default function App() {
         onMove={(acct) => { setDetailsAccount(null); setTransferAccount(acct); }}
         onIncome={(acct) => { setDetailsAccount(null); setIncomeAccount(acct); }}
         onReconcileSuccess={(msg) => { refreshAccountsData(msg); }}
+        onTransactionsChanged={() => { fetchTransactions(); refreshBudgetData(); }}
       />
 
       <AccountIncomeSheet
@@ -1284,6 +1310,9 @@ export default function App() {
         categories={categories}
         homeMonth={homeMonth}
         monthlySummary={monthlySummary}
+        readyToAssignByScope={readyToAssignByScope}
+        jointUnassigned={jointUnassigned}
+        savingPool={savingPool}
         onSuccess={() => {
           refreshBudgetData("Rebalance applied");
           if (rebalanceReturnToAdd.current) {

@@ -15,6 +15,7 @@ type WalletCardSwitcherProps = {
   leftToSpendByScope?: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
   contribStatus?: ContribStatus | null;
+  onOpenJointAllocate?: () => void;
 };
 
 
@@ -60,7 +61,7 @@ const JOINT_VIEW_COLOR: Record<JointView, string> = {
 const JOINT_VIEW_DOT_ACTIVE = "color-mix(in srgb, var(--text) 70%, transparent)";
 const JOINT_VIEW_DOT_INACTIVE = "color-mix(in srgb, var(--text) 20%, transparent)";
 
-export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope, contribStatus }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope, contribStatus, onOpenJointAllocate }: WalletCardSwitcherProps) {
   const [jointView, setJointView] = useState<JointView>("balance");
 
   // Reset cycling when switching scopes
@@ -109,9 +110,12 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
         {value === "joint" ? (
           <button
             type="button"
-            onClick={cycleJointView}
+            onClick={() => {
+              if (jointView === "balance" && onOpenJointAllocate) onOpenJointAllocate();
+              else cycleJointView();
+            }}
             style={numberGroupButtonStyle}
-            aria-label={`Showing ${jointView}. Tap to cycle`}
+            aria-label={jointView === "balance" && onOpenJointAllocate ? "Joint account balance. Tap to allocate unassigned money" : `Showing ${jointView}. Tap to cycle`}
           >
             <span style={statusStyle(status)}>{status}</span>
             <div style={amountRowStyle}>
@@ -122,9 +126,16 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
                 MAD {heroUnit}
               </span>
             </div>
-            <div style={jointDotsStyle} aria-hidden="true">
+            <div style={jointDotsStyle} role="tablist" aria-label="Joint view">
               {JOINT_VIEWS.map(v => (
-                <div key={v} style={jointDotStyle(v === jointView)} />
+                <span
+                  key={v}
+                  role="tab"
+                  aria-selected={v === jointView}
+                  aria-label={`Show ${JOINT_VIEW_LABEL[v]}`}
+                  onClick={(event) => { event.stopPropagation(); setJointView(v); }}
+                  style={{ ...jointDotStyle(v === jointView), cursor: "pointer" }}
+                />
               ))}
             </div>
           </button>
