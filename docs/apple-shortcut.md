@@ -17,8 +17,9 @@ Set these Vercel environment variables for the same deployment:
   `<PREFIX>_KV_REST_API_TOKEN` names are accepted as well.
 - `SHORTCUT_OPTIONS_CACHE_TTL_SECONDS`: optional; defaults to `3600`.
 
-The cache refreshes every 15 minutes through
-`GET /api/shortcuts/cache/refresh`. Vercel authenticates that request with
+The cache refreshes daily at 03:00 UTC through
+`GET /api/shortcuts/cache/refresh` because Vercel's Hobby plan permits one
+scheduled run per day. Vercel authenticates that request with
 `Authorization: Bearer <CRON_SECRET>`. The options endpoint serves a stale
 cached value, marked with `cache.stale: true` and the
 `X-Shortcut-Options-Stale: true` header, while the next scheduled refresh is
