@@ -9,6 +9,8 @@ export const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/callback",
   "/api/auth/logout",
+  // Shortcut routes authenticate with their own bearer tokens.
+  "/api/shortcuts",
 ];
 
 export type SessionPayload = {

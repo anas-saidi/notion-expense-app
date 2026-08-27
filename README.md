@@ -49,11 +49,26 @@ In Notion, open:
 
 | Variable | Value |
 |---|---|
+| `NOTION_TOKEN` | Internal Notion integration secret with access to the three finance databases |
 | `NOTION_OAUTH_CLIENT_ID` | From your Notion OAuth app |
 | `NOTION_OAUTH_CLIENT_SECRET` | From your Notion OAuth app |
 | `APP_URL` | Your Vercel URL e.g. `https://myapp.vercel.app` (no trailing slash) |
 | `SESSION_SECRET` | Run: `openssl rand -base64 32` |
 | `ALLOWED_NOTION_EMAILS` | Comma-separated list of the two allowed Notion account emails |
+| `SHORTCUT_API_TOKEN` | Separate random bearer token for Apple Shortcuts, e.g. `openssl rand -hex 32` |
+| `CRON_SECRET` | Separate random token used by the scheduled cache refresh, e.g. `openssl rand -hex 32` |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Recommended shared cache credentials from Upstash Redis or a Vercel KV integration. Vercel's prefixed `*_KV_REST_API_URL` / `*_KV_REST_API_TOKEN` names are also accepted. |
+| `SHORTCUT_OPTIONS_CACHE_TTL_SECONDS` | Stale threshold for cached options; defaults to `3600` |
+
+The Shortcut endpoints never expose or accept `NOTION_TOKEN`. Configure the
+two Shortcut/cache secrets separately. A Redis REST cache is recommended for
+Vercel because function instances do not share memory. If Redis credentials
+are omitted or temporarily unavailable, the adapter falls back to process
+memory and the options response remains usable but is not shared across
+instances.
+
+See [docs/apple-shortcut.md](docs/apple-shortcut.md) for the exact Shortcut
+actions and endpoint payloads.
 
 ### 5. Add to iPhone Home Screen
 

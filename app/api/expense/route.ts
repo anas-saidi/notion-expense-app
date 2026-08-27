@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
+import { createNotionExpense } from "@/lib/notion-transactions";
 
 export async function POST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
@@ -13,32 +12,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
+  const parsedAmount = parseFloat(String(amount));
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    return NextResponse.json({ error: "Amount must be a positive number" }, { status: 400 });
+  }
+
   try {
-    const res = await fetch("https://api.notion.com/v1/pages", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        parent: { database_id: TRANSACTIONS_DB },
-        properties: {
-          Name: { title: [{ text: { content: name } }] },
-          Amount: { number: parseFloat(amount) },
-          Date: { date: { start: date } },
-          Account: { relation: [{ id: accountId }] },
-          Category: { relation: [{ id: categoryId }] },
-          Type: { select: { name: "Expense" } },
-        },
-      }),
+    const transaction = await createNotionExpense(token, {
+      name: String(name).trim(),
+      amount: parsedAmount,
+      accountId,
+      categoryId,
+      date,
     });
-
-    const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data.message, full: data }, { status: res.status });
-
-    return NextResponse.json({ success: true, id: data.id });
+    return NextResponse.json({ success: true, id: transaction.id });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message, full: err.full }, { status: err.status ?? 500 });
   }
 }
