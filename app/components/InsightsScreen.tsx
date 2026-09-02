@@ -5,8 +5,8 @@ import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { categoryMatchesScope, getCategoryScope, transactionMatchesScope, monthBounds, fmt, fmtDate } from "./app-utils";
-import { ArrowLeftIcon, ChevronRightIcon } from "./ui/icons";
-import { BudgetScopeBar, BUDGET_SCOPE_CHIPS } from "./ui/ScopeChipBar";
+import { ArrowLeftIcon, BanknoteIcon, ChartPieIcon, ChevronRightIcon, FlameIcon, TransferIcon, UsersRoundIcon } from "./ui/icons";
+import { BUDGET_SCOPE_CHIPS } from "./ui/ScopeChipBar";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, PieChart, Pie, Cell, Sector } from "recharts";
 import type { PieSectorShapeProps } from "recharts";
 
@@ -17,7 +17,6 @@ type Props = {
   categories: Category[];
   accounts: Account[];
   budgetScope: BudgetScope;
-  onBudgetScopeChange: (s: BudgetScope) => void;
   insightsMonth: string;
   onInsightsMonthChange: (m: string) => void;
   transactionsLoading?: boolean;
@@ -44,7 +43,6 @@ export function InsightsScreen({
   categories,
   accounts,
   budgetScope,
-  onBudgetScopeChange,
   insightsMonth,
   onInsightsMonthChange,
   onClickTransaction,
@@ -270,7 +268,7 @@ export function InsightsScreen({
   return (
     <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" className="categories-main" style={wrapStyle}>
 
-      {/* ── Controls: month nav + scope chips ── */}
+      {/* ── Month control; scope is controlled globally by AppShell. ── */}
       <div style={controlsRowStyle}>
         <div className="insights-month-nav" style={monthNavStyle}>
           <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
@@ -287,15 +285,13 @@ export function InsightsScreen({
             <ChevronRightIcon size={14} />
           </button>
         </div>
-        <div style={{ flex: 1 }} />
-        <BudgetScopeBar value={budgetScope} onChange={onBudgetScopeChange} ariaLabel="Insights scope" />
       </div>
 
       {/* ── Insight cards grid ── */}
       <div className="insights-grid">
 
         {/* 1. Burn Rate */}
-        <InsightCard emoji="🔥" title="Burn Rate" subtitle="Are you on pace?">
+        <InsightCard icon={<FlameIcon size={16} />} title="Burn Rate" subtitle="Are you on pace?">
           {assignedByCategory === null || transactionsLoading
             ? <BurnRateSkeleton />
             : <BurnRateBody burnRate={burnRate} totalSpent={totalSpent} totalPlanned={totalPlanned} lastMonthTotalSpent={lastMonthTotalSpent} />
@@ -304,7 +300,7 @@ export function InsightsScreen({
 
         {/* 3. Together vs. Apart (joint only) */}
         {budgetScope === "joint" && (
-          <InsightCard emoji="👫" title="Together vs. Apart" subtitle="How does the money split?">
+          <InsightCard icon={<UsersRoundIcon size={16} />} title="Together vs. Apart" subtitle="How does the money split?">
             {transactionsLoading
               ? <TogetherApartSkeleton />
               : <TogetherApartBody data={splitData} />
@@ -313,7 +309,7 @@ export function InsightsScreen({
         )}
 
         {/* 4. Spending Breakdown */}
-        <InsightCard emoji="🥧" title="Spending Breakdown" subtitle={`By category · ${BUDGET_SCOPE_CHIPS.find(c => c.key === budgetScope)?.label ?? budgetScope}`}>
+        <InsightCard icon={<ChartPieIcon size={16} />} title="Spending Breakdown" subtitle={`By category · ${BUDGET_SCOPE_CHIPS.find(c => c.key === budgetScope)?.label ?? budgetScope}`}>
           {transactionsLoading
             ? <SpendingBreakdownSkeleton />
             : <SpendingBreakdownBody
@@ -360,7 +356,7 @@ export function InsightsScreen({
                         <div onClick={() => onClickTransaction(txn)} className="tx-row">
                           {isIncome || isTransfer ? (
                             <span style={txTypeIconStyle(isIncome)}>
-                              {isIncome ? "💰" : "↔"}
+                              {isIncome ? <BanknoteIcon size={13} /> : <TransferIcon size={12} />}
                             </span>
                           ) : (
                             <CategoryIcon icon={cat?.icon ?? null} size={22} style={{ flexShrink: 0 }} />
@@ -388,10 +384,10 @@ export function InsightsScreen({
         )}
 
         {!transactionsLoading && transactions.length === 0 && (
-          <div style={emptyScreenStyle}>
-            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text2)" }}>Nothing in {monthLabel}</p>
-            <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>No activity recorded for this month.</p>
-          </div>
+          <section aria-label="Activity" style={emptyScreenStyle}>
+            <div className="section-label" style={sectionDividerLabelStyle}>Activity</div>
+            <p style={{ fontSize: 13, color: "var(--muted)" }}>No transactions in {monthLabel}.</p>
+          </section>
         )}
       </div>
 
@@ -401,13 +397,13 @@ export function InsightsScreen({
 
 /* ─── Card wrapper ───────────────────────────────────────────────── */
 
-function InsightCard({ emoji, title, subtitle, children }: {
-  emoji: string; title: string; subtitle: string; children: ReactNode;
+function InsightCard({ icon, title, subtitle, children }: {
+  icon: ReactNode; title: string; subtitle: string; children: ReactNode;
 }) {
   return (
     <div className="insights-card" style={cardStyle}>
       <div style={cardHeaderStyle}>
-        <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{emoji}</span>
+        <span className="insight-card-icon">{icon}</span>
         <div>
           <div style={cardTitleStyle}>{title}</div>
           <div style={cardSubtitleStyle}>{subtitle}</div>
@@ -535,7 +531,7 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent 
       {/* Bar + pace marker */}
       <div style={{ position: "relative", padding: "4px 0" }}>
         <div style={burnRailStyle}>
-          <div style={{ ...burnFillStyle, width: `${spentPct}%`, background: fillColor }} />
+          <div style={{ ...burnFillStyle, transform: `scaleX(${spentPct / 100})`, background: fillColor }} />
         </div>
         {totalPlanned > 0 && (
           <div style={{
@@ -649,9 +645,11 @@ function ContribBlock({ name, actual, plan, pct, delta, color }: {
           <div style={{ height: 3, borderRadius: 999, background: "var(--surface2)", overflow: "hidden" }}>
             <div style={{
               height: "100%", borderRadius: 999,
-              width: `${pct}%`,
+              width: "100%",
               background: isShort ? "var(--danger)" : isOver ? "var(--success)" : color,
-              transition: "width 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
+              transform: `scaleX(${pct / 100})`,
+              transformOrigin: "left center",
+              transition: "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
             }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -712,10 +710,11 @@ function SpendingBreakdownBody({ data, expenses, insightsMonth, totalPlanned }: 
             style={{
               display: "inline-block",
               height: 4,
-              width: v === view ? 16 : 4,
+              width: 16,
               borderRadius: 999,
               background: v === view ? "var(--accent)" : "var(--border2)",
-              transition: "width 0.22s cubic-bezier(0.22,1,0.36,1), background 0.18s ease",
+              transform: `scaleX(${v === view ? 1 : 0.25})`,
+              transition: "transform 0.22s cubic-bezier(0.22,1,0.36,1), background 0.18s ease",
             }}
           />
         ))}
@@ -949,7 +948,7 @@ const monthNavStyle: CSSProperties = {
 };
 
 const monthNavBtnStyle: CSSProperties = {
-  width: 32, height: 32, borderRadius: 10, border: "none",
+  width: 44, height: 44, borderRadius: 12, border: "none",
   background: "transparent", color: "var(--text2)", cursor: "pointer",
   display: "flex", alignItems: "center", justifyContent: "center",
 };
@@ -962,11 +961,11 @@ const monthLabelStyle: CSSProperties = {
 /* Card */
 const cardStyle: CSSProperties = {
   background: "var(--surface)",
-  borderRadius: 20,
+  border: "1px solid var(--border)",
+  borderRadius: 16,
   padding: 18,
   display: "grid",
   gap: 14,
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
 };
 
 const cardHeaderStyle: CSSProperties = {
@@ -999,8 +998,9 @@ const burnRailStyle: CSSProperties = {
 };
 
 const burnFillStyle: CSSProperties = {
-  height: "100%", borderRadius: 999,
-  transition: "width 0.6s cubic-bezier(0.22,1,0.36,1)",
+  width: "100%", height: "100%", borderRadius: 999,
+  transformOrigin: "left center",
+  transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)",
 };
 
 const burnLegendItemStyle: CSSProperties = {
@@ -1013,7 +1013,7 @@ const burnDotStyle: CSSProperties = {
 };
 
 const copySentenceStyle: CSSProperties = {
-  fontSize: 12, color: "var(--muted)", lineHeight: 1.5, fontStyle: "italic",
+  fontSize: 12, color: "var(--muted)", lineHeight: 1.5,
 };
 
 const emptyBodyStyle: CSSProperties = {
@@ -1086,5 +1086,5 @@ const txDateStyle: CSSProperties = {
 };
 
 const emptyScreenStyle: CSSProperties = {
-  padding: "40px 16px", textAlign: "center", animation: "fadeUp 0.3s ease both",
+  display: "grid", gap: 8, padding: "8px 2px 24px", animation: "fadeUp 0.3s ease both",
 };

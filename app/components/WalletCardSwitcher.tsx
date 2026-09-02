@@ -99,6 +99,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
 
   return (
     <section
+      className="wallet-overview-hero"
       style={wrapStyle}
       aria-label="Wallet overview"
     >
@@ -163,7 +164,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
                   <div
                     style={{
                       ...barFillStyle,
-                      width: hasPlan ? `${progress}%` : "0%",
+                      transform: `scaleX(${hasPlan ? progress / 100 : 0})`,
                       background: barColor,
                     }}
                   />
@@ -282,9 +283,11 @@ const barRailStyle: CSSProperties = {
 };
 
 const barFillStyle: CSSProperties = {
+  width: "100%",
   height: "100%",
   borderRadius: 999,
-  transition: "width 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
+  transformOrigin: "left center",
+  transition: "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
 const captionRowStyle: CSSProperties = {
@@ -349,7 +352,7 @@ function ContribRow({ name, actual, plan, color }: {
       <div style={contribBarRailStyle}>
         <div style={{
           ...contribBarFillStyle,
-          width: `${pct}%`,
+          transform: `scaleX(${pct / 100})`,
           background: done ? "var(--accent)" : color,
         }} />
       </div>
@@ -389,9 +392,11 @@ const contribBarRailStyle: CSSProperties = {
 };
 
 const contribBarFillStyle: CSSProperties = {
+  width: "100%",
   height: "100%",
   borderRadius: 999,
-  transition: "width 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
+  transformOrigin: "left center",
+  transition: "transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
 const contribValueStyle: CSSProperties = {
@@ -401,10 +406,12 @@ const contribValueStyle: CSSProperties = {
 };
 
 const jointDotStyle = (active: boolean): CSSProperties => ({
-  width: active ? 14 : 4,
+  width: 14,
   height: 4,
   borderRadius: 999,
   background: active ? JOINT_VIEW_DOT_ACTIVE : JOINT_VIEW_DOT_INACTIVE,
-  transition: "width 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease",
+  transform: `scaleX(${active ? 1 : 0.285})`,
+  transformOrigin: "left center",
+  transition: "transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease",
   flexShrink: 0,
 });

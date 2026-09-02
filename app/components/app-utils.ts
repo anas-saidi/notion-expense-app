@@ -88,8 +88,8 @@ export const monthBounds = (dateStr: string) => {
 
 export const BUDGET_SCOPE_LABELS: Record<BudgetScope, string> = {
   joint: "Joint",
-  anas: "Anas",
-  salma: "Salma",
+  anas: "Husband",
+  salma: "Wife",
 };
 
 export const isSavingsAccount = (account: Account) => {

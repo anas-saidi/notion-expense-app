@@ -72,6 +72,22 @@ Below the orb, each person is represented simply — a name, their contribution,
 
 The two halves of the orb can subtly diverge in behavior if one person's situation differs from the other's — for example if one has contributed significantly more or less. These are moments for gentle, non-judgmental visual expression.
 
+## Global Budget Scope
+
+`Joint / Husband / Wife` is one app-wide context, not a separate filter owned by each screen. It stays in the same top position across Home, Budget, and Insights, and changing it updates every destination.
+
+- The scope picker replaces the greeting/title at the leading edge of the global header, with global action icons aligned opposite it.
+- The picker itself has no container surface, border, or rail; the three modes read as individual compact controls.
+- The selected scope uses an inset, high-contrast filled segment; in dark mode it becomes raised charcoal rather than a bright reversal.
+- Unselected scopes use borderless white surfaces with soft neutral shadows.
+- Joint, Husband, and Wife use distinct, semantically recognizable people pictograms; avoid abstract gender symbols.
+- Each option has a minimum 44-point touch target with narrow spacing.
+- Individual screens must consume the shared scope state rather than creating local scope state.
+
+## Color Direction
+
+Home uses a bounded, deep purple gradient behind the global controls and primary financial balance. The purple is rendered as its own background layer and masked to transparent across a short transition band, revealing the true-white page beneath it. There is no foreground sheet, rounded ledge, white glow, or page-length color ramp. The exact purple remains tokenized for later tuning. Other destinations use the white canvas unless their information hierarchy earns a dedicated financial zone. Do not place decorative words or illustrations behind live data. The vivid lime accent remains reserved for actions, progress, and selected navigation.
+
 ---
 
 ## Emotional Design Principles

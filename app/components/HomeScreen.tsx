@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { ChevronRightIcon } from "./ui/icons";
-import { BudgetScopeBar } from "./ui/ScopeChipBar";
+import { BanknoteIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 
 type HomeScreenProps = {
@@ -191,11 +190,6 @@ export function HomeScreen({
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
 
-      {/* Scope picker — right-aligned, matching Budget/Insights */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-        <BudgetScopeBar value={budgetScope} onChange={onBudgetScopeChange} ariaLabel="Home scope" />
-      </div>
-
       {/* Zone 1: Hero */}
       <div style={walletSwitcherWrapStyle}>
         <WalletCardSwitcher
@@ -209,6 +203,8 @@ export function HomeScreen({
           onOpenJointAllocate={isCurrentMonth ? onOpenJointAllocate : undefined}
         />
       </div>
+
+      <div className="home-lower-surface">
 
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
@@ -359,7 +355,7 @@ export function HomeScreen({
                     {savingsGoal.name}
                   </span>
                   <div style={savingsBarTrackStyle}>
-                    <div style={{ ...savingsBarFillStyle, width: `${goalPct}%` }} />
+                    <div style={{ ...savingsBarFillStyle, transform: `scaleX(${goalPct / 100})` }} />
                   </div>
                   <div style={savingsMetaRowStyle}>
                     <span style={savingsSavedStyle}>{fmt(goalAvailable)} MAD saved</span>
@@ -403,7 +399,9 @@ export function HomeScreen({
                     onClick={onClickTransaction ? () => onClickTransaction(txn) : undefined}
                   >
                     {isIncome || isTransfer ? (
-                      <span style={recentTypeIconStyle(isIncome)}>{isIncome ? "💰" : "↔"}</span>
+                      <span style={recentTypeIconStyle(isIncome)}>
+                        {isIncome ? <BanknoteIcon size={13} /> : <TransferIcon size={12} />}
+                      </span>
                     ) : (
                       <CategoryIcon icon={cat?.icon ?? null} size={22} style={{ flexShrink: 0 }} />
                     )}
@@ -428,6 +426,7 @@ export function HomeScreen({
           </section>
         )}
 
+      </div>
       </div>
     </div>
   );
@@ -659,13 +658,12 @@ const upcomingWrapStyle: CSSProperties = {
 const billChipStyle = (isImminent: boolean): CSSProperties => ({
   flex: "0 0 100px",
   borderRadius: 12,
-  background: "var(--surface)",
-  borderLeft: `3px solid ${isImminent ? "var(--spend-warn)" : "var(--border)"}`,
-  padding: "10px 10px 10px 11px",
+  background: isImminent ? "color-mix(in srgb, var(--warning) 7%, var(--surface))" : "var(--surface)",
+  border: `1px solid ${isImminent ? "color-mix(in srgb, var(--warning) 28%, var(--border))" : "var(--border)"}`,
+  padding: 10,
   display: "flex",
   flexDirection: "column",
   gap: 4,
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--border) 50%, transparent)",
 });
 
 const billNameStyle: CSSProperties = {
@@ -711,10 +709,12 @@ const savingsBarTrackStyle: CSSProperties = {
 };
 
 const savingsBarFillStyle: CSSProperties = {
+  width: "100%",
   height: "100%",
   borderRadius: 999,
   background: "var(--accent)",
-  transition: "width 0.4s cubic-bezier(0.22,1,0.36,1)",
+  transformOrigin: "left center",
+  transition: "transform 0.4s cubic-bezier(0.22,1,0.36,1)",
 };
 
 const savingsMetaRowStyle: CSSProperties = {
@@ -775,8 +775,6 @@ const recentTypeIconStyle = (isIncome: boolean): CSSProperties => ({
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: isIncome ? 13 : 11,
-  lineHeight: 1,
   color: isIncome ? "var(--accent-ink)" : "var(--muted)",
 });
 

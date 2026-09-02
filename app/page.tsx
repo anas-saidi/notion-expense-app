@@ -997,6 +997,8 @@ export default function App() {
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
+      budgetScope={budgetScope}
+      onBudgetScopeChange={setBudgetScope}
       theme={theme}
       onToggleTheme={toggleTheme}
       toast={microToast}
@@ -1106,6 +1108,7 @@ export default function App() {
           accounts={accounts}
           monthlySummary={monthlySummary}
           homeMonth={homeMonth}
+          budgetScope={budgetScope}
           selectedCategoryId={categoryId}
           onSelectCategory={selectCategory}
           onOpenCategoryDetails={openCategoryDetails}
@@ -1123,7 +1126,6 @@ export default function App() {
           categories={categories}
           accounts={accounts}
           budgetScope={budgetScope}
-          onBudgetScopeChange={setBudgetScope}
           insightsMonth={historyMonth}
           onInsightsMonthChange={setHistoryMonth}
           transactionsLoading={historyLoading}

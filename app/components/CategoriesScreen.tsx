@@ -3,9 +3,8 @@
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { SearchIcon, ShuffleIcon, FreezeIcon, ChevronRightIcon } from "./ui/icons";
-import { BudgetScopeBar } from "./ui/ScopeChipBar";
-import { fmt, getCategoryScope } from "./app-utils";
+import { CheckIcon, SearchIcon, ShuffleIcon, FreezeIcon, ChevronRightIcon, PlusIcon } from "./ui/icons";
+import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope } from "./app-utils";
 import { PieChart, Pie, Cell, Sector } from "recharts";
 import type { PieSectorShapeProps } from "recharts";
 
@@ -25,6 +24,7 @@ type Props = {
   accounts: Account[];
   monthlySummary: MonthlySummary;
   homeMonth: string;
+  budgetScope: BudgetScope;
   selectedCategoryId: string;
   onSelectCategory: (cat: Category) => void;
   onOpenCategoryDetails: (cat: Category) => void;
@@ -56,6 +56,7 @@ export function CategoriesScreen({
   accounts,
   monthlySummary,
   homeMonth,
+  budgetScope,
   onSelectCategory,
   onOpenCategoryDetails,
   onOpenRebalance,
@@ -65,10 +66,7 @@ export function CategoriesScreen({
   onOpenNewCategory,
 }: Props) {
   const [search, setSearch] = useState("");
-  const [scope, setScope] = useState<ScopeChip>("joint");
   const [showFrozenAll, setShowFrozenAll] = useState(false);
-
-  const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
 
   const spentByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -87,7 +85,7 @@ export function CategoriesScreen({
     const items = categories
       .filter(cat => {
         if (q && !cat.name.toLowerCase().includes(q) && !cat.type.some(t => t.toLowerCase().includes(q))) return false;
-        if (getCategoryScope(cat, accounts) !== scope) return false;
+        if (getCategoryScope(cat, accounts) !== budgetScope) return false;
         return true;
       })
       .map(cat => {
@@ -106,10 +104,11 @@ export function CategoriesScreen({
       map.get(row.section)!.push(row);
     }
     return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
-  }, [categories, search, scope, spentByCategory, plannedByCategory, isCurrentMonth]);
+  }, [categories, search, budgetScope, accounts, spentByCategory, plannedByCategory]);
 
   // Frozen preview: flat, first 5, unfiltered (always visible regardless of scope)
   const frozenPreview = frozenCategories.slice(0, 5);
+  const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
 
   if (showFrozenAll) {
     return (
@@ -126,7 +125,7 @@ export function CategoriesScreen({
   return (
     <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main" style={wrapStyle}>
 
-      {/* Rebalance + Scope chips */}
+      {/* Rebalance action; scope is controlled globally by AppShell. */}
       <div style={pillRailStyle}>
         <button
           type="button"
@@ -137,36 +136,43 @@ export function CategoriesScreen({
           <ShuffleIcon size={14} />
           <span style={{ fontSize: 12, fontWeight: 600 }}>Rebalance</span>
         </button>
-        <div style={{ flex: 1 }} />
-        <BudgetScopeBar value={scope} onChange={setScope} ariaLabel="Budget scope" />
       </div>
 
       {/* Budget distribution chart */}
       <BudgetDistributionChart
-        key={scope}
+        key={budgetScope}
         categories={categories}
         monthlySummary={monthlySummary}
         homeMonth={homeMonth}
-        scope={scope}
+        scope={budgetScope}
         onSelectCategory={onOpenCategoryDetails}
       />
 
       {/* Search */}
-      <label style={searchWrapStyle}>
-        <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
-        <input
-          type="text"
-          aria-label="Search categories"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search categories"
-          style={searchInputStyle}
-        />
-      </label>
+      {hasScopedCategories && (
+        <label style={searchWrapStyle}>
+          <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
+          <input
+            type="text"
+            aria-label="Search categories"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search categories"
+            style={searchInputStyle}
+          />
+        </label>
+      )}
 
       {/* Active groups */}
       {activeGroups.length === 0
-        ? <div style={emptyStyle}>No categories found.</div>
+        ? hasScopedCategories
+          ? <div style={emptyStyle}>No categories match “{search}”.</div>
+          : onOpenNewCategory
+            ? <button type="button" className="budget-empty-action" style={emptyActionStyle} onClick={() => onOpenNewCategory("Other")}>
+                <PlusIcon size={15} />
+                Add the first {BUDGET_SCOPE_LABELS[budgetScope].toLowerCase()} category
+              </button>
+            : null
         : <div className="categories-groups" style={groupsStyle}>
             {activeGroups.map(({ label, items }) => (
               <section key={label} style={{ minWidth: 0 }}>
@@ -192,7 +198,7 @@ export function CategoriesScreen({
                       className="ghost-card"
                       style={ghostCardStyle}
                     >
-                      <span style={{ fontSize: 22, lineHeight: 1, color: "var(--muted)", opacity: 0.5 }}>＋</span>
+                      <PlusIcon size={20} style={{ color: "var(--muted)", opacity: 0.55 }} />
                     </button>
                   )}
                 </div>
@@ -485,8 +491,8 @@ function BudgetDistributionChart({
   });
 
   const chartData = useMemo(() => {
-    const items = categories
-      .filter(cat => getCategoryScope(cat) === scope)
+    const scopedCategories = categories.filter(cat => getCategoryScope(cat) === scope);
+    const items = scopedCategories
       .map(cat => {
         const available = Math.max(0, cat.available ?? 0);
         return { cat, available };
@@ -495,7 +501,7 @@ function BudgetDistributionChart({
       .sort((a, b) => b.available - a.available);
 
     const total = items.reduce((s, { available }) => s + available, 0);
-    return { items, total };
+    return { items, total, hasCategories: scopedCategories.length > 0 };
   }, [categories, scope]);
 
   // Segment computation before guard — needed by useCountUp
@@ -517,14 +523,19 @@ function BudgetDistributionChart({
     return (
       <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <div style={{ position: "relative", width: 260, height: 260 }}>
-            <svg width={260} height={260} viewBox="0 0 260 260" aria-hidden="true">
-              <circle cx={130} cy={130} r={101} fill="none" stroke="var(--accent)"
-                strokeWidth={22} strokeDasharray="5 8" strokeLinecap="round" opacity={0.4} />
+          <div style={{ position: "relative", width: 200, height: 200 }}>
+            <svg width={200} height={200} viewBox="0 0 200 200" aria-hidden="true">
+              <circle cx={100} cy={100} r={76} fill="none" stroke="var(--accent)"
+                strokeWidth={18} strokeDasharray="4 7" strokeLinecap="round" opacity={0.32} />
             </svg>
             <div style={chartCenterStyle}>
-              <span style={{ fontSize: 26, lineHeight: 1 }}>✓</span>
-              <span style={{ fontSize: 10, color: "var(--muted)", marginTop: 6, letterSpacing: 0.3 }}>all used!</span>
+              {chartData.hasCategories ? <CheckIcon size={24} /> : <PlusIcon size={22} />}
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", marginTop: 8 }}>
+                {chartData.hasCategories ? "Nothing left" : "No categories yet"}
+              </span>
+              <span style={{ maxWidth: 124, textAlign: "center", fontSize: 10, lineHeight: 1.4, color: "var(--muted)", marginTop: 4 }}>
+                {chartData.hasCategories ? "All available funds are assigned or spent." : "Add a category below to start planning."}
+              </span>
             </div>
           </div>
         </div>
@@ -999,4 +1010,21 @@ const emptyStyle: CSSProperties = {
   color: "var(--muted)",
   fontSize: 14,
   textAlign: "center",
+};
+
+const emptyActionStyle: CSSProperties = {
+  minHeight: 44,
+  padding: "0 16px",
+  border: "1px solid var(--border)",
+  borderRadius: 14,
+  background: "var(--surface)",
+  color: "var(--text2)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+  fontFamily: "var(--font-body)",
+  fontSize: 12,
+  fontWeight: 650,
+  cursor: "pointer",
 };

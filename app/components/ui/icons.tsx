@@ -40,6 +40,9 @@ import {
   Moon,
   Sun,
   TriangleAlert,
+  Flame,
+  UsersRound,
+  ChartPie,
   type LucideProps,
 } from "lucide-react";
 
@@ -78,6 +81,28 @@ export const TrendingUpIcon      = (p: LucideProps) => <TrendingUp    size={S} {
 export const AlertTriangleIcon   = (p: LucideProps) => <TriangleAlert size={S} {...p} />;
 export const MoonIcon            = (p: LucideProps) => <Moon          size={S} {...p} />;
 export const SunIcon             = (p: LucideProps) => <Sun           size={S} {...p} />;
+export const FlameIcon           = (p: LucideProps) => <Flame         size={S} {...p} />;
+export const UsersRoundIcon      = (p: LucideProps) => <UsersRound    size={S} {...p} />;
+export const ChartPieIcon        = (p: LucideProps) => <ChartPie      size={S} {...p} />;
+
+/** Compact filled people pictograms for identity controls. */
+export function ManIcon({ size = S, ...props }: LucideProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <circle cx="12" cy="5.5" r="3" />
+      <path d="M7.2 10h9.6c1 0 1.8.8 1.8 1.8V17h-2.7v5h-2.6v-5h-2.6v5H8.1v-5H5.4v-5.2c0-1 .8-1.8 1.8-1.8Z" />
+    </svg>
+  );
+}
+
+export function WomanIcon({ size = S, ...props }: LucideProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <circle cx="12" cy="5.5" r="3" />
+      <path d="M9.2 10h5.6c.8 0 1.5.5 1.8 1.2L19 18h-3.2v4h-2.5v-4h-2.6v4H8.2v-4H5l2.4-6.8c.3-.7 1-1.2 1.8-1.2Z" />
+    </svg>
+  );
+}
 
 /** Switches between Maximize2 (enter) and Minimize2 (exit). */
 export function FullScreenIcon({

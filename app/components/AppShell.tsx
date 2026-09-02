@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
-import type { AppTab } from "./app-types";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { AppTab, BudgetScope } from "./app-types";
 import { BottomNav } from "./BottomNav";
 import { LandmarkIcon, MoonIcon, SunIcon, PlusIcon } from "./ui/icons";
+import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 
 export function AppShell({
   tab,
@@ -9,6 +10,8 @@ export function AppShell({
   onTabChange,
   onOpenAdd,
   onOpenManage,
+  budgetScope,
+  onBudgetScopeChange,
   theme = "light",
   onToggleTheme,
   toast,
@@ -22,6 +25,8 @@ export function AppShell({
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
   onOpenManage?: () => void;
+  budgetScope: BudgetScope;
+  onBudgetScopeChange: (scope: BudgetScope) => void;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
   toast?: string | null;
@@ -33,43 +38,48 @@ export function AppShell({
   // On desktop (≥ 1100px) the sidebar is always visible — immersive mode only
   // applies on mobile where the bottom nav needs to be hidden.
   const [isDesktop, setIsDesktop] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 1100);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    content.scrollTop = 0;
+    const frame = requestAnimationFrame(() => {
+      content.scrollTop = 0;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tab]);
   // effectiveImmersive drives layout/nav; the original immersive drives header visibility.
   const effectiveImmersive = immersive && !isDesktop;
 
   return (
-    <div className="app-shell-root" style={{ height: "100dvh", position: "relative" }}>
+    <div className={`app-shell-root${tab === "home" ? " app-shell-root--home" : ""}`} style={{ height: "100dvh", position: "relative" }}>
       <div
+        ref={contentRef}
         id={!effectiveImmersive ? "app-root-shell" : undefined}
         className={effectiveImmersive ? undefined : "app-content"}
-        style={effectiveImmersive ? { height: "100%" } : { height: "100%", overflowY: "auto", position: "relative" }}
+        style={effectiveImmersive ? { height: "100%" } : { height: "100%", overflowY: "auto", overflowAnchor: "none", position: "relative" }}
       >
-        {!immersive && !hideHeader && onOpenManage && (
-          <header style={headerStyle}>
-            <div>
-              {tab === "home" ? (
-                <>
-                  <p style={headerEyebrowStyle}>{getGreeting()}</p>
-                  <h1 style={headerTitleStyle}>Anas &amp; Salma</h1>
-                </>
-              ) : (
-                <h1 style={headerTitleStyle}>{TAB_TITLE[tab]}</h1>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 2 }}>
+        {!immersive && !hideHeader && (
+          <header className="app-header" style={headerStyle}>
+            <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} />
+            <div className="app-header-actions">
               {onToggleTheme && (
-                <button type="button" onClick={onToggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} style={menuButtonStyle}>
+                <button className="app-top-action" type="button" onClick={onToggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} style={menuButtonStyle}>
                   {theme === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
                 </button>
               )}
-              <button type="button" onClick={onOpenManage} aria-label="Accounts" style={menuButtonStyle}>
-                <LandmarkIcon size={18} />
-              </button>
+              {onOpenManage && (
+                <button className="app-top-action" type="button" onClick={onOpenManage} aria-label="Accounts" style={menuButtonStyle}>
+                  <LandmarkIcon size={18} />
+                </button>
+              )}
             </div>
           </header>
         )}
@@ -102,6 +112,7 @@ export function AppShell({
               }}
             >
               <PlusIcon size={22} strokeWidth={2.5} />
+              <span className="app-nav-add-label">Add</span>
             </button>
           )}
         </div>
@@ -138,59 +149,26 @@ export function AppShell({
   );
 }
 
-const TAB_TITLE: Record<AppTab, string> = {
-  home: "Home",
-  plan: "Plan",
-  budget: "Budget",
-  history: "Insights",
-};
-
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning,";
-  if (h < 18) return "Good afternoon,";
-  return "Good evening,";
-}
-
 const menuButtonStyle = {
-  width: 44,
-  height: 44,
-  borderRadius: 14,
+  width: 40,
+  height: 40,
+  borderRadius: "50%",
   border: "none",
-  background: "transparent",
+  background: "color-mix(in srgb, var(--surface) 88%, transparent)",
   color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   flexShrink: 0,
+  boxShadow: "0 7px 18px color-mix(in srgb, var(--ink-strong) 9%, transparent)",
+  backdropFilter: "blur(18px) saturate(1.2)",
 };
 
 const headerStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 16,
-  marginBottom: 18,
-  paddingLeft: 4,
-  paddingRight: 4,
-};
-
-const headerEyebrowStyle = {
-  fontFamily: "var(--font-body)",
-  fontSize: 10,
-  fontWeight: 500,
-  letterSpacing: 0.5,
-  textTransform: "uppercase" as const,
-  color: "var(--muted)",
-  margin: "0 0 3px",
-};
-
-const headerTitleStyle = {
-  fontFamily: "var(--font-display)",
-  fontSize: 18,
-  lineHeight: 1,
-  fontWeight: 800,
-  color: "var(--text)",
-  margin: 0,
+  gap: 10,
+  marginBottom: 24,
 };

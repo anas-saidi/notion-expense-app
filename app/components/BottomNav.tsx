@@ -35,7 +35,7 @@ export function BottomNav({ tab, onTabChange }: BottomNavProps) {
               {item.key === "budget" && <SlidersIcon size={20} strokeWidth={tab === "budget" ? 2.5 : 2} />}
               {item.key === "history" && <TrendingUpIcon size={20} strokeWidth={tab === "history" ? 2.5 : 2} />}
 
-              <span className="nav-label" style={{ fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 700 }}>{item.label}</span>
+              <span className="nav-label">{item.label}</span>
             </button>
           );
         })}

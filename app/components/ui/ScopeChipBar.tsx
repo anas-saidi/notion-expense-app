@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { UsersRound } from "lucide-react";
 import type { BudgetScope } from "../app-types";
+import { ManIcon, WomanIcon } from "./icons";
 
 /* ─── Scope color tokens (single source of truth) ─────────────── */
 
@@ -39,8 +41,8 @@ export const SCOPE_COLOR: Record<string, string> = {
 
 export const BUDGET_SCOPE_CHIPS: ScopeChipItem[] = [
   { key: "joint", emoji: "👫", label: "Joint" },
-  { key: "anas",  emoji: "👨", label: "Anas" },
-  { key: "salma", emoji: "👩", label: "Salma" },
+  { key: "anas",  emoji: "👨", label: "Husband" },
+  { key: "salma", emoji: "👩", label: "Wife" },
 ];
 
 /* ─── Types ───────────────────────────────────────────────────── */
@@ -94,6 +96,38 @@ export function BudgetScopeBar({
       onChange={k => onChange(k as BudgetScope)}
       ariaLabel={ariaLabel}
     />
+  );
+}
+
+/* ─── App-wide budget scope picker ─────────────────────────────── */
+
+export function GlobalBudgetScopePicker({
+  value,
+  onChange,
+}: {
+  value: BudgetScope;
+  onChange: (scope: BudgetScope) => void;
+}) {
+  return (
+    <div className="global-scope-picker" role="tablist" aria-label="App-wide budget scope">
+      {BUDGET_SCOPE_CHIPS.map(chip => {
+        const active = chip.key === value;
+        const ScopeIcon = chip.key === "joint" ? UsersRound : chip.key === "anas" ? ManIcon : WomanIcon;
+        return (
+          <button
+            key={chip.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className="global-scope-option"
+            onClick={() => onChange(chip.key as BudgetScope)}
+          >
+            <ScopeIcon className="global-scope-icon" size={13} strokeWidth={2.2} aria-hidden="true" />
+            <span>{chip.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
