@@ -141,8 +141,8 @@ type ClosingSummary = {
   assignedByCategory: { categoryId: string; total: number }[];
 };
 
-type FundRecord = { categoryId: string; planned: number; assignmentType?: string | null; reverse?: boolean };
-const normId = (id: string) => id.replace(/-/g, "").toLowerCase();
+type FundRecord = { categoryId?: string; planned: number; assignmentType?: string | null; reverse?: boolean };
+const normId = (id?: string) => (id ?? "").replace(/-/g, "").toLowerCase();
 const isMonthlyFund = (fund: FundRecord) => !fund.assignmentType || fund.assignmentType === "Monthly";
 
 /* ─── Main Component ──────────────────────────────────────────────── */

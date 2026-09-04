@@ -38,10 +38,9 @@ const getStatus = (available: number | null, planned: number | null, scope?: Bud
   return scope === "joint" ? "Together" : "On track";
 };
 
-const getProgress = (available: number | null, planned: number | null) => {
-  if (available === null || planned === null || planned <= 0) return 0;
-  const spent = Math.max(0, planned - available);
-  return Math.min(100, Math.round((spent / planned) * 100));
+const getProgress = (spent: number | null, allocated: number | null) => {
+  if (spent === null || allocated === null || allocated <= 0) return 0;
+  return Math.min(100, Math.round((Math.max(0, spent) / allocated) * 100));
 };
 
 
@@ -73,7 +72,8 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
   // Curve/progress still uses category-based left-to-spend for spend % display
   const available = leftToSpendByScope != null ? leftToSpendByScope[value] : currentSummary ? currentSummary.totalAssigned - currentSummary.totalSpent : null;
   const planned   = currentSummary?.totalAssigned ?? null;
-  const progress  = getProgress(available, planned);
+  const spent = currentSummary?.totalSpent ?? (available !== null && planned !== null ? Math.max(0, planned - available) : null);
+  const progress = getProgress(spent, planned);
   const status    = getStatus(balance, planned, value);
   const isOver    = balance !== null && balance < 0;
   const hasPlan   = planned !== null && planned > 0;
@@ -186,12 +186,12 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
                   </span>
                 )}
               </div>
-              <div style={captionRowStyle}>
+              <div style={captionGroupStyle}>
                 {hasPlan ? (
-                  <>
+                  <div style={captionRowStyle}>
                     <span style={captionStyle}>{progress}% spent</span>
-                    <span style={captionDimStyle}>of {fmt(planned!)} MAD planned</span>
-                  </>
+                    <span style={captionDimStyle}>of {fmt(planned!)} MAD planned this month</span>
+                  </div>
                 ) : (
                   <span style={captionStyle}>No plan yet</span>
                 )}
@@ -203,8 +203,8 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
         {/* Joint contribution — inline within the card */}
         {value === "joint" && contribStatus && (contribStatus.anasPlan > 0 || contribStatus.salmaPlan > 0) && (
           <div style={contribSectionStyle}>
-            <ContribRow name="Anas" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} color="var(--partner-husband)" />
-            <ContribRow name="Salma" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} color="var(--partner-wife)" />
+            <ContribCard name="Anas" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} color="var(--partner-husband)" />
+            <ContribCard name="Salma" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} color="var(--partner-wife)" />
           </div>
         )}
 
@@ -294,6 +294,12 @@ const captionRowStyle: CSSProperties = {
   gap: 6,
 };
 
+const captionGroupStyle: CSSProperties = {
+  display: "grid",
+  justifyItems: "center",
+  gap: 3,
+};
+
 const captionStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: 11,
@@ -328,30 +334,41 @@ const jointDotsStyle: CSSProperties = {
   paddingTop: 2,
 };
 
-function ContribRow({ name, actual, plan, color }: {
+function ContribCard({ name, actual, plan, color }: {
   name: string; actual: number; plan: number; color: string;
 }) {
   const left = Math.max(0, plan - actual);
   const done = plan > 0 && actual >= plan * 0.99;
-  const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
+  const pct = plan > 0 ? Math.min(100, Math.round((actual / plan) * 100)) : 0;
+  const statusText = done ? "Done" : `${fmt(Math.round(left))} left`;
 
   return (
-    <div style={contribRowStyle}>
-      <div style={contribHeaderStyle}>
-        <span style={{ ...contribNameStyle, color }}>{name}</span>
-        <span style={contribValueStyle}>
-          {done
-            ? <span style={{ color: "var(--accent)", fontWeight: 600 }}>Done</span>
-            : <><span style={{ fontWeight: 600, color: "var(--text2)" }}>{fmt(Math.round(left))}</span> left</>
-          }
-        </span>
+    <div style={contribCardStyle}>
+      <div
+        style={{ ...contribRingStyle, color: done ? "var(--accent)" : color }}
+        role="img"
+        aria-label={`${name} contribution: ${pct}% funded, ${statusText}`}
+      >
+        <svg viewBox="0 0 44 44" width="56" height="56" aria-hidden="true">
+          <circle cx="22" cy="22" r="18" pathLength="100" fill="none" stroke="var(--surface2)" strokeWidth="4" />
+          <circle
+            cx="22"
+            cy="22"
+            r="18"
+            pathLength="100"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={`${pct} 100`}
+            transform="rotate(-90 22 22)"
+          />
+        </svg>
+        <span style={contribPercentStyle}>{pct}%</span>
       </div>
-      <div style={contribBarRailStyle}>
-        <div style={{
-          ...contribBarFillStyle,
-          width: `${pct}%`,
-          background: done ? "var(--accent)" : color,
-        }} />
+      <div style={contribCopyStyle}>
+        <span style={{ ...contribNameStyle, color }}>{name}</span>
+        <span style={{ ...contribValueStyle, color: done ? "var(--accent)" : "var(--text2)" }}>{statusText}</span>
       </div>
     </div>
   );
@@ -360,18 +377,41 @@ function ContribRow({ name, actual, plan, color }: {
 const contribSectionStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: 12,
+  gap: 8,
 };
 
-const contribRowStyle: CSSProperties = {
-  display: "grid",
-  gap: 6,
-};
-
-const contribHeaderStyle: CSSProperties = {
+const contribCardStyle: CSSProperties = {
   display: "flex",
-  alignItems: "baseline",
-  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  minWidth: 0,
+  padding: "10px 12px",
+  border: "1px solid var(--border)",
+  borderRadius: 16,
+  background: "var(--surface)",
+};
+
+const contribRingStyle: CSSProperties = {
+  position: "relative",
+  width: 56,
+  height: 56,
+  flex: "0 0 56px",
+  display: "grid",
+  placeItems: "center",
+};
+
+const contribPercentStyle: CSSProperties = {
+  position: "absolute",
+  fontSize: 10,
+  fontWeight: 700,
+  color: "var(--text2)",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const contribCopyStyle: CSSProperties = {
+  display: "grid",
+  gap: 4,
+  minWidth: 0,
 };
 
 const contribNameStyle: CSSProperties = {
@@ -381,23 +421,11 @@ const contribNameStyle: CSSProperties = {
   textTransform: "uppercase",
 };
 
-const contribBarRailStyle: CSSProperties = {
-  height: 4,
-  borderRadius: 999,
-  background: "var(--surface2)",
-  overflow: "hidden",
-};
-
-const contribBarFillStyle: CSSProperties = {
-  height: "100%",
-  borderRadius: 999,
-  transition: "width 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
-};
-
 const contribValueStyle: CSSProperties = {
-  fontSize: 10,
-  color: "var(--muted)",
+  fontSize: 11,
+  fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
+  whiteSpace: "nowrap",
 };
 
 const jointDotStyle = (active: boolean): CSSProperties => ({

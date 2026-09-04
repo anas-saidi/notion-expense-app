@@ -148,6 +148,9 @@ export default function App() {
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const initialAcctApplied = useRef(false);
   const initialCatApplied = useRef(false);
+  const initialDataFetchStarted = useRef(false);
+  const historyFetchedMonth = useRef<string | null>(null);
+  const homeSummaryFetchedMonth = useRef<string | null>(null);
   const plannerMonthHydrated = useRef(false);
   const loadedPendingId = useRef<string | null>(null);
   const rebalanceReturnToAdd = useRef(false);
@@ -251,6 +254,8 @@ export default function App() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (historyFetchedMonth.current === historyMonth) return;
+    historyFetchedMonth.current = historyMonth;
     fetchHistoryTransactions(historyMonth);
   }, [historyMonth, fetchHistoryTransactions]);
 
@@ -285,14 +290,15 @@ export default function App() {
       d.setMonth(d.getMonth() - (4 - i));
       return d.toISOString().slice(0, 7);
     });
-    const results = await Promise.allSettled(
-      months.map(async (m) => {
+    const results: Array<{ month: string; totalSpent: number }> = [];
+    for (const m of months) {
+      try {
         const { start, end } = monthBounds(`${m}-01`);
         const data = await fetch(`/api/monthly-summary?start=${start}&end=${end}`).then(r => r.json());
-        return { month: m, totalSpent: data.summary?.totalSpent ?? 0 };
-      })
-    );
-    setMonthlyTrend(results.flatMap(r => r.status === "fulfilled" ? [r.value] : []));
+        results.push({ month: m, totalSpent: data.summary?.totalSpent ?? 0 });
+      } catch {}
+    }
+    setMonthlyTrend(results);
   };
 
   const fetchPending = async () => {
@@ -331,6 +337,8 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (initialDataFetchStarted.current) return;
+    initialDataFetchStarted.current = true;
     fetchCategories().finally(() => setLoading(false));
     fetchFrozenCategories();
 
@@ -349,6 +357,8 @@ export default function App() {
 
   // Refetch monthly summary whenever the viewed home month changes
   useEffect(() => {
+    if (homeSummaryFetchedMonth.current === homeMonth) return;
+    homeSummaryFetchedMonth.current = homeMonth;
     fetchMonthlySummary(homeMonth); // eslint-disable-line react-hooks/exhaustive-deps
   }, [homeMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -378,7 +388,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!plannerMonth) return;
+    if (!plannerMonth || tab !== "plan") return;
     setPlannerSummaryReady(false);
     setPlannerMonthlySummary(null);
     const { start, end } = monthBounds(`${plannerMonth}-01`);
@@ -409,7 +419,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [plannerMonth]);
+  }, [plannerMonth, tab]);
 
   useEffect(() => {
     if (initialAcctApplied.current) return;
@@ -859,7 +869,18 @@ export default function App() {
     const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
     const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
     const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
-    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
+
+    // `Available` includes carried category balances as well as this month's
+    // net plan. Add this month's spending back to reconstruct the amount that
+    // all joint envelopes needed at the start of the month. Only the portion
+    // of the starting joint balance above those carried reserves was actually
+    // free to reduce the partners' contribution target.
+    const jointAvailable = categories
+      .filter(category => categoryMatchesScope(category, "joint"))
+      .reduce((sum, category) => sum + (category.available ?? 0), 0);
+    const jointExpenses = anasPocket + salmaPocket + sharedSpend;
+    const requiredJointReserves = jointAvailable + jointExpenses;
+    const needFromPersonal = Math.max(0, requiredJointReserves - organicBalance);
 
     const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
     const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;

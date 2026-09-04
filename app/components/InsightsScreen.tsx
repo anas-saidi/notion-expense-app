@@ -197,7 +197,18 @@ export function InsightsScreen({
     const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
     const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
     const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
-    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
+
+    // Current category availability includes balances carried from prior
+    // months. Add current spending back to reconstruct the opening reserve
+    // requirement; historical months fall back to their net monthly plan
+    // because today's category availability cannot describe an old month.
+    const currentJointAvailable = categories
+      .filter(category => getCategoryScope(category) === "joint")
+      .reduce((sum, category) => sum + (category.available ?? 0), 0);
+    const requiredJointReserves = insightsMonth === currentMonthStr
+      ? currentJointAvailable + anasPocket + salmaPocket + sharedSpend
+      : totalPlanned;
+    const needFromPersonal = Math.max(0, requiredJointReserves - organicBalance);
     const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
     const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
 
@@ -220,7 +231,7 @@ export function InsightsScreen({
       anasContribPct, salmaContribPct,
       hasPlan: totalPlanned > 0,
     };
-  }, [expenses, transactions, accounts, categories, totalPlanned]);
+  }, [expenses, transactions, accounts, categories, totalPlanned, insightsMonth, currentMonthStr]);
 
   /* ── 4. Spending Breakdown (donut) ────────────────────────────── */
   const donutData = useMemo(() => {
