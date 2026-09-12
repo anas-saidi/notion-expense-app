@@ -3,6 +3,8 @@ import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } 
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BanknoteIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
+import { TransactionRow } from "./ui/TransactionRow";
+import { Banner } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 
 type HomeScreenProps = {
@@ -110,21 +112,9 @@ export function HomeScreen({
       .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
   }, [pendingItems]);
 
-  const savingsGoal = useMemo(() => {
-    return visibleCategories
-      .filter(cat => {
-        const types = cat.type.map(t => t.toLowerCase());
-        return types.some(t => t.includes("saving") || t.includes("sinking") || t.includes("goal") || t.includes("fund"))
-          && !types.some(t => t.includes("team") || t.includes("household"));
-      })
-      .filter(cat => cat.planned && cat.planned > 0)
-      .sort((a, b) => (b.available ?? 0) - (a.available ?? 0))[0] ?? null;
-  }, [visibleCategories]);
-
   const recentTxns = useMemo(() => (transactions ?? []).slice(0, 5), [transactions]);
 
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
-  const showPlanningPrompt = isCurrentMonth && readyToAssign > 0;
   const showJointUnassignedPrompt = isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
   const monthLabel = monthShortLabel(homeMonth);
 
@@ -149,12 +139,10 @@ export function HomeScreen({
     ? Object.values(plannedScopes).filter(Boolean).length
     : 0;
   const showMonthEndAlert = isCurrentMonth && daysUntilMonthEnd <= 2 && !allScopesPlanned;
-  const hasMonthPlan = monthlySummary.totalAssigned > 0;
-  const planningPromptTitle = hasMonthPlan
-    ? `${monthLabel} has money left`
-    : `${monthLabel} is ready to plan`;
-  const planningPromptMeta = `${BUDGET_SCOPE_LABELS[budgetScope]} monthly budget`;
-  const planningPromptAction = hasMonthPlan ? "Continue" : "Plan now";
+  const showPlanningPrompt = showMonthEndAlert && readyToAssign > 0;
+  const planningTiming = daysUntilMonthEnd <= 0
+    ? "Last day of the month"
+    : `${daysUntilMonthEnd} day${daysUntilMonthEnd === 1 ? "" : "s"} left`;
 
   const storageKey = `dismissed-attention-${homeMonth}-${budgetScope}`;
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
@@ -204,56 +192,45 @@ export function HomeScreen({
         />
       </div>
 
-      <div className="home-lower-surface">
-
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
-        <button type="button" onClick={onOpenPlan} style={assignRowStyle}>
-          <span style={assignCopyStyle}>
-            <span style={assignTitleStyle}>{planningPromptTitle}</span>
-            <span style={assignFreeStyle}>{planningPromptMeta}</span>
-            {budgetScope === "joint" && (
-              <span style={assignJointHintStyle}>
-                👨 {fmt(readyToAssignByScope["anas"])} + 👩 {fmt(readyToAssignByScope["salma"])} from personal accounts
-              </span>
-            )}
-          </span>
-          <span style={assignRightStyle}>
-            <span style={assignAmountStyle}>{fmt(readyToAssign)} MAD</span>
-            <span style={assignActionVisibleStyle}>{planningPromptAction} -&gt;</span>
-          </span>
-        </button>
+        <Banner
+          tone="accent"
+          style={{ marginBottom: 16 }}
+          title={`Plan ${planningNextMonthLabel}`}
+          action={(
+            <span style={assignRightStyle}>
+              <span style={assignAmountStyle}>{fmt(readyToAssign)} MAD</span>
+              <button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>Plan →</button>
+            </span>
+          )}
+        >
+          {planningTiming} · {BUDGET_SCOPE_LABELS[budgetScope]} budget
+        </Banner>
       )}
 
       {/* Zone 2a: Joint account has unassigned money */}
       {showJointUnassignedPrompt && (
-        <button type="button" onClick={onOpenJointAllocate} style={assignRowStyle}>
-          <span style={assignCopyStyle}>
-            <span style={assignTitleStyle}>Joint account has unassigned money</span>
-            <span style={assignFreeStyle}>Sitting in the joint account, not yet budgeted</span>
-          </span>
-          <span style={assignRightStyle}>
-            <span style={assignAmountStyle}>{fmt(jointUnassigned ?? 0)} MAD</span>
-            <span style={assignActionVisibleStyle}>Allocate -&gt;</span>
-          </span>
-        </button>
+        <Banner
+          tone="accent"
+          style={{ marginBottom: 16 }}
+          title="Joint account has unassigned money"
+          action={<span style={assignRightStyle}><span style={assignAmountStyle}>{fmt(jointUnassigned ?? 0)} MAD</span><button type="button" onClick={onOpenJointAllocate} style={bannerActionButtonStyle}>Allocate →</button></span>}
+        >
+          Sitting in the joint account, not yet budgeted
+        </Banner>
       )}
 
       {/* Zone 2.5a: Month-end planning alert */}
-      {showMonthEndAlert && (
-        <button type="button" onClick={onOpenPlan} style={monthEndAlertStyle}>
-          <span style={assignCopyStyle}>
-            <span style={assignTitleStyle}>
-              {plannedCount > 0 ? `${planningNextMonthLabel} · ${plannedCount}/3 scopes` : `Plan ${planningNextMonthLabel}`}
-            </span>
-            <span style={assignFreeStyle}>
-              {daysUntilMonthEnd <= 0
-                ? "Last day of the month"
-                : `${daysUntilMonthEnd} day${daysUntilMonthEnd === 1 ? "" : "s"} left`}
-            </span>
-          </span>
-          <span style={assignActionVisibleStyle}>{plannedCount > 0 ? "Continue →" : "Plan now →"}</span>
-        </button>
+      {showMonthEndAlert && !showPlanningPrompt && (
+        <Banner
+          tone="accent"
+          style={{ marginBottom: 16 }}
+          title={plannedCount > 0 ? `${planningNextMonthLabel} · ${plannedCount}/3 scopes` : `Plan ${planningNextMonthLabel}`}
+          action={<button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>{plannedCount > 0 ? "Resume →" : "Plan →"}</button>}
+        >
+          {planningTiming}
+        </Banner>
       )}
 
       {/* Zone 2.5: Upcoming bills strip */}
@@ -283,97 +260,13 @@ export function HomeScreen({
 
       <div className="home-content" style={contentStyle}>
 
-        {/* Zone 3: Attention — horizontal scroll */}
-        {visibleAttentionItems.length > 0 && (
-          <section aria-label="Categories needing attention" style={{ minWidth: 0 }}>
-            <div className="home-section-hdr" style={sectionHeaderStyle}>
-              <span className="section-label" style={sectionLabelStyle}>Needs attention</span>
-              {onOpenBudgetTab && (
-                <button
-                  type="button"
-                  onClick={onOpenBudgetTab}
-                  style={seeAllBtnStyle}
-                  aria-label="View all categories"
-                >
-                  All categories <ChevronRightIcon size={12} style={{ verticalAlign: "middle" }} />
-                </button>
-              )}
-            </div>
-
-            <div className="home-scroll-rail" style={cardsRailStyle}>
-              {visibleAttentionItems.map(({ cat, spent, planned, available, isOver }) => (
-                <div key={cat.id} className="home-attention-card" style={attentionCardStyle}>
-                  <button
-                    type="button"
-                    onClick={() => dismissAttention(cat.id)}
-                    style={dismissBtnStyle}
-                    aria-label={`Dismiss ${cat.name}`}
-                  >
-                    ✕
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { onSelectCategory(cat); onOpenCategoryDetails(cat); }}
-                    style={attentionBodyStyle}
-                    aria-label={`${cat.name}: ${isOver ? "over budget" : "low"}`}
-                  >
-                    <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
-                    <span style={attentionNameStyle}>{cat.name}</span>
-                    <span style={attentionSubStyle}>
-                      {isOver ? `+${fmt(spent - planned)} MAD over` : `${fmt(available)} MAD left`}
-                    </span>
-                  </button>
-                  {onFundCategory && (
-                    <button
-                      type="button"
-                      onClick={() => { onSelectCategory(cat); onFundCategory(cat); }}
-                      style={fundBtnStyle}
-                    >
-                      Fund
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Zone 4: Savings goal widget */}
-        {savingsGoal && (() => {
-          const goalPlanned = savingsGoal.planned ?? 1;
-          const goalAvailable = savingsGoal.available ?? 0;
-          const goalPct = Math.min(100, Math.max(0, (goalAvailable / goalPlanned) * 100));
-          return (
-            <section aria-label="Savings goal">
-              <div className="home-section-hdr" style={sectionHeaderStyle}>
-                <span className="section-label" style={sectionLabelStyle}>Savings goal</span>
-              </div>
-              <div style={savingsCardStyle}>
-                <div style={savingsTextStyle}>
-                  <span style={savingsNameStyle}>
-                    {savingsGoal.icon && <span style={{ marginRight: 5 }}>{savingsGoal.icon}</span>}
-                    {savingsGoal.name}
-                  </span>
-                  <div style={savingsBarTrackStyle}>
-                    <div style={{ ...savingsBarFillStyle, transform: `scaleX(${goalPct / 100})` }} />
-                  </div>
-                  <div style={savingsMetaRowStyle}>
-                    <span style={savingsSavedStyle}>{fmt(goalAvailable)} MAD saved</span>
-                    <span style={savingsGoalLabelStyle}>{Math.round(goalPct)}% of {fmt(goalPlanned)}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-          );
-        })()}
-
         {/* Zone 6: Recent transactions */}
         {recentTxns.length > 0 && (
           <section aria-label="Recent transactions">
-            <div className="home-section-hdr" style={sectionHeaderStyle}>
+            <div className="home-section-hdr home-recent-header" style={sectionHeaderStyle}>
               <span className="section-label" style={sectionLabelStyle}>Recent</span>
               {onOpenHistory && (
-                <button type="button" onClick={onOpenHistory} style={seeAllBtnStyle} aria-label="View all transactions">
+                <button className="home-recent-action" type="button" onClick={onOpenHistory} style={seeAllBtnStyle} aria-label="View all transactions">
                   All activity <ChevronRightIcon size={12} style={{ verticalAlign: "middle" }} />
                 </button>
               )}
@@ -386,47 +279,26 @@ export function HomeScreen({
                 const isIncome   = txn.type === "Income";
                 const isTransfer = txn.type === "Transfer";
                 const amountPrefix = isIncome ? "+" : isTransfer ? "↔" : "−";
-                const amountColor = isIncome
-                  ? "var(--accent-ink)"
-                  : isTransfer
-                  ? "var(--muted)"
-                  : "var(--text2)";
+                const amountTone = isIncome ? "income" : isTransfer ? "transfer" : "expense";
                 return (
-                  <div
+                  <TransactionRow
                     key={txn.id}
-                    className="home-txn-row tx-row"
-                    style={{ cursor: onClickTransaction ? "pointer" : undefined }}
+                    className="home-txn-row"
+                    title={isTransfer && (fromCat || toCat) ? `${fromCat?.name ?? "—"} → ${toCat?.name ?? "—"}` : txn.name}
+                    subtitle={!isTransfer ? cat?.name : undefined}
+                    amount={txn.amount}
+                    tone={amountTone}
+                    prefix={amountPrefix}
+                    date={txn.date ? fmtDate(txn.date) : undefined}
+                    icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} size={22} />}
                     onClick={onClickTransaction ? () => onClickTransaction(txn) : undefined}
-                  >
-                    {isIncome || isTransfer ? (
-                      <span style={recentTypeIconStyle(isIncome)}>
-                        {isIncome ? <BanknoteIcon size={13} /> : <TransferIcon size={12} />}
-                      </span>
-                    ) : (
-                      <CategoryIcon icon={cat?.icon ?? null} size={22} style={{ flexShrink: 0 }} />
-                    )}
-                    <div style={recentMiddleStyle}>
-                      {isTransfer && (fromCat || toCat) ? (
-                        <span style={recentNameStyle}>{fromCat?.name ?? "—"} → {toCat?.name ?? "—"}</span>
-                      ) : (
-                        <span style={recentNameStyle}>{txn.name}</span>
-                      )}
-                      {!isTransfer && cat && <span style={recentCategoryStyle}>{cat.name}</span>}
-                    </div>
-                    <div style={recentRightStyle}>
-                      <span style={{ ...recentAmountStyle, color: amountColor }}>
-                        {amountPrefix}{fmt(txn.amount)} MAD
-                      </span>
-                      <span style={recentDateStyle}>{txn.date ? fmtDate(txn.date) : ""}</span>
-                    </div>
-                  </div>
+                  />
                 );
               })}
             </div>
           </section>
         )}
 
-      </div>
       </div>
     </div>
   );
@@ -439,7 +311,7 @@ function monthShortLabel(ym: string): string {
 /* ─── Styles ──────────────────────────────────────────────────── */
 
 const walletSwitcherWrapStyle: CSSProperties = {
-  paddingTop: 16,
+  paddingTop: 8,
   paddingBottom: 16,
 };
 
@@ -460,7 +332,7 @@ const sectionHeaderStyle: CSSProperties = {
 };
 
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 0.7,
   textTransform: "uppercase",
@@ -476,7 +348,7 @@ const seeAllBtnStyle: CSSProperties = {
   border: "none",
   background: "transparent",
   color: "var(--muted)",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 400,
   cursor: "pointer",
   letterSpacing: 0.3,
@@ -493,8 +365,9 @@ const cardsRailStyle: CSSProperties = {
 
 const attentionCardStyle: CSSProperties = {
   flex: "0 0 120px",
-  borderRadius: 16,
+  borderRadius: "var(--radius-card)",
   background: "var(--surface)",
+  boxShadow: "var(--elevation-card)",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
@@ -517,7 +390,7 @@ const attentionBodyStyle: CSSProperties = {
 };
 
 const attentionNameStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 600,
   color: "var(--muted)",
   lineHeight: 1.2,
@@ -542,7 +415,7 @@ const fundBtnStyle: CSSProperties = {
   borderRadius: 8,
   border: "1px solid var(--border)",
   background: "transparent",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 500,
   color: "var(--text2)",
   cursor: "pointer",
@@ -569,51 +442,6 @@ const dismissBtnStyle: CSSProperties = {
 
 /* Ready to assign row */
 
-const monthEndAlertStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  width: "100%",
-  padding: "14px 16px",
-  borderRadius: 14,
-  border: "1.5px solid color-mix(in srgb, var(--accent) 45%, transparent)",
-  background: "color-mix(in srgb, var(--accent) 14%, var(--surface))",
-  cursor: "pointer",
-  marginBottom: 16,
-};
-
-const assignRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  width: "100%",
-  padding: "14px 16px",
-  borderRadius: 14,
-  border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
-  background: "color-mix(in srgb, var(--accent) 10%, var(--surface))",
-  cursor: "pointer",
-  marginBottom: 16,
-};
-
-const assignCopyStyle: CSSProperties = {
-  minWidth: 0,
-  display: "grid",
-  gap: 3,
-  textAlign: "left",
-};
-
-const assignTitleStyle: CSSProperties = {
-  minWidth: 0,
-  fontSize: 13,
-  fontWeight: 700,
-  color: "var(--text)",
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};
-
 const assignRightStyle: CSSProperties = {
   flexShrink: 0,
   display: "grid",
@@ -627,26 +455,17 @@ const assignAmountStyle: CSSProperties = {
   color: "var(--text)",
 };
 
-const assignFreeStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 400,
-  color: "var(--muted)",
-  textAlign: "left",
-};
-
-const assignJointHintStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 500,
-  color: "var(--muted)",
-  textAlign: "left",
-  letterSpacing: 0.1,
-};
-
-const assignActionVisibleStyle: CSSProperties = {
+const bannerActionButtonStyle: CSSProperties = {
+  minHeight: 44,
+  margin: "-10px -8px -10px 0",
+  padding: "0 8px",
+  border: "none",
+  borderRadius: 10,
+  background: "transparent",
+  color: "var(--text2)",
   fontSize: 12,
-  fontWeight: 500,
-  color: "var(--muted)",
-  flexShrink: 0,
+  fontWeight: 650,
+  cursor: "pointer",
 };
 
 /* Upcoming bills strip */
@@ -685,145 +504,15 @@ const billAmountStyle: CSSProperties = {
 };
 
 const billDateStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 400,
   color: "var(--muted)",
   lineHeight: 1,
 };
-
-/* Savings goal widget */
-
-const savingsCardStyle: CSSProperties = {
-  background: "var(--surface)",
-  borderRadius: 16,
-  padding: "14px 16px",
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--border) 50%, transparent)",
-};
-
-const savingsBarTrackStyle: CSSProperties = {
-  width: "100%",
-  height: 4,
-  borderRadius: 999,
-  background: "var(--surface2)",
-  overflow: "hidden",
-};
-
-const savingsBarFillStyle: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  borderRadius: 999,
-  background: "var(--accent)",
-  transformOrigin: "left center",
-  transition: "transform 0.4s cubic-bezier(0.22,1,0.36,1)",
-};
-
-const savingsMetaRowStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "baseline",
-};
-
-const savingsTextStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-  minWidth: 0,
-};
-
-const savingsNameStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 700,
-  color: "var(--text2)",
-  lineHeight: 1.2,
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};
-
-const savingsSavedStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 13,
-  fontWeight: 500,
-  color: "var(--text2)",
-  lineHeight: 1,
-};
-
-const savingsGoalLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 10,
-  fontWeight: 400,
-  color: "var(--muted)",
-  lineHeight: 1,
-};
-
 
 /* Recent transactions */
 
 const recentListStyle: CSSProperties = {
   display: "grid",
-  gap: 6,
-};
-
-const recentTypeIconStyle = (isIncome: boolean): CSSProperties => ({
-  flexShrink: 0,
-  width: 22,
-  height: 22,
-  borderRadius: 8,
-  background: isIncome
-    ? "color-mix(in srgb, var(--accent) 15%, transparent)"
-    : "color-mix(in srgb, var(--muted) 15%, transparent)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: isIncome ? "var(--accent-ink)" : "var(--muted)",
-});
-
-const recentMiddleStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  display: "flex",
-  flexDirection: "column",
-  gap: 3,
-};
-
-const recentNameStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 500,
-  color: "var(--text2)",
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};
-
-const recentCategoryStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 400,
-  color: "var(--muted)",
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};
-
-const recentRightStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-end",
-  gap: 6,
-  flexShrink: 0,
-};
-
-const recentAmountStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 16,
-  fontWeight: 500,
-  color: "var(--text2)",
-  lineHeight: 1,
-};
-
-const recentDateStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 400,
-  color: "var(--muted)",
-  lineHeight: 1,
-  padding: "3px 7px",
+  gap: 0,
 };

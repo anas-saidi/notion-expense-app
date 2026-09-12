@@ -4,9 +4,10 @@ import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 
 import type { Account, BudgetScope, Category } from "./app-types";
 import { fmt, getCategoryScope, isSavingsAccount, monthBounds } from "./app-utils";
 import { Money } from "./Money";
-import { XIcon } from "./ui/icons";
+import { LandmarkIcon, ManIcon, UsersRoundIcon, WomanIcon, XIcon } from "./ui/icons";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
+import { Banner } from "./ui/Banner";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 
@@ -33,11 +34,11 @@ function monthLabel(month: string, format: "long" | "short" = "long"): string {
 
 /* ─── Scope chip ──────────────────────────────────────────────────── */
 
-const SCOPE_CHIPS: { value: ScopeTab; emoji: string; label: string }[] = [
-  { value: "joint",  emoji: "👫", label: "Joint"  },
-  { value: "anas",   emoji: "👨", label: "Anas"   },
-  { value: "salma",  emoji: "👩", label: "Salma"  },
-  { value: "saving", emoji: "🏦", label: "Saving" },
+const SCOPE_CHIPS: { value: ScopeTab; label: string }[] = [
+  { value: "joint",  label: "Joint"  },
+  { value: "anas",   label: "Anas"   },
+  { value: "salma",  label: "Salma"  },
+  { value: "saving", label: "Saving" },
 ];
 
 const CHIP_BG: Record<ScopeTab, string> = {
@@ -48,9 +49,9 @@ const CHIP_BG: Record<ScopeTab, string> = {
 };
 const CHIP_INK: Record<ScopeTab, string> = {
   joint:  "var(--accent-ink)",
-  anas:   "#ffffff",
-  salma:  "#ffffff",
-  saving: "#ffffff",
+  anas:   "var(--partner-husband-ink)",
+  salma:  "var(--partner-wife-ink)",
+  saving: "var(--text)",
 };
 const CHIP_COLOR: Record<ScopeTab, string> = {
   joint:  "var(--accent)",
@@ -60,11 +61,12 @@ const CHIP_COLOR: Record<ScopeTab, string> = {
 };
 
 function ScopeChipBtn({
-  value, emoji, label, active, locked, onClick,
+  value, label, active, locked, onClick,
 }: {
-  value: ScopeTab; emoji: string; label: string; active: boolean; locked: boolean; onClick: () => void;
+  value: ScopeTab; label: string; active: boolean; locked: boolean; onClick: () => void;
 }) {
   const [pressed, setPressed] = useState(false);
+  const ScopeIcon = value === "joint" ? UsersRoundIcon : value === "anas" ? ManIcon : value === "salma" ? WomanIcon : LandmarkIcon;
   return (
     <button
       type="button"
@@ -75,7 +77,7 @@ function ScopeChipBtn({
       onMouseUp={() => setPressed(false)}
       onMouseLeave={() => setPressed(false)}
       style={active ? {
-        height: 38, borderRadius: 12, border: "none",
+        minHeight: 44, borderRadius: 999, border: "none",
         background: CHIP_BG[value], color: CHIP_INK[value],
         padding: "0 14px 0 10px", gap: 7, cursor: "pointer",
         display: "inline-flex", alignItems: "center",
@@ -84,37 +86,19 @@ function ScopeChipBtn({
         animation: "categorySelectIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both",
         flexShrink: 0, fontFamily: "var(--font-body)",
       } : {
-        width: 38, height: 38, borderRadius: 12,
+        minHeight: 44, borderRadius: 999,
         border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
-        background: "transparent", color: CHIP_COLOR[value],
-        cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center",
-        opacity: pressed ? 0.9 : 0.45,
+        background: "var(--surface)", color: CHIP_COLOR[value],
+        padding: "0 14px 0 10px", gap: 7,
+        cursor: "pointer", display: "inline-flex", alignItems: "center",
+        opacity: pressed ? 0.9 : 1,
         transform: pressed ? "scale(0.93)" : "none",
         transition: "opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
         flexShrink: 0,
-        position: "relative",
       }}
     >
-      {active ? (
-        <>
-          <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
-            {label}{locked ? " ✓" : ""}
-          </span>
-        </>
-      ) : (
-        <>
-          <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
-          {locked && (
-            <span style={{
-              position: "absolute", bottom: 4, right: 4,
-              width: 7, height: 7, borderRadius: "50%",
-              background: "var(--accent)",
-              border: "1.5px solid var(--bg)",
-            }} />
-          )}
-        </>
-      )}
+      <ScopeIcon size={17} strokeWidth={2.1} aria-hidden="true" />
+      <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>{label}{locked ? " ✓" : ""}</span>
     </button>
   );
 }
@@ -141,8 +125,8 @@ type ClosingSummary = {
   assignedByCategory: { categoryId: string; total: number }[];
 };
 
-type FundRecord = { categoryId: string; planned: number; assignmentType?: string | null; reverse?: boolean };
-const normId = (id: string) => id.replace(/-/g, "").toLowerCase();
+type FundRecord = { categoryId?: string | null; planned: number; assignmentType?: string | null; reverse?: boolean };
+const normId = (id: string | null | undefined) => (id ?? "").replace(/-/g, "").toLowerCase();
 const isMonthlyFund = (fund: FundRecord) => !fund.assignmentType || fund.assignmentType === "Monthly";
 
 /* ─── Main Component ──────────────────────────────────────────────── */
@@ -477,12 +461,12 @@ export function MonthStartPlanner({
               jointSplit = (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: anasColor }}>
-                    👨 {fmt(anasObligation)}
+                    <ManIcon size={13} aria-hidden="true" /> {fmt(anasObligation)}
                     <span style={{ fontWeight: 400, opacity: 0.5 }}> / {fmt(Math.round(anasBalance))}</span>
                   </span>
                   <span style={{ color: "var(--muted)", opacity: 0.3, fontSize: 12 }}>·</span>
                   <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: salmaColor }}>
-                    👩 {fmt(salmaObligation)}
+                    <WomanIcon size={13} aria-hidden="true" /> {fmt(salmaObligation)}
                     <span style={{ fontWeight: 400, opacity: 0.5 }}> / {fmt(Math.round(salmaBalance))}</span>
                   </span>
                 </div>
@@ -499,7 +483,7 @@ export function MonthStartPlanner({
                 </div>
                 <span style={{ ...leftHeroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
                   {left < 0 ? "−" : ""}
-                  <Money value={Math.abs(Math.round(left))} />
+                  <Money value={Math.abs(Math.round(left))} animated animateOnMount />
                 </span>
                 {jointSplit}
               </div>
@@ -508,11 +492,10 @@ export function MonthStartPlanner({
 
           {/* Scope chips */}
           <div style={scopeBarStyle} role="tablist">
-            {SCOPE_CHIPS.map(({ value, emoji, label }) => (
+            {SCOPE_CHIPS.map(({ value, label }) => (
               <ScopeChipBtn
                 key={value}
                 value={value}
-                emoji={emoji}
                 label={label}
                 active={scope === value}
                 locked={lockedScopes[value]}
@@ -551,7 +534,7 @@ export function MonthStartPlanner({
 
           {/* Footer */}
           <div style={footerStyle}>
-            {saveError && <div style={saveErrorStyle}>{saveError}</div>}
+            {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
             <div style={footerRowStyle} className="planner-footer-row">
               {scopeHasPrevData && (
                 <button type="button" onClick={copyFromLastMonth} style={copyButtonStyle}>
@@ -591,7 +574,7 @@ export function MonthStartPlanner({
         panelStyle={{ background: "var(--bg)", borderRadius: "24px 24px 0 0" }}
       >
         <div style={{ padding: "8px 16px calc(env(safe-area-inset-bottom, 0px) + 20px)", display: "grid", gap: 6 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--muted)", padding: "4px 0" }}>
+          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--muted)", padding: "4px 0" }}>
             Frozen categories
           </p>
           {availableFrozen.length === 0 ? (
@@ -600,7 +583,7 @@ export function MonthStartPlanner({
             <button key={cat.id} type="button" onClick={() => reviveCategory(cat)} style={frozenRowStyle}>
               <div style={catIconWrapStyle}><CategoryIcon icon={cat.icon} size={15} /></div>
               <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--text2)", textAlign: "left" }}>{cat.name}</span>
-              <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 700 }}>Unfreeze</span>
+              <span style={{ fontSize: 12, color: "var(--accent-foreground)", fontWeight: 700 }}>Unfreeze</span>
             </button>
           ))}
           {onOpenNewCategory && (
@@ -609,7 +592,7 @@ export function MonthStartPlanner({
               <button
                 type="button"
                 onClick={() => { setShowAddCat(false); onOpenNewCategory(); }}
-                style={{ ...frozenRowStyle, color: "var(--accent)" }}
+                style={{ ...frozenRowStyle, color: "var(--accent-foreground)" }}
               >
                 <span style={{ fontSize: 20 }}>＋</span>
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 600, textAlign: "left" }}>Create new category</span>
@@ -656,11 +639,11 @@ function RecapCard({
   allCatsByScope: Record<ScopeTab, Category[]>;
 }) {
   const scopeData = useMemo(() => {
-    return SCOPE_CHIPS.map(({ value, emoji, label }) => {
+    return SCOPE_CHIPS.map(({ value, label }) => {
       const cats = allCatsByScope[value];
       const spent   = summary ? cats.reduce((s, c) => s + (summary.spentByCategory.find((e) => e.categoryId === c.id)?.total ?? 0), 0) : 0;
       const planned = summary ? cats.reduce((s, c) => s + (summary.assignedByCategory.find((e) => e.categoryId === c.id)?.total ?? 0), 0) : 0;
-      return { value, emoji, label, spent, planned };
+      return { value, label, spent, planned };
     });
   }, [summary, allCatsByScope]);
 
@@ -693,12 +676,13 @@ function RecapCard({
     <div style={recapCardStyle}>
       <p style={recapEyebrowStyle}>{monthLabel(closingMonth, "short")} recap</p>
       <div style={{ display: "flex", justifyContent: "space-around" }}>
-        {scopeData.map(({ value, emoji, label, spent, planned }) => {
+        {scopeData.map(({ value, label, spent, planned }) => {
           const ratio      = planned > 0 ? spent / planned : 0;
           const isOver     = ratio > 1;
           const fillDeg    = Math.min(ratio, 1) * 360;
           const strokeColor = isOver ? "var(--danger)" : SCOPE_COLOR[value];
           const pct        = planned > 0 ? Math.round(ratio * 100) : null;
+          const ScopeIcon = value === "joint" ? UsersRoundIcon : value === "anas" ? ManIcon : value === "salma" ? WomanIcon : LandmarkIcon;
 
           return (
             <div key={value} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
@@ -729,10 +713,10 @@ function RecapCard({
                   alignItems: "center", justifyContent: "center",
                   gap: 1,
                 }}>
-                  <span style={{ fontSize: 14, lineHeight: 1 }}>{emoji}</span>
+                  <ScopeIcon size={14} aria-hidden="true" />
                   {pct !== null && (
                     <span style={{
-                      fontSize: 10, fontWeight: 700, lineHeight: 1,
+                      fontSize: 12, fontWeight: 700, lineHeight: 1,
                       fontVariantNumeric: "tabular-nums",
                       color: isOver ? "var(--danger)" : "var(--text2)",
                     }}>
@@ -744,8 +728,8 @@ function RecapCard({
 
               {/* Label + amount */}
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)" }}>{label}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)", fontVariantNumeric: "tabular-nums", marginTop: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{label}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums", marginTop: 1 }}>
                   {planned > 0 ? `${fmt(Math.round(spent))} / ${fmt(Math.round(planned))}` : fmt(Math.round(spent))}
                 </div>
               </div>
@@ -816,7 +800,7 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
         <div style={catIconWrapStyle}><CategoryIcon icon={cat.icon} size={15} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={catNameStyle} title={cat.name}>{cat.name}</div>
-          <div style={{ fontSize: 11, marginTop: 3, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 12, marginTop: 3, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
             {lastMonthSpent > 0 && (
               <span style={{ color: flag ? FLAG_COLOR[flag] : "var(--muted)" }}>
                 {fmt(Math.round(lastMonthSpent))}
@@ -838,13 +822,13 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
                     <>
                       <span style={{ opacity: 0.5 }}>{fmt(Math.round(cat.available))}</span>
                       <span style={{ opacity: 0.35 }}>→</span>
-                      <span style={{ color: delta > 0 ? "var(--accent)" : "var(--danger)", fontWeight: 700 }}>
+                      <span style={{ color: delta > 0 ? "var(--accent-foreground)" : "var(--danger)", fontWeight: 700 }}>
                         {fmt(Math.round(projected))}
                       </span>
-                      <span style={{ fontSize: 11, opacity: 0.55 }}>MAD</span>
+                      <span style={{ fontSize: 12, opacity: 0.55 }}>MAD</span>
                     </>
                   ) : (
-                    <>{fmt(Math.round(cat.available))} <span style={{ fontSize: 11, opacity: 0.6 }}>MAD</span></>
+                    <>{fmt(Math.round(cat.available))} <span style={{ fontSize: 12, opacity: 0.6 }}>MAD</span></>
                   )}
                 </span>
               );
@@ -891,10 +875,10 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
 
       {showSplit && amount > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
-          <span>👨 {fmt(Math.round(amount * JOINT_SPLIT.anas))}</span>
+          <span><ManIcon size={13} aria-hidden="true" /> {fmt(Math.round(amount * JOINT_SPLIT.anas))}</span>
           <span style={{ opacity: 0.3 }}>·</span>
-          <span>👩 {fmt(Math.round(amount * JOINT_SPLIT.salma))}</span>
-          <span style={{ fontSize: 11, opacity: 0.55 }}>MAD</span>
+          <span><WomanIcon size={13} aria-hidden="true" /> {fmt(Math.round(amount * JOINT_SPLIT.salma))}</span>
+          <span style={{ fontSize: 12, opacity: 0.55 }}>MAD</span>
         </div>
       )}
     </div>
@@ -930,7 +914,7 @@ const headerStyle: CSSProperties = {
 };
 
 const eyebrowStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -970,7 +954,7 @@ const leftHeroStyle: CSSProperties = {
 };
 
 const leftHeroLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: 0.6,
   textTransform: "uppercase",
@@ -978,10 +962,10 @@ const leftHeroLabelStyle: CSSProperties = {
 };
 
 const afterLockBadgeStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 0.3,
-  color: "var(--accent)",
+  color: "var(--accent-foreground)",
   background: "color-mix(in srgb, var(--accent) 12%, transparent)",
   borderRadius: 6,
   padding: "2px 6px",
@@ -1023,7 +1007,7 @@ const recapCardStyle: CSSProperties = {
 };
 
 const recapEyebrowStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -1071,7 +1055,7 @@ const catNameStyle: CSSProperties = {
 
 const amountInputStyle: CSSProperties = {
   width: 86,
-  height: 36,
+  height: 44,
   borderRadius: 10,
   border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
   background: "var(--bg)",
@@ -1086,8 +1070,8 @@ const amountInputStyle: CSSProperties = {
 };
 
 const freezeBtnStyle: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 44,
+  height: 44,
   borderRadius: 10,
   border: "none",
   background: "transparent",
@@ -1169,13 +1153,4 @@ const lockButtonStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 800,
   boxShadow: "0 6px 18px color-mix(in srgb, var(--accent) 28%, transparent)",
-};
-
-const saveErrorStyle: CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 12,
-  background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-  color: "var(--danger)",
-  fontSize: 12,
-  lineHeight: 1.4,
 };

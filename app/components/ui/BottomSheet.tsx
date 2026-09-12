@@ -5,12 +5,14 @@ import {
   type ReactNode,
   type RefObject,
   useEffect,
+  useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createPortal } from "react-dom";
 
 const DESKTOP_BREAKPOINT = 600;
+const MOBILE_SHEET_TOP = "calc(var(--safe-top) + 76px)";
 
 type BottomSheetProps = {
   open: boolean;
@@ -46,19 +48,18 @@ export function BottomSheet({
   labelledBy,
   panelRef,
   maxWidth = "520px",
-  maxHeight,
   zIndex = 70,
   showHandle = true,
   panelStyle,
   contentStyle,
   backdropStrength = 0.16,
-  snapPoints,
-  initialSnap = 1,
-  detent = "default",
   align = "bottom",
   desktopFullscreen = false,
 }: BottomSheetProps) {
   const [mounted, setMounted] = useState(false);
+  const localPanelRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const reduceMotion = useReducedMotion();
   useEffect(() => setMounted(true), []);
 
   const [isDesktop, setIsDesktop] = useState(false);
@@ -69,18 +70,31 @@ export function BottomSheet({
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Height for the outer animation wrapper (only for "default" detent with snap points).
-  // For "content" detent, the consumer sets height via panelStyle.
-  const wrapperHeight = (() => {
-    if (detent !== "default") return undefined;
-    if (snapPoints && snapPoints[initialSnap] !== undefined) {
-      return `${snapPoints[initialSnap] * 100}dvh`;
-    }
-    return maxHeight ?? "calc(100dvh - 20px)";
-  })();
+  useEffect(() => {
+    if (!open) return;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = panelRef?.current ?? localPanelRef.current;
+    if (!panel) return;
 
-  const wrapperMaxHeight =
-    detent === "content" ? (maxHeight ?? "calc(100dvh - 20px)") : undefined;
+    const selector = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+    const focusable = () => Array.from(panel.querySelectorAll<HTMLElement>(selector)).filter(element => !element.hidden);
+    const frame = requestAnimationFrame(() => (focusable()[0] ?? panel).focus());
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKeyDown);
+      returnFocusRef.current?.focus();
+    };
+  }, [open, onClose, panelRef, mounted]);
 
   if (!mounted) return null;
 
@@ -89,14 +103,17 @@ export function BottomSheet({
       {/* Backdrop */}
       <motion.div
         key="sheet-backdrop"
-        initial={{ opacity: 0 }}
+        initial={reduceMotion ? false : { opacity: 0 }}
         animate={{ opacity: isDesktop ? Math.max(backdropStrength, 0.25) : backdropStrength }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.22 }}
+        transition={{ duration: reduceMotion ? 0 : 0.22 }}
         onClick={onClose}
         style={{
           position: "fixed",
-          inset: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
           background: "black",
           zIndex: zIndex - 1,
         }}
@@ -112,11 +129,13 @@ export function BottomSheet({
        */}
       <motion.div
         key="sheet-panel"
-        initial={isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
+        initial={reduceMotion ? false : isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
         animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
         exit={isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
         transition={
-          isDesktop
+          reduceMotion
+            ? { duration: 0 }
+            : isDesktop
             ? { type: "spring", stiffness: 400, damping: 32 }
             : { type: "spring", stiffness: 380, damping: 38 }
         }
@@ -154,7 +173,7 @@ export function BottomSheet({
                   width: `min(${maxWidth}, calc(100vw - 48px))`,
                   height: "auto",
                   maxHeight: "calc(100dvh - 80px)",
-                  borderRadius: 20,
+                  borderRadius: "var(--radius-sheet)",
                   zIndex,
                   display: "flex",
                   flexDirection: "column",
@@ -162,12 +181,12 @@ export function BottomSheet({
                 }
             : {
                 position: "fixed",
+                top: MOBILE_SHEET_TOP,
                 bottom: 0,
                 left: "50%",
                 x: "-50%",
-                width: `min(${maxWidth}, 100vw)`,
-                height: wrapperHeight,
-                maxHeight: wrapperMaxHeight,
+                width: `min(${maxWidth}, 90vw)`,
+                height: "auto",
                 zIndex,
                 display: "flex",
                 flexDirection: "column",
@@ -179,17 +198,21 @@ export function BottomSheet({
          * position:"relative" from sheetStyle is safe here (parent is fixed).
          */}
         <div
-          ref={panelRef}
-          role="dialog"
-          aria-modal="true"
+          ref={panelRef ?? localPanelRef}
+          role={isDesktop ? "dialog" : "region"}
+          aria-modal={isDesktop ? "true" : undefined}
           aria-label={label}
           aria-labelledby={labelledBy}
+          tabIndex={-1}
           style={{
             flex: 1,
             minHeight: 0,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
+            boxShadow: isDesktop
+              ? "0 20px 56px rgba(20, 24, 22, 0.16)"
+              : "0 -8px 28px rgba(20, 24, 22, 0.10)",
             ...panelStyle,
             ...(desktopFullscreen && isDesktop ? { borderRadius: 0 } : {}),
           }}

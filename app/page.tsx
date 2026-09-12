@@ -19,11 +19,13 @@ import { MonthStartPlanner } from "./components/MonthStartPlanner";
 import { JointAllocateSheet } from "./components/JointAllocateSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
+import { TransactionDetailsSheet } from "./components/TransactionDetailsSheet";
 import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
   categoryMatchesScope,
   categoryIdMatchesScope,
   evalExpr,
+  expenseBalancePreview,
   fmtDate,
   getCategoryScope,
   getLeftToAssignByScope,
@@ -47,6 +49,22 @@ const LOADING_LINES = [
 const FALLBACK_ACCOUNTS: Account[] = [];
 
 const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15000) });
+    const data = await response.json();
+    if (response.ok) return data as T;
+    if ((response.status === 429 || response.status >= 500) && attempt < retries) {
+      await wait(900 * (attempt + 1));
+      continue;
+    }
+    throw new Error(data.error || `Request failed with status ${response.status}`);
+  }
+  throw new Error("Request failed");
+}
 
 const isHouseholdCategory = (category: Category) => {
   return category.type.some((value) => {
@@ -86,7 +104,7 @@ function SectionHeader({
 export default function App() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<"wife" | "husband">("husband");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
   const [categories, setCategories] = useState<Category[]>([]);
   const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
@@ -101,6 +119,11 @@ export default function App() {
     spentByCategory: [],
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshState, setRefreshState] = useState<"idle" | "updating" | "stale">("idle");
+  const [budgetRefreshing, setBudgetRefreshing] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [tab, setTab] = useState<"home" | "plan" | "budget" | "history">("home");
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
   const [plannerMonth, setPlannerMonth] = useState(formatMonthInput(today()));
@@ -109,6 +132,7 @@ export default function App() {
   const [plannerSummaryReady, setPlannerSummaryReady] = useState(false);
   const [plannerMonthlySummary, setPlannerMonthlySummary] = useState<MonthlySummary | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [transactionType, setTransactionType] = useState<"Expense" | "Income">("Expense");
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [detailsCategory, setDetailsCategory] = useState<Category | null>(null);
   const [showRebalance, setShowRebalance] = useState(false);
@@ -123,6 +147,10 @@ export default function App() {
   const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
   const [homeSearch, setHomeSearch] = useState("");
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [editingOriginal, setEditingOriginal] = useState<{ amount: number; accountId: string } | null>(null);
+  const [detailsTransaction, setDetailsTransaction] = useState<Transaction | null>(null);
+  const [archivedTransaction, setArchivedTransaction] = useState<Transaction | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<"idle" | "archiving" | "archived" | "restoring" | "error">("idle");
 
   const [amount, setAmount] = useState("");
   const [name, setName] = useState("");
@@ -135,6 +163,7 @@ export default function App() {
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [draftOffer, setDraftOffer] = useState<{ amount: string; name: string; accountId: string; categoryId: string; date: string; scope: BudgetScope; timestamp: number } | null>(null);
   const [loadingLineIdx, setLoadingLineIdx] = useState(0);
 
   const [microToast, setMicroToast] = useState<string | null>(null);
@@ -148,11 +177,14 @@ export default function App() {
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const initialAcctApplied = useRef(false);
   const initialCatApplied = useRef(false);
+  const initialLoadStarted = useRef(false);
+  const initialLoadComplete = useRef(false);
   const plannerMonthHydrated = useRef(false);
   const loadedPendingId = useRef<string | null>(null);
   const rebalanceReturnToAdd = useRef(false);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const balanceAnimRef = useRef<number | null>(null);
   const fuseRef = useRef<Fuse<{ description: string; categoryId: string }> | null>(null);
@@ -174,7 +206,7 @@ export default function App() {
       setBudgetScope(savedScope);
     }
     const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark" || savedTheme === "light") {
+    if (savedTheme === "dark" || savedTheme === "light" || savedTheme === "system") {
       setTheme(savedTheme);
       document.documentElement.dataset.theme = savedTheme;
     }
@@ -185,14 +217,18 @@ export default function App() {
     if (mode) document.documentElement.dataset.mode = mode;
   }, [mode]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => {
-      const next = prev === "dark" ? "light" : "dark";
-      document.documentElement.dataset.theme = next;
-      localStorage.setItem("theme", next);
-      return next;
-    });
+  const selectTheme = useCallback((next: "system" | "light" | "dark") => {
+    setTheme(next);
+    localStorage.setItem("theme", next);
   }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => { document.documentElement.dataset.theme = theme === "system" ? (media.matches ? "dark" : "light") : theme; };
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [theme]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -234,7 +270,7 @@ export default function App() {
   };
 
   const fetchTransactions = async () => {
-    const data = await fetch("/api/transactions?page_size=100").then((r) => r.json());
+    const data = await fetchApiJson<{ transactions?: Transaction[] }>("/api/transactions?page_size=100");
     const txns: Transaction[] = data.transactions ?? [];
     setTransactions(txns);
     const latestCat = txns.find(t => (!t.type || t.type === "Expense") && t.category)?.category;
@@ -251,32 +287,22 @@ export default function App() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (tab !== "history") return;
     fetchHistoryTransactions(historyMonth);
-  }, [historyMonth, fetchHistoryTransactions]);
+  }, [tab, historyMonth, fetchHistoryTransactions]);
 
   const fetchMonthlySummary = async (month?: string) => {
-    try {
-      const target = month ?? formatMonthInput(today());
-      const { start, end } = monthBounds(`${target}-01`);
-      const data = await fetch(`/api/monthly-summary?start=${start}&end=${end}`).then((r) => r.json());
-      setMonthlySummary({
-        start,
-        end,
-        totalAssigned: data.summary?.totalAssigned ?? 0,
-        totalSpent: data.summary?.totalSpent ?? 0,
-        assignedByCategory: data.summary?.assignedByCategory ?? [],
-        spentByCategory: data.summary?.spentByCategory ?? [],
-      });
-    } catch {
-      setMonthlySummary({
-        start: "",
-        end: "",
-        totalAssigned: 0,
-        totalSpent: 0,
-        assignedByCategory: [],
-        spentByCategory: [],
-      });
-    }
+    const target = month ?? formatMonthInput(today());
+    const { start, end } = monthBounds(`${target}-01`);
+    const data = await fetchApiJson<{ summary?: MonthlySummary }>(`/api/monthly-summary?start=${start}&end=${end}`);
+    setMonthlySummary({
+      start,
+      end,
+      totalAssigned: data.summary?.totalAssigned ?? 0,
+      totalSpent: data.summary?.totalSpent ?? 0,
+      assignedByCategory: data.summary?.assignedByCategory ?? [],
+      spentByCategory: data.summary?.spentByCategory ?? [],
+    });
   };
 
   const fetchMonthlyTrend = async () => {
@@ -315,9 +341,24 @@ export default function App() {
   };
 
   const fetchCategories = async () => {
-    const data = await fetch("/api/categories").then((r) => r.json());
-    setCategories(data.categories ?? []);
-    if (data.categories?.length > 0 && !categoryId) setCategoryId(data.categories[0].id);
+    const data = await fetchApiJson<{ categories?: Category[] }>("/api/categories");
+    const loadedCategories = data.categories ?? [];
+    setCategories(loadedCategories);
+    if (loadedCategories.length > 0 && !categoryId) setCategoryId(loadedCategories[0].id);
+  };
+
+  const fetchCategoryCatalog = async () => {
+    const data = await fetchApiJson<{ categories?: Category[] }>("/api/categories?includeSnoozed=true");
+    const catalog: Category[] = data.categories ?? [];
+    const active = catalog.filter((category) => !category.snoozed && !category.archived);
+    setCategories(active);
+    setFrozenCategories(catalog.filter((category) => category.snoozed && !category.archived));
+    if (active.length > 0 && !categoryId) setCategoryId(active[0].id);
+  };
+
+  const fetchAccounts = async () => {
+    const data = await fetchApiJson<{ accounts?: Account[] }>("/api/accounts");
+    setAccounts(data.accounts ?? []);
   };
 
   const fetchFrozenCategories = async () => {
@@ -331,26 +372,65 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchCategories().finally(() => setLoading(false));
-    fetchFrozenCategories();
+    if (initialLoadStarted.current && loadAttempt === 0) return;
+    initialLoadStarted.current = true;
 
-    fetch("/api/accounts")
-      .then((r) => r.json())
-      .then((data) => {
-        const accs: Account[] = data.accounts ?? [];
-        setAccounts(accs);
-      });
+    const loadLiveData = async () => {
+      try {
+        setLoading(true);
+        setLoadError(null);
+        // Notion enforces a low request rate. Load the home dependencies in
+        // sequence so a page refresh does not fan out into a burst of 429s.
+        await fetchCategoryCatalog();
+        await fetchAccounts();
+        await fetchTransactions();
+        await fetchPending();
+        await fetchMonthlySummary(homeMonth);
+        await fetchNextMonthFunds();
+        setLastUpdatedAt(new Date());
+      } catch (error) {
+        console.error("[app] Failed to load live data:", error);
+        setLoadError(error instanceof Error ? error.message : "Could not load financial data");
+      } finally {
+        initialLoadComplete.current = true;
+        setLoading(false);
+      }
+    };
 
-    fetchTransactions();
-    fetchPending();
-    fetchMonthlyTrend();
-    fetchNextMonthFunds(); // eslint-disable-line react-hooks/exhaustive-deps
-  }, []);
+    void loadLiveData();
+  }, [loadAttempt]);
+
+  useEffect(() => {
+    if (!mounted || !categories.length || !accounts.length) return;
+    try {
+      const raw = localStorage.getItem(`expenseDraft:v1:${mode}`);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.version !== 1 || Date.now() - Number(parsed.timestamp) > 7 * 86400000) {
+        localStorage.removeItem(`expenseDraft:v1:${mode}`);
+        return;
+      }
+      setDraftOffer(parsed);
+    } catch {}
+  }, [mounted, mode, categories.length, accounts.length]);
+
+  useEffect(() => {
+    if (!mounted || !showAddModal || editingTransactionId || draftOffer) return;
+    const payload = { version: 1, timestamp: Date.now(), amount, name, accountId, categoryId, date, scope: budgetScope };
+    if (!amount && !name) return;
+    try { localStorage.setItem(`expenseDraft:v1:${mode}`, JSON.stringify(payload)); } catch {}
+  }, [mounted, showAddModal, editingTransactionId, draftOffer, amount, name, accountId, categoryId, date, budgetScope, mode]);
 
   // Refetch monthly summary whenever the viewed home month changes
   useEffect(() => {
+    if (!initialLoadComplete.current) return;
     fetchMonthlySummary(homeMonth); // eslint-disable-line react-hooks/exhaustive-deps
   }, [homeMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tab !== "history") return;
+    void fetchMonthlyTrend();
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the open account-details sheet pointed at the freshest account snapshot
   // instead of the one captured when the sheet was opened.
@@ -378,7 +458,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!plannerMonth) return;
+    if (!showMonthStartPlanner || !plannerMonth) return;
     setPlannerSummaryReady(false);
     setPlannerMonthlySummary(null);
     const { start, end } = monthBounds(`${plannerMonth}-01`);
@@ -409,7 +489,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [plannerMonth]);
+  }, [showMonthStartPlanner, plannerMonth]);
 
   useEffect(() => {
     if (initialAcctApplied.current) return;
@@ -527,6 +607,7 @@ export default function App() {
 
   const loadPending = (item: PendingItem) => {
     setEditingTransactionId(null);
+    setTransactionType("Expense");
     setName(item.name);
     if (item.amount !== null) setAmount(String(item.amount));
     if (item.date) setDate(item.date);
@@ -540,7 +621,13 @@ export default function App() {
   };
 
   const editTransaction = (transaction: Transaction) => {
+    if (transaction.type !== "Expense" && transaction.type != null) {
+      setDetailsTransaction(transaction);
+      return;
+    }
     setEditingTransactionId(transaction.id);
+    setTransactionType("Expense");
+    setEditingOriginal({ amount: transaction.amount, accountId: transaction.accountId ?? "" });
     setName(transaction.name);
     setAmount(transaction.amount ? String(transaction.amount) : "");
     setDate(transaction.date || today());
@@ -549,8 +636,8 @@ export default function App() {
     setShowDatePicker(false);
     setShowCatPicker(false);
     setShowAccountPicker(false);
-    if (transaction.category) setCategoryId(transaction.category);
-    if (transaction.accountId) setAccountId(transaction.accountId);
+    setCategoryId(transaction.category ?? "");
+    setAccountId(transaction.accountId ?? "");
     loadedPendingId.current = null;
     setShowAddModal(true);
   };
@@ -567,11 +654,58 @@ export default function App() {
       });
   };
 
-  const deleteTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-    setHistoryTransactions((prev) => prev.filter((t) => t.id !== id));
-    fetch("/api/transactions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
-      .then((r) => { if (!r.ok) { fetchTransactions(); fetchHistoryTransactions(historyMonth); } else fetchMonthlySummary(homeMonth); });
+  const refreshAffectedData = useCallback(async () => {
+    setRefreshState("updating");
+    const results = await Promise.allSettled([
+      fetchTransactions(), fetchHistoryTransactions(historyMonth), fetchCategoryCatalog(), fetchAccounts(), fetchMonthlySummary(homeMonth),
+    ]);
+    if (results.some(result => result.status === "rejected")) {
+      setRefreshState("stale");
+      throw new Error("Some balances or activity could not be refreshed");
+    }
+    setRefreshState("idle");
+    setLastUpdatedAt(new Date());
+  }, [historyMonth, homeMonth, fetchHistoryTransactions]);
+
+  const deleteTransaction = async (id: string) => {
+    const transaction = historyTransactions.find(item => item.id === id) ?? transactions.find(item => item.id === id);
+    if (!transaction) return false;
+    setArchiveStatus("archiving");
+    try {
+      const response = await fetch("/api/transactions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not archive transaction");
+      setTransactions(prev => prev.filter(item => item.id !== id));
+      setHistoryTransactions(prev => prev.filter(item => item.id !== id));
+      setArchivedTransaction(transaction);
+      setArchiveStatus("archived");
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = setTimeout(() => { setArchivedTransaction(null); setArchiveStatus("idle"); }, 10000);
+      void refreshAffectedData().catch(error => showToast(error.message));
+      return true;
+    } catch (error) {
+      setArchiveStatus("error");
+      showToast(error instanceof Error ? error.message : "Could not archive transaction");
+      return false;
+    }
+  };
+
+  const restoreArchivedTransaction = async () => {
+    const transaction = archivedTransaction;
+    if (!transaction) return;
+    setArchiveStatus("restoring");
+    try {
+      const response = await fetch("/api/transactions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: transaction.id }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not restore transaction");
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setArchivedTransaction(null);
+      setArchiveStatus("idle");
+      await refreshAffectedData();
+    } catch (error) {
+      setArchiveStatus("error");
+      showToast(error instanceof Error ? error.message : "Could not restore transaction");
+    }
   };
 
   const selectedCat = categories.find((c) => c.id === categoryId);
@@ -662,11 +796,15 @@ export default function App() {
     setCategoryManageMode("create");
   };
 
-  const refreshBudgetData = (message?: string) => {
-    fetchCategories();
-    fetchFrozenCategories();
-    fetchMonthlySummary(homeMonth);
-    fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
+  const refreshBudgetData = async (message?: string) => {
+    setBudgetRefreshing(true);
+    await Promise.allSettled([
+      fetchCategories(),
+      fetchFrozenCategories(),
+      fetchMonthlySummary(homeMonth),
+      fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? [])),
+    ]);
+    setBudgetRefreshing(false);
     if (message) showToast(message, 1500);
   };
 
@@ -816,8 +954,8 @@ export default function App() {
     [budgetScope, categories, pendingItems],
   );
 
-  // Joint contribution status — single source of truth for Home + Insights.
-  // Uses historyTransactions (month-filtered, all transactions for the month).
+  // Joint contribution status — single source of truth for the Home partner cards.
+  // Uses the current month's transactions already loaded for the Home screen.
   const contribStatus = useMemo(() => {
     if (budgetScope !== "joint" || !accounts.length) return null;
     const jointSummary = getMonthlySummaryForScope("joint");
@@ -833,9 +971,11 @@ export default function App() {
     const salmaContribPct = salmaAcc?.contributionPercent ?? null;
     if (anasContribPct == null && salmaContribPct == null) return null;
 
-    // Use scope-filtered history transactions — joint scope includes:
+    // Joint scope includes:
     // personal-account expenses on joint categories + all category-less transfers
-    const jointTxns = historyTransactions.filter(t => transactionMatchesScope(t, categories, "joint", accounts));
+    const jointTxns = transactions.filter(
+      (transaction) => transaction.date?.startsWith(homeMonth) && transactionMatchesScope(transaction, categories, "joint", accounts),
+    );
     const expenseTxns = jointTxns.filter(t => t.category && (!t.type || t.type === "Expense"));
 
     let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
@@ -868,8 +1008,12 @@ export default function App() {
       anasPlan, salmaPlan,
       anasActual: anasPocket + anasFunded,
       salmaActual: salmaPocket + salmaFunded,
+      anasDirectSpend: anasPocket,
+      salmaDirectSpend: salmaPocket,
+      anasTransferred: anasFunded,
+      salmaTransferred: salmaFunded,
     };
-  }, [budgetScope, accounts, historyTransactions, categories, getMonthlySummaryForScope]);
+  }, [budgetScope, accounts, transactions, homeMonth, categories, getMonthlySummaryForScope]);
 
   const selectedDateLabel =
     date === today() ? "Today" :
@@ -878,7 +1022,11 @@ export default function App() {
     fmtDate(date);
 
   const amountAfterBalance = displayedBalance !== null && amount && evalExpr(amount) > 0
-    ? displayedBalance - evalExpr(amount)
+    ? editingOriginal
+      ? expenseBalancePreview({ currentAccountId: accountId, currentBalance: displayedBalance, originalAccountId: editingOriginal.accountId, originalAmount: editingOriginal.amount, editedAmount: evalExpr(amount) })
+      : transactionType === "Income"
+        ? displayedBalance + evalExpr(amount)
+        : displayedBalance - evalExpr(amount)
     : null;
 
   const suggestCategory = (query: string) => {
@@ -904,13 +1052,14 @@ export default function App() {
   };
 
   const submit = async () => {
-    if (!amount || !name || !categoryId) return;
+    if (!amount || !name || !accountId || (transactionType === "Expense" && !categoryId)) return;
     setStatus("saving");
     setErrorMsg("");
     const isEditing = Boolean(editingTransactionId);
     try {
       const payload = { name, amount: evalExpr(amount), accountId, categoryId, date };
-      const res = await fetch(isEditing ? "/api/transactions" : "/api/expense", {
+      const endpoint = isEditing ? "/api/transactions" : transactionType === "Income" ? "/api/monthly-income" : "/api/expense";
+      const res = await fetch(endpoint, {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(isEditing ? { id: editingTransactionId, ...payload } : payload),
@@ -921,15 +1070,17 @@ export default function App() {
       setStatus("success");
       showToast(isEditing ? "Transaction updated" : "Saved", 1500);
 
-      const newEntry = { description: name.trim(), categoryId };
-      setCorpus((prev) => {
-        const updated = [...prev, newEntry].slice(-100);
-        localStorage.setItem("expenseCorpus", JSON.stringify(updated));
-        return updated;
-      });
+      if (transactionType === "Expense") {
+        const newEntry = { description: name.trim(), categoryId };
+        setCorpus((prev) => {
+          const updated = [...prev, newEntry].slice(-100);
+          localStorage.setItem("expenseCorpus", JSON.stringify(updated));
+          return updated;
+        });
+      }
 
       const expAmt = evalExpr(amount);
-      if (!isEditing && displayedBalance !== null) animateBalance(displayedBalance, displayedBalance - expAmt);
+      if (!isEditing && displayedBalance !== null) animateBalance(displayedBalance, displayedBalance + (transactionType === "Income" ? expAmt : -expAmt));
       fetchTransactions();
       fetchMonthlySummary(homeMonth);
       fetchCategories();
@@ -946,9 +1097,15 @@ export default function App() {
         loadedPendingId.current = null;
       }
 
+      if (!isEditing) {
+        try { localStorage.removeItem(`expenseDraft:v1:${mode}`); } catch {}
+        setDraftOffer(null);
+      }
+
       setAmount("");
       setName("");
       setEditingTransactionId(null);
+      setEditingOriginal(null);
       setSuggestedCatId(null);
       setDate(today());
       if (isEditing) {
@@ -980,11 +1137,15 @@ export default function App() {
     );
   }
 
+  if (loadError && !categories.length && !accounts.length) {
+    return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 20, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 22 }}>Could not load your finances</h1><p style={{ margin: "10px 0 18px", color: "var(--text2)" }}>No balances were replaced. Check the connection and try again.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ minHeight: 48, padding: "0 18px", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>Retry</button></section></main>;
+  }
+
   const parsedAmount = amount ? evalExpr(amount) : 0;
   const isEditingTransaction = Boolean(editingTransactionId);
-  const categoryUnfunded = !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
-  const categoryOverBudget = !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
-  const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && categoryId && accountId && status === "idle" && !categoryUnfunded && !categoryOverBudget);
+  const categoryUnfunded = transactionType === "Expense" && !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
+  const categoryOverBudget = transactionType === "Expense" && !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
+  const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && accountId && (transactionType === "Income" || categoryId) && status === "idle" && !categoryUnfunded && !categoryOverBudget);
   const suggestedCategory = suggestedCatId ? categories.find((c) => c.id === suggestedCatId) : undefined;
 
   return (
@@ -994,20 +1155,31 @@ export default function App() {
       onTabChange={(t) => { setTab(t); setShowManageScreen(false); }}
       onOpenAdd={() => {
         setEditingTransactionId(null);
+        setTransactionType("Expense");
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
       budgetScope={budgetScope}
       onBudgetScopeChange={setBudgetScope}
+      personalScope={mode === "wife" ? "salma" : "anas"}
+      onBudgetSearch={() => window.dispatchEvent(new Event("open-budget-search"))}
+      onInsightsSearch={() => window.dispatchEvent(new Event("open-insights-search"))}
+      onBudgetRebalance={() => setShowRebalance(true)}
       theme={theme}
-      onToggleTheme={toggleTheme}
+      onSelectTheme={selectTheme}
       toast={microToast}
       showAddButton={tab !== "plan" && !showManageScreen}
-      immersive={tab === "plan" || showManageScreen}
+      immersive={tab === "plan"}
     >
+      {refreshState !== "idle" && (
+        <div role="status" aria-live="polite" style={refreshStatusStyle}>
+          {refreshState === "updating" ? "Updating" : <>Could not refresh · <button type="button" onClick={() => void refreshAffectedData().catch(error => showToast(error.message))}>Retry</button></>}
+        </div>
+      )}
       {showManageScreen && (
         <ManageScreen
           accounts={accounts}
+          budgetScope={budgetScope}
           onClose={() => setShowManageScreen(false)}
           onOpenDetails={setDetailsAccount}
         />
@@ -1029,7 +1201,7 @@ export default function App() {
         onOpenNewCategory={openNewCategory}
       />
 
-      {!showManageScreen && tab === "home" && (
+      {tab === "home" && (
         <HomeScreen
           categories={homeCategories}
           selectedCategoryId={categoryId}
@@ -1076,7 +1248,7 @@ export default function App() {
         jointUnassigned={jointUnassigned}
       />
 
-      {!showManageScreen && <MonthlyPlanningFlow
+      {<MonthlyPlanningFlow
         open={tab === "plan"}
         selectedMonth={plannerMonth}
         onSelectedMonthChange={setPlannerMonth}
@@ -1101,7 +1273,7 @@ export default function App() {
         isUsingFallbackData={plannerUsesFallbackData}
       />}
 
-      {!showManageScreen && tab === "budget" && (
+      {tab === "budget" && (
         <CategoriesScreen
           categories={categories}
           frozenCategories={frozenCategories}
@@ -1117,12 +1289,13 @@ export default function App() {
           onReviveCategory={reviveCategory}
           onFundCategory={openFundCategory}
           onOpenNewCategory={openNewCategory}
+          loading={budgetRefreshing || refreshState === "updating"}
         />
       )}
 
-      {!showManageScreen && tab === "history" && (
+      {tab === "history" && (
         <InsightsScreen
-          transactions={scopedHistoryTransactions}
+          transactions={historyTransactions}
           categories={categories}
           accounts={accounts}
           budgetScope={budgetScope}
@@ -1162,6 +1335,14 @@ export default function App() {
         canSubmit={canSubmit}
         allCategories={categories.filter(c => !isSavingsCategory(c))}
         modeVariant={editingTransactionId ? "edit" : "create"}
+        transactionType={transactionType}
+        onTransactionTypeChange={(type) => {
+          setTransactionType(type);
+          setSuggestedCatId(null);
+          setShowCatPicker(false);
+          setStatus("idle");
+          setErrorMsg("");
+        }}
         onOpenRebalance={() => {
           rebalanceReturnToAdd.current = true;
           setShowAddModal(false);
@@ -1202,6 +1383,7 @@ export default function App() {
           }
           setShowAddModal(false);
           setEditingTransactionId(null);
+          setEditingOriginal(null);
           setStatus("idle");
         }}
         onAmountChange={(value) => {
@@ -1244,6 +1426,13 @@ export default function App() {
         accountRef={accountRef}
       />
 
+      <TransactionDetailsSheet
+        transaction={detailsTransaction}
+        accounts={accounts}
+        categories={categories}
+        onClose={() => setDetailsTransaction(null)}
+      />
+
       <CategoryDetailsSheet
         open={showCategoryDetails}
         category={detailsCategory}
@@ -1252,6 +1441,7 @@ export default function App() {
         onOpenAdd={() => {
           if (detailsCategory) selectCategory(detailsCategory);
           setEditingTransactionId(null);
+          setTransactionType("Expense");
           setShowCategoryDetails(false);
           setShowAddModal(true);
         }}
@@ -1310,11 +1500,12 @@ export default function App() {
           rebalanceReturnToAdd.current = false;
         }}
         categories={categories}
+        accounts={accounts}
         homeMonth={homeMonth}
         monthlySummary={monthlySummary}
+        budgetScope={budgetScope}
         readyToAssignByScope={readyToAssignByScope}
         jointUnassigned={jointUnassigned}
-        savingPool={savingPool}
         onSuccess={() => {
           refreshBudgetData("Rebalance applied");
           if (rebalanceReturnToAdd.current) {
@@ -1324,13 +1515,35 @@ export default function App() {
         }}
       />
 
+      {archivedTransaction && (
+        <div role="status" aria-live="polite" style={undoNoticeStyle}>
+          <span>{archiveStatus === "restoring" ? "Restoring transaction…" : archiveStatus === "error" ? "Restore failed; transaction remains archived." : "Transaction archived."}</span>
+          <button type="button" disabled={archiveStatus === "restoring"} onClick={restoreArchivedTransaction} style={undoButtonStyle}>
+            {archiveStatus === "error" ? "Retry" : "Undo"}
+          </button>
+        </div>
+      )}
+
+      {draftOffer && !showAddModal && (
+        <div role="dialog" aria-modal="true" aria-label="Restore expense draft" style={draftOverlayStyle}>
+          <div style={draftDialogStyle}>
+            <h2 style={{ fontSize: 20 }}>Restore unfinished expense?</h2>
+            <p style={{ color: "var(--text2)", lineHeight: 1.45 }}>A draft from {new Date(draftOffer.timestamp).toLocaleDateString()} is available. It will not be submitted automatically.</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={() => { try { localStorage.removeItem(`expenseDraft:v1:${mode}`); } catch {} setDraftOffer(null); }} style={draftSecondaryButtonStyle}>Discard</button>
+              <button type="button" onClick={() => { setAmount(draftOffer.amount); setName(draftOffer.name); setAccountId(accounts.some(a => a.id === draftOffer.accountId) ? draftOffer.accountId : ""); setCategoryId(categories.some(c => c.id === draftOffer.categoryId) ? draftOffer.categoryId : ""); setDate(draftOffer.date || today()); setBudgetScope(draftOffer.scope); setDraftOffer(null); setShowAddModal(true); }} style={draftPrimaryButtonStyle}>Restore</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AppShell>
   );
 }
 
 
 const ghostActionStyle: CSSProperties = {
-  minHeight: 34,
+  minHeight: 44,
   padding: "0 10px",
   borderRadius: 10,
   border: "1px solid var(--border)",
@@ -1338,3 +1551,20 @@ const ghostActionStyle: CSSProperties = {
   color: "var(--muted)",
   cursor: "pointer",
 };
+
+const undoNoticeStyle: CSSProperties = {
+  position: "fixed", left: 16, right: 16, bottom: "calc(92px + env(safe-area-inset-bottom))", zIndex: 200,
+  maxWidth: 480, margin: "0 auto", minHeight: 52, padding: "8px 10px 8px 16px", borderRadius: "var(--radius-card)",
+  background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+  boxShadow: "var(--elevation-float)", fontSize: 14,
+};
+
+const undoButtonStyle: CSSProperties = {
+  minWidth: 72, minHeight: 44, border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800,
+};
+
+const refreshStatusStyle: CSSProperties = { minHeight: 20, padding: "2px 18px 0", textAlign: "right", color: "var(--muted)", fontSize: 12 };
+const draftOverlayStyle: CSSProperties = { position: "fixed", inset: 0, zIndex: 220, background: "rgba(0,0,0,.35)", display: "grid", placeItems: "center", padding: 20 };
+const draftDialogStyle: CSSProperties = { width: "min(100%, 420px)", padding: 20, borderRadius: "var(--radius-sheet)", background: "var(--surface)", display: "grid", gap: 16 };
+const draftSecondaryButtonStyle: CSSProperties = { flex: 1, minHeight: 48, borderRadius: "var(--radius-control)", border: "1px solid var(--border2)", background: "var(--surface)", color: "var(--text)", fontWeight: 700 };
+const draftPrimaryButtonStyle: CSSProperties = { ...draftSecondaryButtonStyle, border: 0, background: "var(--accent)", color: "var(--accent-ink)" };

@@ -1,9 +1,13 @@
 "use client";
+import { DatePicker } from "./DatePicker";
+import { ChoicePicker } from "./ChoicePicker";
 
 import { useState, useMemo, useEffect, type CSSProperties } from "react";
 import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { Banner } from "./ui/Banner";
+import { TransactionRow } from "./ui/TransactionRow";
 import { Money } from "./Money";
 import type { Account, Category, Transaction } from "./app-types";
 import { fmt, fmtDate, monthBounds } from "./app-utils";
@@ -415,7 +419,7 @@ export function AccountDetailsSheet({
             </button>
           </div>
           <p style={{ ...heroValueStyle, color: isNegative ? "var(--danger)" : "var(--text)" }}>
-            <Money value={liveBalance} absolute={isNegative} />
+            <Money value={liveBalance} absolute={isNegative} animated animateOnMount />
           </p>
           {account.readyToAssign != null && (
             <p style={heroSubStyle}>
@@ -467,12 +471,12 @@ export function AccountDetailsSheet({
                     <XAxis
                       dataKey="day"
                       ticks={xTicks}
-                      tick={{ fontSize: 9, fill: "var(--muted)" }}
+                      tick={{ fontSize: 12, fill: "var(--muted)" }}
                       tickLine={false}
                       axisLine={false}
                     />
                     <YAxis
-                      tick={{ fontSize: 9, fill: "var(--muted)" }}
+                      tick={{ fontSize: 12, fill: "var(--muted)" }}
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={v => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
@@ -483,7 +487,7 @@ export function AccountDetailsSheet({
                         background: "var(--surface)",
                         border: "1px solid var(--border2)",
                         borderRadius: 10,
-                        fontSize: 11,
+                        fontSize: 12,
                         color: "var(--text2)",
                         boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                       }}
@@ -505,12 +509,12 @@ export function AccountDetailsSheet({
 
                 {/* Net change footer */}
                 <div style={chartFooterStyle}>
-                  <span style={{ fontSize: 10, color: "var(--muted)" }}>
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
                     {fmt(Math.abs(lastPoint?.balance ?? 0))} MAD
                   </span>
                   {chartData.netChange !== 0 && (
                     <span style={{
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: 700,
                       color: chartData.netChange > 0 ? "var(--action-income)" : "var(--danger)",
                     }}>
@@ -660,7 +664,7 @@ export function AccountDetailsSheet({
                   />
 
                   {txnType === "Expense" && (
-                    <select
+                    <ChoicePicker aria-label="Category"
                       value={txnCategoryId}
                       onChange={e => setTxnCategoryId(e.target.value)}
                       style={txnSelectStyle}
@@ -669,18 +673,17 @@ export function AccountDetailsSheet({
                       {activeCategories.map(c => (
                         <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>
                       ))}
-                    </select>
+                    </ChoicePicker>
                   )}
 
-                  <input
-                    type="date"
+                  <DatePicker
                     value={txnDate}
                     onChange={e => setTxnDate(e.target.value)}
                     max={new Date().toISOString().slice(0, 10)}
                     style={txnSelectStyle}
                   />
 
-                  {txnError && <div style={reconcileErrorStyle}>{txnError}</div>}
+                  {txnError && <Banner role="alert" tone="danger" compact>{txnError}</Banner>}
 
                   <button
                     type="button"
@@ -720,7 +723,7 @@ export function AccountDetailsSheet({
             </div>
 
             {reconcileError && (
-              <div style={reconcileErrorStyle}>{reconcileError}</div>
+              <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
             )}
 
             <button
@@ -814,22 +817,17 @@ export function AccountDetailsSheet({
                     const isTransferOut = t.type === "Transfer" && t.fromAccountId === acctId;
                     const isPositive = isIncome || isTransferIn;
                     const prefix = isPositive ? "+" : "−";
-                    const amtColor = isIncome ? "var(--action-income)" : isTransferIn ? "var(--action-income)" : isTransferOut ? "var(--danger)" : "var(--text2)";
                     return (
-                      <div key={t.id} style={txRowStyle}>
-                        {isIncome || isTransferIn || isTransferOut ? (
-                          <span style={txTypeIconStyle(isPositive)}>
-                            {isIncome ? "💰" : "↔"}
-                          </span>
-                        ) : (
-                          <CategoryIcon icon={cat?.icon ?? null} size={20} style={{ flexShrink: 0 }} />
-                        )}
-                        <span style={txNameStyle}>{t.name}</span>
-                        <div style={txRightStyle}>
-                          <span style={{ ...txAmtStyle, color: amtColor }}>{prefix}{fmt(t.amount)}</span>
-                          <span style={txDateStyle}>{t.date ? fmtDate(t.date) : ""}</span>
-                        </div>
-                      </div>
+                      <TransactionRow
+                        key={t.id}
+                        title={t.name}
+                        subtitle={!isIncome && !isTransferIn && !isTransferOut ? cat?.name : undefined}
+                        amount={t.amount}
+                        tone={isIncome ? "income" : isTransferIn || isTransferOut ? "transfer" : "expense"}
+                        prefix={prefix}
+                        date={t.date ? fmtDate(t.date) : undefined}
+                        icon={isIncome ? <BanknoteIcon size={15} /> : isTransferIn || isTransferOut ? <TransferIcon size={15} /> : <CategoryIcon icon={cat?.icon ?? null} size={20} />}
+                      />
                     );
                   })}
                 </div>
@@ -872,7 +870,7 @@ function ActionBtn({
 
 const panelStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
-  borderRadius: 20,
+  borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
@@ -916,7 +914,7 @@ const acctNameStyle: CSSProperties = {
 
 const acctTypeStyle: CSSProperties = {
   marginTop: 2,
-  fontSize: 11,
+  fontSize: 12,
   color: "var(--muted)",
   letterSpacing: 0.3,
   textTransform: "uppercase",
@@ -949,8 +947,8 @@ const heroTopRowStyle: CSSProperties = {
 };
 
 const chartToggleBtnStyle: CSSProperties = {
-  width: 28,
-  height: 28,
+  width: 44,
+  height: 44,
   borderRadius: 8,
   border: "none",
   cursor: "pointer",
@@ -975,8 +973,8 @@ const chartNavStyle: CSSProperties = {
 };
 
 const chartNavBtnStyle: CSSProperties = {
-  width: 30,
-  height: 30,
+  width: 44,
+  height: 44,
   borderRadius: 8,
   border: "none",
   background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
@@ -1011,7 +1009,7 @@ const chartFooterStyle: CSSProperties = {
 };
 
 const heroLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -1117,7 +1115,7 @@ const reconcileFieldStyle: CSSProperties = {
 };
 
 const reconcileLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   color: "var(--muted)",
   letterSpacing: 0.3,
@@ -1161,7 +1159,7 @@ const reconcileInputStyle: CSSProperties = {
 };
 
 const reconcileCurrencyStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 600,
   color: "var(--muted)",
   flexShrink: 0,
@@ -1169,7 +1167,7 @@ const reconcileCurrencyStyle: CSSProperties = {
 
 const differenceBandStyle = (diff: number): CSSProperties => ({
   minHeight: 40,
-  borderRadius: 10,
+  borderRadius: 999,
   background: diff === 0
     ? "color-mix(in srgb, var(--success) 10%, var(--surface))"
     : diff > 0
@@ -1189,19 +1187,11 @@ const differenceBandStyle = (diff: number): CSSProperties => ({
 });
 
 const differenceLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   textTransform: "uppercase",
   letterSpacing: 0.4,
   opacity: 0.7,
-};
-
-const reconcileErrorStyle: CSSProperties = {
-  borderRadius: 10,
-  padding: "10px 12px",
-  background: "color-mix(in srgb, var(--danger) 9%, var(--surface))",
-  color: "var(--danger)",
-  fontSize: 12,
 };
 
 // Add-transaction (inline, inside reconcile panel)
@@ -1249,7 +1239,7 @@ const txnTypeToggleStyle: CSSProperties = {
 };
 
 const txnTypePillStyle = (active: boolean): CSSProperties => ({
-  minHeight: 40,
+  minHeight: 44,
   borderRadius: 10,
   border: active ? "none" : "1px solid color-mix(in srgb, var(--border2) 55%, transparent)",
   background: active ? "var(--accent)" : "var(--surface)",
@@ -1370,7 +1360,7 @@ const sectionStyle: CSSProperties = {
 };
 
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 0.7,
   textTransform: "uppercase",
@@ -1386,7 +1376,7 @@ const sectionHeaderStyle: CSSProperties = {
 const seeAllBtnStyle: CSSProperties = {
   border: "none",
   background: "transparent",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 600,
   color: "var(--accent-ink)",
   cursor: "pointer",
@@ -1445,62 +1435,6 @@ const barFillStyle: CSSProperties = {
 };
 
 // Transactions
-const txRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  padding: "12px 14px",
-  background: "var(--surface)",
-  borderRadius: 12,
-};
-
-const txTypeIconStyle = (isIncome: boolean): CSSProperties => ({
-  flexShrink: 0,
-  width: 20,
-  height: 20,
-  borderRadius: 7,
-  background: isIncome
-    ? "color-mix(in srgb, var(--accent) 15%, transparent)"
-    : "color-mix(in srgb, var(--muted) 15%, transparent)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 11,
-  lineHeight: 1,
-  color: isIncome ? "var(--accent-ink)" : "var(--muted)",
-});
-
-const txNameStyle: CSSProperties = {
-  flex: 1,
-  fontSize: 13,
-  fontWeight: 500,
-  color: "var(--text2)",
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};
-
-const txRightStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-end",
-  gap: 4,
-  flexShrink: 0,
-};
-
-const txAmtStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-  color: "var(--text2)",
-  fontVariantNumeric: "tabular-nums",
-};
-
-const txDateStyle: CSSProperties = {
-  fontSize: 10,
-  color: "var(--muted)",
-  fontWeight: 400,
-};
-
 const emptyStyle: CSSProperties = {
   textAlign: "center",
   color: "var(--muted)",

@@ -22,7 +22,7 @@ export type Transaction = {
   date: string;
   category: string | null;
   accountId: string | null;
-  type?: "Expense" | "Income" | "Transfer";
+  type?: "Expense" | "Income" | "Transfer" | null;
   fromCategoryId?: string | null;
   toCategoryId?: string | null;
   fromAccountId?: string | null;
@@ -95,6 +95,7 @@ export type PlanningAllocationItem = {
   name: string;
   icon: string | null;
   amount: number;
+  spent?: number;
   available: number | null;
   lastMonthSpent: number | null;
   defaultAccount: string | null;

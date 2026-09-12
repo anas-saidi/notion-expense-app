@@ -3,20 +3,12 @@
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { CheckIcon, SearchIcon, ShuffleIcon, FreezeIcon, ChevronRightIcon, PlusIcon } from "./ui/icons";
+import { SwipeToDelete } from "./ui/SwipeToDelete";
+import { CheckIcon, ChevronRightIcon, PlusIcon } from "./ui/icons";
+import { ScreenChip } from "./ui/ScreenChip";
+import { SearchField } from "./ui/SearchField";
+import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope } from "./app-utils";
-import { PieChart, Pie, Cell, Sector } from "recharts";
-import type { PieSectorShapeProps } from "recharts";
-
-const CHART_COLORS = [
-  "var(--accent)",
-  "var(--partner-husband)",
-  "var(--partner-wife)",
-  "#a78bfa",
-  "#fb923c",
-  "#34d399",
-  "#60a5fa",
-];
 
 type Props = {
   categories: Category[];
@@ -33,6 +25,7 @@ type Props = {
   onReviveCategory: (cat: Category) => void;
   onFundCategory: (cat: Category) => void;
   onOpenNewCategory?: (defaultType: string) => void;
+  loading?: boolean;
 };
 
 type ScopeChip = BudgetScope;
@@ -57,16 +50,29 @@ export function CategoriesScreen({
   monthlySummary,
   homeMonth,
   budgetScope,
-  onSelectCategory,
   onOpenCategoryDetails,
   onOpenRebalance,
   onFreezeCategory,
   onReviveCategory,
   onFundCategory,
   onOpenNewCategory,
+  loading = false,
 }: Props) {
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showFrozenAll, setShowFrozenAll] = useState(false);
+  const [selectedSection, setSelectedSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    const openSearch = () => setSearchOpen(true);
+    window.addEventListener("open-budget-search", openSearch);
+    return () => window.removeEventListener("open-budget-search", openSearch);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   const spentByCategory = useMemo(() => {
     const map = new Map<string, number>();
@@ -106,61 +112,37 @@ export function CategoriesScreen({
     return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
   }, [categories, search, budgetScope, accounts, spentByCategory, plannedByCategory]);
 
-  // Frozen preview: flat, first 5, unfiltered (always visible regardless of scope)
-  const frozenPreview = frozenCategories.slice(0, 5);
-  const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
+  const visibleSection = activeGroups.some(group => group.label === selectedSection)
+    ? selectedSection
+    : activeGroups[0]?.label ?? null;
+  const visibleGroup = activeGroups.find(group => group.label === visibleSection);
+  const budgetHealth = useMemo(() => {
+    const rows = activeGroups.flatMap(group => group.items);
+    const allocated = rows.reduce((sum, row) => sum + row.planned, 0);
+    const spent = rows.reduce((sum, row) => sum + row.spent, 0);
+    const remaining = Math.max(0, allocated - spent);
+    return { remaining };
+  }, [activeGroups]);
+  const monthLabel = useMemo(() => {
+    const parsed = /^\d{4}-\d{2}$/.test(homeMonth) ? new Date(`${homeMonth}-01T12:00:00`) : new Date(homeMonth);
+    return Number.isNaN(parsed.getTime()) ? "Monthly budget" : parsed.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  }, [homeMonth]);
 
-  if (showFrozenAll) {
-    return (
-      <FrozenAllScreen
-        frozenCategories={frozenCategories}
-        onBack={() => setShowFrozenAll(false)}
-        onSelectCategory={onSelectCategory}
-        onOpenCategoryDetails={onOpenCategoryDetails}
-        onReviveCategory={onReviveCategory}
-      />
-    );
-  }
+  const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
 
   return (
     <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main" style={wrapStyle}>
 
-      {/* Rebalance action; scope is controlled globally by AppShell. */}
-      <div style={pillRailStyle}>
-        <button
-          type="button"
-          onClick={onOpenRebalance}
-          style={rebalanceBtnStyle}
-          aria-label="Rebalance budget"
-        >
-          <ShuffleIcon size={14} />
-          <span style={{ fontSize: 12, fontWeight: 600 }}>Rebalance</span>
-        </button>
-      </div>
-
-      {/* Budget distribution chart */}
-      <BudgetDistributionChart
-        key={budgetScope}
-        categories={categories}
-        monthlySummary={monthlySummary}
-        homeMonth={homeMonth}
-        scope={budgetScope}
-        onSelectCategory={onOpenCategoryDetails}
-      />
-
       {/* Search */}
-      {hasScopedCategories && (
-        <label style={searchWrapStyle}>
-          <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
-          <input
-            type="text"
-            aria-label="Search categories"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search categories"
-            style={searchInputStyle}
-          />
-        </label>
+      {hasScopedCategories && searchOpen && (
+        <SearchField
+          ref={searchInputRef}
+          value={search}
+          onChange={setSearch}
+          onClose={() => { setSearch(""); setSearchOpen(false); }}
+          placeholder="Search categories"
+          ariaLabel="Search categories"
+        />
       )}
 
       {/* Active groups */}
@@ -173,12 +155,59 @@ export function CategoriesScreen({
                 Add the first {BUDGET_SCOPE_LABELS[budgetScope].toLowerCase()} category
               </button>
             : null
-        : <div className="categories-groups" style={groupsStyle}>
-            {activeGroups.map(({ label, items }) => (
-              <section key={label} style={{ minWidth: 0 }}>
-                <div style={sectionLabelStyle}>{label}</div>
+        : <>
+            <section aria-label={`${fmt(Math.round(budgetHealth.remaining))} MAD available in ${monthLabel}`} style={budgetHealthStyle}>
+              <span style={budgetHealthTitleStyle}>{monthLabel}</span>
+              <span style={budgetHealthLabelStyle}>Available</span>
+              <span style={budgetHealthAmountStyle}>
+                <AnimatedCounter value={budgetHealth.remaining} animateOnMount />
+                <small style={budgetHealthCurrencyStyle}>MAD</small>
+              </span>
+            </section>
+
+            <div role="tablist" aria-label="Budget category groups" style={groupPillsStyle}>
+              {activeGroups.map(group => {
+                const selected = !showFrozenAll && group.label === visibleSection;
+                const groupAvailable = group.items.reduce((sum, item) => sum + (item.available ?? 0), 0);
+                return (
+                  <ScreenChip
+                    key={group.label}
+                    mode="tab"
+                    selected={selected}
+                    ariaLabel={`${group.label}, ${fmt(Math.round(groupAvailable))} MAD available`}
+                    onClick={() => { setShowFrozenAll(false); setSelectedSection(group.label); }}
+                    badge={fmt(Math.round(groupAvailable))}
+                    badgeTone="metric"
+                  >
+                    {group.label}
+                  </ScreenChip>
+                );
+              })}
+              {frozenCategories.length > 0 && (
+                <ScreenChip
+                  mode="tab"
+                  selected={showFrozenAll}
+                  ariaLabel={`Frozen, ${frozenCategories.length} categories`}
+                  onClick={() => setShowFrozenAll(true)}
+                  badge={frozenCategories.length}
+                >
+                  Frozen
+                </ScreenChip>
+              )}
+            </div>
+
+            {!showFrozenAll && loading && (
+              <section aria-label="Loading budget categories" aria-busy="true" style={{ minWidth: 0 }}>
+                <span style={srOnlyStyle} role="status">Loading budget categories</span>
+                <div style={railStyle}>
+                  {Array.from({ length: 3 }, (_, index) => <CategoryCardSkeleton key={index} />)}
+                </div>
+              </section>
+            )}
+            {!showFrozenAll && !loading && visibleGroup && (
+              <section key={visibleGroup.label} style={{ minWidth: 0 }} aria-label={`${visibleGroup.label} categories`}>
                 <div className="home-scroll-rail" style={railStyle}>
-                  {items.map(({ cat, available, spent, planned, health }, i) => (
+                  {visibleGroup.items.map(({ cat, available, spent, planned, health }, i) => (
                     <CategoryCard
                       key={cat.id}
                       cat={cat}
@@ -193,8 +222,8 @@ export function CategoriesScreen({
                   {onOpenNewCategory && (
                     <button
                       type="button"
-                      onClick={() => onOpenNewCategory(label)}
-                      aria-label={`Add new ${label} category`}
+                      onClick={() => onOpenNewCategory(visibleGroup.label)}
+                      aria-label={`Add new ${visibleGroup.label} category`}
                       className="ghost-card"
                       style={ghostCardStyle}
                     >
@@ -203,168 +232,41 @@ export function CategoriesScreen({
                   )}
                 </div>
               </section>
-            ))}
-          </div>
+            )}
+            {showFrozenAll && (
+              <section style={{ minWidth: 0 }} aria-label="Frozen categories">
+                <div className="home-scroll-rail" style={railStyle}>
+                  {frozenCategories.map((cat, i) => (
+                    <SwipeToDelete key={cat.id} variant="restore" deleteLabel={`Restore ${cat.name}`} onDelete={() => { onReviveCategory(cat); return true; }}>
+                      <button type="button" onClick={() => onOpenCategoryDetails(cat)} style={{ ...frozenRowStyle, animation: `fadeUp 0.22s ${Math.min(i * 0.025, 0.2)}s ease both` }} aria-label={cat.name}>
+                        <CategoryIcon icon={cat.icon} size={24} style={{ opacity: 0.5, flexShrink: 0 }} />
+                        <span style={frozenNameStyle}>{cat.name}</span>
+                        <ChevronRightIcon size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
+                      </button>
+                    </SwipeToDelete>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
       }
-
-      {/* Frozen preview */}
-      {frozenPreview.length > 0 && (
-        <div style={frozenPreviewWrapStyle}>
-          <div style={frozenPreviewHeaderStyle}>
-            <div style={frozenPreviewLabelStyle}>
-              <FreezeIcon size={10} strokeWidth={2} style={{ opacity: 0.5 }} />
-              <span>Frozen · {frozenCategories.length}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowFrozenAll(true)}
-              style={seeAllBtnStyle}
-              aria-label="See all frozen categories"
-            >
-              See all
-              <ChevronRightIcon size={12} strokeWidth={2.5} />
-            </button>
-          </div>
-          <div className="home-scroll-rail" style={railStyle}>
-            {frozenPreview.map((cat, i) => (
-              <div
-                key={cat.id}
-                style={{ ...cardStyle, animation: `fadeUp 0.22s ${Math.min(i * 0.025, 0.2)}s ease both` }}
-              >
-                <button
-                  type="button"
-                  onClick={() => onOpenCategoryDetails(cat)}
-                  style={cardBodyStyle}
-                  aria-label={cat.name}
-                >
-                  <CategoryIcon icon={cat.icon} size={22} style={{ opacity: 0.35, flexShrink: 0 }} />
-                  <span style={{ ...cardNameStyle, opacity: 0.45 }}>{cat.name}</span>
-                  <span style={cardUnitStyle}>Frozen</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onReviveCategory(cat)}
-                  style={cardActionStyle}
-                >
-                  Revive
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
     </div>
   );
 }
 
-/* ─── Frozen all screen ────────────────────────────────────────── */
-
-function FrozenAllScreen({
-  frozenCategories,
-  onBack,
-  onSelectCategory,
-  onOpenCategoryDetails,
-  onReviveCategory,
-}: {
-  frozenCategories: Category[];
-  onBack: () => void;
-  onSelectCategory: (cat: Category) => void;
-  onOpenCategoryDetails: (cat: Category) => void;
-  onReviveCategory: (cat: Category) => void;
-}) {
-  const [search, setSearch] = useState("");
-
-  const groups = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    const items = frozenCategories
-      .filter(cat =>
-        !q ||
-        cat.name.toLowerCase().includes(q) ||
-        cat.type.some(t => t.toLowerCase().includes(q))
-      )
-      .map(cat => ({ cat, section: cat.type[0] ?? "Other" }));
-
-    const map = new Map<string, typeof items>();
-    for (const row of items) {
-      if (!map.has(row.section)) map.set(row.section, []);
-      map.get(row.section)!.push(row);
-    }
-    return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
-  }, [frozenCategories, search]);
-
+function CategoryCardSkeleton() {
   return (
-    <div style={{ ...wrapStyle, animation: "fadeUp 0.2s ease both" }}>
-
-      {/* Header */}
-      <div style={headerStyle}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
-            type="button"
-            onClick={onBack}
-            style={backBtnStyle}
-            aria-label="Back to budget"
-          >
-            ←
-          </button>
-          <div>
-            <div style={eyebrowStyle}>Budget</div>
-            <h1 style={titleStyle}>Frozen</h1>
-          </div>
+    <div className="budget-category-skeleton" style={skeletonCardStyle} aria-hidden="true">
+      <span className="skeleton" style={skeletonIconStyle} />
+      <div style={skeletonContentStyle}>
+        <div style={skeletonTopStyle}>
+          <span className="skeleton" style={{ width: "32%", height: 18, borderRadius: 5 }} />
+          <span className="skeleton" style={{ width: 76, height: 18, borderRadius: 5 }} />
         </div>
+        <span className="skeleton" style={{ width: "100%", height: 6, borderRadius: 999 }} />
+        <span className="skeleton" style={{ width: 88, height: 12, borderRadius: 4 }} />
       </div>
-
-      {/* Search */}
-      <label style={searchWrapStyle}>
-        <SearchIcon size={14} style={{ color: "var(--muted)", flexShrink: 0 }} />
-        <input
-          type="text"
-          aria-label="Search frozen categories"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search frozen"
-          style={searchInputStyle}
-        />
-      </label>
-
-      {/* Grouped frozen rails */}
-      {groups.length === 0
-        ? <div style={emptyStyle}>No frozen categories.</div>
-        : <div className="categories-groups" style={groupsStyle}>
-            {groups.map(({ label, items }) => (
-              <section key={label} style={{ minWidth: 0 }}>
-                <div style={sectionLabelStyle}>{label}</div>
-                <div className="home-scroll-rail" style={railStyle}>
-                  {items.map(({ cat }, i) => (
-                    <div
-                      key={cat.id}
-                      style={{ ...cardStyle, animation: `fadeUp 0.22s ${Math.min(i * 0.025, 0.2)}s ease both` }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onOpenCategoryDetails(cat)}
-                        style={cardBodyStyle}
-                        aria-label={cat.name}
-                      >
-                        <CategoryIcon icon={cat.icon} size={22} style={{ opacity: 0.35, flexShrink: 0 }} />
-                        <span style={{ ...cardNameStyle, opacity: 0.45 }}>{cat.name}</span>
-                        <span style={cardUnitStyle}>Frozen</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onReviveCategory(cat)}
-                        style={cardActionStyle}
-                      >
-                        Revive
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-      }
-
     </div>
   );
 }
@@ -380,49 +282,48 @@ function CategoryCard({
   onOpenDetails: () => void;
 }) {
   const amountNum = Math.abs(available ?? 0);
-  const progressPct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
+  const availableAmount = Math.max(0, available ?? 0);
+  const barTotal = Math.max(planned, spent + availableAmount, 1);
+  const spentPct = Math.min(100, (spent / barTotal) * 100);
+  const availablePct = Math.min(Math.max(0, 100 - spentPct), (availableAmount / barTotal) * 100);
 
   // Animate between values on updates; show instantly on mount
   const displayAmount = useCountUp(amountNum, 580);
   const amountStr = available === null ? "—" : fmt(Math.round(displayAmount));
   const unitStr   = available === null ? "" : "MAD";
 
-  // Progress bar: scaleX from 0 on mount, transition on subsequent updates
-  const [barScale, setBarScale] = useState(0);
-  useEffect(() => { setBarScale(progressPct / 100); }, [progressPct]);
-
-  const barColor = health === "over" ? "var(--danger)"
-                 : health === "low"  ? "var(--warning)"
-                 :                     "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
-
   return (
     <div
       style={{ ...cardStyle, animation: `fadeUp 0.22s ${Math.min(index * 0.025, 0.2)}s ease both` }}
     >
+      <span style={categoryIconStageStyle} aria-hidden="true">
+        <CategoryIcon icon={cat.icon} size={36} decorative />
+      </span>
       <button type="button" onClick={onOpenDetails} style={cardBodyStyle}
         aria-label={`${cat.name}${health === "over" ? ", overbudget" : health === "low" ? ", low" : health === "funded" ? ", funded" : ", unfunded"}`}>
-        <div style={cardTopStyle}>
-          <CategoryIcon icon={cat.icon} size={22} style={{ flexShrink: 0 }} />
-          <span style={cardNameStyle}>{cat.name}</span>
-          <span style={cardBadgeStyle(health)}>
-            {health === "over" ? "Overbudget" : health === "low" ? "Low" : health === "funded" ? "Funded" : "Unfunded"}
+        <span style={categoryContentStyle}>
+          <span style={cardTopStyle}>
+            <span style={cardNameStyle}>{cat.name}</span>
+            <span style={cardBottomStyle}>
+              <span style={cardAmountStyle(health)}>{amountStr}</span>
+              <span style={cardUnitStyle}>{unitStr}</span>
+            </span>
           </span>
-        </div>
-        <div style={cardBottomStyle}>
-          {(health === "funded" || health === "low" || health === "over") && (
-            <div style={progressTrackStyle}>
-              <div style={{
-                height: "100%", width: "100%", borderRadius: 999,
-                background: barColor,
-                transformOrigin: "left center",
-                transform: `scaleX(${barScale})`,
-                transition: "transform 0.65s cubic-bezier(0.22, 1, 0.36, 1)",
-              }} />
-            </div>
-          )}
-          <span style={cardAmountStyle(health)}>{amountStr}</span>
-          <span style={cardUnitStyle}>{unitStr}</span>
-        </div>
+          <span style={budgetBarStyle} aria-hidden="true">
+            {health === "over" ? (
+              <span style={{ ...budgetBarSegmentStyle, width: "100%", background: "var(--danger)" }} />
+            ) : (
+              <>
+                <span style={{ ...budgetBarSegmentStyle, width: `${spentPct}%`, background: health === "low" ? "var(--warning-dim)" : "var(--accent-dim)" }} />
+                <span style={{ ...budgetBarSegmentStyle, width: `${availablePct}%`, background: health === "low" ? "var(--warning)" : "var(--accent)" }} />
+              </>
+            )}
+          </span>
+          <span style={budgetMetaStyle}>
+            <span style={budgetSpentStyle(spent)}>{fmt(Math.round(spent))} spent</span>
+            {health === "over" && <span>{fmt(Math.round(Math.abs(available ?? 0)))} overspent</span>}
+          </span>
+        </span>
       </button>
     </div>
   );
@@ -469,27 +370,6 @@ function BudgetDistributionChart({
   scope: ScopeChip;
   onSelectCategory: (cat: Category) => void;
 }) {
-  // All hooks at top — before any conditional return
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-  const legendRef = useRef<HTMLDivElement>(null);
-  const [canScrollLegend, setCanScrollLegend] = useState(false);
-  const [legendAtBottom, setLegendAtBottom] = useState(false);
-
-  useEffect(() => {
-    const el = legendRef.current;
-    if (!el) return;
-    const check = () => {
-      const overflows = el.scrollHeight > el.clientHeight + 2;
-      setCanScrollLegend(overflows);
-      setLegendAtBottom(overflows && el.scrollTop + el.clientHeight >= el.scrollHeight - 2);
-    };
-    check();
-    el.addEventListener("scroll", check, { passive: true });
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
-  });
-
   const chartData = useMemo(() => {
     const scopedCategories = categories.filter(cat => getCategoryScope(cat) === scope);
     const items = scopedCategories
@@ -503,225 +383,73 @@ function BudgetDistributionChart({
     const total = items.reduce((s, { available }) => s + available, 0);
     return { items, total, hasCategories: scopedCategories.length > 0 };
   }, [categories, scope]);
-
-  // Segment computation before guard — needed by useCountUp
-  const allSegments = chartData.items.map(({ cat, available }, i) => ({
-    name: cat.name,
-    value: available,
-    available,
-    cat,
-    color: CHART_COLORS[i % CHART_COLORS.length],
-  }));
-  const visibleSegments = allSegments.filter(s => !hiddenIds.has(s.cat.id));
-  const visibleTotal = visibleSegments.reduce((s, seg) => s + seg.available, 0);
-
-  // Count-up must be called before conditional return (hook rule)
-  const countedTotal = useCountUp(visibleTotal);
+  const countedTotal = useCountUp(chartData.total);
+  const largest = chartData.items[0]?.available ?? 1;
 
   // ── All spent empty state ──────────────────────────────────────
   if (chartData.total === 0 || chartData.items.length === 0) {
     return (
       <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <div style={{ position: "relative", width: 200, height: 200 }}>
-            <svg width={200} height={200} viewBox="0 0 200 200" aria-hidden="true">
-              <circle cx={100} cy={100} r={76} fill="none" stroke="var(--accent)"
-                strokeWidth={18} strokeDasharray="4 7" strokeLinecap="round" opacity={0.32} />
-            </svg>
-            <div style={chartCenterStyle}>
-              {chartData.hasCategories ? <CheckIcon size={24} /> : <PlusIcon size={22} />}
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", marginTop: 8 }}>
-                {chartData.hasCategories ? "Nothing left" : "No categories yet"}
-              </span>
-              <span style={{ maxWidth: 124, textAlign: "center", fontSize: 10, lineHeight: 1.4, color: "var(--muted)", marginTop: 4 }}>
-                {chartData.hasCategories ? "All available funds are assigned or spent." : "Add a category below to start planning."}
-              </span>
-            </div>
-          </div>
+        <div style={emptyChartStyle}>
+          {chartData.hasCategories ? <CheckIcon size={24} /> : <PlusIcon size={22} />}
+          <strong>{chartData.hasCategories ? "Nothing left" : "No categories yet"}</strong>
+          <span>{chartData.hasCategories ? "All available funds are assigned or spent." : "Add a category below to start planning."}</span>
         </div>
       </div>
     );
   }
 
-  function toggleHidden(id: string) {
-    setHiddenIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function handleSliceClick(index: number) {
-    onSelectCategory(visibleSegments[index].cat);
-  }
-
   return (
-    <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
-      {/* Donut — centered */}
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <div style={{ position: "relative", width: 260, height: 260, overflow: "hidden" }}>
-          <PieChart width={260} height={260} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-            <Pie
-              data={visibleSegments}
-              cx={130} cy={130}
-              innerRadius={88} outerRadius={114}
-              paddingAngle={visibleSegments.length > 1 ? 4 : 0}
-              dataKey="value"
-              startAngle={90} endAngle={-270}
-              onClick={(_, index) => handleSliceClick(index)}
-              cursor="pointer"
-              stroke="none"
-              isAnimationActive={true}
-              animationBegin={0}
-              animationDuration={750}
-              animationEasing="ease-out"
-              shape={(props: PieSectorShapeProps) => {
-                const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
-                const arcLen = (sweep * Math.PI / 180) * 114;
-                const cr = Math.min(11, arcLen / 3);
-                return <Sector {...props} cornerRadius={cr} outerRadius={114} />;
-              }}
-            >
-              {visibleSegments.map((seg, i) => (
-                <Cell key={seg.cat.id ?? i} fill={seg.color} />
-              ))}
-            </Pie>
-          </PieChart>
-
-          <div style={{ ...chartCenterStyle, pointerEvents: "none" }}>
-            <span style={{
-              fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800,
-              color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1,
-              display: "block",
-            }}>
-              {fmt(countedTotal)}
+    <section aria-labelledby="budget-available-heading" style={{ ...chartWrapStyle, animation: "modeIn 180ms var(--ease-standard) both" }}>
+      <div style={chartSummaryStyle}>
+        <div>
+          <span id="budget-available-heading" style={chartEyebrowStyle}>Available by category</span>
+          <strong style={chartTotalStyle}>{fmt(countedTotal)} <small>MAD</small></strong>
+        </div>
+        <span style={chartSummaryCopyStyle}>{chartData.items.length} funded categor{chartData.items.length === 1 ? "y" : "ies"}</span>
+      </div>
+      <div style={rankedListStyle}>
+        {chartData.items.map(({ cat, available }, index) => (
+          <button key={cat.id} type="button" onClick={() => onSelectCategory(cat)} style={rankedRowStyle}>
+            <span style={rankStyle}>{String(index + 1).padStart(2, "0")}</span>
+            <CategoryIcon icon={cat.icon} size={22} decorative />
+            <span style={rankedCopyStyle}>
+              <span style={rankedNameStyle}>{cat.name}</span>
+              <span style={barTrackStyle} aria-hidden="true">
+                <span style={{ ...barFillStyle, width: `${Math.max(5, (available / largest) * 100)}%` }} />
+              </span>
             </span>
-            <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 4, letterSpacing: 0.3 }}>MAD available</span>
-          </div>
-        </div>
+            <strong style={rankedAmountStyle}>{fmt(Math.round(available))}<small>MAD</small></strong>
+            <ChevronRightIcon size={14} aria-hidden="true" />
+          </button>
+        ))}
       </div>
-
-      {/* Legend — scrollable with fade hint */}
-      <div style={{ position: "relative" }}>
-        <div ref={legendRef} className="donut-legend-scroll" style={chartLegendStyle}>
-          {allSegments.map(({ cat, available, color }, i) => {
-            const isHidden = hiddenIds.has(cat.id);
-            return (
-              <button
-                key={cat.id ?? i}
-                type="button"
-                onClick={() => toggleHidden(cat.id)}
-                title={isHidden ? `Show ${cat.name}` : `Hide ${cat.name}`}
-                className="donut-legend-row"
-                style={{
-                  ...chartLegendRowStyle,
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  opacity: isHidden ? 0.35 : 1,
-                  transition: "opacity 0.15s ease",
-                  animation: `legendRowIn 0.28s ease-out ${i * 12}ms both`,
-                }}
-              >
-                <span style={{ ...chartDotStyle, background: isHidden ? "var(--muted)" : color }} />
-                <span style={chartLegendIconStyle}>
-                  <CategoryIcon icon={cat.icon} size={11} />
-                </span>
-                <span style={{ ...chartLegendNameStyle, textDecoration: isHidden ? "line-through" : "none" }}>{cat.name}</span>
-                <span style={{ ...chartLegendAmtStyle, visibility: isHidden ? "hidden" : "visible" }}>{fmt(Math.round(available))}</span>
-              </button>
-            );
-          })}
-        </div>
-        {canScrollLegend && !legendAtBottom && (
-          <div style={legendFadeStyle} aria-hidden="true" />
-        )}
-      </div>
-    </div>
+    </section>
   );
 }
 
 const chartWrapStyle: CSSProperties = {
-  borderRadius: 16,
+  borderRadius: "var(--radius-card)",
   background: "var(--surface)",
   padding: "16px 16px 18px",
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
+  boxShadow: "var(--elevation-card)",
   display: "grid",
   gap: 16,
 };
 
-const chartCenterStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const chartLegendStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "8px 12px",
-  maxHeight: 90,
-  overflowY: "auto",
-  scrollbarWidth: "none",
-};
-
-const legendFadeStyle: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  bottom: 0,
-  height: 28,
-  background: "linear-gradient(to bottom, transparent, var(--surface))",
-  pointerEvents: "none",
-  borderRadius: "0 0 8px 8px",
-};
-
-const chartLegendRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  minWidth: 0,
-};
-
-const chartDotStyle: CSSProperties = {
-  width: 7,
-  height: 7,
-  borderRadius: 2,
-  flexShrink: 0,
-};
-
-const chartLegendIconStyle: CSSProperties = {
-  width: 14,
-  height: 14,
-  flexShrink: 0,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const chartLegendNameStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--text2)",
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-};
-
-const chartLegendAmtStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: "var(--text2)",
-  flexShrink: 0,
-  fontVariantNumeric: "tabular-nums",
-  fontFeatureSettings: '"tnum"',
-};
+const emptyChartStyle: CSSProperties = { minHeight: 160, display: "grid", placeItems: "center", alignContent: "center", gap: 8, color: "var(--muted)", textAlign: "center", fontSize: 13 };
+const chartSummaryStyle: CSSProperties = { display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16 };
+const chartEyebrowStyle: CSSProperties = { display: "block", fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase" };
+const chartTotalStyle: CSSProperties = { display: "block", marginTop: 6, fontSize: 30, lineHeight: 1, color: "var(--text)", fontVariantNumeric: "tabular-nums" };
+const chartSummaryCopyStyle: CSSProperties = { fontSize: 12, color: "var(--muted)", paddingBottom: 2 };
+const rankedListStyle: CSSProperties = { display: "grid", gap: 4 };
+const rankedRowStyle: CSSProperties = { width: "100%", minHeight: 56, display: "grid", gridTemplateColumns: "24px 26px minmax(0, 1fr) auto 16px", alignItems: "center", gap: 10, border: 0, borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text2)", textAlign: "left", cursor: "pointer", padding: "8px 4px" };
+const rankStyle: CSSProperties = { fontSize: 12, fontWeight: 700, color: "var(--muted)", fontVariantNumeric: "tabular-nums" };
+const rankedCopyStyle: CSSProperties = { minWidth: 0, display: "grid", gap: 7 };
+const rankedNameStyle: CSSProperties = { fontSize: 14, fontWeight: 650, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" };
+const barTrackStyle: CSSProperties = { height: 5, borderRadius: 999, background: "var(--surface2)", overflow: "hidden" };
+const barFillStyle: CSSProperties = { display: "block", height: "100%", borderRadius: 999, background: "var(--accent)" };
+const rankedAmountStyle: CSSProperties = { display: "inline-flex", alignItems: "baseline", gap: 4, fontSize: 14, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 
 /* ─── Scope chip button ────────────────────────────────────────── */
 
@@ -745,7 +473,7 @@ const headerStyle: CSSProperties = {
 
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 10,
+  fontSize: 12,
   letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
@@ -760,7 +488,7 @@ const titleStyle: CSSProperties = {
 };
 
 const rebalanceBtnStyle: CSSProperties = {
-  minHeight: 36,
+  minHeight: 44,
   padding: "0 8px",
   borderRadius: 10,
   border: "none",
@@ -775,6 +503,8 @@ const rebalanceBtnStyle: CSSProperties = {
 };
 
 const backBtnStyle: CSSProperties = {
+  minWidth: 44,
+  minHeight: 44,
   width: 36,
   height: 36,
   borderRadius: 10,
@@ -799,7 +529,7 @@ const searchWrapStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 9,
-  minHeight: 42,
+  minHeight: 44,
   padding: "0 12px",
   borderRadius: 12,
   background: "color-mix(in srgb, var(--surface) 86%, var(--surface2))",
@@ -823,8 +553,65 @@ const groupsStyle: CSSProperties = {
   minWidth: 0,
 };
 
+const budgetHealthStyle: CSSProperties = {
+  display: "grid",
+  justifyItems: "center",
+  gap: 8,
+  padding: "20px 16px 28px",
+  background: "transparent",
+  boxShadow: "none",
+  position: "relative",
+  isolation: "isolate",
+};
+
+const budgetHealthTitleStyle: CSSProperties = {
+  fontSize: 13,
+  lineHeight: 1,
+  fontWeight: 600,
+  color: "var(--muted)",
+};
+
+const budgetHealthLabelStyle: CSSProperties = {
+  marginTop: 8,
+  fontSize: 12,
+  lineHeight: 1,
+  fontWeight: 700,
+  letterSpacing: 0.7,
+  textTransform: "uppercase",
+  color: "var(--muted)",
+};
+
+const budgetHealthAmountStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "baseline",
+  justifyContent: "center",
+  gap: 6,
+  fontSize: "clamp(40px, 12vw, 56px)",
+  lineHeight: 1,
+  fontWeight: 500,
+  letterSpacing: "-0.035em",
+  color: "var(--text)",
+  fontVariantNumeric: "tabular-nums",
+  whiteSpace: "nowrap",
+};
+
+const budgetHealthCurrencyStyle: CSSProperties = {
+  fontSize: 16,
+  fontWeight: 500,
+  letterSpacing: 0,
+  color: "var(--muted)",
+};
+
+const groupPillsStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  overflowX: "auto",
+  padding: "0 0 4px",
+  scrollbarWidth: "none",
+};
+
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 0.7,
   textTransform: "uppercase",
@@ -834,10 +621,9 @@ const sectionLabelStyle: CSSProperties = {
 };
 
 const railStyle: CSSProperties = {
-  display: "flex",
-  gap: 8,
-  overflowX: "auto",
-  padding: "2px 4px 8px",
+  display: "grid",
+  gap: 12,
+  padding: "0 0 8px",
   minWidth: 0,
 };
 
@@ -860,7 +646,7 @@ const frozenPreviewLabelStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 5,
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 0.7,
   textTransform: "uppercase",
@@ -885,8 +671,8 @@ const seeAllBtnStyle: CSSProperties = {
 /* ─── Ghost add card ────────────────────────────────────────────── */
 
 const ghostCardStyle: CSSProperties = {
-  flex: "0 0 120px",
-  minHeight: 90,
+  width: "100%",
+  minHeight: 48,
   borderRadius: 16,
   border: "1.5px dashed color-mix(in srgb, var(--border) 55%, transparent)",
   background: "transparent",
@@ -900,76 +686,120 @@ const ghostCardStyle: CSSProperties = {
 /* ─── Card ─────────────────────────────────────────────────────── */
 
 const cardStyle: CSSProperties = {
-  flex: "0 0 120px",
-  borderRadius: 16,
-  background: "var(--surface)",
+  width: "100%",
+  borderRadius: "var(--radius-card)",
+  background: "transparent",
   display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
+  flexDirection: "row",
+  alignItems: "stretch",
+  boxShadow: "none",
   position: "relative",
-  overflow: "hidden",
+  overflow: "visible",
+  marginTop: 32,
 };
 
 
 const cardBodyStyle: CSSProperties = {
   flex: 1,
   display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
-  alignItems: "center",
-  padding: "10px 10px 12px",
-  border: "none",
-  background: "transparent",
+  position: "relative",
+  minHeight: 100,
+  padding: "26px 16px 12px",
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  boxShadow: "none",
   cursor: "pointer",
   width: "100%",
-  textAlign: "center",
+  textAlign: "left",
+  overflow: "visible",
+  borderRadius: "var(--radius-card)",
+};
+
+const categoryIconStageStyle: CSSProperties = {
+  position: "absolute",
+  left: 16,
+  top: -28,
+  width: 56,
+  height: 56,
+  borderRadius: 0,
+  background: "transparent",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxShadow: "none",
+  zIndex: 2,
+  pointerEvents: "none",
+};
+
+const categoryContentStyle: CSSProperties = {
+  width: "100%",
+  minWidth: 0,
+  display: "grid",
   gap: 8,
+  position: "relative",
+  zIndex: 1,
+};
+
+const frozenRowStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 64,
+  padding: "12px 16px",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-card)",
+  background: "var(--surface)",
+  boxShadow: "none",
+  color: "var(--text2)",
+  display: "grid",
+  gridTemplateColumns: "32px minmax(0, 1fr) 20px",
+  alignItems: "center",
+  gap: 12,
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const frozenNameStyle: CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+  fontSize: 14,
+  fontWeight: 650,
 };
 
 const cardTopStyle: CSSProperties = {
   display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 5,
+  justifyContent: "space-between",
+  alignItems: "baseline",
+  gap: 12,
+  minWidth: 0,
 };
 
 const cardBottomStyle: CSSProperties = {
   display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
+  flexDirection: "row",
+  justifyContent: "flex-end",
+  alignItems: "baseline",
   gap: 4,
-  width: "100%",
+  width: "auto",
+  minWidth: 88,
 };
 
 const cardNameStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: "var(--muted)",
+  fontSize: 15,
+  fontWeight: 700,
+  color: "var(--text)",
   lineHeight: 1.2,
   overflow: "hidden",
   whiteSpace: "nowrap",
   textOverflow: "ellipsis",
-  maxWidth: "100%",
-  textAlign: "center",
+  maxWidth: "min(42vw, 180px)",
+  textAlign: "left",
 };
-
-const cardBadgeStyle = (health: Health): CSSProperties => ({
-  fontSize: 8,
-  fontWeight: 700,
-  letterSpacing: 1.1,
-  textTransform: "uppercase",
-  color: health === "over"      ? "var(--danger)"
-       : health === "low"       ? "var(--warning)"
-       : health === "funded"    ? "var(--accent)"
-       :                          "var(--warning)",
-  lineHeight: 1,
-});
 
 const cardAmountStyle = (health: Health): CSSProperties => ({
   fontFamily: "var(--font-body)",
-  fontSize: 15,
-  fontWeight: 500,
+  fontSize: 17,
+  fontWeight: 700,
   lineHeight: 1,
   color: health === "over"      ? "var(--danger)"
        : health === "low"       ? "var(--warning)"
@@ -978,18 +808,81 @@ const cardAmountStyle = (health: Health): CSSProperties => ({
 });
 
 const cardUnitStyle: CSSProperties = {
-  fontSize: 9,
+  fontSize: 12,
   fontWeight: 400,
   color: "var(--muted)",
   lineHeight: 1,
 };
 
-const progressTrackStyle: CSSProperties = {
+const budgetBarStyle: CSSProperties = {
   width: "100%",
-  height: 3,
+  height: 6,
   borderRadius: 999,
   background: "var(--surface2)",
   overflow: "hidden",
+  display: "flex",
+};
+
+const budgetBarSegmentStyle: CSSProperties = {
+  display: "block",
+  height: "100%",
+};
+
+const budgetMetaStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  color: "var(--muted)",
+  fontSize: 11,
+  fontVariantNumeric: "tabular-nums",
+};
+
+const budgetSpentStyle = (spent: number): CSSProperties => ({
+  color: spent > 0 ? "var(--danger)" : "var(--muted)",
+  fontWeight: spent > 0 ? 650 : 500,
+});
+
+const skeletonCardStyle: CSSProperties = {
+  position: "relative",
+  minHeight: 132,
+  marginTop: 32,
+  padding: "26px 16px 12px",
+  borderRadius: "var(--radius-card)",
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+};
+
+const skeletonIconStyle: CSSProperties = {
+  position: "absolute",
+  insetInlineStart: 16,
+  top: -28,
+  width: 56,
+  height: 56,
+  borderRadius: 14,
+};
+
+const skeletonContentStyle: CSSProperties = {
+  display: "grid",
+  gap: 14,
+};
+
+const skeletonTopStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 16,
+};
+
+const srOnlyStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
 };
 
 const cardActionStyle: CSSProperties = {
@@ -998,7 +891,7 @@ const cardActionStyle: CSSProperties = {
   borderRadius: 8,
   border: "1px solid var(--border)",
   background: "transparent",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 500,
   color: "var(--text2)",
   cursor: "pointer",

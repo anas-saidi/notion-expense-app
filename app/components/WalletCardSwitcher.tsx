@@ -1,10 +1,14 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
 import { fmt } from "./app-utils";
+import { UsersRoundIcon } from "./ui/icons";
+import { AnimatedCounter } from "./ui/AnimatedCounter";
 
 export type ContribStatus = {
   anasPlan: number; salmaPlan: number;
   anasActual: number; salmaActual: number;
+  anasDirectSpend: number; salmaDirectSpend: number;
+  anasTransferred: number; salmaTransferred: number;
 };
 
 type WalletCardSwitcherProps = {
@@ -21,12 +25,21 @@ type WalletCardSwitcherProps = {
 
 
 const STATUS_COLOR: Record<string, string> = {
-  "On track":  "var(--accent)",
-  "Together":  "var(--accent)",
+  "On track":  "var(--accent-ink)",
+  "Together":  "var(--accent-ink)",
   "Low":       "var(--warning)",
   "Over":      "var(--danger)",
   "No plan":   "var(--muted)",
   "Quiet":     "var(--muted)",
+};
+
+const STATUS_BACKGROUND: Record<string, string> = {
+  "On track": "var(--accent-dim)",
+  "Together": "var(--accent-dim)",
+  "Low": "var(--warning-dim)",
+  "Over": "color-mix(in srgb, var(--danger) 12%, var(--surface))",
+  "No plan": "var(--surface2)",
+  "Quiet": "var(--surface2)",
 };
 
 
@@ -38,19 +51,12 @@ const getStatus = (available: number | null, planned: number | null, scope?: Bud
   return scope === "joint" ? "Together" : "On track";
 };
 
-const getProgress = (available: number | null, planned: number | null) => {
-  if (available === null || planned === null || planned <= 0) return 0;
-  const spent = Math.max(0, planned - available);
-  return Math.min(100, Math.round((spent / planned) * 100));
-};
-
-
 type JointView = "balance" | "budgeted" | "spent";
 const JOINT_VIEWS: JointView[] = ["balance", "budgeted", "spent"];
 const JOINT_VIEW_LABEL: Record<JointView, string> = {
-  balance:  "balance",
-  budgeted: "budgeted",
-  spent:    "spent",
+  balance:  "Account balance",
+  budgeted: "Planned this month",
+  spent:    "Spent this month",
 };
 // Each view gets its own accent so the number feels distinct at a glance
 const JOINT_VIEW_COLOR: Record<JointView, string> = {
@@ -73,10 +79,16 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
   // Curve/progress still uses category-based left-to-spend for spend % display
   const available = leftToSpendByScope != null ? leftToSpendByScope[value] : currentSummary ? currentSummary.totalAssigned - currentSummary.totalSpent : null;
   const planned   = currentSummary?.totalAssigned ?? null;
-  const progress  = getProgress(available, planned);
   const status    = getStatus(balance, planned, value);
   const isOver    = balance !== null && balance < 0;
   const hasPlan   = planned !== null && planned > 0;
+  const spent     = Math.max(0, currentSummary?.totalSpent ?? (planned ?? 0) - (available ?? 0));
+  const remaining = Math.max(0, (planned ?? 0) - spent);
+  const progress  = hasPlan ? Math.min(100, Math.round((spent / planned) * 100)) : 0;
+  const isBudgetOver = hasPlan && spent > planned;
+  const contributionRemaining = contribStatus
+    ? Math.max(0, contribStatus.anasPlan + contribStatus.salmaPlan - contribStatus.anasActual - contribStatus.salmaActual)
+    : 0;
 
   const cycleJointView = () => {
     setJointView(v => {
@@ -90,76 +102,60 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
   const heroNumber = value === "joint"
     ? jointView === "budgeted" ? (planned ?? 0)
     : jointView === "spent"    ? (jointSummary?.totalSpent ?? 0)
-    : Math.abs(balance ?? available ?? 0)
-    : Math.abs(balance ?? available ?? 0);
+    : (balance ?? available ?? 0)
+    : (balance ?? available ?? 0);
 
-  const heroUnit = value === "joint"
-    ? (isOver && jointView === "balance") ? "over" : JOINT_VIEW_LABEL[jointView]
-    : isOver ? "over" : "balance";
-
+  const heroUnit = "MAD";
   return (
-    <section
-      className="wallet-overview-hero"
-      style={wrapStyle}
-      aria-label="Wallet overview"
-    >
+    <div style={switcherStyle}>
+      <section
+        className="wallet-overview-card"
+        style={wrapStyle}
+        aria-label="Wallet overview"
+      >
 
       {/* Hero */}
       <div style={heroStyle} key={value}>
 
-        {/* Status + number — tappable only on joint */}
-        {value === "joint" ? (
-          <button
-            type="button"
-            onClick={() => {
-              if (jointView === "balance" && onOpenJointAllocate) onOpenJointAllocate();
-              else cycleJointView();
-            }}
-            style={numberGroupButtonStyle}
-            aria-label={jointView === "balance" && onOpenJointAllocate ? "Joint account balance. Tap to allocate unassigned money" : `Showing ${jointView}. Tap to cycle`}
-          >
-            <span style={statusStyle(status)}>{status}</span>
-            <div style={amountRowStyle}>
-              <span style={{ ...bigNumberStyle(isOver && jointView === "balance"), color: JOINT_VIEW_COLOR[jointView], transition: "color 0.3s ease" }}>
-                {fmt(heroNumber)}
-              </span>
-              <span style={{ ...unitStyle(isOver && jointView === "balance"), color: `color-mix(in srgb, ${JOINT_VIEW_COLOR[jointView]} 60%, transparent)`, transition: "color 0.3s ease" }}>
-                MAD {heroUnit}
-              </span>
-            </div>
-            <div style={jointDotsStyle} role="tablist" aria-label="Joint view">
-              {JOINT_VIEWS.map(v => (
-                <span
-                  key={v}
-                  role="tab"
-                  aria-selected={v === jointView}
-                  aria-label={`Show ${JOINT_VIEW_LABEL[v]}`}
-                  onClick={(event) => { event.stopPropagation(); setJointView(v); }}
-                  style={{ ...jointDotStyle(v === jointView), cursor: "pointer" }}
-                />
+        <div style={numberGroupStyle}>
+          <div style={amountRowStyle}>
+            <span style={bigNumberStyle(isOver && jointView === "balance")}><AnimatedCounter value={value === "joint" ? heroNumber : (balance ?? available ?? 0)} animateOnMount /></span>
+            <span style={unitStyle(isOver && jointView === "balance")}>{heroUnit}</span>
+          </div>
+          {value === "joint" && (
+            <div role="group" aria-label="Balance view" style={{ display: "flex", gap: 8 }}>
+              {JOINT_VIEWS.map(view => (
+                <button key={view} type="button" aria-pressed={view === jointView} onClick={() => setJointView(view)} style={{ minHeight: 44, padding: "0 12px", border: 0, borderRadius: "var(--radius-control)", background: view === jointView ? "var(--surface2)" : "transparent", color: view === jointView ? "var(--text)" : "var(--muted)", fontWeight: view === jointView ? 700 : 500, cursor: "pointer" }}>
+                  {view === "balance" ? "Balance" : view === "budgeted" ? "Planned" : "Spent"}
+                </button>
               ))}
             </div>
-          </button>
-        ) : (
-          <div style={numberGroupStyle}>
-            <span style={statusStyle(status)}>{status}</span>
-            <div style={amountRowStyle}>
-              <span style={bigNumberStyle(isOver)}>{fmt(Math.abs(balance ?? available ?? 0))}</span>
-              <span style={unitStyle(isOver)}>MAD {isOver ? "over" : "balance"}</span>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Progress bar + caption */}
         {(() => {
-          const barColor = isOver
+          const barColor = isBudgetOver
             ? "var(--spend-over)"
-            : progress >= 85 ? "var(--spend-warn)"
-            : progress >= 65 ? "var(--spend-caution)"
-            : "var(--accent)";
+            : progress >= 85 ? "var(--spend-caution)"
+            : "var(--budget-used)";
           return (
             <div style={barGroupStyle}>
-              <div style={{ position: "relative" }} aria-hidden="true">
+              {hasPlan && (
+                <div style={barLabelRowStyle}>
+                  <span style={barContextStyle}>Monthly plan</span>
+                  <span style={barValueStyle}>{fmt(remaining)} MAD left</span>
+                </div>
+              )}
+              <div
+                style={{ position: "relative" }}
+                role="progressbar"
+                aria-label="Monthly budget spent"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={hasPlan ? progress : 0}
+                aria-valuetext={hasPlan ? `${progress}% spent, ${fmt(remaining)} MAD left` : "No monthly plan"}
+              >
                 <div style={barRailStyle}>
                   <div
                     style={{
@@ -169,59 +165,70 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
                     }}
                   />
                 </div>
-                {hasPlan && progress > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: `${progress}%`,
-                      transform: "translate(-50%, -50%)",
-                      fontSize: 14,
-                      lineHeight: 1,
-                      transition: "left 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
-                      pointerEvents: "none",
-                      userSelect: "none",
-                    }}
-                  >
-                    💸
-                  </span>
-                )}
               </div>
               <div style={captionRowStyle}>
                 {hasPlan ? (
-                  <>
-                    <span style={captionStyle}>{progress}% spent</span>
-                    <span style={captionDimStyle}>of {fmt(planned!)} MAD planned</span>
-                  </>
+                  <span style={captionStyle}>{progress}% used{isBudgetOver ? ` · ${fmt(spent - (planned ?? 0))} MAD over budget` : progress >= 85 ? " · Budget nearly used" : ""}</span>
                 ) : (
-                  <span style={captionStyle}>No plan yet</span>
+                  <span style={captionStyle}>No monthly plan</span>
                 )}
               </div>
             </div>
           );
         })()}
 
-        {/* Joint contribution — inline within the card */}
-        {value === "joint" && contribStatus && (contribStatus.anasPlan > 0 || contribStatus.salmaPlan > 0) && (
-          <div style={contribSectionStyle}>
-            <ContribRow name="Anas" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} color="var(--partner-husband)" />
-            <ContribRow name="Salma" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} color="var(--partner-wife)" />
-          </div>
-        )}
-
       </div>
+      </section>
 
-    </section>
+      {value === "joint" && contribStatus && (contribStatus.anasPlan > 0 || contribStatus.salmaPlan > 0) && (
+        <div style={contribSectionStyle} aria-label="Partner budgets">
+          <div style={contribHeaderStyle}>
+            <strong style={contribHeadingStyle}>Contributions</strong>
+          </div>
+          <div style={contribPanelStyle}>
+            <div style={contribGridStyle}>
+            <ContribCard
+              scope="anas"
+              name="Anas"
+              actual={contribStatus.anasActual}
+              plan={contribStatus.anasPlan}
+              color="var(--partner-husband)"
+              onSelect={onChange}
+            />
+            <span style={contribSharedStyle}>
+              <span style={contribConnectorStyle} aria-hidden="true"><UsersRoundIcon size={15} /></span>
+              <span style={contribGapStyle}>
+                {contributionRemaining > 0 ? `${fmt(Math.round(contributionRemaining))} MAD remaining` : "Covered together"}
+              </span>
+            </span>
+            <ContribCard
+              scope="salma"
+              name="Salma"
+              actual={contribStatus.salmaActual}
+              plan={contribStatus.salmaPlan}
+              color="var(--partner-wife)"
+              onSelect={onChange}
+            />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 /* ─── Styles ──────────────────────────────────────────────────── */
 
+const switcherStyle: CSSProperties = {
+  display: "grid",
+  gap: 16,
+};
+
 const wrapStyle: CSSProperties = {
   display: "grid",
-  gap: 36,
-  padding: "16px 24px 24px",
-  borderRadius: 24,
+  padding: "20px 0 12px",
+  background: "transparent",
+  boxShadow: "none",
 };
 
 const heroStyle: CSSProperties = {
@@ -232,21 +239,29 @@ const heroStyle: CSSProperties = {
 
 const numberGroupStyle: CSSProperties = {
   display: "grid",
-  gap: 5,
+  gap: 4,
+  justifyItems: "center",
+  textAlign: "center",
 };
 
 const statusStyle = (status: string): CSSProperties => ({
-  fontSize: 9,
+  display: "inline-flex",
+  alignItems: "center",
+  minHeight: 26,
+  padding: "3px 8px",
+  borderRadius: 8,
+  background: STATUS_BACKGROUND[status] ?? "var(--surface2)",
+  fontSize: 12,
   fontWeight: 700,
-  letterSpacing: 1.4,
-  textTransform: "uppercase",
+  letterSpacing: 0,
   color: STATUS_COLOR[status] ?? "var(--muted)",
 });
 
 const amountRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "baseline",
-  gap: 7,
+  justifyContent: "center",
+  gap: 8,
 };
 
 const bigNumberStyle = (isOver: boolean): CSSProperties => ({
@@ -274,9 +289,29 @@ const barGroupStyle: CSSProperties = {
   gap: 8,
 };
 
+const barLabelRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "baseline",
+  gap: 12,
+};
+
+const barValueStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: "var(--text2)",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const barContextStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: "var(--muted)",
+};
+
 const barRailStyle: CSSProperties = {
   width: "100%",
-  height: 4,
+  height: 8,
   borderRadius: 999,
   background: "var(--surface2)",
   overflow: "hidden",
@@ -293,24 +328,16 @@ const barFillStyle: CSSProperties = {
 const captionRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "baseline",
-  justifyContent: "center",
+  justifyContent: "space-between",
   gap: 6,
 };
 
 const captionStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: "0.02em",
   color: "var(--text2)",
-};
-
-const captionDimStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 10,
-  fontWeight: 400,
-  letterSpacing: "0.02em",
-  color: "var(--muted)",
 };
 
 /* Joint cycling */
@@ -318,89 +345,149 @@ const captionDimStyle: CSSProperties = {
 const numberGroupButtonStyle: CSSProperties = {
   display: "grid",
   gap: 5,
+  width: "100%",
+  justifyItems: "center",
   background: "transparent",
   border: "none",
   padding: 0,
   cursor: "pointer",
-  textAlign: "left",
+  textAlign: "center",
 };
 
 const jointDotsStyle: CSSProperties = {
   display: "flex",
-  gap: 5,
-  paddingTop: 2,
+  justifyContent: "center",
+  gap: 4,
+  paddingTop: 4,
 };
 
-function ContribRow({ name, actual, plan, color }: {
-  name: string; actual: number; plan: number; color: string;
+function ContribCard({ scope, name, actual, plan, color, onSelect }: {
+  scope: BudgetScope;
+  name: string;
+  actual: number;
+  plan: number;
+  color: string;
+  onSelect: (scope: BudgetScope) => void;
 }) {
-  const left = Math.max(0, plan - actual);
+  const difference = actual - plan;
+  const left = Math.max(0, -difference);
   const done = plan > 0 && actual >= plan * 0.99;
   const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
 
   return (
-    <div style={contribRowStyle}>
-      <div style={contribHeaderStyle}>
-        <span style={{ ...contribNameStyle, color }}>{name}</span>
-        <span style={contribValueStyle}>
-          {done
-            ? <span style={{ color: "var(--accent)", fontWeight: 600 }}>Done</span>
-            : <><span style={{ fontWeight: 600, color: "var(--text2)" }}>{fmt(Math.round(left))}</span> left</>
-          }
-        </span>
-      </div>
-      <div style={contribBarRailStyle}>
-        <div style={{
-          ...contribBarFillStyle,
-          transform: `scaleX(${pct / 100})`,
-          background: done ? "var(--accent)" : color,
-        }} />
-      </div>
-    </div>
+    <button
+      type="button"
+      className="partner-summary-card"
+      style={contribCardStyle}
+      onClick={() => onSelect(scope)}
+      aria-label={`Open ${name} contribution. ${done ? "Covered" : `${fmt(Math.round(left))} MAD left`}.`}
+    >
+      <span style={contribRingStyle(pct, color)} aria-hidden="true">
+          <span style={{ ...contribAvatarStyle, background: `color-mix(in srgb, ${color} 24%, var(--surface))`, color }}>
+            <PartnerPortrait partner={scope === "anas" ? "anas" : "salma"} />
+          </span>
+      </span>
+      <span style={contribIdentityStyle}>
+        <span style={contribNameStyle}>{name}</span>
+        <span style={contribAmountStyle}>{done ? "Covered" : `${fmt(Math.round(left))} MAD left`}</span>
+      </span>
+    </button>
+  );
+}
+
+function PartnerPortrait({ partner }: { partner: "anas" | "salma" }) {
+  return (
+    <svg width="42" height="42" viewBox="0 0 42 42" fill="none" aria-hidden="true">
+      {partner === "anas" ? (
+        <>
+          <path d="M11 17c1-7 6-11 12-11 5 0 9 2 11 7-3-2-6-3-10-2-5 1-8 4-13 6Z" fill="currentColor" opacity=".2" />
+          <path d="M12 18c0 10 4 16 10 16s10-6 10-16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M10 17c2-1 4-4 5-7m17 7c-1-3-3-6-6-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M17 21h.1M27 21h.1" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          <path d="M18 27c2 2 6 2 8 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <path d="M8 21C8 11 13 5 21 5s13 6 13 16c0 7-3 12-6 15l-2-9H16l-2 9c-3-3-6-8-6-15Z" fill="currentColor" opacity=".2" />
+          <path d="M12 19c0 9 4 15 9 15s9-6 9-15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M11 18c3-1 5-4 6-8 3 4 7 6 13 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M16.5 21h.1M25.5 21h.1" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          <path d="M17 27c2 2 6 2 8 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </>
+      )}
+    </svg>
   );
 }
 
 const contribSectionStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
   gap: 12,
 };
 
-const contribRowStyle: CSSProperties = {
-  display: "grid",
-  gap: 6,
+const contribHeaderStyle: CSSProperties = {
+  display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12,
 };
 
-const contribHeaderStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "baseline",
-  justifyContent: "space-between",
+const contribHeadingStyle: CSSProperties = { fontSize: 14, color: "var(--text)" };
+const contribPanelStyle: CSSProperties = { display: "grid", padding: "8px 10px 6px", background: "transparent" };
+const contribSharedStyle: CSSProperties = { display: "grid", justifyItems: "center", alignContent: "start", gap: 7, paddingTop: 17 };
+const contribGapStyle: CSSProperties = { maxWidth: 88, fontSize: 10, lineHeight: 1.25, color: "var(--text2)", fontWeight: 600, fontVariantNumeric: "tabular-nums", textAlign: "center" };
+const contribGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "104px 88px 104px", justifyContent: "center", alignItems: "start", gap: 0 };
+const contribConnectorStyle: CSSProperties = { width: 32, height: 32, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--text)", color: "var(--bg)", boxShadow: "var(--elevation-card)" };
+
+const contribCardStyle: CSSProperties = {
+  display: "grid",
+  justifyItems: "center",
+  gap: 6,
+  minWidth: 0,
+  minHeight: 98,
+  padding: "2px",
+  border: "none",
+  borderRadius: 14,
+  background: "transparent",
+  boxShadow: "none",
+  color: "var(--text)",
+  textAlign: "center",
+  cursor: "pointer",
 };
+
+const contribIdentityStyle: CSSProperties = {
+  display: "grid",
+  justifyItems: "center",
+  gap: 4,
+};
+
+const contribAvatarStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 54,
+  height: 54,
+  borderRadius: "50%",
+  flexShrink: 0,
+};
+
+const contribRingStyle = (pct: number, color: string): CSSProperties => ({
+  width: 68,
+  height: 68,
+  padding: 4,
+  borderRadius: "50%",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: `conic-gradient(${color} ${pct}%, color-mix(in srgb, ${color} 13%, var(--surface)) ${pct}% 100%)`,
+  flexShrink: 0,
+});
 
 const contribNameStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 14,
   fontWeight: 700,
-  letterSpacing: 0.6,
-  textTransform: "uppercase",
+  letterSpacing: 0.2,
 };
 
-const contribBarRailStyle: CSSProperties = {
-  height: 4,
-  borderRadius: 999,
-  background: "var(--surface2)",
-  overflow: "hidden",
-};
-
-const contribBarFillStyle: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  borderRadius: 999,
-  transformOrigin: "left center",
-  transition: "transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)",
-};
-
-const contribValueStyle: CSSProperties = {
-  fontSize: 10,
+const contribAmountStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 500,
   color: "var(--muted)",
   fontVariantNumeric: "tabular-nums",
 };

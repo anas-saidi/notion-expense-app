@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { createPortal } from "react-dom";
 
 type PickerPopoverProps = {
+  title?: string;
+  onClose?: () => void;
   open: boolean;
   children: ReactNode;
   width?: string;
@@ -11,19 +13,21 @@ type PickerPopoverProps = {
   placement?: "top" | "bottom";
   zIndex?: number;
   anchorRef?: RefObject<HTMLElement | null>;
+  showHeader?: boolean;
 };
 
-// Below this width, always pin to bottom of visual viewport (above keyboard on mobile)
-const MOBILE_BREAKPOINT = 600;
 
 export function PickerPopover({
   open,
+  title = "Choose an option",
+  onClose,
   children,
   width = "min(296px, calc(100vw - 56px))",
   align = "left",
   placement = "bottom",
   zIndex = 80,
   anchorRef,
+  showHeader = false,
 }: PickerPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   // Placement direction is locked on first open so the popover doesn't jump
@@ -54,25 +58,9 @@ export function PickerPopover({
       const vv = window.visualViewport;
       const viewportHeight = vv?.height ?? window.innerHeight;
       const viewportWidth = window.innerWidth;
-      const gutter = 8;
+      const gutter = 16;
 
-      // ── Mobile: pin to the bottom of the visual viewport ──────────────────
-      // On mobile the virtual keyboard shrinks the visual viewport. Anchoring a
-      // popover to a chip while the keyboard is open is unreliable across iOS/
-      // Android PWA. Instead we follow the native pattern: float the picker as
-      // a full-width panel just above the keyboard (bottom: gutter).
-      if (viewportWidth < MOBILE_BREAKPOINT) {
-        setPositionStyle({
-          position: "fixed",
-          left: gutter,
-          right: gutter,
-          bottom: gutter,
-          visibility: "visible",
-        });
-        return;
-      }
-
-      // ── Desktop: anchor to the chip ────────────────────────────────────────
+      // Keep the menu beside its trigger on phones and desktop.
       let left = align === "right"
         ? anchorRect.right - popoverRect.width
         : anchorRect.left;
@@ -128,6 +116,26 @@ export function PickerPopover({
     };
   }, [align, anchorRef, open, placement]);
 
+  useEffect(() => {
+    if (!open || !onClose) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!popoverRef.current?.contains(event.target as Node) && !anchorRef?.current?.contains(event.target as Node)) onClose();
+    };
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === "Tab") {
+        const items = Array.from(popoverRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled)") ?? []);
+        const first = items[0], last = items[items.length - 1];
+        if (first && (!popoverRef.current?.contains(document.activeElement) || (event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last))) {
+          event.preventDefault(); (event.shiftKey ? last : first).focus();
+        }
+      }
+      if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); onClose(); anchorRef?.current?.querySelector<HTMLElement>("button")?.focus(); }
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", keyboard, true);
+    return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", keyboard, true); };
+  }, [open, onClose, anchorRef]);
+
   if (!open || !mounted) return null;
 
   // On mobile (bottom-pinned), `right` is set so `width` must be "auto"
@@ -137,22 +145,25 @@ export function PickerPopover({
     <div
       ref={popoverRef}
       data-picker-popover="true"
+      role="dialog"
+      aria-label={title}
       style={{
         ...positionStyle,
         width: isMobilePinned ? "auto" : width,
         maxWidth: "min(calc(100vw - 16px), calc(100dvw - 16px))",
         // On mobile give a sensible max-height so the picker doesn't cover the whole screen
-        maxHeight: isMobilePinned ? "min(380px, 52dvh)" : undefined,
+        maxHeight: "calc(100dvh - 32px)",
         background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
         border: "1px solid color-mix(in srgb, var(--border2) 64%, transparent)",
-        borderRadius: 18,
+        borderRadius: "var(--radius-card)",
         overflow: "hidden",
-        boxShadow: "0 0 0 1px color-mix(in srgb, var(--ink-strong) 8%, transparent)",
+        boxShadow: "var(--elevation-float)",
         boxSizing: "border-box",
         zIndex,
       }}
     >
-      {children}
+      {showHeader && <div className="picker-heading"><strong>{title}</strong>{onClose && <button type="button" aria-label={`Close ${title}`} onClick={onClose}>×</button>}</div>}
+      <div className="picker-body">{children}</div>
     </div>,
     document.body
   );

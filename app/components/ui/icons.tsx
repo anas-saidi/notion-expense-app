@@ -43,6 +43,8 @@ import {
   Flame,
   UsersRound,
   ChartPie,
+  Settings,
+  Delete,
   type LucideProps,
 } from "lucide-react";
 
@@ -77,6 +79,7 @@ export const MenuIcon         = (p: LucideProps) => <Menu          size={S} {...
 export const LandmarkIcon     = (p: LucideProps) => <Landmark      size={S} {...p} />;
 export const UserIcon         = (p: LucideProps) => <User          size={S} {...p} />;
 export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
+export const DeleteIcon       = (p: LucideProps) => <Delete        size={S} {...p} />;
 export const TrendingUpIcon      = (p: LucideProps) => <TrendingUp    size={S} {...p} />;
 export const AlertTriangleIcon   = (p: LucideProps) => <TriangleAlert size={S} {...p} />;
 export const MoonIcon            = (p: LucideProps) => <Moon          size={S} {...p} />;
@@ -84,6 +87,7 @@ export const SunIcon             = (p: LucideProps) => <Sun           size={S} {
 export const FlameIcon           = (p: LucideProps) => <Flame         size={S} {...p} />;
 export const UsersRoundIcon      = (p: LucideProps) => <UsersRound    size={S} {...p} />;
 export const ChartPieIcon        = (p: LucideProps) => <ChartPie      size={S} {...p} />;
+export const SettingsIcon        = (p: LucideProps) => <Settings      size={S} {...p} />;
 
 /** Compact filled people pictograms for identity controls. */
 export function ManIcon({ size = S, ...props }: LucideProps) {

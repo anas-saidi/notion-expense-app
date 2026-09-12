@@ -1,4 +1,6 @@
 "use client";
+import { DatePicker } from "./DatePicker";
+import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
@@ -6,6 +8,7 @@ import { today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { CheckIcon, TransferIcon, XIcon } from "./ui/icons";
+import { Banner } from "./ui/Banner";
 
 type AccountTransferSheetProps = {
   open: boolean;
@@ -116,7 +119,7 @@ export function AccountTransferSheet({ open, account, accounts, onClose, onSucce
         <section style={formStyle}>
           <label style={fieldStyle}>
             <span style={labelStyle}>From account</span>
-            <select
+            <ChoicePicker aria-label="From account"
               value={fromAccountId}
               onChange={(event) => {
                 const nextFrom = event.target.value;
@@ -131,17 +134,17 @@ export function AccountTransferSheet({ open, account, accounts, onClose, onSucce
               {accounts.map((entry) => (
                 <option key={entry.id} value={entry.id}>{entry.icon} {entry.label}</option>
               ))}
-            </select>
+            </ChoicePicker>
           </label>
 
           <label style={fieldStyle}>
             <span style={labelStyle}>To account</span>
-            <select value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} style={inputStyle}>
+            <ChoicePicker aria-label="To account" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} style={inputStyle}>
               <option value="" disabled>Choose destination</option>
               {destinationAccounts.map((entry) => (
                 <option key={entry.id} value={entry.id}>{entry.icon} {entry.label}</option>
               ))}
-            </select>
+            </ChoicePicker>
           </label>
 
           <label style={fieldStyle}>
@@ -167,11 +170,11 @@ export function AccountTransferSheet({ open, account, accounts, onClose, onSucce
 
           <label style={fieldStyle}>
             <span style={labelStyle}>Date</span>
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
+            <DatePicker value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
           </label>
         </section>
 
-        {error && <div style={errorStyle}>{error}</div>}
+        {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
           {status === "success" && <CheckIcon size={16} />}
@@ -197,7 +200,7 @@ function BalanceTile({ label, account, nextBalance }: { label: string; account: 
 
 const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",
-  borderRadius: 20,
+  borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
@@ -216,7 +219,7 @@ const headerStyle: CSSProperties = {
 
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 10,
+  fontSize: 12,
   letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
@@ -329,14 +332,6 @@ const currencyStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: 12,
   color: "var(--muted)",
-};
-
-const errorStyle: CSSProperties = {
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--danger) 9%, var(--surface))",
-  color: "color-mix(in srgb, var(--danger) 54%, var(--text))",
-  padding: "11px 12px",
-  fontSize: 12,
 };
 
 const submitStyle: CSSProperties = {

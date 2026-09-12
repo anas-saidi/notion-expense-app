@@ -1,16 +1,20 @@
 "use client";
 
 import { useRef, useState, useEffect, type ReactNode } from "react";
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 
 type Props = {
-  onDelete: () => void;
+  onDelete: () => boolean | Promise<boolean>;
   children: ReactNode;
+  deleteLabel?: string;
   /** Px to drag before the delete commits. Default 80. */
   threshold?: number;
+  variant?: "delete" | "restore";
+  /** Removes row rounding when used inside a continuous activity feed. */
+  flat?: boolean;
 };
 
-export function SwipeToDelete({ onDelete, children, threshold = 80 }: Props) {
+export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel = "Delete item", variant = "delete", flat = false }: Props) {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
 
@@ -29,18 +33,13 @@ export function SwipeToDelete({ onDelete, children, threshold = 80 }: Props) {
     setDragging(false);
     setOffset(-window.innerWidth); // slide content off-screen left
 
-    // Height collapse after the slide-out
-    const el = outerRef.current;
-    if (el) {
-      const h = el.scrollHeight;
-      el.style.overflow = "hidden";
-      el.style.height   = `${h}px`;
-      el.offsetHeight;  // force reflow
-      el.style.transition = "height 0.22s cubic-bezier(0.22, 1, 0.36, 1)";
-      el.style.height = "0";
-    }
-
-    timerRef.current = setTimeout(onDelete, 340);
+    timerRef.current = setTimeout(async () => {
+      const succeeded = await onDelete();
+      if (!succeeded) {
+        committed.current = false;
+        setOffset(0);
+      }
+    }, 220);
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -84,20 +83,20 @@ export function SwipeToDelete({ onDelete, children, threshold = 80 }: Props) {
   const revealPx = Math.max(0, -offset);
   const progress = Math.min(1, revealPx / threshold);
   const isPast   = progress >= 1;
+  const actionColor = variant === "restore" ? "var(--accent)" : "var(--danger)";
 
   return (
     <div ref={outerRef}>
       {/* Inner wrapper clips the horizontal swipe */}
-      <div style={{ position: "relative", overflow: "hidden", borderRadius: 14 }}>
+      <div style={{ position: "relative", overflow: "hidden", borderRadius: flat ? 0 : 14 }}>
         {/* Danger layer revealed behind the content */}
         <div
-          aria-hidden="true"
           style={{
             position: "absolute",
             inset: 0,
             background: isPast
-              ? "var(--danger)"
-              : `color-mix(in srgb, var(--danger) ${Math.round(65 * progress)}%, var(--surface))`,
+              ? actionColor
+              : `color-mix(in srgb, ${actionColor} ${Math.round(65 * progress)}%, var(--surface))`,
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
@@ -105,15 +104,17 @@ export function SwipeToDelete({ onDelete, children, threshold = 80 }: Props) {
             transition: dragging ? "none" : "background 0.2s ease",
           }}
         >
-          <Trash2
-            size={17}
-            style={{
-              color: "white",
-              opacity: progress,
-              transform: `scale(${0.72 + 0.38 * progress})`,
-              transition: dragging ? "none" : "transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s",
-            }}
-          />
+          <button
+            type="button"
+            aria-label={deleteLabel}
+            className="swipe-delete-action"
+            onFocus={() => setOffset(-72)}
+            onBlur={() => { if (!committed.current) setOffset(0); }}
+            onClick={commit}
+            style={{ opacity: Math.max(progress, 0.01) }}
+          >
+            {variant === "restore" ? <RotateCcw size={17} aria-hidden="true" /> : <Trash2 size={17} aria-hidden="true" />}
+          </button>
         </div>
 
         {/* Swipeable surface */}

@@ -1,10 +1,12 @@
 "use client";
+import { DatePicker } from "./DatePicker";
 
 import { useEffect, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { BanknoteIcon, CheckIcon, XIcon } from "./ui/icons";
+import { Banner } from "./ui/Banner";
 import { today } from "./app-utils";
 
 type AccountIncomeSheetProps = {
@@ -112,11 +114,11 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
 
           <label style={fieldStyle}>
             <span style={labelStyle}>Date</span>
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
+            <DatePicker value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
           </label>
         </section>
 
-        {error && <div style={errorStyle}>{error}</div>}
+        {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
           {status === "success" && <CheckIcon size={16} />}
@@ -130,7 +132,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
 
 const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",
-  borderRadius: 20,
+  borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
@@ -160,7 +162,7 @@ const accountIconStyle: CSSProperties = {
 
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 10,
+  fontSize: 12,
   letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
@@ -256,14 +258,6 @@ const currencyStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: 12,
   color: "var(--muted)",
-};
-
-const errorStyle: CSSProperties = {
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--danger) 9%, var(--surface))",
-  color: "color-mix(in srgb, var(--danger) 54%, var(--text))",
-  padding: "11px 12px",
-  fontSize: 12,
 };
 
 const submitStyle: CSSProperties = {

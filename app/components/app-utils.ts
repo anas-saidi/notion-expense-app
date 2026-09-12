@@ -68,7 +68,10 @@ export const shiftDate = (dateStr: string, days: number) => {
 
 export const MONEY_CURRENCY = "MAD";
 
-export const fmt = (n: number) => n.toLocaleString("fr-MA");
+export const fmt = (n: number) => n.toLocaleString("fr-MA", {
+  minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+  maximumFractionDigits: 2,
+});
 
 export const fmtMoney = (n: number) => `${fmt(n)} ${MONEY_CURRENCY}`;
 
@@ -167,7 +170,7 @@ export const getJointAccountUnassigned = (accounts: Account[]): number => {
   return accounts.reduce((sum, account) => {
     if (isSavingsAccount(account)) return sum;
     if (!norm(account.label).includes("joined")) return sum;
-    return sum + Math.max(0, account.readyToAssign ?? 0);
+    return sum + (account.readyToAssign ?? 0);
   }, 0);
 };
 
@@ -208,12 +211,40 @@ export const getCategoryScope = (category: Category, accounts?: Account[]): Budg
     }
   }
 
-  // Default to joint — an uncategorized category is shared, not invisible
-  return "joint";
+  return null;
 };
 
 export const categoryMatchesScope = (category: Category, scope: BudgetScope) =>
   getCategoryScope(category) === scope;
+
+export const resolveTransactionScopes = (
+  transaction: Transaction,
+  categories: Category[],
+  accounts?: Account[],
+) : BudgetScope[] => {
+  const categoryScope = (id: string | null | undefined) => {
+    if (!id) return null;
+    const category = categories.find(entry => entry.id === id);
+    return category ? getCategoryScope(category, accounts) : null;
+  };
+  const accountScope = (id: string | null | undefined) => {
+    if (!id || !accounts) return null;
+    const account = accounts.find(entry => entry.id === id);
+    return account ? scopeFromAccountLabel(account.label) : null;
+  };
+  const unique = (values: Array<BudgetScope | null>) => [...new Set(values.filter(Boolean))] as BudgetScope[];
+
+  if (transaction.type === "Transfer") {
+    return unique([
+      categoryScope(transaction.fromCategoryId), categoryScope(transaction.toCategoryId),
+      accountScope(transaction.fromAccountId), accountScope(transaction.toAccountId),
+    ]);
+  }
+  if (transaction.type === "Income") {
+    return unique([accountScope(transaction.toAccountId), accountScope(transaction.accountId)]);
+  }
+  return unique([categoryScope(transaction.category) ?? accountScope(transaction.accountId)]);
+};
 
 export const transactionMatchesScope = (
   transaction: Transaction,
@@ -221,26 +252,47 @@ export const transactionMatchesScope = (
   scope: BudgetScope,
   accounts?: Account[],
 ) => {
-  if (!transaction.category) return true;
-  const category = categories.find((entry) => entry.id === transaction.category);
-  if (!category) return true;
+  return resolveTransactionScopes(transaction, categories, accounts).includes(scope);
+};
 
-  const catScope = getCategoryScope(category);
-  if (catScope !== null) return catScope === scope;
+export const isExpenseTransaction = (transaction: Transaction) =>
+  transaction.type === "Expense" || transaction.type == null;
 
-  // Category has no determinable scope — fall back to the transaction's account label
-  if (transaction.accountId && accounts) {
-    const account = accounts.find(a => a.id === transaction.accountId);
-    if (account) {
-      const label = account.label.toLowerCase();
-      if (label.includes("hubb")) return scope === "anas";
-      if (label.includes("wife")) return scope === "salma";
-      if (label.includes("joined")) return scope === "joint";
-    }
-  }
+export const expenseBalancePreview = ({
+  currentAccountId,
+  currentBalance,
+  originalAccountId,
+  originalAmount,
+  editedAmount,
+}: {
+  currentAccountId: string;
+  currentBalance: number | null;
+  originalAccountId: string;
+  originalAmount: number;
+  editedAmount: number;
+}) => currentBalance == null
+  ? null
+  : currentAccountId === originalAccountId
+    ? currentBalance + originalAmount - editedAmount
+    : currentBalance - editedAmount;
 
-  // Can't determine scope — include in joint only to avoid polluting personal views
-  return scope === "joint";
+export const comparisonPeriods = (selectedMonth: string, now = new Date()) => {
+  const [year, month] = selectedMonth.split("-").map(Number);
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const selectedEndDay = new Date(year, month, 0).getDate();
+  const isCurrent = selectedMonth === currentMonth;
+  const currentDay = isCurrent ? Math.min(now.getDate(), selectedEndDay) : selectedEndDay;
+  const previous = new Date(year, month - 2, 1);
+  const previousEndDay = new Date(previous.getFullYear(), previous.getMonth() + 1, 0).getDate();
+  const previousDay = Math.min(currentDay, previousEndDay);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return {
+    current: { start: `${selectedMonth}-01`, end: `${selectedMonth}-${pad(currentDay)}` },
+    previous: {
+      start: `${previous.getFullYear()}-${pad(previous.getMonth() + 1)}-01`,
+      end: `${previous.getFullYear()}-${pad(previous.getMonth() + 1)}-${pad(previousDay)}`,
+    },
+  };
 };
 
 export const categoryIdMatchesScope = (

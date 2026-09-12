@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, PlusIcon, FreezeIcon, XIcon, ChevronLeftIcon, ChevronRightIcon } from "./ui/icons";
+import { FundIcon, PlusIcon, FreezeIcon, XIcon, TransferIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { TransactionRow } from "./ui/TransactionRow";
+import { MonthPicker } from "./DatePicker";
 
 type TimelineItem = {
   id: string;
@@ -136,7 +138,7 @@ export function CategoryDetailsSheet({
                 <FreezeIcon size={16} strokeWidth={2} />
               </button>
             )}
-            <button onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
+            <button className="sheet-close-button" onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
               <XIcon strokeWidth={2.2} />
             </button>
           </div>
@@ -148,13 +150,11 @@ export function CategoryDetailsSheet({
             <div style={statItemStyle}>
               <span style={statLabelStyle}>Available</span>
               <span style={statValueStyle}><Money value={available} /></span>
-              <span style={statCurrencyStyle}>MAD</span>
             </div>
             <div style={statDividerStyle} />
             <div style={statItemStyle}>
               <span style={statLabelStyle}>Planned</span>
               <span style={statValueStyle}><Money value={planned} /></span>
-              <span style={statCurrencyStyle}>MAD</span>
             </div>
             <div style={statDividerStyle} />
             <div style={statItemStyle}>
@@ -162,12 +162,11 @@ export function CategoryDetailsSheet({
               <span style={{ ...statValueStyle, color: spentPct >= 100 ? "var(--danger)" : spentPct >= 85 ? "var(--warning)" : "var(--text2)" }}>
                 <Money value={spent} />
               </span>
-              <span style={statCurrencyStyle}>MAD</span>
             </div>
           </div>
           {planned > 0 && (
-            <div style={progressRailStyle} aria-hidden="true">
-              <div style={{ ...progressFillStyle, width: `${spentPct}%` }} />
+            <div style={progressRailStyle} role="progressbar" aria-label="Budget spent" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(spentPct)}>
+              <div style={{ ...progressFillStyle, transform: `scaleX(${spentPct / 100})` }} />
             </div>
           )}
         </section>
@@ -176,16 +175,18 @@ export function CategoryDetailsSheet({
         <div style={actionsRowStyle}>
           <ActionBtn
             icon={<PlusIcon size={18} strokeWidth={2.2} />}
+            label="Add expense"
             ariaLabel="Add expense"
-            bg="color-mix(in srgb, var(--action-transfer) 11%, var(--surface))"
-            ink="var(--action-transfer)"
+            bg="var(--text)"
+            ink="var(--bg)"
             onClick={onOpenAdd}
           />
           <ActionBtn
             icon={<FundIcon size={18} strokeWidth={2.2} />}
+            label="Fund"
             ariaLabel="Fund category"
-            bg="color-mix(in srgb, var(--action-income) 11%, var(--surface))"
-            ink="var(--action-income)"
+            bg="var(--surface2)"
+            ink="var(--text2)"
             onClick={onOpenFund}
           />
         </div>
@@ -194,26 +195,7 @@ export function CategoryDetailsSheet({
         <section style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={sectionLabelStyle}>Activity</span>
-            <div style={monthNavStyle}>
-              <button
-                type="button"
-                onClick={() => setActiveMonth(shiftMonth(activeMonth, -1))}
-                aria-label="Previous month"
-                style={monthNavBtnStyle}
-              >
-                <ChevronLeftIcon size={12} strokeWidth={2.5} />
-              </button>
-              <span style={monthNavLabelStyle}>{formatMonth(activeMonth)}</span>
-              <button
-                type="button"
-                onClick={() => setActiveMonth(shiftMonth(activeMonth, 1))}
-                aria-label="Next month"
-                disabled={activeMonth >= todayMonth()}
-                style={{ ...monthNavBtnStyle, opacity: activeMonth >= todayMonth() ? 0.3 : 1 }}
-              >
-                <ChevronRightIcon size={12} strokeWidth={2.5} />
-              </button>
-            </div>
+            <MonthPicker value={activeMonth} max={todayMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} style={monthFilterStyle} />
           </div>
 
           {loading && (
@@ -237,9 +219,7 @@ export function CategoryDetailsSheet({
 
           {!loading && !error && (data?.timeline?.length ?? 0) > 0 && (
             <div>
-              {data!.timeline.map((item, i) => {
-                const isLast = i === data!.timeline.length - 1;
-                const tone = kindTone(item.kind);
+              {data!.timeline.map((item) => {
                 const meta = [
                   eventKindLabel(item.kind),
                   item.relatedCategoryName,
@@ -247,33 +227,20 @@ export function CategoryDetailsSheet({
                 ].filter(Boolean).join(" · ");
 
                 return (
-                  <div key={item.id} style={{ display: "flex", gap: 12 }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, width: 14 }}>
-                      <div style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: tone.dot,
-                        flexShrink: 0,
-                        marginTop: 5,
-                      }} />
-                      {!isLast && (
-                        <div style={{ width: 1, flex: 1, background: "var(--border)", minHeight: 12, marginTop: 3, marginBottom: 3 }} />
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : 12 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                        <span style={txTitleStyle}>{item.title}</span>
-                        <span style={{ ...amountTextStyle, color: tone.amount, flexShrink: 0 }}>
-                          {item.direction === "in" ? "+" : "−"}<Money value={Math.abs(item.amount)} />
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 2 }}>
-                        <span style={metaTextStyle}>{meta}</span>
-                        <span style={{ ...metaTextStyle, flexShrink: 0 }}>{formatDay(item.date)}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <TransactionRow
+                    key={item.id}
+                    title={item.title}
+                    subtitle={meta}
+                    amount={item.amount}
+                    tone={item.kind === "funded" ? "income" : item.kind === "expense" ? "expense" : "transfer"}
+                    prefix={item.direction === "in" ? "+" : "−"}
+                    date={formatDay(item.date)}
+                    icon={item.kind === "funded"
+                      ? <FundIcon size={14} />
+                      : item.kind === "expense"
+                        ? <CategoryIcon icon={category.icon} size={20} />
+                        : <TransferIcon size={14} />}
+                  />
                 );
               })}
             </div>
@@ -286,12 +253,14 @@ export function CategoryDetailsSheet({
 
 function ActionBtn({
   icon,
+  label,
   ariaLabel,
   onClick,
   bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
   ink = "var(--text2)",
 }: {
   icon: React.ReactNode;
+  label: string;
   ariaLabel: string;
   onClick: () => void;
   bg?: string;
@@ -305,6 +274,7 @@ function ActionBtn({
       style={{ ...actionBtnStyle, background: bg, color: ink }}
     >
       <span style={actionIconStyle}>{icon}</span>
+      <span>{label}</span>
     </button>
   );
 }
@@ -315,30 +285,10 @@ function todayMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-function shiftMonth(m: string, delta: number): string {
-  const [y, mo] = m.split("-").map(Number);
-  const d = new Date(y, mo - 1 + delta, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function formatMonth(m: string): string {
   const [y, mo] = m.split("-").map(Number);
   return new Date(y, mo - 1, 1).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 }
-
-function kindTone(kind: TimelineItem["kind"]): { dot: string; amount: string } {
-  if (kind === "funded") {
-    // Income → green
-    return { dot: "var(--success)", amount: "var(--success)" };
-  }
-  if (kind === "moved_in" || kind === "moved_out") {
-    // Transfer (in or out) → gray
-    return { dot: "var(--muted)", amount: "var(--muted)" };
-  }
-  // Expense → red
-  return { dot: "var(--danger)", amount: "var(--danger)" };
-}
-
 
 function formatDay(value: string) {
   if (!value) return "";
@@ -360,7 +310,7 @@ const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
   display: "flex",
   flexDirection: "column",
-  borderRadius: 20,
+  borderRadius: "var(--radius-sheet)",
 };
 
 const sheetInnerStyle: CSSProperties = {
@@ -378,8 +328,8 @@ const topBarStyle: CSSProperties = {
 };
 
 const closeButtonStyle: CSSProperties = {
-  width: 40,
-  height: 40,
+  width: 44,
+  height: 44,
   border: "none",
   background: "transparent",
   color: "var(--muted)",
@@ -431,7 +381,7 @@ const statDividerStyle: CSSProperties = {
 };
 
 const statLabelStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: 0.5,
   textTransform: "uppercase",
@@ -446,13 +396,6 @@ const statValueStyle: CSSProperties = {
   fontVariantNumeric: "tabular-nums",
 };
 
-const statCurrencyStyle: CSSProperties = {
-  fontSize: 9,
-  fontWeight: 400,
-  color: "var(--muted)",
-  letterSpacing: 0.3,
-};
-
 const progressRailStyle: CSSProperties = {
   width: "100%",
   height: 4,
@@ -462,28 +405,35 @@ const progressRailStyle: CSSProperties = {
 };
 
 const progressFillStyle: CSSProperties = {
+  width: "100%",
   height: "100%",
   borderRadius: 999,
   background: "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))",
-  transition: "width 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+  transformOrigin: "left center",
+  transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
 /* Actions */
 
 const actionsRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, 1fr)",
+  display: "flex",
+  alignItems: "center",
   gap: 8,
 };
 
 const actionBtnStyle: CSSProperties = {
-  height: 52,
-  borderRadius: 14,
+  minHeight: 44,
+  padding: "0 14px",
+  borderRadius: "var(--radius-control)",
   border: "none",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
+  gap: 8,
+  fontFamily: "var(--font-body)",
+  fontSize: 13,
+  fontWeight: 750,
   transition: "background 0.15s ease, color 0.15s ease",
 };
 
@@ -496,10 +446,11 @@ const actionIconStyle: CSSProperties = {
 };
 
 const headerIconBtnStyle: CSSProperties = {
-  width: 40,
-  height: 40,
+  width: 44,
+  height: 44,
   border: "none",
-  background: "transparent",
+  borderRadius: "50%",
+  background: "var(--surface2)",
   color: "var(--muted)",
   cursor: "pointer",
   display: "inline-flex",
@@ -511,7 +462,7 @@ const headerIconBtnStyle: CSSProperties = {
 /* Activity */
 
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 0.7,
   textTransform: "uppercase",
@@ -524,57 +475,17 @@ const panelMessageStyle: CSSProperties = {
   fontSize: 13,
 };
 
-const txTitleStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 500,
-  color: "var(--text2)",
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-};
-
-const amountTextStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-};
-
-const metaTextStyle: CSSProperties = {
-  fontSize: 11,
-  color: "var(--muted)",
-  letterSpacing: 0.1,
-};
-
 /* Month nav */
 
-const monthNavStyle: CSSProperties = {
+const monthFilterStyle: CSSProperties = {
+  position: "relative",
+  minHeight: 44,
+  padding: "0 10px",
   display: "inline-flex",
   alignItems: "center",
-  gap: 2,
+  gap: 6,
   background: "var(--surface2)",
-  borderRadius: 10,
-  padding: "2px 4px",
-};
-
-const monthNavBtnStyle: CSSProperties = {
-  width: 24,
-  height: 24,
-  borderRadius: 7,
-  border: "none",
-  background: "transparent",
+  borderRadius: "var(--radius-control)",
   color: "var(--text2)",
   cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
-
-const monthNavLabelStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: "var(--text2)",
-  minWidth: 68,
-  textAlign: "center",
-  letterSpacing: 0.2,
 };

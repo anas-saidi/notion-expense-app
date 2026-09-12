@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { AppTab, BudgetScope } from "./app-types";
 import { BottomNav } from "./BottomNav";
-import { LandmarkIcon, MoonIcon, SunIcon, PlusIcon } from "./ui/icons";
+import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon } from "./ui/icons";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
+import { SettingsSheet } from "./SettingsSheet";
 
 export function AppShell({
   tab,
@@ -12,8 +13,12 @@ export function AppShell({
   onOpenManage,
   budgetScope,
   onBudgetScopeChange,
+  personalScope,
+  onBudgetSearch,
+  onInsightsSearch,
+  onBudgetRebalance,
   theme = "light",
-  onToggleTheme,
+  onSelectTheme,
   toast,
   showAddButton = true,
   immersive = false,
@@ -27,8 +32,12 @@ export function AppShell({
   onOpenManage?: () => void;
   budgetScope: BudgetScope;
   onBudgetScopeChange: (scope: BudgetScope) => void;
-  theme?: "light" | "dark";
-  onToggleTheme?: () => void;
+  personalScope: Exclude<BudgetScope, "joint">;
+  onBudgetSearch?: () => void;
+  onInsightsSearch?: () => void;
+  onBudgetRebalance?: () => void;
+  theme?: "system" | "light" | "dark";
+  onSelectTheme?: (theme: "system" | "light" | "dark") => void;
   toast?: string | null;
   showAddButton?: boolean;
   immersive?: boolean;
@@ -38,6 +47,7 @@ export function AppShell({
   // On desktop (≥ 1100px) the sidebar is always visible — immersive mode only
   // applies on mobile where the bottom nav needs to be hidden.
   const [isDesktop, setIsDesktop] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 1100);
@@ -59,7 +69,7 @@ export function AppShell({
   const effectiveImmersive = immersive && !isDesktop;
 
   return (
-    <div className={`app-shell-root${tab === "home" ? " app-shell-root--home" : ""}`} style={{ height: "100dvh", position: "relative" }}>
+    <div className="app-shell-root" style={{ height: "100dvh", position: "relative" }}>
       <div
         ref={contentRef}
         id={!effectiveImmersive ? "app-root-shell" : undefined}
@@ -68,16 +78,31 @@ export function AppShell({
       >
         {!immersive && !hideHeader && (
           <header className="app-header" style={headerStyle}>
-            <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} />
+            <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
             <div className="app-header-actions">
-              {onToggleTheme && (
-                <button className="app-top-action" type="button" onClick={onToggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} style={menuButtonStyle}>
-                  {theme === "dark" ? <SunIcon size={18} /> : <MoonIcon size={18} />}
-                </button>
-              )}
-              {onOpenManage && (
-                <button className="app-top-action" type="button" onClick={onOpenManage} aria-label="Accounts" style={menuButtonStyle}>
-                  <LandmarkIcon size={18} />
+              {tab === "budget" ? (
+                <>
+                  <button className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
+                    <SearchIcon size={18} />
+                  </button>
+                  <button className="app-top-action" type="button" onClick={onBudgetRebalance} aria-label="Rebalance budget" style={menuButtonStyle}>
+                    <ShuffleIcon size={18} />
+                  </button>
+                </>
+              ) : tab === "history" ? (
+                <>
+                  <button className="app-top-action" type="button" onClick={onInsightsSearch} aria-label="Search activity" style={menuButtonStyle}>
+                    <SearchIcon size={18} />
+                  </button>
+                  {onSelectTheme && (
+                    <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
+                      <SettingsIcon size={18} />
+                    </button>
+                  )}
+                </>
+              ) : onSelectTheme && (
+                <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
+                  <SettingsIcon size={18} />
                 </button>
               )}
             </div>
@@ -94,16 +119,15 @@ export function AppShell({
             <button
               onClick={onOpenAdd}
               className="fab-add app-nav-add"
-              aria-label="Add expense"
+              aria-label="Add transaction"
               style={{
                 width: 58,
                 height: 58,
                 borderRadius: "50%",
-                border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
-                background: "var(--accent)",
-                color: "var(--accent-ink)",
-                boxShadow:
-                  "0 16px 30px color-mix(in srgb, var(--ink-strong) 12%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)",
+                border: "1px solid var(--text)",
+                background: "var(--text)",
+                color: "var(--bg)",
+                boxShadow: "var(--elevation-float)",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -116,6 +140,19 @@ export function AppShell({
             </button>
           )}
         </div>
+      )}
+
+      {onSelectTheme && (
+        <SettingsSheet
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          theme={theme}
+          onSelectTheme={onSelectTheme}
+          onOpenAccounts={onOpenManage ? () => {
+            setSettingsOpen(false);
+            onOpenManage();
+          } : undefined}
+        />
       )}
 
       {toast && (
@@ -137,7 +174,7 @@ export function AppShell({
             fontSize: 12,
             fontFamily: "var(--font-body)",
             letterSpacing: 0.4,
-            boxShadow: "0 0 0 1px color-mix(in srgb, var(--ink-strong) 10%, transparent)",
+            boxShadow: "var(--elevation-float)",
             animation: "toastIn 0.2s ease both",
             pointerEvents: "none",
           }}
@@ -150,25 +187,24 @@ export function AppShell({
 }
 
 const menuButtonStyle = {
-  width: 40,
-  height: 40,
+  width: 44,
+  height: 44,
   borderRadius: "50%",
-  border: "none",
-  background: "color-mix(in srgb, var(--surface) 88%, transparent)",
+  border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
+  background: "var(--surface)",
   color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   flexShrink: 0,
-  boxShadow: "0 7px 18px color-mix(in srgb, var(--ink-strong) 9%, transparent)",
-  backdropFilter: "blur(18px) saturate(1.2)",
+  boxShadow: "none",
 };
 
 const headerStyle = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 10,
-  marginBottom: 24,
+  gap: 8,
+  marginBottom: 16,
 };

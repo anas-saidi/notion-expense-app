@@ -6,7 +6,9 @@ import { evalExpr, fmt, isExpression, shiftDate, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { PickerPopover } from "./PickerPopover";
-import { CalendarIcon, ChevronDownIcon, CheckIcon, XIcon } from "./ui/icons";
+import { Banner } from "./ui/Banner";
+import { DateCalendar, DatePickerTrigger } from "./DatePicker";
+import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, ChevronDownIcon, CheckIcon, DeleteIcon, XIcon } from "./ui/icons";
 
 type AddTransactionSheetProps = {
   open: boolean;
@@ -35,6 +37,8 @@ type AddTransactionSheetProps = {
   canSubmit: boolean;
   allCategories?: Category[];
   modeVariant?: "create" | "edit";
+  transactionType: "Expense" | "Income";
+  onTransactionTypeChange: (type: "Expense" | "Income") => void;
   onClose: () => void;
   onOpenRebalance?: () => void;
   onQuickFund?: (sourceCategoryId: string, amount: number) => Promise<void>;
@@ -90,6 +94,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     .slice(0, 8);
 
   const isEditMode = props.modeVariant === "edit";
+  const isIncome = props.transactionType === "Income";
   const todayValue = today();
   const yesterdayValue = shiftDate(todayValue, -1);
   const visibleBalance = props.amountAfterBalance ?? props.displayedBalance;
@@ -99,6 +104,38 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     { label: "Yesterday", value: yesterdayValue },
   ];
 
+  const enterAmount = (key: string) => {
+    if (key === "delete") {
+      props.onAmountChange(props.amount.slice(0, -1));
+      return;
+    }
+    if (key === ".") {
+      const currentNumber = props.amount.split(/[+\-*/]/).at(-1) ?? "";
+      if (currentNumber.includes(".")) return;
+      props.onAmountChange(`${props.amount || "0"}.`);
+      return;
+    }
+    if (["+", "-", "*", "/"].includes(key)) {
+      if (!props.amount) {
+        if (key === "-") props.onAmountChange("-");
+        return;
+      }
+      const next = /[+\-*/]$/.test(props.amount)
+        ? `${props.amount.slice(0, -1)}${key}`
+        : `${props.amount}${key}`;
+      props.onAmountChange(next);
+      return;
+    }
+    props.onAmountChange(props.amount === "0" ? key : `${props.amount}${key}`);
+  };
+
+  const keypadKeys = [
+    { value: "7", label: "7" }, { value: "8", label: "8" }, { value: "9", label: "9" }, { value: "/", label: "÷", ariaLabel: "Divide" },
+    { value: "4", label: "4" }, { value: "5", label: "5" }, { value: "6", label: "6" }, { value: "*", label: "×", ariaLabel: "Multiply" },
+    { value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "-", label: "−", ariaLabel: "Subtract" },
+    { value: ".", label: ".", ariaLabel: "Decimal point" }, { value: "0", label: "0" }, { value: "delete", label: "delete", ariaLabel: "Delete last digit" }, { value: "+", label: "+", ariaLabel: "Add" },
+  ];
+
   return (
     <BottomSheet
       open={props.open}
@@ -106,25 +143,33 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       label={isEditMode ? "Edit transaction" : "Add transaction"}
       maxWidth="500px"
       detent="default"
-      snapPoints={[0, 0.72, 1]}
-      initialSnap={1}
+      snapPoints={[0, 0.88, 1]}
+      initialSnap={2}
+      backdropStrength={0.12}
       panelStyle={panelStyle}
-      contentStyle={{ paddingTop: 0 }}
+      contentStyle={{ paddingTop: 0, overflow: "hidden" }}
     >
       <div style={sheetInnerStyle}>
 
         {/* ── Header ── */}
         <header style={topBarStyle}>
-          <div style={eyebrowStyle}>{isEditMode ? "Edit transaction" : "New transaction"}</div>
+          <div style={eyebrowStyle}>{isEditMode ? "Edit expense" : "New transaction"}</div>
           <button onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
         </header>
 
+        {!isEditMode && (
+          <div role="tablist" aria-label="Transaction type" style={typeSwitcherStyle}>
+            <button type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" onClick={() => props.onTransactionTypeChange("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></button>
+            <button type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" onClick={() => props.onTransactionTypeChange("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></button>
+          </div>
+        )}
+
         {/* ── Amount hero ── */}
         <section style={heroWrapStyle}>
           <span style={currencyLabelStyle}>MAD</span>
-          <div className="amount-hero-sizer" data-value={props.amount || "0"}>
+          <div className="amount-hero-sizer" data-value={props.amount || "0"} style={{ width: "100%" }}>
             <input
               type="text"
               value={props.amount}
@@ -132,6 +177,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
               placeholder="0"
               aria-label="Amount"
+              inputMode="decimal"
               autoComplete="off"
               autoFocus
               className="amount-hero-input"
@@ -141,16 +187,16 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 padding: 0,
                 margin: 0,
                 color: "var(--text2)",
-                outline: "none",
                 WebkitAppearance: "none",
                 appearance: "none",
-                fontSize: "clamp(96px, 26vw, 144px)",
+                fontSize: "clamp(68px, 20vw, 104px)",
                 fontFamily: "var(--font-body)",
                 fontWeight: 500,
                 fontVariantNumeric: "tabular-nums",
                 fontFeatureSettings: '"tnum"',
                 lineHeight: 0.88,
                 letterSpacing: "-0.03em",
+                textAlign: "center",
               }}
             />
           </div>
@@ -167,34 +213,34 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         </section>
 
         {/* ── Form fields ── */}
-        <section style={{ display: "grid", gap: 18 }}>
-
+        <section style={formSectionStyle}>
           <input
+            id="transaction-description"
             type="text"
             aria-label="Transaction description"
             value={props.name}
             onChange={(e) => props.onNameChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
-            placeholder="What was it for?"
+            placeholder={isIncome ? "Where did it come from?" : "What was it for?"}
             style={{
               width: "100%",
               background: "transparent",
               border: "none",
-              borderBottom: "1px solid color-mix(in srgb, var(--border) 36%, transparent)",
-              padding: "0 0 10px",
+              padding: "8px 0 14px",
               color: "var(--text2)",
-              outline: "none",
               fontSize: 16,
               lineHeight: 1.25,
               fontWeight: 400,
+              textAlign: "center",
             }}
           />
 
           {/* Pickers row */}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={pickerBarStyle}>
+            <div style={pickerContextGroupStyle}>
 
             {/* Account picker */}
-            <div style={{ position: "relative" }} ref={props.accountRef}>
+            <div style={pickerSlotStyle} ref={props.accountRef}>
               <button
                 onClick={props.onToggleAccountPicker}
                 aria-haspopup="dialog"
@@ -207,14 +253,13 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               >
                 <span style={chipIconStyle}>{props.selectedAccount?.icon ?? "$"}</span>
                 <span style={chipLabelStyle}>{props.selectedAccount?.label ?? ""}</span>
-                <ChevronDownIcon size={11} style={{ color: "var(--muted)", flexShrink: 0, transition: "transform 0.18s", transform: props.showAccountPicker ? "rotate(180deg)" : "none" }} />
               </button>
 
-              <PickerPopover open={props.showAccountPicker} align="left" placement="top" width="min(292px, calc(100vw - 28px))" zIndex={140} anchorRef={props.accountRef}>
+              <PickerPopover open={props.showAccountPicker} title="Account" onClose={props.onToggleAccountPicker} align="left" placement="top" width="min(292px, calc(100vw - 28px))" zIndex={140} anchorRef={props.accountRef}>
                 <div id="account-picker" style={{ maxHeight: 236, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
                   <div style={{ display: "grid", gap: 2 }}>
                     {props.filteredAccounts.map((acct) => (
-                      <button key={acct.id} onClick={() => props.onSelectAccount(acct.id)} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                      <button className="picker-option" aria-pressed={acct.id === props.selectedAccount?.id} key={acct.id} onClick={() => props.onSelectAccount(acct.id)} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
                         <div style={pickerIconStyle}>
                           {acct.icon ?? "$"}
                         </div>
@@ -235,7 +280,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>
 
             {/* Category picker */}
-            <div style={{ position: "relative" }} ref={props.catRef}>
+            {!isIncome && <div style={pickerSlotStyle} ref={props.catRef}>
               <button
                 onClick={props.onToggleCatPicker}
                 aria-haspopup="dialog"
@@ -247,18 +292,17 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 }}
               >
                 <span style={chipIconStyle}>{props.selectedCat?.icon ?? "#"}</span>
-                <span style={{ ...chipLabelStyle, maxWidth: 132 }}>{props.selectedCat?.name ?? "Category"}</span>
-                <ChevronDownIcon size={11} style={{ color: "var(--muted)", flexShrink: 0, transition: "transform 0.18s", transform: props.showCatPicker ? "rotate(180deg)" : "none" }} />
+                <span style={chipLabelStyle}>{props.selectedCat?.name ?? "Category"}</span>
               </button>
 
-              <PickerPopover open={props.showCatPicker} align="left" placement="top" width="min(300px, calc(100vw - 28px))" zIndex={140} anchorRef={props.catRef}>
+              <PickerPopover open={props.showCatPicker} title="Category" onClose={props.onToggleCatPicker} align="left" placement="top" width="min(300px, calc(100vw - 28px))" zIndex={140} anchorRef={props.catRef}>
                 <div id="category-picker" style={{ width: "100%", boxSizing: "border-box" }}>
-                  <div style={{ maxHeight: 228, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
+                  <div style={{ maxHeight: 164, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
                     <div style={{ display: "grid", gap: 2 }}>
                       {props.filteredCats.map((cat) => {
                         const meta = [cat.type[0] ?? null, cat.id === props.lastUsedCatId ? "Last used" : null].filter(Boolean).join(" / ");
                         return (
-                          <button key={cat.id} onClick={() => props.onSelectCategory(cat)} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                          <button className="picker-option" aria-pressed={cat.id === props.selectedCat?.id} key={cat.id} onClick={() => props.onSelectCategory(cat)} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
                             <div style={pickerIconStyle}>
                               {cat.icon ?? "#"}
                             </div>
@@ -287,49 +331,35 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   </div>
                 </div>
               </PickerPopover>
+            </div>}
             </div>
 
             {/* Date picker */}
-            <div style={{ position: "relative" }} ref={props.dateRef}>
-              <button
-                onClick={props.onToggleDatePicker}
-                aria-haspopup="dialog"
-                aria-expanded={props.showDatePicker}
-                aria-controls="date-picker"
-                style={{
-                  ...chipStyle,
-                  color: props.showDatePicker ? "var(--text2)" : "var(--muted)",
-                }}
-              >
-                <span style={chipIconStyle}><CalendarIcon size={11} /></span>
-                <span style={{ ...chipLabelStyle, whiteSpace: "nowrap" }}>{props.selectedDateLabel}</span>
-                <ChevronDownIcon size={11} style={{ color: "var(--muted)", flexShrink: 0, transition: "transform 0.18s", transform: props.showDatePicker ? "rotate(180deg)" : "none" }} />
-              </button>
+            <div style={datePickerSlotStyle} ref={props.dateRef}>
+              <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} ariaLabel="Choose date" onClick={props.onToggleDatePicker} style={chipStyle} className="composer-picker-chip" showChevron={false} />
 
-              <PickerPopover open={props.showDatePicker} align="right" placement="top" width="min(196px, calc(100vw - 28px))" zIndex={140} anchorRef={props.dateRef}>
-                <div id="date-picker" style={{ width: "100%", boxSizing: "border-box" }}>
-                  <div style={{ display: "grid", gap: 1, padding: "6px 6px 5px", boxSizing: "border-box" }}>
-                    {dateOptions.map((option) => {
-                      const selected = option.value === props.date;
-                      return (
-                        <button key={option.value} onClick={() => props.onSelectDate(option.value)} style={{ width: "100%", minHeight: 36, padding: "0 10px", background: selected ? "color-mix(in srgb, var(--accent) 9%, var(--surface))" : "transparent", border: "none", borderRadius: 8, color: selected ? "color-mix(in srgb, var(--accent) 70%, var(--text2))" : "var(--text2)", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 13, fontWeight: selected ? 600 : 400, textAlign: "left" }}>
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div style={{ padding: "5px 6px 7px", borderTop: "1px solid color-mix(in srgb, var(--border) 22%, transparent)" }}>
-                    <div style={{ minHeight: 36, borderRadius: 8, background: "color-mix(in srgb, var(--surface2) 50%, var(--surface))", display: "flex", alignItems: "center", padding: "0 10px" }}>
-                      <input type="date" aria-label="Transaction date" value={props.date} onChange={(e) => props.onSelectDate(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", padding: 0, color: "var(--text2)", outline: "none", fontSize: 13 }} />
-                    </div>
-                  </div>
-                </div>
+              <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onToggleDatePicker} align="right" placement="top" width="min(304px, calc(100vw - 32px))" zIndex={140} anchorRef={props.dateRef}>
+                <div id="date-picker"><DateCalendar value={props.date} onChange={props.onSelectDate} /></div>
               </PickerPopover>
             </div>
           </div>
 
+          <div aria-label="Amount keypad" style={keypadStyle}>
+            {keypadKeys.map(key => (
+              <button
+                key={key.value}
+                type="button"
+                aria-label={key.ariaLabel ?? key.label}
+                onClick={() => enterAmount(key.value)}
+                style={keypadButtonStyle}
+              >
+                {key.value === "delete" ? <DeleteIcon size={19} aria-hidden="true" /> : key.label}
+              </button>
+            ))}
+          </div>
+
           {/* Budget warnings */}
-          {(props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
+          {!isIncome && (props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
             <div style={{ display: "grid", gap: 10 }}>
               {props.suggestedCategory && props.suggestedCategory.id !== props.selectedCat?.id && (
                 <button onClick={() => props.onSelectCategory(props.suggestedCategory!)} style={{ minHeight: 44, padding: "0 2px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, justifySelf: "start" }}>
@@ -338,17 +368,13 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 </button>
               )}
               {(props.categoryUnfunded || props.categoryOverBudget) && props.selectedCat && (
-                <div style={warnStyle}>
-                  <span style={{ fontSize: 12, opacity: 0.75, marginTop: 1, flexShrink: 0 }}>!</span>
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 8px", flex: 1, minWidth: 0 }}>
-
-                    <span style={warnTextStyle}>
-                      {props.categoryUnfunded
-                        ? <>No budget in <strong>{props.selectedCat.name}</strong></>
-                        : <>Short <strong>{fmt(deficit)} MAD</strong> in <strong>{props.selectedCat.name}</strong></>
-                      }
-                    </span>
-
+                <Banner
+                  role="alert"
+                  tone="danger"
+                  compact
+                  icon={<AlertTriangleIcon size={15} />}
+                  action={(
+                    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                     {/* Fund from dropdown — only shown once amount is entered */}
                     {props.onQuickFund && sourceCandidates.length > 0 && deficit > 0 && (
                       <div style={{ position: "relative", flexShrink: 0 }} ref={fundPickerRef}>
@@ -367,7 +393,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                           }
                         </button>
 
-                        <PickerPopover open={showFundPicker} align="left" placement="top" width="min(260px, calc(100vw - 28px))" zIndex={150} anchorRef={fundPickerRef}>
+                        <PickerPopover open={showFundPicker} title="Source category" onClose={() => setShowFundPicker(false)} align="left" placement="top" width="min(260px, calc(100vw - 28px))" zIndex={150} anchorRef={fundPickerRef}>
                           <div role="listbox" aria-label="Source categories" style={{ maxHeight: 220, overflowY: "auto", padding: 6, boxSizing: "border-box" }}>
                             <div style={{ display: "grid", gap: 2 }}>
                               {sourceCandidates.map(cat => {
@@ -388,12 +414,13 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                         setFundingSourceId(null);
                                       }
                                     }}
+                                    className="picker-option"
                                     style={fundPickerRowStyle}
                                   >
                                     <div style={{ ...pickerIconStyle, fontSize: 13, width: 28, height: 28, borderRadius: 8 }}>{cat.icon ?? "#"}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
-                                      {isPartial && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>partial</div>}
+                                      {isPartial && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>partial</div>}
                                     </div>
                                     <span style={{ fontSize: 12, color: isPartial ? "var(--warning)" : "var(--success)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
                                       {fmt(moveAmount)} MAD
@@ -412,9 +439,14 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                         Rebalance
                       </button>
                     )}
-
-                  </div>
-                </div>
+                    </div>
+                  )}
+                >
+                  {props.categoryUnfunded
+                    ? <>No budget in <strong>{props.selectedCat.name}</strong></>
+                    : <>Short <strong>{fmt(deficit)} MAD</strong> in <strong>{props.selectedCat.name}</strong></>
+                  }
+                </Banner>
               )}
             </div>
           )}
@@ -424,10 +456,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             onClick={props.onSubmit}
             disabled={!props.canSubmit}
             aria-label={
-              props.status === "saving" ? (isEditMode ? "Updating transaction" : "Saving transaction")
-              : props.status === "success" ? (isEditMode ? "Transaction updated" : "Transaction saved")
+              props.status === "saving" ? (isEditMode ? "Updating expense" : isIncome ? "Adding income" : "Adding expense")
+              : props.status === "success" ? (isEditMode ? "Expense updated" : isIncome ? "Income added" : "Expense added")
               : props.status === "error" ? `Save failed: ${props.errorMsg}`
-              : isEditMode ? "Update transaction" : "Save transaction"
+              : isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
             }
             className="pressable cta-save"
             style={{
@@ -438,15 +470,15 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               background:
                 props.status === "success" ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
                 : props.status === "error" ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
-                : "var(--accent)",
+                : !props.canSubmit && props.status === "idle" ? "var(--surface2)" : "var(--accent)",
               color:
                 props.status === "success" ? "var(--success)"
                 : props.status === "error" ? "var(--danger)"
-                : "var(--accent-ink)",
+                : !props.canSubmit && props.status === "idle" ? "var(--muted)" : "var(--accent-ink)",
               fontWeight: 700,
               fontSize: 15,
               cursor: props.canSubmit ? "pointer" : "not-allowed",
-              opacity: props.canSubmit || props.status !== "idle" ? 1 : 0.4,
+              opacity: 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -461,7 +493,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             ) : props.status === "error" ? (
               <><XIcon size={16} />Error</>
             ) : (
-              isEditMode ? "Update transaction" : "Save"
+              isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
             )}
           </button>
 
@@ -478,13 +510,26 @@ const panelStyle: CSSProperties = {
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
-  borderRadius: 20,
+  borderRadius: "var(--radius-sheet)",
 };
 
 const sheetInnerStyle: CSSProperties = {
-  padding: "18px 18px 24px",
-  display: "grid",
-  gap: 20,
+  padding: "8px 18px 12px",
+  height: "100%",
+  boxSizing: "border-box",
+  minHeight: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  overflowY: "auto",
+  scrollbarWidth: "none",
+};
+
+const formSectionStyle: CSSProperties = {
+  flexShrink: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
 };
 
 const topBarStyle: CSSProperties = {
@@ -494,9 +539,23 @@ const topBarStyle: CSSProperties = {
   gap: 12,
 };
 
+const typeSwitcherStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+  height: 44,
+  width: "fit-content",
+  margin: "0 auto",
+  padding: 3,
+  boxSizing: "border-box",
+  borderRadius: 999,
+  background: "var(--surface2)",
+};
+
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 10,
+  fontSize: 12,
   letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
@@ -516,17 +575,23 @@ const closeButtonStyle: CSSProperties = {
 };
 
 const heroWrapStyle: CSSProperties = {
+  position: "relative",
+  flex: 1,
+  minHeight: 96,
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   gap: 6,
-  padding: "12px 0 28px",
-  borderBottom: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
+  justifyContent: "center",
+  padding: "0 0 8px",
 };
 
 const currencyLabelStyle: CSSProperties = {
+  position: "absolute",
+  right: 4,
+  bottom: 14,
   fontFamily: "var(--font-body)",
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: 1.4,
   textTransform: "uppercase",
@@ -544,32 +609,74 @@ const heroCopyStyle: CSSProperties = {
   animation: "fadeUp 0.18s ease both",
 };
 
-const chipStyle: CSSProperties = {
-  minHeight: 36,
-  padding: "0 6px",
-  borderRadius: 8,
-  border: "none",
-  background: "transparent",
-  color: "var(--muted)",
-  fontSize: 12,
-  fontWeight: 500,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 5,
+const keypadStyle: CSSProperties = {
+  height: 188,
+  flexShrink: 0,
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateRows: "repeat(4, 44px)",
+  gap: 4,
 };
 
-const chipIconStyle: CSSProperties = {
-  width: 16,
-  height: 16,
+const keypadButtonStyle: CSSProperties = {
+  minHeight: 44,
+  border: "none",
+  borderRadius: "var(--radius-control)",
+  background: "var(--surface2)",
+  color: "var(--text)",
+  fontSize: 20,
+  fontWeight: 650,
+  fontVariantNumeric: "tabular-nums",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 11,
+  cursor: "pointer",
+};
+
+const pickerBarStyle: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+};
+
+const pickerContextGroupStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "0 1 auto" };
+const pickerSlotStyle: CSSProperties = { position: "relative", minWidth: 0 };
+const datePickerSlotStyle: CSSProperties = { position: "relative", minWidth: 0, marginLeft: "auto" };
+
+const chipStyle: CSSProperties = {
+  minHeight: 44,
+  minWidth: 0,
+  maxWidth: "100%",
+  padding: "0 12px",
+  borderRadius: 999,
+  border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
+  background: "var(--surface)",
+  color: "var(--text2)",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  boxSizing: "border-box",
+};
+
+const chipIconStyle: CSSProperties = {
+  width: 18,
+  height: 18,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 13,
   flexShrink: 0,
 };
 
 const chipLabelStyle: CSSProperties = {
+  minWidth: 0,
+  maxWidth: 128,
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -606,7 +713,7 @@ const pickerIconStyle: CSSProperties = {
 const pickerMetaStyle: CSSProperties = {
   marginTop: 3,
   fontFamily: "var(--font-body)",
-  fontSize: 11,
+  fontSize: 12,
   color: "var(--muted)",
   whiteSpace: "nowrap",
   overflow: "hidden",
@@ -619,26 +726,11 @@ const monoSmallStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-const warnStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: 10,
-  padding: "11px 12px",
-  borderRadius: 16,
-  background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
-};
-
-const warnTextStyle: CSSProperties = {
-  fontSize: 12,
-  color: "color-mix(in srgb, var(--danger) 46%, var(--text2))",
-  lineHeight: 1.5,
-};
-
 const rebalanceLinkStyle: CSSProperties = {
   padding: 0,
   border: "none",
   background: "transparent",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 500,
   color: "var(--muted)",
   cursor: "pointer",

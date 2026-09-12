@@ -8,6 +8,18 @@ export const config = {
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Local development does not need a registered Notion OAuth redirect URI.
+  const isLocalDevelopment =
+    process.env.NODE_ENV === "development" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(request.nextUrl.hostname);
+
+  if (isLocalDevelopment) {
+    if (pathname === "/login" || pathname.startsWith("/api/auth/")) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next();
+  }
+
   if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return NextResponse.next();
   }

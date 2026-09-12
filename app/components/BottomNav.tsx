@@ -18,7 +18,7 @@ export function BottomNav({ tab, onTabChange }: BottomNavProps) {
     <nav role="tablist" aria-label="App navigation" className="app-nav">
       <div className="app-nav-inner">
         {items.map((item) => {
-          const activeColor = "var(--accent)";
+          const activeColor = "var(--accent-foreground)";
 
           return (
             <button

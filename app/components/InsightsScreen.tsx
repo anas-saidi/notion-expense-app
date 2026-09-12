@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
+import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { categoryMatchesScope, getCategoryScope, transactionMatchesScope, monthBounds, fmt, fmtDate } from "./app-utils";
-import { ArrowLeftIcon, BanknoteIcon, ChartPieIcon, ChevronRightIcon, FlameIcon, TransferIcon, UsersRoundIcon } from "./ui/icons";
-import { BUDGET_SCOPE_CHIPS } from "./ui/ScopeChipBar";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart, PieChart, Pie, Cell, Sector } from "recharts";
+import { categoryMatchesScope, comparisonPeriods, getCategoryScope, isExpenseTransaction, resolveTransactionScopes, transactionMatchesScope, fmt, fmtDate } from "./app-utils";
+import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, BanknoteIcon, CalendarIcon, ChartPieIcon, ChevronRightIcon, FlameIcon, TransferIcon } from "./ui/icons";
+import { Banner } from "./ui/Banner";
+import { ScreenChip } from "./ui/ScreenChip";
+import { SearchField } from "./ui/SearchField";
+import { TransactionRow } from "./ui/TransactionRow";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, PieChart, Pie, Cell, Sector } from "recharts";
 import type { PieSectorShapeProps } from "recharts";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
@@ -21,7 +25,7 @@ type Props = {
   onInsightsMonthChange: (m: string) => void;
   transactionsLoading?: boolean;
   onClickTransaction: (t: Transaction) => void;
-  onDeleteTransaction: (id: string) => void;
+  onDeleteTransaction: (id: string) => boolean | Promise<boolean>;
 };
 
 /* ─── Constants ──────────────────────────────────────────────────── */
@@ -66,36 +70,60 @@ export function InsightsScreen({
     const [y, m] = insightsMonth.split("-").map(Number);
     return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(new Date(y, m - 1, 1));
   }, [insightsMonth]);
-
   /* Historical planned — fetched from monthly-summary per viewed month */
   type SummaryEntry = { categoryId: string; total: number; accountId?: string | null };
   const [assignedByCategory, setAssignedByCategory] = useState<SummaryEntry[] | null>(null);
   const [prevMonthTransactions, setPrevMonthTransactions] = useState<Transaction[] | null>(null);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const [activityQuery, setActivityQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [activityType, setActivityType] = useState<"All" | "Expenses" | "Income" | "Transfers" | "Needs review">("All");
 
-  const prevMonth = useMemo(() => {
-    const [y, m] = insightsMonth.split("-").map(Number);
-    const d = new Date(y, m - 2, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }, [insightsMonth]);
+  useEffect(() => {
+    const openSearch = () => setSearchOpen(true);
+    window.addEventListener("open-insights-search", openSearch);
+    return () => window.removeEventListener("open-insights-search", openSearch);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   useEffect(() => {
     setAssignedByCategory(null);
     setPrevMonthTransactions(null);
-    const { start: prevStart, end: prevEnd } = monthBounds(`${prevMonth}-01`);
+    setInsightsError(null);
+    const periods = comparisonPeriods(insightsMonth);
+
+    const readJson = async (url: string) => {
+      const response = await fetch(url);
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!response.ok || !contentType.includes("application/json")) {
+        throw new Error(`Unable to load insights (${response.status || "invalid response"})`);
+      }
+      return response.json();
+    };
+
     Promise.all([
-      fetch(`/api/monthly-summary?month=${insightsMonth}`).then(r => r.json()),
-      fetch(`/api/transactions?start=${prevStart}&end=${prevEnd}`).then(r => r.json()),
+      readJson(`/api/monthly-summary?month=${insightsMonth}`),
+      readJson(`/api/transactions?start=${periods.previous.start}&end=${periods.previous.end}`),
     ]).then(([curr, prevTx]) => {
       setAssignedByCategory(curr.summary?.assignedByCategory ?? null);
       setPrevMonthTransactions(prevTx.transactions ?? null);
-    }).catch(() => {});
-  }, [insightsMonth, prevMonth]);
+    }).catch((error: unknown) => {
+      setAssignedByCategory([]);
+      setPrevMonthTransactions([]);
+      setInsightsError(error instanceof Error ? error.message : "Unable to load insights");
+    });
+  }, [insightsMonth, retryKey]);
 
   /* Shared derivations */
-  const expenses = useMemo(
-    () => transactions.filter(t => t.category && (!t.type || t.type === "Expense")),
-    [transactions],
-  );
+  const scopedTransactions = useMemo(() => transactions.filter(t => transactionMatchesScope(t, categories, budgetScope, accounts)), [transactions, categories, budgetScope, accounts]);
+  const unassignedTransactions = useMemo(() => transactions.filter(t => resolveTransactionScopes(t, categories, accounts).length === 0), [transactions, categories, accounts]);
+  const activityTransactions = activityType === "Needs review" ? unassignedTransactions : scopedTransactions;
+  const expenses = useMemo(() => scopedTransactions.filter(isExpenseTransaction), [scopedTransactions]);
 
   const totalSpent = useMemo(
     () => expenses.reduce((s, t) => s + t.amount, 0),
@@ -133,7 +161,7 @@ export function InsightsScreen({
   const lastMonthTotalSpent = useMemo(() => {
     if (!prevMonthTransactions) return 0;
     return prevMonthTransactions
-      .filter(t => t.category && (!t.type || t.type === "Expense"))
+      .filter(isExpenseTransaction)
       .filter(t => transactionMatchesScope(t, categories, budgetScope, accounts))
       .reduce((s, t) => s + t.amount, 0);
   }, [prevMonthTransactions, categories, budgetScope, accounts]);
@@ -157,70 +185,7 @@ export function InsightsScreen({
   }, [insightsMonth, totalSpent, totalPlanned, lastMonthTotalSpent, currentMonthStr]);
 
 
-  /* ── 3. Together vs. Apart ─────────────────────────────────────── */
-  const splitData = useMemo(() => {
-    const acctLabel = (id: string | null | undefined) =>
-      id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
-
-    // Personal accounts
-    const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
-    const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
-
-    const anasContribPct  = anasAcc?.contributionPercent  ?? null;
-    const salmaContribPct = salmaAcc?.contributionPercent ?? null;
-
-    // Actual: pocket spend + transfers to joint categories
-    let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
-    for (const t of expenses) {
-      const label = acctLabel(t.accountId);
-      if (label.includes("hubb")) anasPocket += t.amount;
-      else if (label.includes("wife")) salmaPocket += t.amount;
-      else sharedSpend += t.amount;
-    }
-
-    // Add transfers from personal accounts into joint account
-    const joinedAccId = accounts.find(a => a.label.toLowerCase().includes("joined"))?.id;
-    let anasFunded = 0, salmaFunded = 0;
-    for (const t of transactions) {
-      if (t.type !== "Transfer") continue;
-      if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
-      const fromLabel = acctLabel(t.fromAccountId);
-      if (fromLabel.includes("hubb"))       anasFunded  += t.amount;
-      else if (fromLabel.includes("wife"))  salmaFunded += t.amount;
-    }
-
-    // Organic balance = what was in the joined account independent of this month's
-    // personal contributions. Back out transfers in, add back spending out.
-    // This keeps contribution targets stable as people transfer money in.
-    const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
-    const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
-    const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
-    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
-    const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
-    const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
-
-    const anasActual  = anasPocket + anasFunded;
-    const salmaActual = salmaPocket + salmaFunded;
-
-    // Progress % (capped at 100 for the bar)
-    const anasPct  = anasPlan  > 0 ? Math.min(100, (anasActual  / anasPlan)  * 100) : null;
-    const salmaPct = salmaPlan > 0 ? Math.min(100, (salmaActual / salmaPlan) * 100) : null;
-
-    // Delta: positive = over-contributed, negative = short
-    const anasDelta  = anasPlan  > 0 ? anasActual  - anasPlan  : null;
-    const salmaDelta = salmaPlan > 0 ? salmaActual - salmaPlan : null;
-
-    return {
-      anasActual, salmaActual, sharedSpend,
-      anasPlan, salmaPlan,
-      anasPct, salmaPct,
-      anasDelta, salmaDelta,
-      anasContribPct, salmaContribPct,
-      hasPlan: totalPlanned > 0,
-    };
-  }, [expenses, transactions, accounts, categories, totalPlanned]);
-
-  /* ── 4. Spending Breakdown (donut) ────────────────────────────── */
+  /* ── 2. Spending Breakdown (donut) ────────────────────────────── */
   const donutData = useMemo(() => {
     const all = categories
       .filter(c => categoryMatchesScope(c, budgetScope))
@@ -241,27 +206,35 @@ export function InsightsScreen({
   const txGroups = useMemo(() => {
     const now = new Date();
     const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const getGroup = (dateStr: string) => {
+    const getGroupLabel = (dateStr: string) => {
       const d = new Date(`${dateStr}T00:00:00`);
       const diff = Math.round((nowDay - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86400000);
       if (diff <= 0) return "Today";
       if (diff === 1) return "Yesterday";
-      if (diff <= 6) return "This week";
-      return "Earlier";
+      return new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric" }).format(d);
     };
-    const ORDER = ["Today", "Yesterday", "This week", "Earlier"];
-    const map = new Map<string, Transaction[]>();
-    for (const t of expenses) {
-      const g = t.date ? getGroup(t.date) : "Earlier";
-      if (!map.has(g)) map.set(g, []);
-      map.get(g)!.push(t);
+    const map = new Map<string, { label: string; items: Transaction[] }>();
+    const query = activityQuery.trim().toLowerCase();
+    const filtered = activityTransactions.filter(t => {
+      const typeMatches = activityType === "All" || activityType === "Needs review" || (activityType === "Expenses" && isExpenseTransaction(t)) || (activityType === "Income" && t.type === "Income") || (activityType === "Transfers" && t.type === "Transfer");
+      if (!typeMatches) return false;
+      const related = [t.name, categories.find(c => c.id === t.category)?.name, accounts.find(a => a.id === t.accountId)?.label,
+        categories.find(c => c.id === t.fromCategoryId)?.name, categories.find(c => c.id === t.toCategoryId)?.name,
+        accounts.find(a => a.id === t.fromAccountId)?.label, accounts.find(a => a.id === t.toAccountId)?.label].filter(Boolean).join(" ").toLowerCase();
+      return !query || related.includes(query);
+    });
+    for (const t of filtered) {
+      const key = t.date || "undated";
+      if (!map.has(key)) map.set(key, { label: t.date ? getGroupLabel(t.date) : "Undated", items: [] });
+      map.get(key)!.items.push(t);
     }
-    return ORDER.filter(g => map.has(g)).map(g => ({
-      label: g,
-      items: map.get(g)!,
-      subtotal: map.get(g)!.reduce((s, t) => s + t.amount, 0),
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a)).map(([, group]) => ({
+      label: group.label,
+      items: group.items,
+      expenseTotal: group.items.filter(isExpenseTransaction).reduce((s, t) => s + t.amount, 0),
+      incomeTotal: group.items.filter(t => t.type === "Income").reduce((s, t) => s + t.amount, 0),
     }));
-  }, [expenses]);
+  }, [activityTransactions, activityQuery, activityType, categories, accounts]);
 
   /* ── Render ────────────────────────────────────────────────────── */
 
@@ -287,44 +260,49 @@ export function InsightsScreen({
         </div>
       </div>
 
-      {/* ── Insight cards grid ── */}
-      <div className="insights-grid">
+      {insightsError && (
+        <Banner
+          role="alert"
+          tone="danger"
+          title="Insights could not be refreshed"
+          action={<button type="button" onClick={() => setRetryKey(key => key + 1)} style={retryButtonStyle}>Try again</button>}
+        >
+          Your existing activity is still available. Check the connection and try again.
+        </Banner>
+      )}
 
-        {/* 1. Burn Rate */}
-        <InsightCard icon={<FlameIcon size={16} />} title="Burn Rate" subtitle="Are you on pace?">
-          {assignedByCategory === null || transactionsLoading
-            ? <BurnRateSkeleton />
-            : <BurnRateBody burnRate={burnRate} totalSpent={totalSpent} totalPlanned={totalPlanned} lastMonthTotalSpent={lastMonthTotalSpent} />
-          }
-        </InsightCard>
-
-        {/* 3. Together vs. Apart (joint only) */}
-        {budgetScope === "joint" && (
-          <InsightCard icon={<UsersRoundIcon size={16} />} title="Together vs. Apart" subtitle="How does the money split?">
-            {transactionsLoading
-              ? <TogetherApartSkeleton />
-              : <TogetherApartBody data={splitData} />
-            }
-          </InsightCard>
-        )}
-
-        {/* 4. Spending Breakdown */}
-        <InsightCard icon={<ChartPieIcon size={16} />} title="Spending Breakdown" subtitle={`By category · ${BUDGET_SCOPE_CHIPS.find(c => c.key === budgetScope)?.label ?? budgetScope}`}>
-          {transactionsLoading
-            ? <SpendingBreakdownSkeleton />
-            : <SpendingBreakdownBody
-                data={donutData}
-                expenses={expenses}
-                insightsMonth={insightsMonth}
-                totalPlanned={totalPlanned}
-              />
-          }
-        </InsightCard>
-
-      </div>
+      {assignedByCategory === null || transactionsLoading ? (
+        <div className="skeleton" style={{ height: 84, borderRadius: 12 }} />
+      ) : (
+        <NarrativeSummary burnRate={burnRate} totalPlanned={totalPlanned} />
+      )}
 
       {/* ── Transaction history — full width ── */}
       <div className="insights-history">
+        <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+          <div className="section-label" style={sectionDividerLabelStyle}>Filter activity</div>
+          {searchOpen && (
+            <SearchField
+              ref={searchInputRef}
+              value={activityQuery}
+              onChange={setActivityQuery}
+              onClose={() => { setActivityQuery(""); setSearchOpen(false); }}
+              placeholder="Search description, category or account"
+              ariaLabel="Search activity"
+            />
+          )}
+          <div role="group" aria-label="Activity filters" className="filter-chip-rail" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
+            {(["All", "Expenses", "Income", "Transfers"] as const).map(filter => <ScreenChip key={filter} selected={activityType === filter} onClick={() => setActivityType(filter)}>{filter}</ScreenChip>)}
+            <ScreenChip
+              selected={activityType === "Needs review"}
+              onClick={() => setActivityType("Needs review")}
+              badge={unassignedTransactions.length || undefined}
+              ariaLabel={`Needs review: ${unassignedTransactions.length} transactions missing an account or category`}
+            >
+              Needs review
+            </ScreenChip>
+          </div>
+        </div>
         {transactionsLoading && (
           <div style={{ display: "grid", gap: 20 }}>
             <div className="section-label" style={sectionDividerLabelStyle}>History</div>
@@ -335,14 +313,13 @@ export function InsightsScreen({
         )}
         {!transactionsLoading && txGroups.length > 0 && (
           <div style={{ display: "grid", gap: 20 }}>
-            <div className="section-label" style={sectionDividerLabelStyle}>History</div>
-            {txGroups.map(({ label, items, subtotal }) => (
+            {txGroups.map(({ label, items, expenseTotal, incomeTotal }) => (
               <section key={label}>
                 <div style={groupHeaderStyle}>
                   <span style={groupLabelStyle}>{label}</span>
-                  {subtotal > 0 && <span style={groupSubtotalStyle}>{fmt(subtotal)} MAD</span>}
+                  <span style={groupSubtotalStyle}>{expenseTotal > 0 ? `${fmt(expenseTotal)} MAD` : ""}{expenseTotal > 0 && incomeTotal > 0 ? " · " : ""}{incomeTotal > 0 ? `${fmt(incomeTotal)} MAD income` : ""}</span>
                 </div>
-                <div className="tx-group-list" style={{ display: "grid", gap: 6 }}>
+                <div className="tx-group-list" style={transactionGroupStyle}>
                   {items.map(txn => {
                     const cat      = categories.find(c => c.id === txn.category);
                     const fromCat  = categories.find(c => c.id === txn.fromCategoryId);
@@ -350,30 +327,18 @@ export function InsightsScreen({
                     const isIncome   = txn.type === "Income";
                     const isTransfer = txn.type === "Transfer";
                     const prefix = isIncome ? "+" : isTransfer ? "↔" : "−";
-                    const amtColor = isIncome ? "var(--accent-ink)" : isTransfer ? "var(--muted)" : "var(--text2)";
                     return (
-                      <SwipeToDelete key={txn.id} onDelete={() => onDeleteTransaction(txn.id)}>
-                        <div onClick={() => onClickTransaction(txn)} className="tx-row">
-                          {isIncome || isTransfer ? (
-                            <span style={txTypeIconStyle(isIncome)}>
-                              {isIncome ? <BanknoteIcon size={13} /> : <TransferIcon size={12} />}
-                            </span>
-                          ) : (
-                            <CategoryIcon icon={cat?.icon ?? null} size={22} style={{ flexShrink: 0 }} />
-                          )}
-                          <div style={txMiddleStyle}>
-                            {isTransfer && (fromCat || toCat) ? (
-                              <span style={txNameStyle}>{fromCat?.name ?? "—"} → {toCat?.name ?? "—"}</span>
-                            ) : (
-                              <span style={txNameStyle}>{txn.name}</span>
-                            )}
-                            {!isTransfer && cat && <span style={txCategoryStyle}>{cat.name}</span>}
-                          </div>
-                          <div style={txRightStyle}>
-                            <span style={{ ...txAmountStyle, color: amtColor }}>{prefix}{fmt(txn.amount)} MAD</span>
-                            <span style={txDateStyle}>{fmtDate(txn.date)}</span>
-                          </div>
-                        </div>
+                      <SwipeToDelete key={txn.id} flat deleteLabel={`Delete ${txn.name}`} onDelete={() => onDeleteTransaction(txn.id)}>
+                        <TransactionRow
+                          title={isTransfer && (fromCat || toCat) ? `${fromCat?.name ?? "—"} → ${toCat?.name ?? "—"}` : txn.name}
+                          subtitle={!isTransfer ? cat?.name : undefined}
+                          amount={txn.amount}
+                          tone={isIncome ? "income" : isTransfer ? "transfer" : "expense"}
+                          prefix={prefix}
+                          date={txn.date ? fmtDate(txn.date) : undefined}
+                          icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} size={22} />}
+                          onClick={() => onClickTransaction(txn)}
+                        />
                       </SwipeToDelete>
                     );
                   })}
@@ -383,16 +348,48 @@ export function InsightsScreen({
           </div>
         )}
 
-        {!transactionsLoading && transactions.length === 0 && (
+        {!transactionsLoading && txGroups.length === 0 && (
           <section aria-label="Activity" style={emptyScreenStyle}>
             <div className="section-label" style={sectionDividerLabelStyle}>Activity</div>
-            <p style={{ fontSize: 13, color: "var(--muted)" }}>No transactions in {monthLabel}.</p>
+            <p style={{ fontSize: 13, color: "var(--muted)" }}>No matching transactions in {monthLabel}.</p>
           </section>
         )}
       </div>
 
     </div>
   );
+}
+
+function NarrativeSummary({ burnRate, totalPlanned }: {
+  burnRate: { spentPct: number; expectedPct: number; isAhead: boolean; isOver: boolean; gapPct: number; daysLeft: number; vsLastMonth: number | null };
+  totalPlanned: number;
+}) {
+  if (totalPlanned <= 0) {
+    return (
+      <section aria-label="Monthly insight summary" style={narrativeSummaryStyle}>
+        <span style={summaryLabelStyle}><ChartPieIcon size={16} />Summary</span>
+        <span>No monthly plan is recorded for this period yet.</span>
+      </section>
+    );
+  }
+
+  const comparison = burnRate.vsLastMonth;
+  return (
+    <section aria-label="Monthly insight summary" style={narrativeSummaryStyle}>
+      <span style={summaryLabelStyle}><ChartPieIcon size={16} />Summary</span>
+      <span>
+        You’ve used <InlineMetric icon={<FlameIcon size={12} />} label={`${Math.round(burnRate.spentPct)}% of plan`} tone={burnRate.isOver ? "danger" : "accent"} /> of this month’s plan.
+        {comparison !== null && (
+          <> Spending is <InlineMetric icon={comparison <= 0 ? <ArrowDownIcon size={12} /> : <ArrowUpIcon size={12} />} label={`${Math.abs(comparison)}% ${comparison <= 0 ? "lower" : "higher"}`} tone={comparison <= 0 ? "positive" : "warning"} /> than the prior period.</>
+        )}
+        {burnRate.daysLeft > 0 && <> You have <InlineMetric icon={<CalendarIcon size={12} />} label={`${burnRate.daysLeft} days`} tone="neutral" /> left.</>}
+      </span>
+    </section>
+  );
+}
+
+function InlineMetric({ icon, label, tone }: { icon: ReactNode; label: string; tone: "neutral" | "accent" | "positive" | "warning" | "danger" }) {
+  return <span role="img" aria-label={label} style={inlineMetricStyle(tone)}>{icon}<span aria-hidden="true">{label}</span></span>;
 }
 
 /* ─── Card wrapper ───────────────────────────────────────────────── */
@@ -432,27 +429,7 @@ function BurnRateSkeleton() {
 }
 
 
-/* ─── 3. Together vs. Apart skeleton ────────────────────────────── */
-
-function TogetherApartSkeleton() {
-  return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        {[1, 2].map(i => (
-          <div key={i} style={{ borderRadius: 14, padding: "14px 14px 12px", background: "var(--surface2)", display: "grid", gap: 6 }}>
-            <div className="skeleton" style={{ width: 40, height: 10, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 70, height: 22, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 24, height: 9, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 80, height: 10, borderRadius: 4, marginTop: 2 }} />
-          </div>
-        ))}
-      </div>
-      <div className="skeleton" style={{ width: "65%", height: 12, borderRadius: 4 }} />
-    </div>
-  );
-}
-
-/* ─── 4. Spending Breakdown skeleton ────────────────────────────── */
+/* ─── 2. Spending Breakdown skeleton ────────────────────────────── */
 
 function SpendingBreakdownSkeleton() {
   return (
@@ -491,55 +468,43 @@ function TxRowSkeleton() {
 
 /* ─── 1. Burn Rate body ──────────────────────────────────────────── */
 
-function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent }: {
+function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent, periodRanges }: {
   burnRate: { spentPct: number; expectedPct: number; isAhead: boolean; isOver: boolean; gapPct: number; daysLeft: number; vsLastMonth: number | null };
   totalSpent: number;
   totalPlanned: number;
   lastMonthTotalSpent: number;
+  periodRanges: ReturnType<typeof comparisonPeriods>;
 }) {
-  const { spentPct, expectedPct, isAhead, isOver, gapPct, daysLeft, vsLastMonth } = burnRate;
+  const { spentPct, isOver, vsLastMonth } = burnRate;
 
-  const fillColor = isOver ? "var(--danger)"
-    : isAhead ? "var(--warning)"
-    : "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
+  const fillColor = isOver ? "var(--danger)" : "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
 
   const copy = totalPlanned === 0
-    ? "No budget planned this month."
-    : isOver
-    ? `Over budget by ${fmt(totalSpent - totalPlanned)} MAD.`
-    : isAhead
-    ? `Running ${Math.round(gapPct)}% ahead of pace — ${daysLeft} day${daysLeft !== 1 ? "s" : ""} left.`
-    : `${Math.round(gapPct)}% under expected pace. The budget is breathing easy.`;
+    ? "No monthly plan is recorded for this period."
+    : `${fmt(totalSpent)} of ${fmt(totalPlanned)} MAD monthly plan spent.`;
 
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {/* Spend number + vs last month */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" as const }}>
-        <span style={bigNumStyle(isOver)}>{fmt(totalSpent)}</span>
+        <span style={bigNumStyle(isOver)}><AnimatedCounter value={totalSpent} animateOnMount /></span>
         <span style={bigNumUnitStyle}>MAD spent</span>
         {vsLastMonth !== null && lastMonthTotalSpent > 0 && (
           <span style={{
-            fontSize: 11, fontWeight: 600, letterSpacing: 0.2,
-            color: vsLastMonth > 0 ? "var(--warning)" : "color-mix(in srgb, var(--accent) 72%, var(--text2))",
+            fontSize: 12, fontWeight: 600, letterSpacing: 0.2,
+            color: "var(--muted)",
             marginLeft: 4,
           }}>
-            {vsLastMonth > 0 ? "↑" : "↓"} {Math.abs(vsLastMonth)}% vs last month
+            {vsLastMonth > 0 ? "+" : "−"}{Math.abs(vsLastMonth)}% vs prior period
           </span>
         )}
       </div>
 
-      {/* Bar + pace marker */}
+      {/* Neutral plan progress */}
       <div style={{ position: "relative", padding: "4px 0" }}>
         <div style={burnRailStyle}>
           <div style={{ ...burnFillStyle, transform: `scaleX(${spentPct / 100})`, background: fillColor }} />
         </div>
-        {totalPlanned > 0 && (
-          <div style={{
-            position: "absolute", top: 0, bottom: 0,
-            left: `${expectedPct}%`, width: 2, borderRadius: 1,
-            background: "var(--border2)", transform: "translateX(-50%)",
-          }} />
-        )}
       </div>
 
       {/* Legend */}
@@ -549,10 +514,6 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent 
             <span style={{ ...burnDotStyle, background: fillColor }} />
             {Math.round(spentPct)}% spent
           </span>
-          <span style={{ ...burnLegendItemStyle, opacity: 0.55 }}>
-            <span style={{ width: 2, height: 10, borderRadius: 1, background: "var(--border2)", display: "inline-block" }} />
-            Pace marker
-          </span>
           <span style={{ ...burnLegendItemStyle, marginLeft: "auto" }}>
             {fmt(totalPlanned)} MAD planned
           </span>
@@ -560,113 +521,13 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent 
       )}
 
       <p style={copySentenceStyle}>{copy}</p>
+      <p style={{ ...copySentenceStyle, marginTop: -6 }}>{periodRanges.current.start}–{periodRanges.current.end} vs {periodRanges.previous.start}–{periodRanges.previous.end}</p>
     </div>
   );
 }
 
 
-/* ─── 3. Together vs. Apart body ─────────────────────────────────── */
-
-function TogetherApartBody({ data }: {
-  data: {
-    anasActual: number; salmaActual: number; sharedSpend: number;
-    anasPlan: number; salmaPlan: number;
-    anasPct: number | null; salmaPct: number | null;
-    anasDelta: number | null; salmaDelta: number | null;
-    anasContribPct: number | null; salmaContribPct: number | null;
-    hasPlan: boolean;
-  };
-}) {
-  const { anasActual, salmaActual, sharedSpend, anasPlan, salmaPlan, anasPct, salmaPct, anasDelta, salmaDelta, anasContribPct, salmaContribPct, hasPlan } = data;
-
-  const hasAnyData = anasActual > 0 || salmaActual > 0 || sharedSpend > 0;
-  if (!hasAnyData && !hasPlan) return <p style={emptyBodyStyle}>No expenses recorded this month.</p>;
-
-  const copy = !hasPlan
-    ? "No contribution plan set — showing pocket spend only."
-    : !hasAnyData
-    ? `Planned for the month — Anas ${fmt(anasPlan)} MAD, Salma ${fmt(salmaPlan)} MAD.`
-    : anasDelta !== null && salmaDelta !== null && Math.abs(anasDelta) < 50 && Math.abs(salmaDelta) < 50
-    ? "Both on track with their planned contributions this month."
-    : anasDelta !== null && anasDelta < -50
-    ? `Anas is ${fmt(Math.abs(anasDelta))} MAD short of his ${anasContribPct != null ? Math.round(anasContribPct * 100) : "?"}% target.`
-    : salmaDelta !== null && salmaDelta < -50
-    ? `Salma is ${fmt(Math.abs(salmaDelta))} MAD short of her ${salmaContribPct != null ? Math.round(salmaContribPct * 100) : "?"}% target.`
-    : "Contributions are on track.";
-
-  return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <ContribBlock
-          name="Anas" actual={anasActual} plan={anasPlan} pct={anasPct}
-          delta={anasDelta} color="var(--partner-husband)"
-        />
-        <ContribBlock
-          name="Salma" actual={salmaActual} plan={salmaPlan} pct={salmaPct}
-          delta={salmaDelta} color="var(--partner-wife)"
-        />
-      </div>
-
-      {sharedSpend > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--muted)", opacity: 0.4, flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: "var(--muted)", flex: 1 }}>Spent from shared pot</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{fmt(sharedSpend)} MAD</span>
-        </div>
-      )}
-
-      <p style={copySentenceStyle}>{copy}</p>
-    </div>
-  );
-}
-
-function ContribBlock({ name, actual, plan, pct, delta, color }: {
-  name: string; actual: number; plan: number; pct: number | null;
-  delta: number | null; color: string;
-}) {
-  const isShort = delta !== null && delta < -50;
-  const isOver  = delta !== null && delta > 50;
-  const deltaColor = isShort ? "var(--danger)" : isOver ? "var(--success)" : "var(--muted)";
-
-  return (
-    <div style={{
-      background: `color-mix(in srgb, ${color} 7%, var(--surface))`,
-      borderRadius: 14, padding: "14px 14px 12px",
-      display: "grid", gap: 4,
-    }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase" as const, color }}>{name}</span>
-      <span style={{ fontFamily: "var(--font-body)", fontSize: 22, fontWeight: 400, lineHeight: 1.1, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>
-        {fmt(actual)}
-      </span>
-      <span style={{ fontSize: 9, color: "var(--muted)", letterSpacing: 0.2 }}>MAD</span>
-
-      {pct !== null && (
-        <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
-          <div style={{ height: 3, borderRadius: 999, background: "var(--surface2)", overflow: "hidden" }}>
-            <div style={{
-              height: "100%", borderRadius: 999,
-              width: "100%",
-              background: isShort ? "var(--danger)" : isOver ? "var(--success)" : color,
-              transform: `scaleX(${pct / 100})`,
-              transformOrigin: "left center",
-              transition: "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)",
-            }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <span style={{ fontSize: 9, color: "var(--muted)" }}>of {fmt(plan)} planned</span>
-            {delta !== null && Math.abs(delta) > 50 && (
-              <span style={{ fontSize: 9, fontWeight: 600, color: deltaColor }}>
-                {isShort ? `−${fmt(Math.abs(delta))}` : `+${fmt(delta)}`}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── 4. Spending Breakdown body ─────────────────────────────────── */
+/* ─── 2. Spending Breakdown body ─────────────────────────────────── */
 
 function SpendingBreakdownBody({ data, expenses, insightsMonth, totalPlanned }: {
   data: { items: Array<{ cat: Category; spent: number }>; total: number };
@@ -681,17 +542,12 @@ function SpendingBreakdownBody({ data, expenses, insightsMonth, totalPlanned }: 
     return <p style={emptyBodyStyle}>No expenses this month.</p>;
   }
 
-  const cycleView = () => setView(v => v === "donut" ? "curve" : "donut");
-
   return (
-    <div
-      onClick={cycleView}
-      role="button"
-      tabIndex={0}
-      aria-label={`Switch to ${view === "donut" ? "trend" : "breakdown"} chart`}
-      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") cycleView(); }}
-      style={{ cursor: "pointer", userSelect: "none", WebkitUserSelect: "none" }}
-    >
+    <div>
+      <div role="group" aria-label="Chart view" style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <button type="button" aria-pressed={view === "donut"} onClick={() => setView("donut")} style={filterButtonStyle(view === "donut")}>Breakdown</button>
+        <button type="button" aria-pressed={view === "curve"} onClick={() => setView("curve")} style={filterButtonStyle(view === "curve")}>Trend</button>
+      </div>
       {view === "donut"
         ? <DonutView items={items} total={total} />
         : <CurveView
@@ -702,23 +558,6 @@ function SpendingBreakdownBody({ data, expenses, insightsMonth, totalPlanned }: 
           />
       }
 
-      {/* Dot indicator — shows current view & that it's tappable */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 14 }}>
-        {(["donut", "curve"] as const).map(v => (
-          <span
-            key={v}
-            style={{
-              display: "inline-block",
-              height: 4,
-              width: 16,
-              borderRadius: 999,
-              background: v === view ? "var(--accent)" : "var(--border2)",
-              transform: `scaleX(${v === view ? 1 : 0.25})`,
-              transition: "transform 0.22s cubic-bezier(0.22,1,0.36,1), background 0.18s ease",
-            }}
-          />
-        ))}
-      </div>
     </div>
   );
 }
@@ -767,7 +606,7 @@ function DonutView({ items, total }: {
           <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 700, color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
             {fmt(total)}
           </span>
-          <span style={{ fontSize: 9, color: "var(--muted)", marginTop: 3, letterSpacing: 0.3 }}>MAD</span>
+          <span style={{ fontSize: 12, color: "var(--muted)", marginTop: 3, letterSpacing: 0.3 }}>MAD</span>
         </div>
       </div>
       <div
@@ -785,10 +624,10 @@ function DonutView({ items, total }: {
             }}
           >
             <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: "var(--text2)", fontWeight: 500, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+            <span style={{ fontSize: 12, color: "var(--text2)", fontWeight: 500, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
               {cat.name}
             </span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
               {fmt(spent)}
             </span>
           </div>
@@ -852,12 +691,12 @@ function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
           <XAxis
             dataKey="day"
             ticks={xTicks}
-            tick={{ fontSize: 9, fill: "var(--muted)" }}
+            tick={{ fontSize: 12, fill: "var(--muted)" }}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            tick={{ fontSize: 9, fill: "var(--muted)" }}
+            tick={{ fontSize: 12, fill: "var(--muted)" }}
             tickLine={false}
             axisLine={false}
             tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
@@ -869,7 +708,7 @@ function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
               background: "var(--surface)",
               border: "1px solid var(--border2)",
               borderRadius: 10,
-              fontSize: 11,
+              fontSize: 12,
               color: "var(--text2)",
               boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
             }}
@@ -880,20 +719,6 @@ function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
             labelFormatter={(day) => `Day ${day}`}
             cursor={{ stroke: "var(--border2)", strokeWidth: 1 }}
           />
-
-          {/* Budget pace line */}
-          {totalPlanned > 0 && (
-            <Line
-              type="linear"
-              dataKey="budget"
-              stroke="var(--muted)"
-              strokeWidth={1.5}
-              strokeDasharray="5 3"
-              dot={false}
-              opacity={0.35}
-              strokeOpacity={0.45}
-            />
-          )}
 
           {/* Spending area */}
           <Area
@@ -912,16 +737,9 @@ function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
       <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 12, height: 2, background: "var(--danger)", borderRadius: 999, display: "inline-block" }} />
-          <span style={{ fontSize: 10, color: "var(--muted)" }}>Spent · {fmt(totalSpent)} MAD</span>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>Spent · {fmt(totalSpent)} MAD</span>
         </div>
-        {totalPlanned > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <svg width={12} height={4} style={{ flexShrink: 0 }}>
-              <line x1={0} y1={2} x2={12} y2={2} stroke="var(--muted)" strokeWidth={1.5} strokeDasharray="4 2" opacity={0.55} />
-            </svg>
-            <span style={{ fontSize: 10, color: "var(--muted)" }}>Budget · {fmt(totalPlanned)} MAD</span>
-          </div>
-        )}
+        {totalPlanned > 0 && <span style={{ fontSize: 12, color: "var(--muted)" }}>{fmt(totalSpent)} of {fmt(totalPlanned)} MAD planned</span>}
       </div>
     </div>
   );
@@ -957,12 +775,94 @@ const monthLabelStyle: CSSProperties = {
   fontSize: 15, fontWeight: 600, color: "var(--text2)", letterSpacing: "-0.01em",
 };
 
+const retryButtonStyle: CSSProperties = {
+  minHeight: 44,
+  padding: "0 14px",
+  border: "none",
+  borderRadius: "var(--radius-control)",
+  background: "var(--text)",
+  color: "var(--bg)",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const narrativeSummaryStyle: CSSProperties = {
+  display: "grid",
+  gap: 10,
+  fontSize: 16,
+  lineHeight: 1.75,
+  fontWeight: 500,
+  color: "var(--text2)",
+  padding: "14px 16px 16px",
+  border: "none",
+  borderRadius: "var(--radius-card)",
+  background: "color-mix(in srgb, var(--surface2) 58%, var(--surface))",
+  boxShadow: "none",
+};
+
+const summaryLabelStyle: CSSProperties = {
+  width: "fit-content",
+  minHeight: 28,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "3px 9px",
+  borderRadius: 8,
+  background: "var(--summary-accent-dim)",
+  color: "var(--summary-accent-ink)",
+  fontSize: 14,
+  lineHeight: 1,
+  fontWeight: 700,
+};
+
+const inlineMetricStyle = (tone: "neutral" | "accent" | "positive" | "warning" | "danger"): CSSProperties => {
+  const color = tone === "danger" ? "var(--danger)"
+    : tone === "warning" ? "var(--warning)"
+    : tone === "positive" || tone === "accent" ? "var(--accent-ink)"
+    : "var(--text2)";
+  const background = tone === "danger" ? "color-mix(in srgb, var(--danger) 10%, transparent)"
+    : tone === "warning" ? "color-mix(in srgb, var(--warning) 12%, transparent)"
+    : tone === "positive" || tone === "accent" ? "color-mix(in srgb, var(--accent) 16%, transparent)"
+    : "var(--surface2)";
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    minHeight: 22,
+    margin: "0 2px",
+    padding: "1px 6px",
+    borderRadius: 7,
+    background,
+    color,
+    fontSize: 12,
+    lineHeight: 1,
+    fontWeight: 700,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+    verticalAlign: "baseline",
+  };
+};
+
+const filterButtonStyle = (selected: boolean): CSSProperties => ({
+  minHeight: 36,
+  padding: "0 12px",
+  flexShrink: 0,
+  borderRadius: 999,
+  border: selected ? "1px solid transparent" : "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
+  background: selected ? "var(--text)" : "var(--surface)",
+  color: selected ? "var(--bg)" : "var(--text2)",
+  fontSize: 12,
+  fontWeight: 700,
+});
+
 
 /* Card */
 const cardStyle: CSSProperties = {
   background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 16,
+  border: "none",
+  borderRadius: "var(--radius-card)",
+  boxShadow: "var(--elevation-card)",
   padding: 18,
   display: "grid",
   gap: 14,
@@ -977,7 +877,7 @@ const cardTitleStyle: CSSProperties = {
 };
 
 const cardSubtitleStyle: CSSProperties = {
-  fontSize: 11, color: "var(--muted)", marginTop: 3, letterSpacing: 0.1,
+  fontSize: 12, color: "var(--muted)", marginTop: 3, letterSpacing: 0.1,
 };
 
 /* Burn Rate */
@@ -1005,7 +905,7 @@ const burnFillStyle: CSSProperties = {
 
 const burnLegendItemStyle: CSSProperties = {
   display: "flex", alignItems: "center", gap: 5,
-  fontSize: 10, color: "var(--muted)", fontWeight: 500,
+  fontSize: 12, color: "var(--muted)", fontWeight: 500,
 };
 
 const burnDotStyle: CSSProperties = {
@@ -1031,7 +931,7 @@ const donutCenterStyle: CSSProperties = {
 
 /* Transaction list */
 const sectionDividerLabelStyle: CSSProperties = {
-  fontSize: 11, fontWeight: 700, letterSpacing: 0.7,
+  fontSize: 12, fontWeight: 700, letterSpacing: 0.7,
   textTransform: "uppercase", color: "var(--muted)",
 };
 
@@ -1041,49 +941,19 @@ const groupHeaderStyle: CSSProperties = {
 };
 
 const groupLabelStyle: CSSProperties = {
-  fontSize: 11, fontWeight: 700, letterSpacing: 0.7,
+  fontSize: 12, fontWeight: 700, letterSpacing: 0.7,
   textTransform: "uppercase", color: "var(--muted)",
 };
 
 const groupSubtotalStyle: CSSProperties = {
-  fontSize: 11, fontWeight: 500, color: "var(--muted)",
+  fontSize: 12, fontWeight: 500, color: "var(--muted)",
 };
 
-const txTypeIconStyle = (isIncome: boolean): CSSProperties => ({
-  flexShrink: 0, width: 22, height: 22, borderRadius: 8,
-  background: isIncome
-    ? "color-mix(in srgb, var(--accent) 15%, transparent)"
-    : "color-mix(in srgb, var(--muted) 15%, transparent)",
-  display: "flex", alignItems: "center", justifyContent: "center",
-  fontSize: isIncome ? 13 : 11, lineHeight: 1,
-  color: isIncome ? "var(--accent-ink)" : "var(--muted)",
-});
-
-const txMiddleStyle: CSSProperties = {
-  flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3,
+const transactionGroupStyle: CSSProperties = {
+  display: "grid",
+  gap: 0,
 };
 
-const txNameStyle: CSSProperties = {
-  fontSize: 13, fontWeight: 500, color: "var(--text2)",
-  overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-};
-
-const txCategoryStyle: CSSProperties = {
-  fontSize: 11, fontWeight: 400, color: "var(--muted)",
-  overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-};
-
-const txRightStyle: CSSProperties = {
-  display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0,
-};
-
-const txAmountStyle: CSSProperties = {
-  fontFamily: "var(--font-body)", fontSize: 16, fontWeight: 500, lineHeight: 1,
-};
-
-const txDateStyle: CSSProperties = {
-  fontSize: 13, fontWeight: 400, color: "var(--muted)", lineHeight: 1, padding: "3px 7px",
-};
 
 const emptyScreenStyle: CSSProperties = {
   display: "grid", gap: 8, padding: "8px 2px 24px", animation: "fadeUp 0.3s ease both",

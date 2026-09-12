@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { UsersRound } from "lucide-react";
 import type { BudgetScope } from "../app-types";
 import { ManIcon, WomanIcon } from "./icons";
@@ -19,10 +19,10 @@ export const SCOPE_BG: Record<string, string> = {
 
 export const SCOPE_INK: Record<string, string> = {
   joint:   "var(--accent-ink)",
-  anas:    "#ffffff",
-  salma:   "#ffffff",
-  husband: "#ffffff",
-  wife:    "#ffffff",
+  anas:    "var(--partner-husband-ink)",
+  salma:   "var(--partner-wife-ink)",
+  husband: "var(--partner-husband-ink)",
+  wife:    "var(--partner-wife-ink)",
   all:     "var(--bg)",
   savings: "var(--accent-ink)",
 };
@@ -40,16 +40,15 @@ export const SCOPE_COLOR: Record<string, string> = {
 /* ─── Default budget scope chips ──────────────────────────────── */
 
 export const BUDGET_SCOPE_CHIPS: ScopeChipItem[] = [
-  { key: "joint", emoji: "👫", label: "Joint" },
-  { key: "anas",  emoji: "👨", label: "Husband" },
-  { key: "salma", emoji: "👩", label: "Wife" },
+  { key: "joint", label: "Joint" },
+  { key: "anas",  label: "Husband" },
+  { key: "salma", label: "Wife" },
 ];
 
 /* ─── Types ───────────────────────────────────────────────────── */
 
 export type ScopeChipItem = {
   key: string;
-  emoji: string;
   label: string;
 };
 
@@ -78,41 +77,26 @@ export function ScopeChipBar({ chips, value, onChange, ariaLabel = "Scope" }: Sc
   );
 }
 
-/* ─── Convenience wrapper for BudgetScope ─────────────────────── */
-
-export function BudgetScopeBar({
-  value,
-  onChange,
-  ariaLabel,
-}: {
-  value: BudgetScope;
-  onChange: (scope: BudgetScope) => void;
-  ariaLabel?: string;
-}) {
-  return (
-    <ScopeChipBar
-      chips={BUDGET_SCOPE_CHIPS}
-      value={value}
-      onChange={k => onChange(k as BudgetScope)}
-      ariaLabel={ariaLabel}
-    />
-  );
-}
-
 /* ─── App-wide budget scope picker ─────────────────────────────── */
 
 export function GlobalBudgetScopePicker({
   value,
   onChange,
+  personalScope,
 }: {
   value: BudgetScope;
   onChange: (scope: BudgetScope) => void;
+  personalScope: Exclude<BudgetScope, "joint">;
 }) {
+  const chips: ScopeChipItem[] = [
+    { key: "joint", label: "Joint" },
+    { key: "personal", label: "Personal" },
+  ];
   return (
     <div className="global-scope-picker" role="tablist" aria-label="App-wide budget scope">
-      {BUDGET_SCOPE_CHIPS.map(chip => {
-        const active = chip.key === value;
-        const ScopeIcon = chip.key === "joint" ? UsersRound : chip.key === "anas" ? ManIcon : WomanIcon;
+      {chips.map(chip => {
+        const active = chip.key === "joint" ? value === "joint" : value !== "joint";
+        const ScopeIcon = chip.key === "joint" ? UsersRound : personalScope === "anas" ? ManIcon : WomanIcon;
         return (
           <button
             key={chip.key}
@@ -120,7 +104,7 @@ export function GlobalBudgetScopePicker({
             role="tab"
             aria-selected={active}
             className="global-scope-option"
-            onClick={() => onChange(chip.key as BudgetScope)}
+            onClick={() => onChange(chip.key === "joint" ? "joint" : personalScope)}
           >
             <ScopeIcon className="global-scope-icon" size={13} strokeWidth={2.2} aria-hidden="true" />
             <span>{chip.label}</span>
@@ -142,8 +126,7 @@ function ScopeChip({
   active: boolean;
   onClick: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
+  const ScopeIcon = chip.key === "joint" ? UsersRound : chip.key === "anas" || chip.key === "husband" ? ManIcon : WomanIcon;
 
   return (
     <button
@@ -152,13 +135,9 @@ function ScopeChip({
       aria-selected={active}
       aria-label={active ? `${chip.label}, selected` : `Filter by ${chip.label}`}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setPressed(false); }}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
       style={active ? {
-        height: 38,
-        borderRadius: 12,
+        minHeight: 44,
+        borderRadius: 999,
         border: "none",
         background: SCOPE_BG[chip.key] ?? "var(--ink-strong)",
         color: SCOPE_INK[chip.key] ?? "var(--bg)",
@@ -167,33 +146,23 @@ function ScopeChip({
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
-        transform: pressed ? "scale(0.95)" : "translateY(-1px)",
-        transition: "transform 0.15s cubic-bezier(0.22, 1, 0.36, 1)",
-        animation: "categorySelectIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both",
         flexShrink: 0,
       } : {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
+        minHeight: 44,
+        borderRadius: 999,
         border: "1px solid color-mix(in srgb, var(--border) 40%, transparent)",
-        background: "transparent",
+        background: "var(--surface)",
         color: SCOPE_COLOR[chip.key] ?? "var(--text2)",
+        padding: "0 14px 0 10px",
+        gap: 7,
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
-        justifyContent: "center",
-        opacity: pressed ? 0.9 : hovered ? 0.75 : 0.45,
-        transform: pressed ? "scale(0.93)" : hovered ? "translateY(-1px)" : "none",
-        transition: "opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
         flexShrink: 0,
       }}
     >
-      <span style={{ fontSize: 18, lineHeight: 1 }}>{chip.emoji}</span>
-      {active && (
-        <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>
-          {chip.label}
-        </span>
-      )}
+      <ScopeIcon size={17} strokeWidth={2.1} aria-hidden="true" />
+      <span style={{ fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, lineHeight: 1, whiteSpace: "nowrap" }}>{chip.label}</span>
     </button>
   );
 }

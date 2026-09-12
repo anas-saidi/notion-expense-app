@@ -102,20 +102,9 @@ export async function GET(req: NextRequest) {
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
 
-    // Notion bulk query returns stale formula values; fetch each page individually
-    // in parallel so the `Available` formula is freshly computed.
-    const freshPages = await Promise.all(
-      (data.results as any[]).map((page: any) =>
-        fetch(`https://api.notion.com/v1/pages/${page.id}`, {
-          headers: notionHeaders(token),
-          cache: "no-store",
-        })
-          .then((r) => r.json())
-          .catch(() => page) // fall back to query result if individual fetch fails
-      )
-    );
-
-    const categories = freshPages.map(mapCategoryPage);
+    // Use the database query payload directly. Fetching every category page in
+    // parallel exhausts Notion's request budget during initial app loading.
+    const categories = (data.results ?? []).map(mapCategoryPage);
 
     return NextResponse.json({ categories });
   } catch (err: any) {

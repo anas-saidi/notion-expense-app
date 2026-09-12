@@ -78,7 +78,7 @@ Not used as primary UI accent — only for per-partner attribution (account indi
 | Caption / meta | Instrument Sans | 12px | 400 | |
 | Eyebrow / label | DM Mono | 10–12px | 400 | uppercase, `letter-spacing: 0.4–0.5px` |
 | Amount (large display) | DM Mono or Fraunces | 40–52px | 700 | `font-variant-numeric: tabular-nums` |
-| Currency prefix | DM Mono | ~60% of amount size | 400 | `color: var(--muted)`, same baseline |
+| Currency marker | DM Mono | ~60% of amount size | 400 | `color: var(--muted)`, same baseline; locale-appropriate order |
 
 ### Large Number Display Pattern
 
@@ -181,7 +181,7 @@ Chips inside a segmented container (e.g. "Active / Frozen" pill group) may be 38
 ### Pattern B — Large Number Display
 
 See Typography section above for full specs. Key points:
-- Currency prefix is always smaller and muted — never the same size as the number
+- The currency marker is always smaller and muted—never the same size as the number. Keep it adjacent on the same baseline and use locale-appropriate order (`199.516 MAD` in this product).
 - Supporting lines live below, not beside
 - Number itself should have generous vertical breathing room (min 24px above, 16px below)
 
@@ -268,6 +268,14 @@ These are non-negotiable constraints — new patterns must not violate them:
 - Not a spreadsheet dressed as an app
 - Not one person's tool that the other also has access to
 - Not anxiety-inducing — every design choice defaults toward calm and clarity
+
+## 10. Mobile remediation rules (2026-09)
+
+- The first phone viewport prioritizes account balance, available category money, monthly spending, one actionable household issue, and recent activity.
+- Budget uses one grouped category list after its compact summary and filters. No duplicate ranking precedes the list; frozen categories remain collapsed by default.
+- Reused radii are `--radius-card`, `--radius-control`, and `--radius-sheet`; elevations use the shared tokens in `app/globals.css`.
+- Financial actions use visible verb-first labels. Standalone controls are at least 44×44 CSS pixels, focus is visible, numerals are tabular, and currency is rendered once.
+- Motion communicates state changes only and becomes opacity-only or static under `prefers-reduced-motion`.
 
 ---
 

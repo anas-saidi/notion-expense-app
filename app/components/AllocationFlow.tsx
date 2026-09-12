@@ -1,14 +1,18 @@
 "use client";
+import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Save } from "lucide-react";
-import { ArrowLeftIcon, CalendarIcon, XIcon } from "./ui/icons";
+import { ArrowLeftIcon, XIcon } from "./ui/icons";
+import { MonthPicker } from "./DatePicker";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
+import { AnimatedCounter } from "./ui/AnimatedCounter";
+import { Banner } from "./ui/Banner";
 import type { Account, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
-import { getLeftToAssignByScope } from "./app-utils";
+import { fmt, getLeftToAssignByScope } from "./app-utils";
 
 export type BudgetGroupKey = "household" | "wife" | "husband" | "savings" | string;
 
@@ -18,6 +22,14 @@ export type AllocationGroup = {
   items: PlanningAllocationItem[];
   onChange: (items: PlanningAllocationItem[]) => void;
 };
+
+function getPracticalStep(span: number): number {
+  if (span <= 0) return 1;
+  const target = span / 24;
+  const magnitude = 10 ** Math.floor(Math.log10(target));
+  const candidates = [1, 2, 2.5, 5, 10].map(value => value * magnitude);
+  return Math.max(1, Math.round(candidates.reduce((best, value) => Math.abs(value - target) < Math.abs(best - target) ? value : best)));
+}
 
 type AllocationFlowProps = {
   open: boolean;
@@ -73,7 +85,6 @@ export function AllocationFlow({
   metaLabel = "Last month",
   rebalanceMode = false,
 }: AllocationFlowProps) {
-  const monthInputRef = useRef<HTMLInputElement | null>(null);
   // Spent-floor per category, snapshotted on first activation.
   // Must NOT be recomputed from activeItem.amount after edits — that shifts the
   // range input's `min` mid-drag and causes a runaway feedback loop.
@@ -82,9 +93,9 @@ export function AllocationFlow({
   const [activeCategoryId, setActiveCategoryId] = useState<string>(groups[0]?.items[0]?.categoryId ?? "");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(null);
-  const emojiRef = useRef<HTMLSpanElement>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -103,13 +114,13 @@ export function AllocationFlow({
     if (!open) {
       setHasInteracted(false);
       setDraftValue(null);
-      emojiRef.current?.classList.remove("is-dragging");
+      setConfirming(false);
       spentFloorRef.current = {};
     }
   }, [open]);
 
   // Discard any in-progress draft when the active category changes.
-  useEffect(() => { setDraftValue(null); }, [activeCategoryId]);
+  useEffect(() => { setDraftValue(null); setConfirming(false); }, [activeCategoryId]);
 
   const monthLabel = useMemo(() => {
     if (!/^\d{4}-\d{2}$/.test(selectedMonth)) return "Selected month";
@@ -161,10 +172,22 @@ export function AllocationFlow({
   // Range math
   const rangeMin = activeItem ? getSpentFloor(activeItem) : 0;
   const rangeMax = activeItem ? Math.max(rangeMin, activeItem.amount + Math.max(0, leftToAssign)) : 0;
-  const rangeFill = rangeMax > rangeMin ? Math.max(0, Math.min(100, ((activeItem?.amount ?? 0) - rangeMin) / (rangeMax - rangeMin) * 100)) : 0;
+  const rangeStops = useMemo(() => {
+    const span = Math.max(0, rangeMax - rangeMin);
+    if (span === 0) return [rangeMin];
+    const step = getPracticalStep(span);
+    const stops = Array.from({ length: Math.floor(span / step) + 1 }, (_, index) => rangeMin + (index * step));
+    if (stops[stops.length - 1] !== rangeMax) stops.push(rangeMax);
+    return stops;
+  }, [rangeMin, rangeMax]);
+  const activeStopIndex = activeItem
+    ? rangeStops.reduce((best, stop, index) => Math.abs(stop - activeItem.amount) < Math.abs(rangeStops[best] - activeItem.amount) ? index : best, 0)
+    : 0;
+  const rangeStep = getPracticalStep(Math.max(0, rangeMax - rangeMin));
   const updateActiveAmount = (nextAmount: number) => {
     if (!activeItem) return;
     setHasInteracted(true);
+    setConfirming(false);
     const minAmount = getSpentFloor(activeItem);
     const maxAmount = Math.max(minAmount, activeItem.amount + Math.max(0, leftToAssign));
     const clampedAmount = Math.min(maxAmount, Math.max(minAmount, Math.round(nextAmount)));
@@ -200,18 +223,6 @@ export function AllocationFlow({
 
   const innerContent = (
     <>
-      {onSelectedMonthChange && (
-        <input
-          ref={monthInputRef}
-          type="month"
-          value={selectedMonth}
-          onChange={(event) => onSelectedMonthChange(event.target.value)}
-          aria-label="Selected planning month"
-          style={hiddenMonthInputStyle}
-          tabIndex={-1}
-        />
-      )}
-
       {mode === "screen" ? (
         <header style={screenHeaderStyle}>
           <button onClick={onCancel} aria-label="Go back" style={backButtonStyle}>
@@ -220,20 +231,7 @@ export function AllocationFlow({
           <div>
             <h2 style={sheetTitleStyle}>{title}</h2>
             {onSelectedMonthChange ? (
-              <button
-                type="button"
-                aria-label="Change planning month"
-                onClick={() => {
-                  const input = monthInputRef.current;
-                  if (!input) return;
-                  if ("showPicker" in HTMLInputElement.prototype) input.showPicker();
-                  else input.click();
-                }}
-                style={monthPickerButtonStyle}
-              >
-                <CalendarIcon />
-                <span>{monthLabel}</span>
-              </button>
+              <MonthPicker value={selectedMonth} aria-label="Change planning month" onChange={(event) => onSelectedMonthChange(event.target.value)} style={monthPickerButtonStyle} />
             ) : (
               <span style={monthLabelFallbackStyle}>{monthLabel}</span>
             )}
@@ -251,20 +249,7 @@ export function AllocationFlow({
             <XIcon size={14} />
           </button>
           {onSelectedMonthChange ? (
-            <button
-              type="button"
-              aria-label="Change planning month"
-              onClick={() => {
-                const input = monthInputRef.current;
-                if (!input) return;
-                if ("showPicker" in HTMLInputElement.prototype) input.showPicker();
-                else input.click();
-              }}
-              style={monthPickerButtonStyle}
-            >
-              <CalendarIcon />
-              <span>{monthLabel}</span>
-            </button>
+            <MonthPicker value={selectedMonth} aria-label="Change planning month" onChange={(event) => onSelectedMonthChange(event.target.value)} style={monthPickerButtonStyle} />
           ) : (
             <span style={monthLabelFallbackStyle}>{monthLabel}</span>
           )}
@@ -272,7 +257,7 @@ export function AllocationFlow({
         </header>
       )}
 
-      <div style={mode === "screen" ? { ...sheetScrollStyle, flex: 1, minHeight: 0, ...(heroPool ? { paddingTop: 16 } : {}) } : sheetScrollStyle}>
+      <div style={mode === "screen" ? { ...sheetScrollStyle, ...(heroPool ? { paddingTop: 8 } : {}) } : sheetScrollStyle}>
         {chipsContent && (
           <div style={chipsContentWrapStyle}>{chipsContent}</div>
         )}
@@ -281,7 +266,7 @@ export function AllocationFlow({
             <div style={heroPoolWrapStyle}>
               <span style={heroPoolLabelStyle}>{poolLabel}</span>
               <span style={heroPoolNumberStyle}>
-                <Money value={availablePool} />
+                <Money value={availablePool} animated animateOnMount />
               </span>
               <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
                 {isBalanced ? (
@@ -291,15 +276,15 @@ export function AllocationFlow({
                 ) : (
                   <span key={isOver ? "over" : "under"} style={{
                     fontFamily: "var(--font-body)",
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: 700,
                     letterSpacing: -0.3,
                     color: isOver
                       ? "var(--danger)"
                       : "color-mix(in srgb, var(--success) 72%, var(--text2))",
-                    animation: "chipIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+                    animation: "chipIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both",
                   }}>
-                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
+                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} showCurrency={false} />
                   </span>
                 )}
               </div>
@@ -319,7 +304,7 @@ export function AllocationFlow({
                     ✓ {balancedLabel}
                   </span>
                 ) : (
-                  <span key={isOver ? "over" : "under"} style={{ ...deltaChipStyle(isOver), animation: "chipIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both" }}>
+                  <span key={isOver ? "over" : "under"} style={{ ...deltaChipStyle(isOver), animation: "chipIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
                     {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
                   </span>
                 )}
@@ -336,18 +321,8 @@ export function AllocationFlow({
               const isActive = item.categoryId === activeItem?.categoryId;
               return (
                 <button key={item.categoryId} type="button" onClick={() => setActiveCategoryId(item.categoryId)} style={{ ...(isActive ? categoryPillActiveStyle : categoryPillStyle) }} aria-pressed={isActive}>
-                  <CategoryIcon icon={item.icon} size={isActive ? 17 : 18} style={categoryIconStyle(isActive)} />
-                  {isActive && (
-                    <>
-                      <span style={categoryNameStyle}>{item.name}</span>
-                      <strong className="planning-category-amount" style={categoryAmountStyle}>
-                        <Money value={item.amount} />
-                      </strong>
-                      {item.available !== null && (
-                        <span style={categoryAvailableStyle}>{Math.round(item.available).toLocaleString("fr-MA")} avail</span>
-                      )}
-                    </>
-                  )}
+                  <CategoryIcon icon={item.icon} size={17} style={categoryIconStyle(isActive)} />
+                  <span style={categoryNameStyle}>{item.name}</span>
                 </button>
               );
             })}
@@ -362,9 +337,11 @@ export function AllocationFlow({
           <div className="planning-editor" style={editorStyle}>
             <div key={activeItem.categoryId} className="planning-category-enter planning-amount-canvas" style={amountCanvasStyle}>
               <span style={amountCurrencyBigStyle}>MAD</span>
-              <CategoryIcon icon={activeItem.icon} size={16} style={amountCornerIconStyle} />
               <label style={amountEditorStyle}>
                 <span style={srOnlyStyle}>Planned amount for {activeItem.name}</span>
+                {draftValue === null && (
+                  <AnimatedCounter value={activeItem.amount} separator="." style={{ ...amountCounterStyle, color: isOver ? "var(--danger)" : "var(--text2)" }} />
+                )}
                 <input
                   className="planning-amount-input"
                   type="text"
@@ -389,64 +366,50 @@ export function AllocationFlow({
                     }
                   }}
                   aria-label={`Planned amount for ${activeItem.name}`}
-                  style={{ ...amountInputBigStyle(isOver), ...(readOnly ? { opacity: 0.7 } : null) }}
+                  style={{ ...amountInputBigStyle(isOver), ...(draftValue === null ? hiddenAmountInputStyle : null), ...(readOnly ? { opacity: 0.7 } : null) }}
                 />
               </label>
               <div style={metaRowStyle}>
-                <span>{metaLabel} <Money value={activeItem.lastMonthSpent ?? 0} /></span>
-                <span>Spent <Money value={getSpentFloor(activeItem)} /></span>
-                {activeItem.available !== null && (
-                  <span>Available <Money value={activeItem.available} /></span>
-                )}
+                <span>{metaLabel} <Money value={activeItem.lastMonthSpent ?? 0} showCurrency={false} /></span>
+                <span>Spent <Money value={activeItem.spent ?? getSpentFloor(activeItem)} showCurrency={false} /></span>
               </div>
             </div>
           </div>
 
           <div aria-label="Budget control" style={slimBarPanelStyle}>
-            <div style={{ position: "relative", touchAction: "none" }}>
-              {/* Native range — in flow, CSS class handles track/thumb appearance */}
+            <div className="planning-step-control" style={stepControlStyle}>
+              <div style={stepTicksStyle} aria-hidden="true">
+                {rangeStops.map((stop, index) => (
+                  <span key={`${stop}-${index}`} style={stepTickStyle(index === activeStopIndex, index < activeStopIndex)} />
+                ))}
+              </div>
               <input
                 className="planning-dial-range"
                 type="range"
-                min={rangeMin}
-                max={Math.max(rangeMin + 1, rangeMax)}
+                min={0}
+                max={Math.max(0, rangeStops.length - 1)}
                 step={1}
-                value={activeItem.amount}
+                value={activeStopIndex}
                 disabled={readOnly}
-                onChange={(event) => updateActiveAmount(Number(event.target.value))}
-                onPointerDown={() => emojiRef.current?.classList.add("is-dragging")}
-                onPointerUp={() => emojiRef.current?.classList.remove("is-dragging")}
+                onChange={(event) => updateActiveAmount(rangeStops[Number(event.target.value)] ?? rangeMin)}
                 aria-label={`Adjust planned amount for ${activeItem.name}`}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  touchAction: "none",
-                  "--range-fill": `${rangeFill.toFixed(1)}%`,
-                  "--bar-color": isOver ? "var(--danger)" : isBalanced ? "var(--success)" : "var(--accent)",
-                } as CSSProperties}
+                aria-valuetext={`${fmt(activeItem.amount)} MAD; ${fmt(rangeStep)} MAD per step`}
+                style={steppedRangeStyle}
               />
-              {/* 💸 — painted on top (comes after input in DOM), pointer-events: none */}
-              <span
-                ref={emojiRef}
-                aria-hidden="true"
-                className="planning-emoji-overlay"
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: `clamp(10px, ${rangeFill.toFixed(1)}%, calc(100% - 10px))`,
-                  fontSize: 18,
-                  lineHeight: 1,
-                  pointerEvents: "none",
-                  userSelect: "none",
-                }}
-              >
-                💸
-              </span>
             </div>
-            {saveError && <div style={saveErrorStyle}>{saveError}</div>}
-            <button type="button" onClick={savePlan} disabled={!canSave} className={isBalanced ? "planning-save--balanced" : undefined} style={{ ...saveButtonStyle, opacity: canSave ? 1 : 0.55, cursor: canSave ? "pointer" : "not-allowed" }}>
+            {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
+            {confirming && (
+              <div role="status" style={confirmationStyle}>
+                <span>
+                  <strong style={confirmationTitleStyle}>Apply this rebalance?</strong>
+                  <span style={confirmationCopyStyle}>{isBalanced ? "Every available dirham stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} MAD will remain unassigned.`}</span>
+                </span>
+                <button type="button" onClick={() => setConfirming(false)} style={confirmationBackStyle}>Back</button>
+              </div>
+            )}
+            <button type="button" onClick={() => confirming ? savePlan() : setConfirming(true)} disabled={!canSave} className={isBalanced ? "planning-save--balanced" : undefined} style={{ ...saveButtonStyle, opacity: canSave ? 1 : 0.55, cursor: canSave ? "pointer" : "not-allowed" }}>
               <Save size={15} />
-              {saveState === "saving" ? "Saving..." : saveButtonLabel}
+              {saveState === "saving" ? "Saving..." : confirming ? "Confirm" : saveButtonLabel}
             </button>
           </div>
         </div>
@@ -467,7 +430,7 @@ export function AllocationFlow({
   }
 
   return (
-    <BottomSheet open={open} onClose={onCancel} showHandle label="Set monthly budget" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
+    <BottomSheet open={open} onClose={onCancel} showHandle label={title} detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
       {innerContent}
     </BottomSheet>
   );
@@ -488,7 +451,8 @@ const screenInnerStyle: CSSProperties = {
   minHeight: 0,
   display: "flex",
   flexDirection: "column",
-  overflow: "hidden",
+  overflowY: "auto",
+  overflowX: "hidden",
   background: "color-mix(in srgb, var(--bg) 96%, var(--surface))",
   borderRadius: "24px 24px 0 0",
 };
@@ -497,60 +461,9 @@ const screenInnerStyle: CSSProperties = {
 
 // GroupPicker and styles (copied/encapsulated for reusability)
 function GroupPicker({ groups, activeGroup, onSelect }: { groups: AllocationGroup[]; activeGroup: BudgetGroupKey; onSelect: (key: BudgetGroupKey) => void; }) {
-  const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const active = groups.find((g) => g.key === activeGroup) ?? groups[0];
-
-  useEffect(() => { setMounted(true); }, []);
-
-  const handleToggle = () => {
-    if (!open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-    }
-    setOpen((o) => !o);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (triggerRef.current?.contains(e.target as Node)) return;
-      if (menuRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", onKeyDown);
-    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", onKeyDown); };
-  }, [open]);
-
-  const menu = (
-    <div ref={menuRef} role="listbox" aria-label="Budget group" className="view-picker__menu" style={{ ...gpMenuStyle, position: "fixed", top: menuPos.top, right: menuPos.right, left: "auto" }}>
-      {groups.map((group) => {
-        const isActive = group.key === activeGroup;
-        return (
-          <button key={group.key} type="button" role="option" aria-selected={isActive} className={`view-picker__option${isActive ? " view-picker__option--active" : ""}`} onClick={() => { onSelect(group.key); setOpen(false); }} style={{ ...gpOptionStyle, ...(isActive ? gpOptionActiveStyle : null) }}>
-            <span style={{ ...gpDotStyle, background: gpColor(group.key) }} />
-            <span style={gpOptionTextStyle}>{group.label}</span>
-            <span style={gpCountStyle}>{group.items.length}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  return (
-    <div className="view-picker" style={gpWrapStyle}>
-      <button ref={triggerRef} type="button" className="view-picker__trigger" aria-haspopup="listbox" aria-expanded={open} aria-label="Budget group" onClick={handleToggle} style={gpTriggerStyle}>
-        <span style={gpLabelStyle}>{active.label}</span>
-        <ChevronDown size={12} aria-hidden="true" style={{ ...gpChevronStyle, transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
-      </button>
-      {mounted && open && createPortal(menu, document.body)}
-    </div>
-  );
+  return <ChoicePicker aria-label="Budget group" value={activeGroup} onChange={event => onSelect(event.target.value as BudgetGroupKey)}>
+    {groups.map(group => <option key={group.key} value={group.key}>{group.label} ({group.items.length})</option>)}
+  </ChoicePicker>;
 }
 
 const gpColor = (key: BudgetGroupKey): string => {
@@ -561,7 +474,7 @@ const gpColor = (key: BudgetGroupKey): string => {
 
 // --- styles (kept local to component) ---
 const gpWrapStyle: CSSProperties = { position: "relative", display: "inline-flex", alignItems: "center", flexShrink: 0, overflow: "visible" };
-const gpTriggerStyle: CSSProperties = { minHeight: 28, padding: 0, border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, justifySelf: "end" };
+const gpTriggerStyle: CSSProperties = { minHeight: 44, padding: "0 4px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, justifySelf: "end" };
 const gpLabelStyle: CSSProperties = { fontSize: 13, fontWeight: 600 };
 const gpChevronStyle: CSSProperties = { pointerEvents: "none", color: "var(--muted)", transition: "transform 0.16s ease" };
 const gpMenuStyle: CSSProperties = { width: 192, padding: 6, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)", background: "var(--surface)", boxShadow: "0 18px 36px color-mix(in srgb, var(--ink-strong) 14%, transparent), inset 0 1px 0 color-mix(in srgb, white 55%, transparent)", zIndex: 90, display: "grid", gap: 3 };
@@ -569,60 +482,65 @@ const gpOptionStyle: CSSProperties = { minHeight: 44, width: "100%", border: "no
 const gpOptionActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--surface2) 70%, var(--surface))" };
 const gpDotStyle: CSSProperties = { width: 7, height: 7, borderRadius: 999 };
 const gpOptionTextStyle: CSSProperties = { fontSize: 13, fontWeight: 700 };
-const gpCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 10, color: "var(--muted)" };
+const gpCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 12, color: "var(--muted)" };
 
-const sheetPanelStyle: CSSProperties = { background: "color-mix(in srgb, var(--bg) 96%, var(--surface))", borderRadius: "24px 24px 0 0" };
+const sheetPanelStyle: CSSProperties = { background: "var(--surface)", borderRadius: "24px 24px 0 0", boxShadow: "var(--elevation-float)" };
 const sheetContentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
 const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "16px 20px 14px", flexShrink: 0 };
 const screenHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "44px 1fr auto", alignItems: "center", gap: 8, padding: "14px 16px 12px", flexShrink: 0 };
-const backButtonStyle: CSSProperties = { width: 36, height: 36, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
+const backButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text2)" };
-const sheetScrollStyle: CSSProperties = { overflowY: "auto", overflowX: "hidden", padding: "4px 12px 8px", display: "grid", gap: 8 };
-const monthPickerButtonStyle: CSSProperties = { minHeight: 28, padding: 0, border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" };
-const monthLabelFallbackStyle: CSSProperties = { minHeight: 28, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
-const closeButtonStyle: CSSProperties = { width: 36, height: 36, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
-const hiddenMonthInputStyle: CSSProperties = { position: "absolute", pointerEvents: "none", opacity: 0, width: 0, height: 0 };
+const sheetScrollStyle: CSSProperties = { overflowY: "auto", overflowX: "hidden", padding: "8px 12px 12px", display: "grid", alignContent: "start", gap: 12 };
+const monthPickerButtonStyle: CSSProperties = { minHeight: 44, padding: "0 4px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" };
+const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
+const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
 const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };
 const quietAvailableValueStyle: CSSProperties = { color: "var(--text2)", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', letterSpacing: -0.5 };
-const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 999, padding: "5px 9px", background: "color-mix(in srgb, var(--warning-dim) 70%, var(--surface))", color: "color-mix(in srgb, var(--warning) 82%, black)", fontSize: 11, fontWeight: 750 };
-const balancedTextStyle: CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
+const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 999, padding: "5px 9px", background: "color-mix(in srgb, var(--warning-dim) 70%, var(--surface))", color: "color-mix(in srgb, var(--warning) 82%, black)", fontSize: 12, fontWeight: 750 };
+const balancedTextStyle: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
 const deltaChipStyle = (isOver: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "center", gap: 2,
-  fontSize: 11, fontWeight: 700, fontFamily: "var(--font-body)",
+  fontSize: 12, fontWeight: 700, fontFamily: "var(--font-body)",
   color: isOver
     ? "color-mix(in srgb, var(--danger) 78%, var(--text2))"
     : "color-mix(in srgb, var(--success) 72%, var(--text2))",
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
-const categoryPillStyle: CSSProperties = { flex: "0 0 40px", width: 40, minHeight: 40, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border) 32%, transparent)", background: "color-mix(in srgb, var(--surface) 90%, var(--surface))", color: "var(--text2)", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 8px 16px color-mix(in srgb, var(--ink-strong) 4%, transparent)", transition: "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.22s ease" };
-const categoryPillActiveStyle: CSSProperties = { flex: "0 0 140px", minHeight: 54, borderRadius: 18, border: "1px solid transparent", background: "linear-gradient(145deg, #39dec7, color-mix(in srgb, #39dec7 70%, var(--accent)))", color: "var(--accent-ink)", padding: "8px 10px", display: "grid", gridTemplateColumns: "30px minmax(0, 1fr)", gridTemplateRows: "auto auto auto", alignItems: "center", gap: "1px 8px", textAlign: "left", cursor: "pointer", boxShadow: "0 14px 26px color-mix(in srgb, #39dec7 28%, transparent)", animation: "categorySelectIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both" };
-const categoryIconStyle = (isActive: boolean): CSSProperties => ({ gridColumn: "1 / 2", gridRow: isActive ? "1 / 4" : "1 / 3", color: isActive ? "var(--accent-ink)" : "color-mix(in srgb, var(--accent-ink) 78%, var(--text))", flexShrink: 0 });
+const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 148, minHeight: 44, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)", background: "var(--surface)", color: "var(--text2)", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", boxShadow: "none", transition: "background-color var(--motion-standard) ease, color var(--motion-standard) ease" };
+const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "color-mix(in srgb, var(--accent) 42%, var(--surface))", color: "var(--accent-ink)" };
+const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActive ? "var(--accent-ink)" : "var(--text2)", flexShrink: 0 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
-const categoryAmountStyle: CSSProperties = { fontSize: 15, lineHeight: 1, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"' };
-const categoryAvailableStyle: CSSProperties = { fontSize: 10, lineHeight: 1, fontWeight: 600, opacity: 0.72, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"' };
-const stackedUnitStyle: CSSProperties = { borderRadius: "24px 0 0 0", overflow: "hidden", flexShrink: 0, background: "var(--surface)" };
+const stackedUnitStyle: CSSProperties = { overflow: "hidden", flex: "1 1 auto", minHeight: 0, marginTop: 16, background: "var(--surface)", boxShadow: "none", display: "flex", flexDirection: "column" };
 const editorStyle: CSSProperties = { display: "grid" };
-const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gap: 6, minHeight: 120, padding: "12px 10px 10px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
+const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gridTemplateRows: "minmax(68px, auto) auto", gap: 8, minHeight: 132, padding: "14px 10px 12px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
 const amountCurrencyBigStyle: CSSProperties = { position: "absolute", left: 18, top: 18, color: "color-mix(in srgb, var(--muted) 24%, transparent)", fontFamily: "var(--font-body)", fontSize: 22, lineHeight: 1, fontWeight: 600, opacity: 0.6, zIndex: 1 };
-const amountCornerIconStyle: CSSProperties = { position: "absolute", right: 18, top: 30, color: "var(--accent-ink)", opacity: 0.45 };
-const amountEditorStyle: CSSProperties = { display: "flex", justifyContent: "center", alignItems: "center", minWidth: 0 };
+const amountEditorStyle: CSSProperties = { position: "relative", display: "flex", justifyContent: "center", alignItems: "center", minWidth: 0, minHeight: 68 };
+const amountCounterStyle: CSSProperties = { position: "absolute", inset: 0, justifyContent: "center", pointerEvents: "none", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: -2, zIndex: 3 };
+const hiddenAmountInputStyle: CSSProperties = { color: "transparent", caretColor: "transparent" };
 const srOnlyStyle: CSSProperties = { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 };
-const amountInputBigStyle = (isOver: boolean): CSSProperties => ({ width: "100%", minWidth: 0, maxWidth: "100vw", border: "none", background: "transparent", color: isOver ? "var(--danger)" : "var(--text2)", textAlign: "center", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.88, fontWeight: 950, letterSpacing: -3, outline: "none", fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', zIndex: 2, padding: 0, margin: 0, backgroundClip: "text", transition: "color 0.35s cubic-bezier(0.22, 1, 0.36, 1)" });
-const metaRowStyle: CSSProperties = { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, color: "var(--text2)", fontSize: 10, fontFamily: "var(--font-body)", opacity: 0.5 };
+const amountInputBigStyle = (isOver: boolean): CSSProperties => ({ width: "100%", minWidth: 0, maxWidth: "100vw", border: "none", background: "transparent", color: isOver ? "var(--danger)" : "var(--text2)", textAlign: "center", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: -2, outline: "none", fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', zIndex: 2, padding: 0, margin: 0, backgroundClip: "text", transition: "color 0.35s cubic-bezier(0.22, 1, 0.36, 1)" });
+const metaRowStyle: CSSProperties = { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, color: "var(--text2)", fontSize: 12, fontFamily: "var(--font-body)", opacity: 0.5 };
+const stepControlStyle: CSSProperties = { position: "relative", display: "grid", padding: "2px 0", touchAction: "none" };
+const stepTicksStyle: CSSProperties = { height: 38, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px" };
+const stepTickStyle = (active: boolean, passed: boolean): CSSProperties => ({ width: active ? 4 : 3, height: 34, borderRadius: 999, background: active ? "var(--accent)" : passed ? "color-mix(in srgb, var(--accent) 48%, var(--text2))" : "var(--surface2)", transform: `scaleY(${active ? 1 : 0.65})`, transformOrigin: "center", transition: "transform 150ms var(--ease-standard), background-color 150ms ease" });
+const steppedRangeStyle: CSSProperties = { position: "absolute", inset: "0 0 auto", width: "100%", height: 44, margin: 0, opacity: 0, cursor: "ew-resize", touchAction: "none" };
+const confirmationStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)" };
+const confirmationTitleStyle: CSSProperties = { display: "block", fontSize: 13, lineHeight: 1.2 };
+const confirmationCopyStyle: CSSProperties = { display: "block", marginTop: 3, fontSize: 11, lineHeight: 1.35, color: "var(--muted)" };
+const confirmationBackStyle: CSSProperties = { minWidth: 44, minHeight: 44, padding: "0 10px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface)", color: "var(--text2)", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 const emptyStyle: CSSProperties = { minHeight: 220, display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 13 };
-const dialPanelStyle = (isOver: boolean, isBalanced: boolean): CSSProperties => ({ display: "grid", gap: 14, padding: `20px 18px calc(16px + env(safe-area-inset-bottom, 0px))`, borderRadius: "20px 0 0 0", background: isOver ? "linear-gradient(155deg, color-mix(in srgb, var(--danger) 86%, #5c2f3a), color-mix(in srgb, var(--danger) 62%, #31212a))" : isBalanced ? "linear-gradient(155deg, #9fe870, color-mix(in srgb, #9fe870 68%, #1e4a0d))" : "linear-gradient(155deg, var(--accent), color-mix(in srgb, var(--accent) 76%, #4e3df1))", color: "var(--accent-ink)", transition: "background 0.45s cubic-bezier(0.22, 1, 0.36, 1)" });
+const dialPanelStyle = (isOver: boolean, isBalanced: boolean): CSSProperties => ({ display: "grid", gap: 14, padding: `20px 18px calc(16px + env(safe-area-inset-bottom, 0px))`, borderRadius: "20px 0 0 0", background: isOver ? "color-mix(in srgb, var(--danger) 14%, var(--surface))" : isBalanced ? "color-mix(in srgb, var(--accent) 58%, var(--surface))" : "color-mix(in srgb, var(--accent) 34%, var(--surface))", color: isOver ? "var(--danger)" : "var(--accent-ink)", boxShadow: "inset 0 1px 0 color-mix(in srgb, white 42%, transparent)", transition: "background var(--motion-slow) var(--ease-standard)" });
 const dialCopyStyle: CSSProperties = { display: "grid", gap: 4 };
-const dialStatusStyle: CSSProperties = { fontSize: 11, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.78 };
+const dialStatusStyle: CSSProperties = { fontSize: 12, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.78 };
 const dialTitleStyle: CSSProperties = { fontSize: 15, lineHeight: 1.2, fontWeight: 850 };
-const dialBodyStyle: CSSProperties = { maxWidth: 260, fontSize: 11, lineHeight: 1.35, opacity: 0.78 };
+const dialBodyStyle: CSSProperties = { maxWidth: 260, fontSize: 12, lineHeight: 1.35, opacity: 0.78 };
 const rangeWrapStyle: CSSProperties = { display: "grid", gap: 4 };
-const slimBarPanelStyle: CSSProperties = { display: "grid", gap: 12, padding: `16px 18px calc(16px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)" };
-const saveErrorStyle: CSSProperties = { padding: "10px 12px", borderRadius: 14, background: "color-mix(in srgb, var(--danger) 10%, transparent)", color: "var(--danger)", fontSize: 12, lineHeight: 1.4 };
-const saveButtonStyle: CSSProperties = { justifySelf: "end", minHeight: 48, borderRadius: 18, border: "none", background: "var(--accent)", color: "var(--accent-ink)", padding: "0 20px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "0 8px 20px color-mix(in srgb, var(--accent) 30%, transparent)" };
+const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "1 1 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `14px 18px calc(12px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)", boxShadow: "none" };
+const saveButtonStyle: CSSProperties = { width: "100%", marginTop: "auto", minHeight: 52, borderRadius: 16, border: "none", background: "var(--accent)", color: "var(--accent-ink)", padding: "0 20px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "none" };
 
 // ── Chips content wrap ────────────────────────────────────────────────────────
 const chipsContentWrapStyle: CSSProperties = {
@@ -634,12 +552,12 @@ const chipsContentWrapStyle: CSSProperties = {
 // ── Hero pool styles ──────────────────────────────────────────────────────────
 const heroPoolWrapStyle: CSSProperties = {
   display: "grid",
-  gap: 4,
+  gap: 0,
   textAlign: "center",
-  padding: "14px 0 10px",
+  padding: "12px 0 16px",
 };
 const heroPoolLabelStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 600,
   letterSpacing: 0.5,
   textTransform: "uppercase",

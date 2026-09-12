@@ -1,29 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { BudgetScope, Category, MonthlySummary } from "./app-types";
-import { fmt, today } from "./app-utils";
+import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
+import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { ScopeChipBar, type ScopeChipItem } from "./ui/ScopeChipBar";
+import { Banner } from "./ui/Banner";
 import type { PlanningAllocationItem } from "./app-types";
 
 type RebalanceSheetProps = {
   open: boolean;
   onClose: () => void;
   categories: Category[];
+  accounts: Account[];
   onSuccess: () => void;
   homeMonth: string;         // "YYYY-MM"
   monthlySummary: MonthlySummary;
+  budgetScope: BudgetScope;
   // Unassigned money that can be pulled in on top of what's already allocated —
   // only meaningful (and only ever non-zero) for the current month.
   readyToAssignByScope?: Record<BudgetScope, number>;
   jointUnassigned?: number;
-  savingPool?: number;
 };
 
 type MonthContext = "past" | "current" | "future";
-type GroupFilter = "all" | "joint" | "wife" | "husband" | "savings";
 type Transfer = { fromId: string; toId: string; amount: number };
 type TopUp = { id: string; amount: number };
 
@@ -43,24 +43,6 @@ const MONTH_LABELS: Record<string, string> = {
 function formatMonth(ym: string) {
   const [year, month] = ym.split("-");
   return `${MONTH_LABELS[month] ?? month} ${year}`;
-}
-
-const SAVINGS_HINTS = ["saving", "savings", "sinking", "goal", "fund"];
-
-function isJointCategory(cat: Category): boolean {
-  if (cat.isTeamFund) return true;
-  return cat.type.some((t) => {
-    const n = t.toLowerCase();
-    return n.includes("team") || n.includes("household");
-  });
-}
-
-function getCategoryGroup(cat: Category): Exclude<GroupFilter, "all"> {
-  if (isJointCategory(cat)) return "joint";
-  if (cat.type.some((t) => SAVINGS_HINTS.some((h) => t.toLowerCase().includes(h)))) return "savings";
-  if (cat.owner?.toLowerCase().includes("salma")) return "wife";
-  if (cat.owner?.toLowerCase().includes("anas")) return "husband";
-  return "joint";
 }
 
 /**
@@ -103,28 +85,19 @@ function computeTransfersAndTopUps(
   return { transfers, topUps };
 }
 
-// ── Scope chip metadata ────────────────────────────────────────────────────────
-
-const CHIP_EMOJI: Record<string, string> = {
-  all:     "✦",
-  joint:   "👫",
-  husband: "👨",
-  wife:    "👩",
-  savings: "💰",
-};
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function RebalanceSheet({
   open,
   onClose,
   categories,
+  accounts,
   onSuccess,
   homeMonth,
   monthlySummary,
+  budgetScope,
   readyToAssignByScope,
   jointUnassigned = 0,
-  savingPool = 0,
 }: RebalanceSheetProps) {
   const monthCtx = useMemo(() => getMonthContext(homeMonth), [homeMonth]);
   const isReadOnly = monthCtx !== "current";
@@ -161,69 +134,21 @@ export function RebalanceSheet({
     [categories, monthCtx, plannedByCategory, spentByCategory],
   );
 
-  // Only categories with available > 0 — used for pool/transfer source computation
-  const funded = useMemo(
-    () => allItems.filter((f) => f.original > 0),
-    [allItems],
-  );
-
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const [allocations, setAllocations] = useState<Record<string, number>>({});
-  const [groupFilter, setGroupFilter] = useState<GroupFilter>(() => {
-    if (typeof window === "undefined") return "joint";
-    const stored = localStorage.getItem("rebalance-last-group") as GroupFilter | null;
-    return (stored && stored !== "all") ? stored : "joint";
-  });
-
-  const handleGroupFilterChange = (next: GroupFilter) => {
-    setGroupFilter(next);
-    if (typeof window !== "undefined") localStorage.setItem("rebalance-last-group", next);
-  };
 
   useEffect(() => {
     if (!open) return;
     setAllocations(Object.fromEntries(allItems.map((f) => [f.id, f.original])));
-    const stored = (typeof window !== "undefined" ? localStorage.getItem("rebalance-last-group") : null) as GroupFilter | null;
-    setGroupFilter((stored && stored !== "all") ? stored : "joint");
   }, [open, allItems]);
 
-  // ── Group filtering ──
-  const groupCounts = useMemo(() => {
-    const counts: Record<Exclude<GroupFilter, "all">, number> = { joint: 0, wife: 0, husband: 0, savings: 0 };
-    for (const f of allItems) {
-      const cat = catById.get(f.id);
-      if (cat) counts[getCategoryGroup(cat)]++;
-    }
-    return counts;
-  }, [allItems, catById]);
-
-  const groupTabs = useMemo(
-    () => [
-      ...(groupCounts.joint > 0 ? [{ key: "joint", label: "Joint", count: groupCounts.joint }] : []),
-      ...(groupCounts.wife > 0 ? [{ key: "wife", label: "Salma", count: groupCounts.wife }] : []),
-      ...(groupCounts.husband > 0 ? [{ key: "husband", label: "Anas", count: groupCounts.husband }] : []),
-      ...(groupCounts.savings > 0 ? [{ key: "savings", label: "Savings", count: groupCounts.savings }] : []),
-    ],
-    [groupCounts],
-  );
-
   const visibleItems = useMemo(() => {
-    if (groupFilter === "all") return allItems;
     return allItems.filter((f) => {
       const cat = catById.get(f.id);
-      return cat && getCategoryGroup(cat) === groupFilter;
+      return cat && getCategoryScope(cat, accounts) === budgetScope;
     });
-  }, [allItems, catById, groupFilter]);
-
-  // Pool = only the funded (available > 0) categories in the current view
-  const visibleFunded = useMemo(() => {
-    if (groupFilter === "all") return funded;
-    return funded.filter((f) => {
-      const cat = catById.get(f.id);
-      return cat && getCategoryGroup(cat) === groupFilter;
-    });
-  }, [funded, catById, groupFilter]);
+  }, [allItems, catById, accounts, budgetScope]);
 
   // Sum ALL visible items (including over-budget negatives) so the pool matches
   // how "left to spend" is computed on the home screen for each scope.
@@ -236,17 +161,9 @@ export function RebalanceSheet({
   // the current month, since it reflects real-time account state.
   const unallocatedForGroup = useMemo(() => {
     if (isReadOnly) return 0;
-    const jointVal = Math.max(0, jointUnassigned);
-    const wifeVal = Math.max(0, readyToAssignByScope?.salma ?? 0);
-    const husbandVal = Math.max(0, readyToAssignByScope?.anas ?? 0);
-    const savingsVal = Math.max(0, savingPool);
-    if (groupFilter === "all") return jointVal + wifeVal + husbandVal + savingsVal;
-    if (groupFilter === "joint") return jointVal;
-    if (groupFilter === "wife") return wifeVal;
-    if (groupFilter === "husband") return husbandVal;
-    if (groupFilter === "savings") return savingsVal;
-    return 0;
-  }, [isReadOnly, groupFilter, jointUnassigned, readyToAssignByScope, savingPool]);
+    if (budgetScope === "joint") return Math.max(0, jointUnassigned);
+    return Math.max(0, readyToAssignByScope?.[budgetScope] ?? 0);
+  }, [isReadOnly, budgetScope, jointUnassigned, readyToAssignByScope]);
 
   const poolForGroup = alreadyAllocatedForGroup + unallocatedForGroup;
 
@@ -255,8 +172,8 @@ export function RebalanceSheet({
   const groups = useMemo<AllocationGroup[]>(
     () => [
       {
-        key: groupFilter,
-        label: groupFilter === "all" ? "All" : groupFilter.charAt(0).toUpperCase() + groupFilter.slice(1),
+        key: budgetScope,
+        label: BUDGET_SCOPE_LABELS[budgetScope],
         items: visibleItems.map((f): PlanningAllocationItem => {
           const cat = catById.get(f.id)!;
           const amount = allocations[f.id] ?? f.original;
@@ -265,6 +182,7 @@ export function RebalanceSheet({
             name: cat.name,
             icon: cat.icon,
             amount,
+            spent: spentByCategory.get(f.id) ?? 0,
             available: amount,      // keeps rangeMin = 0 always
             lastMonthSpent: f.original,  // shown as "Last month" → original budget
             defaultAccount: cat.defaultAccount,
@@ -283,7 +201,7 @@ export function RebalanceSheet({
     // The active-category reset effect in AllocationFlow uses `groupKeysSignal`
     // (not the `groups` reference), so it won't fire on every allocation change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groupFilter, visibleItems, catById, allocations],
+    [budgetScope, visibleItems, catById, allocations],
   );
 
   const { transfers: liveTransfers, topUps: liveTopUps } = useMemo(
@@ -345,49 +263,20 @@ export function RebalanceSheet({
     </div>
   );
 
-  const scopeChips: ScopeChipItem[] = useMemo(
-    () => groupTabs.map(tab => ({
-      key: tab.key,
-      emoji: CHIP_EMOJI[tab.key] ?? "•",
-      label: tab.label,
-    })),
-    [groupTabs],
-  );
-
-  const chipsContent = scopeChips.length > 1 ? (
-    <ScopeChipBar
-      chips={scopeChips}
-      value={groupFilter}
-      onChange={k => handleGroupFilterChange(k as GroupFilter)}
-      ariaLabel="Rebalance scope"
-    />
-  ) : undefined;
-
   const readOnlyBanner = isReadOnly ? (
-    <div style={{
-      ...contextBannerStyle,
-      background: monthCtx === "past"
-        ? "color-mix(in srgb, var(--surface2) 55%, var(--surface))"
-        : "color-mix(in srgb, var(--info-dim) 60%, var(--surface))",
-      borderColor: monthCtx === "past"
-        ? "color-mix(in srgb, var(--border2) 35%, transparent)"
-        : "color-mix(in srgb, var(--info) 22%, transparent)",
-    }}>
-      <span style={contextBannerDotStyle} />
-      <span style={contextBannerTextStyle}>
-        {monthCtx === "past"
-          ? `${formatMonth(homeMonth)} is closed — showing final balances`
-          : `Rebalancing opens when ${formatMonth(homeMonth)} begins`}
-      </span>
-    </div>
+    <Banner tone={monthCtx === "past" ? "neutral" : "info"} compact>
+      {monthCtx === "past"
+        ? `${formatMonth(homeMonth)} is closed — showing final balances`
+        : `Rebalancing opens when ${formatMonth(homeMonth)} begins`}
+    </Banner>
   ) : undefined;
 
-  const poolLabel = monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Available pool";
+  const poolLabel = monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Available";
 
   return (
     <AllocationFlow
       open={open}
-      mode="screen"
+      mode="sheet"
       selectedMonth={homeMonth}
       onCancel={onClose}
       onComplete={onSuccess}
@@ -395,12 +284,12 @@ export function RebalanceSheet({
       poolOverride={poolForGroup}
       poolLabel={poolLabel}
       title="Rebalance"
+      headerControls={<span style={scopeContextStyle}>{BUDGET_SCOPE_LABELS[budgetScope]}</span>}
       balancedLabel="Balanced"
       saveButtonLabel="Apply"
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}
       flowPreview={flowPreview}
-      chipsContent={chipsContent}
       heroPool
       metaLabel="Before"
       rebalanceMode
@@ -465,7 +354,7 @@ const flowWrapStyle: CSSProperties = {
 };
 
 const flowHeadStyle: CSSProperties = {
-  fontSize: 9,
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: 1.2,
   textTransform: "uppercase",
@@ -501,7 +390,7 @@ const flowToStyle: CSSProperties = {
 };
 
 const flowNameStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 500,
   color: "var(--text2)",
   overflow: "hidden",
@@ -510,7 +399,7 @@ const flowNameStyle: CSSProperties = {
 };
 
 const flowArrowStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 500,
   color: "var(--muted)",
   whiteSpace: "nowrap",
@@ -518,7 +407,7 @@ const flowArrowStyle: CSSProperties = {
 };
 
 const flowMoreStyle: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   color: "var(--muted)",
   textAlign: "center",
 };
@@ -543,22 +432,21 @@ const unallocatedHintDotStyle: CSSProperties = {
 
 const unallocatedHintTextStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 700,
   color: "var(--text2)",
   letterSpacing: 0.1,
 };
 
 
-// ── Context banner styles ──────────────────────────────────────────────────────
-
-const contextBannerStyle: CSSProperties = {
-  display: "flex", alignItems: "center", gap: 8,
-  padding: "10px 14px", borderRadius: 12, border: "1px solid transparent",
-};
-const contextBannerDotStyle: CSSProperties = {
-  width: 6, height: 6, borderRadius: "50%", background: "var(--muted)", flexShrink: 0,
-};
-const contextBannerTextStyle: CSSProperties = {
-  fontFamily: "var(--font-body)", fontSize: 11, color: "var(--muted)", letterSpacing: 0.2,
+const scopeContextStyle: CSSProperties = {
+  minHeight: 32,
+  padding: "0 11px",
+  borderRadius: "var(--radius-control)",
+  background: "var(--surface2)",
+  color: "var(--text2)",
+  display: "inline-flex",
+  alignItems: "center",
+  fontSize: 12,
+  fontWeight: 700,
 };

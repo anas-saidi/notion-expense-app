@@ -13,6 +13,38 @@ const notionHeaders = (token: string) => ({
   "Content-Type": "application/json",
 });
 
+const normalizeId = (value: string | undefined | null) => (value ?? "").replace(/-/g, "").toLowerCase();
+
+const belongsToTransactionsDatabase = (page: any) =>
+  page?.parent?.type === "database_id" && normalizeId(page.parent.database_id) === normalizeId(TRANSACTIONS_DB);
+
+const mapPage = (page: any) => ({
+  id: page.id,
+  name: page.properties?.Name?.title?.[0]?.plain_text ?? "",
+  amount: page.properties?.Amount?.number ?? 0,
+  date: page.properties?.Date?.date?.start ?? "",
+  category: page.properties?.Category?.relation?.[0]?.id ?? null,
+  accountId: page.properties?.Account?.relation?.[0]?.id ?? null,
+  type: page.properties?.Type?.select?.name ?? null,
+  fromCategoryId: page.properties?.[PROP_BUDGET_OUT]?.relation?.[0]?.id ?? null,
+  toCategoryId: page.properties?.[PROP_BUDGET_IN]?.relation?.[0]?.id ?? null,
+  fromAccountId: page.properties?.[PROP_ACCOUNT_OUT]?.relation?.[0]?.id ?? null,
+  toAccountId: page.properties?.[PROP_ACCOUNT_IN]?.relation?.[0]?.id ?? null,
+});
+
+async function fetchTransactionPage(token: string, id: string) {
+  const response = await fetch(`https://api.notion.com/v1/pages/${id}`, {
+    headers: notionHeaders(token),
+    cache: "no-store",
+  });
+  const data = await response.json();
+  if (!response.ok) return { error: NextResponse.json({ error: data.message || "Transaction not found" }, { status: response.status }) };
+  if (!belongsToTransactionsDatabase(data)) {
+    return { error: NextResponse.json({ error: "Transaction does not belong to the configured transactions database" }, { status: 403 }) };
+  }
+  return { page: data };
+}
+
 export async function GET(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
 
@@ -29,20 +61,6 @@ export async function GET(req: NextRequest) {
       { property: "Date", date: { on_or_before: end } },
     ],
   } : undefined;
-
-  const mapPage = (page: any) => ({
-    id: page.id,
-    name: page.properties.Name?.title?.[0]?.plain_text ?? "",
-    amount: page.properties.Amount?.number ?? 0,
-    date: page.properties.Date?.date?.start ?? "",
-    category: page.properties.Category?.relation?.[0]?.id ?? null,
-    accountId: page.properties.Account?.relation?.[0]?.id ?? null,
-    type: page.properties.Type?.select?.name ?? "Expense",
-    fromCategoryId: page.properties[PROP_BUDGET_OUT]?.relation?.[0]?.id  ?? null,
-    toCategoryId:   page.properties[PROP_BUDGET_IN]?.relation?.[0]?.id   ?? null,
-    fromAccountId:  page.properties[PROP_ACCOUNT_OUT]?.relation?.[0]?.id ?? null,
-    toAccountId:    page.properties[PROP_ACCOUNT_IN]?.relation?.[0]?.id  ?? null,
-  });
 
   try {
     // When a date range is provided, paginate through all results.
@@ -94,6 +112,16 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
+    const stored = await fetchTransactionPage(token, id);
+    if (stored.error) return stored.error;
+    const existingType = stored.page.properties?.Type?.select?.name;
+    if (!existingType) {
+      return NextResponse.json({ error: "Legacy transaction has no type and cannot be edited safely. Set its type in Notion first." }, { status: 409 });
+    }
+    if (existingType !== "Expense") {
+      return NextResponse.json({ error: `${existingType} transactions are read-only in the expense editor` }, { status: 409 });
+    }
+
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: notionHeaders(token),
@@ -104,7 +132,6 @@ export async function PATCH(req: NextRequest) {
           Date: { date: { start: date } },
           Account: { relation: [{ id: accountId }] },
           Category: { relation: [{ id: categoryId }] },
-          Type: { select: { name: "Expense" } },
         },
       }),
     });
@@ -113,14 +140,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      transaction: {
-        id: data.id,
-        name: data.properties.Name?.title?.[0]?.plain_text ?? String(name).trim(),
-        amount: data.properties.Amount?.number ?? parsedAmount,
-        date: data.properties.Date?.date?.start ?? date,
-        category: data.properties.Category?.relation?.[0]?.id ?? categoryId,
-        accountId: data.properties.Account?.relation?.[0]?.id ?? accountId,
-      },
+      transaction: mapPage(data),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -135,6 +155,8 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   try {
+    const stored = await fetchTransactionPage(token, id);
+    if (stored.error) return stored.error;
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: notionHeaders(token),
@@ -142,8 +164,33 @@ export async function DELETE(req: NextRequest) {
     });
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, transaction: mapPage(data) });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+/** Restore only a page already verified to belong to the transactions database. */
+export async function PUT(req: NextRequest) {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
+
+  const body = await req.json().catch(() => null);
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  try {
+    const stored = await fetchTransactionPage(token, id);
+    if (stored.error) return stored.error;
+    const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
+      method: "PATCH",
+      headers: notionHeaders(token),
+      body: JSON.stringify({ archived: false }),
+    });
+    const data = await res.json();
+    if (!res.ok) return NextResponse.json({ error: data.message || "Failed to restore transaction" }, { status: res.status });
+    return NextResponse.json({ success: true, transaction: mapPage(data) });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Failed to restore transaction" }, { status: 500 });
   }
 }

@@ -42,11 +42,11 @@ const card: CSSProperties = {
   width: "100%",
   maxWidth: 360,
   background: "var(--surface)",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
+  border: "none",
+  borderRadius: "var(--radius-card)",
   padding: "32px 24px",
   textAlign: "center",
-  boxShadow: "var(--card-shadow)",
+  boxShadow: "var(--elevation-card)",
 };
 
 const eyebrow: CSSProperties = {

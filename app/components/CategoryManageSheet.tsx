@@ -1,4 +1,5 @@
 "use client";
+import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category, BudgetScope } from "./app-types";
@@ -7,6 +8,7 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
+import { Banner } from "./ui/Banner";
 
 type CategoryManageSheetProps = {
   open: boolean;
@@ -172,12 +174,12 @@ export function CategoryManageSheet({
               </label>
               <label style={fieldStyle}>
                 <span style={labelStyle}>Type</span>
-                <select value={categoryType} onChange={(event) => setCategoryType(event.target.value)} style={inputStyle}>
+                <ChoicePicker aria-label="Category type" value={categoryType} onChange={(event) => setCategoryType(event.target.value)} style={inputStyle}>
                   {(availableTypes ?? []).map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                   {!availableTypes?.length && <option value="">No types</option>}
-                </select>
+                </ChoicePicker>
               </label>
             </div>
 
@@ -187,12 +189,12 @@ export function CategoryManageSheet({
         <section style={sectionStyle}>
           <label style={fieldStyle}>
             <span style={labelStyle}>Default account</span>
-            <select value={accountId} onChange={(event) => setAccountId(event.target.value)} style={inputStyle}>
+            <ChoicePicker aria-label="Default account" value={accountId} onChange={(event) => setAccountId(event.target.value)} style={inputStyle}>
               <option value="" disabled>Choose account</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.icon} {account.label}</option>
               ))}
-            </select>
+            </ChoicePicker>
           </label>
 
           <label style={fieldStyle}>
@@ -216,7 +218,7 @@ export function CategoryManageSheet({
           )}
         </section>
 
-        {error && <div style={errorStyle}>{error}</div>}
+        {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
           {status === "success" && <CheckIcon size={16} />}
@@ -230,7 +232,7 @@ export function CategoryManageSheet({
 
 const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",
-  borderRadius: 20,
+  borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
@@ -250,7 +252,7 @@ const headerStyle: CSSProperties = {
 
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 10,
+  fontSize: 12,
   letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
@@ -351,14 +353,6 @@ const accountHintStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 10,
-  fontSize: 12,
-};
-
-const errorStyle: CSSProperties = {
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--danger) 9%, var(--surface))",
-  color: "color-mix(in srgb, var(--danger) 54%, var(--text))",
-  padding: "11px 12px",
   fontSize: 12,
 };
 
