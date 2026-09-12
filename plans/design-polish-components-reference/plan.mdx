@@ -1,0 +1,74 @@
+---
+title: "Design polish component reference"
+brief: "Review the proposed app-wide control rail, bottom navigation, date-grouped transaction rows, and amount-first transaction composer before production implementation."
+kind: "plan"
+localOnly: true
+---
+
+# Design polish component reference
+
+This review artifact defines the proposed mobile shell and transaction-entry hierarchy before any production components change. The working HTML prototype is `design-reference.html` in this folder.
+
+## Outcome
+
+The app gains one persistent top control rail shared by Home, Budget, and Insights. The rail owns `Joint / Husband / Wife`, Search, and Date. The scope choices sit directly on the app background without an enclosing track. Search, Date, bottom navigation, and composer controls use a restrained Liquid Glass-inspired navigation layer. The existing three-tab navigation remains, while Add becomes a labeled action. Transaction history becomes date-grouped and the Add flow becomes an amount-first composer with its own keypad.
+
+<Callout id="design-decision" tone="decision">
+
+Scope and global actions are application chrome. They must be owned by `AppShell`, not repeated inside individual tab screens.
+
+</Callout>
+
+## Settled design decisions
+
+- No mascot is introduced.
+- The light visual system and current brand accent remain.
+- The scope picker appears in the same top position on every tab.
+- Search and Date sit to the right of scope and remain available app-wide.
+- Glass is reserved for navigation and interactive controls; budget and transaction content remain on stable surfaces.
+- Transaction rows retain the current codebase treatment: solid `surface` background, 14-point corners, no enclosing group border, and 6-point separation.
+- Home, Budget, and Insights remain the three primary tabs.
+- Add is a labeled pill inside the floating navigation surface.
+- Activity is grouped by date and presented as flat two-line rows.
+- The transaction composer follows this order: type, amount, description, pickers, keypad, confirmation.
+- Date, category, and account pickers sit directly above the keypad.
+- The final swipe control has a keyboard and tap alternative when implemented.
+
+## Production implementation map
+
+<FileTree
+  id="implementation-files"
+  title="Files expected to change after approval"
+  entries={[
+    { path: "app/components/AppShell.tsx", change: "modified", note: "Own the persistent scope and global-action rail." },
+    { path: "app/components/ui/ScopeChipBar.tsx", change: "modified", note: "Replace collapsing emoji chips with the compact labeled segment." },
+    { path: "app/components/BottomNav.tsx", change: "modified", note: "Polish selected states and coordinate with the labeled Add action." },
+    { path: "app/components/HomeScreen.tsx", change: "modified", note: "Remove the local scope picker and retain the date-grouped recent preview." },
+    { path: "app/components/InsightsScreen.tsx", change: "modified", note: "Use the global actions and date-grouped transaction row treatment." },
+    { path: "app/components/AddTransactionSheet.tsx", change: "modified", note: "Adopt the amount-first composer, picker row, keypad, and final confirmation control." },
+    { path: "app/globals.css", change: "modified", note: "Add shared shell, navigation, keypad, and composer tokens and states." },
+  ]}
+/>
+
+## Scope and non-goals
+
+This proposal changes hierarchy, placement, and component styling. It does not change transaction APIs, account/category data shapes, navigation labels, the existing theme strategy, or budgeting calculations. Dark-mode refinement, advanced motion, and new mascots are deferred.
+
+## Approval gate
+
+Review the Home shell and transaction composer in the canvas, then use the standalone HTML for interaction. Production work begins only after the component placement and composer hierarchy are approved.
+
+## Verification after implementation
+
+<Checklist
+  id="implementation-verification"
+  items={[
+    { id: "scope-persists", label: "Scope selection persists while moving between Home, Budget, and Insights" },
+    { id: "actions-global", label: "Search and Date occupy the same top position on all three tabs" },
+    { id: "composer-keypad", label: "The keypad accepts decimal input, backspace, and valid amount limits" },
+    { id: "picker-placement", label: "Date, category, and account pickers remain directly above the keypad" },
+    { id: "confirmation-accessible", label: "Confirmation works by swipe, tap, keyboard, and assistive technology" },
+    { id: "safe-area", label: "Top controls, sheet, and bottom navigation respect mobile safe areas" },
+    { id: "small-phone", label: "The full composer fits a 375 point phone without hiding confirmation" },
+  ]}
+/>

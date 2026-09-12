@@ -59,8 +59,12 @@ export function BottomSheet({
   const [mounted, setMounted] = useState(false);
   const localPanelRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const reduceMotion = useReducedMotion();
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
@@ -83,7 +87,7 @@ export function BottomSheet({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
     };
@@ -94,7 +98,7 @@ export function BottomSheet({
       document.removeEventListener("keydown", onKeyDown);
       returnFocusRef.current?.focus();
     };
-  }, [open, onClose, panelRef, mounted]);
+  }, [open, panelRef, mounted]);
 
   if (!mounted) return null;
 

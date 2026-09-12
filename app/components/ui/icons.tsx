@@ -9,6 +9,7 @@
 import {
   Search,
   Calendar,
+  CalendarRange,
   Check,
   Plus,
   Home,
@@ -54,6 +55,7 @@ const S = 18; // default size — matches previous hand-rolled SVG default
 
 export const SearchIcon       = (p: LucideProps) => <Search        size={S} {...p} />;
 export const CalendarIcon     = (p: LucideProps) => <Calendar      size={S} {...p} />;
+export const CalendarRangeIcon = (p: LucideProps) => <CalendarRange size={S} {...p} />;
 export const CheckIcon        = (p: LucideProps) => <Check         size={S} {...p} />;
 export const PlusIcon         = (p: LucideProps) => <Plus          size={S} {...p} />;
 export const HomeIcon         = (p: LucideProps) => <Home          size={S} {...p} />;

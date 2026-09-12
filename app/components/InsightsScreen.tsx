@@ -6,11 +6,12 @@ import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { categoryMatchesScope, comparisonPeriods, getCategoryScope, isExpenseTransaction, resolveTransactionScopes, transactionMatchesScope, fmt, fmtDate } from "./app-utils";
-import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, BanknoteIcon, CalendarIcon, ChartPieIcon, ChevronRightIcon, FlameIcon, TransferIcon } from "./ui/icons";
+import { ArrowDownIcon, ArrowUpIcon, BanknoteIcon, CalendarIcon, CalendarRangeIcon, ChartPieIcon, FlameIcon, TransferIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { TransactionRow } from "./ui/TransactionRow";
+import { MonthPicker } from "./DatePicker";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, PieChart, Pie, Cell, Sector } from "recharts";
 import type { PieSectorShapeProps } from "recharts";
 
@@ -56,16 +57,6 @@ export function InsightsScreen({
 
   /* Month nav */
   const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const canGoNext = insightsMonth < currentMonthStr;
-
-  const shiftMonth = (delta: number) => {
-    const [y, m] = insightsMonth.split("-").map(Number);
-    const d = new Date(y, m - 1 + delta, 1);
-    const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    if (delta > 0 && next > currentMonthStr) return;
-    onInsightsMonthChange(next);
-  };
-
   const monthLabel = useMemo(() => {
     const [y, m] = insightsMonth.split("-").map(Number);
     return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(new Date(y, m - 1, 1));
@@ -243,21 +234,15 @@ export function InsightsScreen({
 
       {/* ── Month control; scope is controlled globally by AppShell. ── */}
       <div style={controlsRowStyle}>
-        <div className="insights-month-nav" style={monthNavStyle}>
-          <button type="button" onClick={() => shiftMonth(-1)} style={monthNavBtnStyle} aria-label="Previous month">
-            <ArrowLeftIcon size={14} />
-          </button>
-          <span style={monthLabelStyle}>{monthLabel}</span>
-          <button
-            type="button"
-            onClick={() => shiftMonth(1)}
-            style={{ ...monthNavBtnStyle, opacity: canGoNext ? 1 : 0.25 }}
-            disabled={!canGoNext}
-            aria-label="Next month"
-          >
-            <ChevronRightIcon size={14} />
-          </button>
-        </div>
+        <MonthPicker
+          value={insightsMonth}
+          max={currentMonthStr}
+          aria-label="Filter insights by month"
+          onChange={(event) => event.target.value && onInsightsMonthChange(event.target.value)}
+          triggerIcon={<CalendarRangeIcon size={16} aria-hidden="true" />}
+          triggerClassName="composer-picker-chip"
+          showChevron={false}
+        />
       </div>
 
       {insightsError && (
@@ -280,7 +265,6 @@ export function InsightsScreen({
       {/* ── Transaction history — full width ── */}
       <div className="insights-history">
         <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-          <div className="section-label" style={sectionDividerLabelStyle}>Filter activity</div>
           {searchOpen && (
             <SearchField
               ref={searchInputRef}
@@ -759,20 +743,6 @@ const controlsRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
-};
-
-const monthNavStyle: CSSProperties = {
-  display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2px",
-};
-
-const monthNavBtnStyle: CSSProperties = {
-  width: 44, height: 44, borderRadius: 12, border: "none",
-  background: "transparent", color: "var(--text2)", cursor: "pointer",
-  display: "flex", alignItems: "center", justifyContent: "center",
-};
-
-const monthLabelStyle: CSSProperties = {
-  fontSize: 15, fontWeight: 600, color: "var(--text2)", letterSpacing: "-0.01em",
 };
 
 const retryButtonStyle: CSSProperties = {

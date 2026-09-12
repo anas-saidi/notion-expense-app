@@ -1,0 +1,1489 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Couple Finance - Component Redesign Reference</title>
+  <style>
+    :root {
+      --page: #edf0ea;
+      --paper: #f8faf5;
+      --surface: #ffffff;
+      --surface-2: #eef2eb;
+      --ink: #11130f;
+      --ink-2: #4e514c;
+      --muted: #747871;
+      --line: rgba(17, 19, 15, 0.12);
+      --line-strong: rgba(17, 19, 15, 0.2);
+      --accent: #9fe870;
+      --accent-ink: #173300;
+      --blue: #6aa6e6;
+      --pink: #e86c95;
+      --danger: #d84b50;
+      --success: #087744;
+      --glass-fill: rgba(248, 250, 245, 0.7);
+      --glass-fill-strong: rgba(248, 250, 245, 0.86);
+      --glass-line: rgba(255, 255, 255, 0.78);
+      --glass-shadow: 0 14px 34px rgba(26, 32, 23, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+      --radius-card: 20px;
+      --radius-control: 14px;
+      --shadow-phone: 0 42px 90px rgba(25, 31, 22, 0.22);
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { color-scheme: light; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button,
+    input { font: inherit; }
+
+    button { -webkit-tap-highlight-color: transparent; }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid rgba(53, 53, 224, 0.28);
+      outline-offset: 2px;
+    }
+
+    .page {
+      width: min(1240px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 36px 0 64px;
+    }
+
+    .document-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 32px;
+      padding: 0 4px 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .document-header h1 {
+      max-width: 740px;
+      margin: 0;
+      overflow-wrap: anywhere;
+      font-size: clamp(30px, 4vw, 54px);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+      font-weight: 680;
+    }
+
+    .document-header p {
+      max-width: 460px;
+      margin: 14px 0 0;
+      color: var(--ink-2);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .status-pills {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      max-width: 340px;
+    }
+
+    .status-pill {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.5);
+      color: var(--ink-2);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.74fr) minmax(420px, 1.5fr);
+      gap: clamp(32px, 6vw, 92px);
+      align-items: start;
+      padding-top: 44px;
+    }
+
+    .workspace,
+    .document-header > div,
+    .preview-column,
+    .phone-shell,
+    .decision > span:last-child { min-width: 0; }
+
+    .notes {
+      position: sticky;
+      top: 28px;
+      display: grid;
+      gap: 28px;
+      padding-top: 12px;
+    }
+
+    .note-section {
+      display: grid;
+      gap: 12px;
+    }
+
+    .note-section h2 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+    }
+
+    .note-section p {
+      margin: 0;
+      color: var(--ink-2);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .decision-list {
+      display: grid;
+      gap: 2px;
+      border-top: 1px solid var(--line);
+    }
+
+    .decision {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 10px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-2);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .decision b { color: var(--ink); }
+
+    .decision-index {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .token-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--ink-2);
+      font-size: 12px;
+    }
+
+    .swatch {
+      width: 22px;
+      height: 22px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+    }
+
+    .preview-column {
+      display: grid;
+      justify-items: center;
+      gap: 18px;
+    }
+
+    .preview-toolbar {
+      width: min(100%, 500px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--ink-2);
+      font-size: 12px;
+    }
+
+    .preview-toolbar strong { color: var(--ink); }
+
+    .view-switcher {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.56);
+    }
+
+    .view-switcher button {
+      min-height: 34px;
+      padding: 0 13px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .view-switcher button[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 3px 10px rgba(17,19,15,0.08);
+    }
+
+    .phone-shell {
+      position: relative;
+      width: min(430px, 100%);
+      aspect-ratio: 430 / 900;
+      padding: 10px;
+      border: 1px solid rgba(17,19,15,0.22);
+      border-radius: 52px;
+      background: #242821;
+      box-shadow: var(--shadow-phone);
+    }
+
+    .phone {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 43px;
+      background: var(--paper);
+      isolation: isolate;
+    }
+
+    .dynamic-island {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      z-index: 20;
+      width: 112px;
+      height: 31px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: #171914;
+      pointer-events: none;
+    }
+
+    .phone-screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition: opacity 180ms ease, transform 260ms var(--ease), visibility 180ms;
+    }
+
+    .phone-screen.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .status-bar {
+      height: 52px;
+      flex: 0 0 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 25px 0;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 750;
+      letter-spacing: -0.01em;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--ink-2);
+    }
+
+    .battery {
+      width: 20px;
+      height: 10px;
+      padding: 1px;
+      border: 1px solid currentColor;
+      border-radius: 3px;
+    }
+
+    .battery::before {
+      content: "";
+      display: block;
+      width: 13px;
+      height: 6px;
+      border-radius: 1px;
+      background: currentColor;
+    }
+
+    .global-bar {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 5px 18px 8px;
+    }
+
+    .scope-control {
+      min-width: 0;
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 3px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .scope-button {
+      min-width: 0;
+      min-height: 40px;
+      padding: 0 8px;
+      border: 0;
+      border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 700;
+      transition: background 160ms ease, color 160ms ease, transform 120ms ease;
+    }
+
+    .scope-button:active { transform: scale(0.97); }
+
+    .scope-button[aria-selected="true"] {
+      background: rgba(17, 19, 15, 0.94);
+      color: var(--paper);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 5px 14px rgba(17,19,15,0.16);
+    }
+
+    .global-actions {
+      display: flex;
+      gap: 6px;
+      isolation: isolate;
+    }
+
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 44px;
+      padding: 0;
+      border: 1px solid var(--glass-line);
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.82), rgba(242,246,239,0.58));
+      color: var(--ink-2);
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(26,32,23,0.1), inset 0 1px 0 rgba(255,255,255,0.92);
+      backdrop-filter: blur(18px) saturate(145%);
+      -webkit-backdrop-filter: blur(18px) saturate(145%);
+      transition: transform 120ms ease, background 160ms ease, box-shadow 160ms ease;
+    }
+
+    .icon-button:active { transform: scale(0.96); }
+    .icon-button:hover { background: rgba(255,255,255,0.9); box-shadow: 0 10px 24px rgba(26,32,23,0.13), inset 0 1px 0 #fff; }
+    .icon-button svg { width: 18px; height: 18px; stroke-width: 1.8; }
+
+    .home-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: none;
+      padding: 8px 18px 110px;
+    }
+
+    .home-scroll::-webkit-scrollbar { display: none; }
+
+    .balance-hero {
+      display: grid;
+      gap: 18px;
+      padding: 24px 20px 19px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-card);
+      background: rgba(255,255,255,0.75);
+    }
+
+    .hero-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .hero-amount {
+      margin-top: 5px;
+      font-size: clamp(42px, 12vw, 58px);
+      line-height: 0.95;
+      letter-spacing: -0.055em;
+      font-variant-numeric: tabular-nums;
+      font-weight: 520;
+    }
+
+    .hero-amount small {
+      margin-left: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0;
+      font-weight: 650;
+    }
+
+    .hero-caption {
+      margin-top: 7px;
+      color: var(--ink-2);
+      font-size: 12px;
+    }
+
+    .progress-line {
+      height: 5px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--surface-2);
+    }
+
+    .progress-line span {
+      display: block;
+      width: 62%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--accent);
+    }
+
+    .partners {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .partner {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .partner-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .partner-head b { color: var(--ink-2); }
+
+    .partner-line {
+      height: 4px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--surface-2);
+    }
+
+    .partner-line span { display:block; height:100%; border-radius:inherit; }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 24px 2px 8px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .section-heading button {
+      min-height: 36px;
+      padding: 0 8px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .transaction-group {
+      display: grid;
+      gap: 6px;
+    }
+
+    .transaction-row {
+      width: 100%;
+      min-height: 68px;
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 11px;
+      padding: 16px 14px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .transaction-row:active { transform: scale(0.985); background: var(--surface-2); }
+
+    .category-mark {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: var(--surface-2);
+      color: var(--ink-2);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .transaction-copy { min-width: 0; }
+
+    .transaction-copy strong,
+    .transaction-copy small,
+    .transaction-amount strong,
+    .transaction-amount small { display: block; }
+
+    .transaction-copy strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .transaction-copy small,
+    .transaction-amount small {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .transaction-amount {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .transaction-amount strong { font-size: 12px; }
+    .transaction-amount .positive { color: var(--success); }
+
+    .bottom-navigation {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 12px;
+      z-index: 14;
+      min-height: 72px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px;
+      border: 1px solid var(--glass-line);
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.78), rgba(241,245,238,0.64));
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(24px) saturate(155%);
+      -webkit-backdrop-filter: blur(24px) saturate(155%);
+      isolation: isolate;
+    }
+
+    .nav-item {
+      min-width: 0;
+      min-height: 56px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 0 6px;
+      border: 0;
+      border-radius: 18px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    .nav-item[aria-selected="true"] {
+      background: rgba(255,255,255,0.72);
+      color: var(--ink);
+      box-shadow: inset 0 1px 0 #fff, 0 5px 14px rgba(26,32,23,0.08);
+    }
+
+    .nav-item svg { width: 18px; height: 18px; stroke-width: 1.8; }
+
+    .add-pill {
+      min-width: 100px;
+      min-height: 56px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.62);
+      background: linear-gradient(145deg, rgba(180,244,137,0.96), rgba(143,222,91,0.9));
+      color: var(--accent-ink);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      box-shadow: 0 8px 20px rgba(26,32,23,0.14), inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    .add-pill:active { transform: scale(0.98); }
+    .add-pill svg { width: 17px; height: 17px; stroke-width: 2.3; }
+
+    .floating-panel {
+      position: absolute;
+      top: 112px;
+      left: 18px;
+      right: 18px;
+      z-index: 30;
+      display: none;
+      padding: 14px;
+      border: 1px solid var(--glass-line);
+      border-radius: 18px;
+      background: var(--glass-fill-strong);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(28px) saturate(150%);
+      -webkit-backdrop-filter: blur(28px) saturate(150%);
+    }
+
+    .floating-panel.open { display: block; animation: panel-in 180ms var(--ease) both; }
+
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .search-input {
+      width: 100%;
+      height: 46px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--surface-2);
+      color: var(--ink);
+      font-size: 16px;
+    }
+
+    .quick-results {
+      display: grid;
+      gap: 5px;
+      margin-top: 10px;
+    }
+
+    .quick-results button {
+      min-height: 44px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink-2);
+      text-align: left;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .quick-results button:hover { background: var(--surface-2); }
+
+    .calendar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .calendar-head strong { font-size: 13px; }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+
+    .calendar-grid button,
+    .calendar-grid span {
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--ink-2);
+      font-size: 11px;
+    }
+
+    .calendar-grid span { color: var(--muted); font-size: 9px; font-weight: 750; }
+    .calendar-grid button { cursor: pointer; }
+    .calendar-grid button.selected { background: var(--accent); color: var(--accent-ink); font-weight: 800; }
+
+    .sheet-backdrop {
+      position: absolute;
+      inset: 110px 0 0;
+      background: rgba(17,19,15,0.06);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+    }
+
+    .transaction-sheet {
+      position: absolute;
+      inset: 110px 8px 8px;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      padding: 8px 16px 14px;
+      border: 1px solid var(--glass-line);
+      border-radius: 30px 30px 36px 36px;
+      background: rgba(245,247,242,0.9);
+      box-shadow: 0 -14px 42px rgba(17,19,15,0.13), inset 0 1px 0 rgba(255,255,255,0.92);
+      backdrop-filter: blur(28px) saturate(140%);
+      -webkit-backdrop-filter: blur(28px) saturate(140%);
+    }
+
+    .sheet-handle {
+      width: 38px;
+      height: 4px;
+      margin: 2px auto 8px;
+      border-radius: 999px;
+      background: var(--line-strong);
+    }
+
+    .sheet-topbar {
+      display: grid;
+      grid-template-columns: 44px 1fr 44px;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sheet-close {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.5);
+      color: var(--ink-2);
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.86);
+    }
+
+    .sheet-close svg { width: 18px; height: 18px; }
+
+    .type-toggle {
+      justify-self: center;
+      display: inline-flex;
+      gap: 3px;
+      padding: 3px;
+      border-radius: 13px;
+      border: 1px solid rgba(255,255,255,0.68);
+      background: rgba(230,234,226,0.6);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.82);
+    }
+
+    .type-toggle button {
+      min-height: 34px;
+      padding: 0 15px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .type-toggle button[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 3px 8px rgba(17,19,15,0.08);
+    }
+
+    .amount-stage {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+      padding: 22px 0 10px;
+    }
+
+    .entry-amount {
+      min-height: 66px;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 4px;
+      color: var(--danger);
+      font-size: 58px;
+      line-height: 1;
+      letter-spacing: -0.055em;
+      font-variant-numeric: tabular-nums;
+      font-weight: 550;
+    }
+
+    .entry-amount.income { color: var(--success); }
+
+    .entry-amount small {
+      color: var(--muted);
+      font-size: 23px;
+      letter-spacing: -0.02em;
+      font-weight: 520;
+    }
+
+    .description-input {
+      width: min(260px, 90%);
+      height: 42px;
+      padding: 0 10px;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      background: transparent;
+      color: var(--ink);
+      text-align: center;
+      font-size: 16px;
+    }
+
+    .description-input::placeholder { color: var(--muted); opacity: 1; }
+    .description-input:focus { border-bottom-color: var(--line-strong); outline: 0; }
+
+    .sheet-spacer { flex: 1; min-height: 8px; }
+
+    .picker-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+      margin-bottom: 12px;
+    }
+
+    .picker-chip {
+      min-width: 0;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 0 7px;
+      border: 1px solid rgba(255,255,255,0.72);
+      border-radius: 13px;
+      background: rgba(255,255,255,0.46);
+      color: var(--ink-2);
+      cursor: pointer;
+      overflow: hidden;
+      white-space: nowrap;
+      font-size: 10px;
+      font-weight: 700;
+      box-shadow: 0 5px 14px rgba(26,32,23,0.06), inset 0 1px 0 rgba(255,255,255,0.9);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+    }
+
+    .picker-chip span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .picker-chip svg { width: 14px; height: 14px; flex: 0 0 14px; stroke-width: 1.9; }
+
+    .picker-popover {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 50px;
+      z-index: 20;
+      display: none;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 9px;
+      border: 1px solid var(--glass-line);
+      border-radius: 16px;
+      background: var(--glass-fill-strong);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(22px) saturate(145%);
+      -webkit-backdrop-filter: blur(22px) saturate(145%);
+    }
+
+    .picker-popover.open { display: grid; animation: panel-in 160ms var(--ease) both; }
+
+    .picker-popover button {
+      min-height: 44px;
+      padding: 6px;
+      border: 0;
+      border-radius: 11px;
+      background: var(--surface-2);
+      color: var(--ink-2);
+      cursor: pointer;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      isolation: isolate;
+    }
+
+    .keypad button {
+      min-height: 50px;
+      border: 0;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.7);
+      background: rgba(231,235,227,0.66);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 20px;
+      font-weight: 620;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.82), 0 4px 12px rgba(26,32,23,0.04);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
+      transition: transform 90ms ease, background 100ms ease, box-shadow 100ms ease;
+    }
+
+    .keypad button:active {
+      transform: scale(0.97);
+      background: rgba(218,224,214,0.84);
+      box-shadow: inset 0 2px 4px rgba(26,32,23,0.08);
+    }
+
+    .keypad button svg { width: 20px; height: 20px; }
+
+    .swipe-control {
+      position: relative;
+      height: 56px;
+      margin-top: 12px;
+      overflow: hidden;
+      border: 1px solid var(--glass-line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.38);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.84);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      user-select: none;
+      touch-action: none;
+    }
+
+    .swipe-label {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .swipe-thumb {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 62px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 14px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      cursor: grab;
+      transform: translateX(0);
+      transition: transform 180ms var(--ease), background 160ms ease;
+      will-change: transform;
+    }
+
+    .swipe-thumb:active { cursor: grabbing; }
+    .swipe-thumb svg { width: 18px; height: 18px; stroke-width: 2.2; }
+
+    .save-toast {
+      position: absolute;
+      left: 50%;
+      bottom: 90px;
+      z-index: 50;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      padding: 0 15px;
+      border-radius: 999px;
+      background: var(--ink);
+      color: var(--paper);
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 8px);
+      transition: opacity 180ms ease, transform 220ms var(--ease);
+      white-space: nowrap;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .save-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .icon-button,
+      .bottom-navigation,
+      .floating-panel,
+      .transaction-sheet,
+      .picker-chip,
+      .picker-popover,
+      .keypad button,
+      .swipe-control { background: #f5f7f2; }
+    }
+
+    @media (prefers-reduced-transparency: reduce) {
+      .icon-button,
+      .bottom-navigation,
+      .floating-panel,
+      .transaction-sheet,
+      .picker-chip,
+      .picker-popover,
+      .keypad button,
+      .swipe-control {
+        background: #f5f7f2;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 860px) {
+      .document-header { align-items: flex-start; flex-direction: column; }
+      .status-pills { justify-content: flex-start; }
+      .workspace { grid-template-columns: 1fr; }
+      .notes { position: static; grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+
+    @media (max-width: 560px) {
+      body { overflow-x: hidden; }
+      .page { width: 100%; max-width: 430px; padding: 22px 18px 52px; overflow: hidden; }
+      .document-header { padding-inline: 4px; }
+      .document-header h1 { max-width: 100%; font-size: 28px; }
+      .workspace,
+      .notes,
+      .preview-column,
+      .phone-shell { width: 100%; max-width: 100%; }
+      .notes { grid-template-columns: 1fr; }
+      .preview-toolbar { align-items: flex-start; flex-direction: column; }
+      .phone-shell { border-radius: 46px; }
+      .phone { border-radius: 38px; }
+      .global-bar { gap: 6px; padding-inline: 10px; }
+      .icon-button { width: 40px; height: 40px; flex-basis: 40px; }
+      .scope-button { min-height: 38px; padding-inline: 3px; font-size: 11px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="document-header">
+      <div>
+        <h1>Component redesign reference</h1>
+        <p>A working visual proposal for global scope and actions, the polished navigation shell, date-grouped activity, and the new transaction composer.</p>
+      </div>
+      <div class="status-pills" aria-label="Design constraints">
+        <span class="status-pill">Light system retained</span>
+        <span class="status-pill">No mascot</span>
+        <span class="status-pill">Prototype only</span>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <aside class="notes" aria-label="Design decisions">
+        <section class="note-section">
+          <h2>What changes</h2>
+          <div class="decision-list">
+            <div class="decision"><span class="decision-index">1</span><span><b>One app-wide control rail.</b> Joint, Husband, and Wife remain in the same top position on every tab.</span></div>
+            <div class="decision"><span class="decision-index">2</span><span><b>Global actions live beside scope.</b> Search and date filters no longer move between tab-specific layouts.</span></div>
+            <div class="decision"><span class="decision-index">3</span><span><b>Add becomes a labeled pill.</b> The existing three tabs remain, with a clearer selected state.</span></div>
+            <div class="decision"><span class="decision-index">4</span><span><b>Transactions group by date.</b> Rows stay flat, readable, and easy to scan without stacking extra cards.</span></div>
+            <div class="decision"><span class="decision-index">5</span><span><b>The composer is amount-first.</b> Type, amount, description, pickers, keypad, and final swipe follow one vertical hierarchy.</span></div>
+          </div>
+        </section>
+
+        <section class="note-section">
+          <h2>Interaction notes</h2>
+          <p>Try switching scope, opening Search or Date, pressing Add, entering an amount, changing pickers, and dragging the final control.</p>
+        </section>
+
+        <section class="note-section">
+          <h2>Tokens carried forward</h2>
+          <div class="token-row"><span class="swatch" style="background:#9fe870"></span> Brand and positive action</div>
+          <div class="token-row"><span class="swatch" style="background:#fbfdf7"></span> Warm app background</div>
+          <div class="token-row"><span class="swatch" style="background:#6aa6e6"></span> Anas attribution</div>
+          <div class="token-row"><span class="swatch" style="background:#e86c95"></span> Salma attribution</div>
+        </section>
+      </aside>
+
+      <div class="preview-column">
+        <div class="preview-toolbar">
+          <span><strong>Interactive phone preview</strong><br />390 point layout target</span>
+          <div class="view-switcher" role="tablist" aria-label="Preview state">
+            <button type="button" role="tab" aria-selected="true" data-view="home">Home shell</button>
+            <button type="button" role="tab" aria-selected="false" data-view="add">Add composer</button>
+          </div>
+        </div>
+
+        <div class="phone-shell">
+          <div class="phone">
+            <div class="dynamic-island" aria-hidden="true"></div>
+
+            <section class="phone-screen active" id="home-screen" aria-label="Redesigned home screen">
+              <div class="status-bar"><span>9:41</span><span class="status-icons">5G <span class="battery"></span></span></div>
+              <div class="global-bar">
+                <div class="scope-control" role="tablist" aria-label="App-wide budget scope">
+                  <button class="scope-button" type="button" role="tab" aria-selected="true" data-scope="joint">Joint</button>
+                  <button class="scope-button" type="button" role="tab" aria-selected="false" data-scope="anas">Husband</button>
+                  <button class="scope-button" type="button" role="tab" aria-selected="false" data-scope="salma">Wife</button>
+                </div>
+                <div class="global-actions">
+                  <button class="icon-button" type="button" data-action="search" aria-label="Search"><i data-lucide="search"></i></button>
+                  <button class="icon-button" type="button" data-action="date" aria-label="Choose date"><i data-lucide="calendar-days"></i></button>
+                </div>
+              </div>
+
+              <div class="home-scroll">
+                <section class="balance-hero" aria-label="Budget summary">
+                  <div>
+                    <div class="hero-label" id="hero-label">Joint left to spend</div>
+                    <div class="hero-amount"><span id="hero-value">12,480</span><small>MAD</small></div>
+                    <div class="hero-caption" id="hero-caption">62% of 32,600 MAD planned remains</div>
+                  </div>
+                  <div class="progress-line" aria-label="38 percent spent"><span id="hero-progress"></span></div>
+                  <div class="partners" id="partner-summary">
+                    <div class="partner">
+                      <div class="partner-head"><b>Anas</b><span>1,420 left</span></div>
+                      <div class="partner-line"><span style="width:76%;background:var(--blue)"></span></div>
+                    </div>
+                    <div class="partner">
+                      <div class="partner-head"><b>Salma</b><span>Done</span></div>
+                      <div class="partner-line"><span style="width:100%;background:var(--pink)"></span></div>
+                    </div>
+                  </div>
+                </section>
+
+                <div class="section-heading"><h2>Today</h2><button type="button">See all</button></div>
+                <div class="transaction-group">
+                  <button class="transaction-row" type="button">
+                    <span class="category-mark">GR</span>
+                    <span class="transaction-copy"><strong>Marjane Market</strong><small>Groceries from Joined card</small></span>
+                    <span class="transaction-amount"><strong>-326 MAD</strong><small>10:42</small></span>
+                  </button>
+                  <button class="transaction-row" type="button">
+                    <span class="category-mark">IN</span>
+                    <span class="transaction-copy"><strong>Freelance payment</strong><small>Income to Anas checking</small></span>
+                    <span class="transaction-amount"><strong class="positive">+2,200 MAD</strong><small>09:18</small></span>
+                  </button>
+                </div>
+
+                <div class="section-heading"><h2>Saturday, Aug 29</h2></div>
+                <div class="transaction-group">
+                  <button class="transaction-row" type="button">
+                    <span class="category-mark">TR</span>
+                    <span class="transaction-copy"><strong>Casa Tramway</strong><small>Transport from Salma card</small></span>
+                    <span class="transaction-amount"><strong>-80 MAD</strong><small>18:06</small></span>
+                  </button>
+                  <button class="transaction-row" type="button">
+                    <span class="category-mark">HM</span>
+                    <span class="transaction-copy"><strong>IKEA Morocco</strong><small>Home from Joined card</small></span>
+                    <span class="transaction-amount"><strong>-640 MAD</strong><small>14:20</small></span>
+                  </button>
+                </div>
+              </div>
+
+              <nav class="bottom-navigation" aria-label="Main navigation">
+                <button class="nav-item" type="button" aria-selected="true" data-nav="home"><i data-lucide="house"></i><span>Home</span></button>
+                <button class="nav-item" type="button" aria-selected="false" data-nav="budget"><i data-lucide="sliders-horizontal"></i><span>Budget</span></button>
+                <button class="nav-item" type="button" aria-selected="false" data-nav="insights"><i data-lucide="chart-no-axes-column-increasing"></i><span>Insights</span></button>
+                <button class="add-pill" type="button" data-open-add><i data-lucide="plus"></i><span>Add</span></button>
+              </nav>
+
+              <div class="floating-panel" id="search-panel">
+                <label class="sr-only" for="global-search">Search transactions and categories</label>
+                <input class="search-input" id="global-search" type="search" placeholder="Search transactions" />
+                <div class="quick-results"><button type="button">Marjane Market - 326 MAD</button><button type="button">Groceries - 4 transactions</button></div>
+              </div>
+
+              <div class="floating-panel" id="date-panel">
+                <div class="calendar-head"><strong>August 2026</strong><span class="status-pill">Month</span></div>
+                <div class="calendar-grid" aria-label="August 2026">
+                  <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+                  <button type="button">24</button><button type="button">25</button><button type="button">26</button><button type="button">27</button><button type="button">28</button><button type="button">29</button><button class="selected" type="button">30</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="phone-screen" id="add-screen" aria-label="Redesigned add transaction composer">
+              <div class="status-bar"><span>9:41</span><span class="status-icons">5G <span class="battery"></span></span></div>
+              <div class="global-bar">
+                <div class="scope-control" role="tablist" aria-label="App-wide budget scope">
+                  <button class="scope-button" type="button" role="tab" aria-selected="true" data-scope="joint">Joint</button>
+                  <button class="scope-button" type="button" role="tab" aria-selected="false" data-scope="anas">Husband</button>
+                  <button class="scope-button" type="button" role="tab" aria-selected="false" data-scope="salma">Wife</button>
+                </div>
+                <div class="global-actions">
+                  <button class="icon-button" type="button" aria-label="Search"><i data-lucide="search"></i></button>
+                  <button class="icon-button" type="button" aria-label="Choose date"><i data-lucide="calendar-days"></i></button>
+                </div>
+              </div>
+
+              <div class="sheet-backdrop" aria-hidden="true"></div>
+              <section class="transaction-sheet" aria-label="New transaction">
+                <div class="sheet-handle" aria-hidden="true"></div>
+                <div class="sheet-topbar">
+                  <button class="sheet-close" type="button" data-close-add aria-label="Close transaction composer"><i data-lucide="x"></i></button>
+                  <div class="type-toggle" role="tablist" aria-label="Transaction type">
+                    <button type="button" role="tab" aria-selected="true" data-type="expense">Expense</button>
+                    <button type="button" role="tab" aria-selected="false" data-type="income">Income</button>
+                  </div>
+                  <span></span>
+                </div>
+
+                <div class="amount-stage">
+                  <div class="entry-amount" id="entry-amount"><span id="entry-sign">-</span><span id="entry-value">0</span><small>MAD</small></div>
+                  <label class="sr-only" for="entry-description">Transaction description</label>
+                  <input class="description-input" id="entry-description" type="text" placeholder="What's it for?" autocomplete="off" />
+                </div>
+
+                <div class="sheet-spacer"></div>
+
+                <div class="picker-row">
+                  <button class="picker-chip" type="button" data-picker="date"><i data-lucide="calendar-days"></i><span id="date-choice">Today</span></button>
+                  <button class="picker-chip" type="button" data-picker="category"><i data-lucide="tag"></i><span id="category-choice">Groceries</span></button>
+                  <button class="picker-chip" type="button" data-picker="account"><i data-lucide="credit-card"></i><span id="account-choice">Joined card</span></button>
+                  <div class="picker-popover" id="picker-popover" aria-live="polite"></div>
+                </div>
+
+                <div class="keypad" aria-label="Amount keypad">
+                  <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+                  <button type="button" data-key="4">4</button><button type="button" data-key="5">5</button><button type="button" data-key="6">6</button>
+                  <button type="button" data-key="7">7</button><button type="button" data-key="8">8</button><button type="button" data-key="9">9</button>
+                  <button type="button" data-key=".">.</button><button type="button" data-key="0">0</button><button type="button" data-key="backspace" aria-label="Delete last digit"><i data-lucide="delete"></i></button>
+                </div>
+
+                <div class="swipe-control" id="swipe-control">
+                  <span class="swipe-label" id="swipe-label">Swipe to save expense</span>
+                  <button class="swipe-thumb" id="swipe-thumb" type="button" aria-label="Swipe right or press Enter to save"><i data-lucide="arrow-right"></i></button>
+                </div>
+              </section>
+              <div class="save-toast" id="save-toast" role="status" aria-live="polite">Saved to Groceries</div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    const homeScreen = document.getElementById('home-screen');
+    const addScreen = document.getElementById('add-screen');
+    const viewButtons = document.querySelectorAll('[data-view]');
+    const searchPanel = document.getElementById('search-panel');
+    const datePanel = document.getElementById('date-panel');
+    const scopeData = {
+      joint: { label: 'Joint left to spend', value: '12,480', caption: '62% of 32,600 MAD planned remains', progress: '38%' },
+      anas: { label: 'Husband balance', value: '8,240', caption: 'Personal accounts and assigned categories', progress: '54%' },
+      salma: { label: 'Wife balance', value: '6,910', caption: 'Personal accounts and assigned categories', progress: '47%' }
+    };
+
+    function refreshIcons() {
+      if (window.lucide) window.lucide.createIcons({ attrs: { 'aria-hidden': 'true' } });
+    }
+
+    function showView(name) {
+      const isAdd = name === 'add';
+      homeScreen.classList.toggle('active', !isAdd);
+      addScreen.classList.toggle('active', isAdd);
+      viewButtons.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.view === name)));
+      searchPanel.classList.remove('open');
+      datePanel.classList.remove('open');
+    }
+
+    viewButtons.forEach((button) => button.addEventListener('click', () => showView(button.dataset.view)));
+    document.querySelectorAll('[data-open-add]').forEach((button) => button.addEventListener('click', () => showView('add')));
+    document.querySelectorAll('[data-close-add]').forEach((button) => button.addEventListener('click', () => showView('home')));
+
+    document.querySelectorAll('[data-action]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const target = button.dataset.action === 'search' ? searchPanel : datePanel;
+        const other = target === searchPanel ? datePanel : searchPanel;
+        other.classList.remove('open');
+        target.classList.toggle('open');
+        if (target === searchPanel && target.classList.contains('open')) document.getElementById('global-search').focus();
+      });
+    });
+
+    document.querySelectorAll('[data-scope]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const scope = button.dataset.scope;
+        document.querySelectorAll('[data-scope]').forEach((candidate) => candidate.setAttribute('aria-selected', String(candidate.dataset.scope === scope)));
+        const next = scopeData[scope];
+        document.getElementById('hero-label').textContent = next.label;
+        document.getElementById('hero-value').textContent = next.value;
+        document.getElementById('hero-caption').textContent = next.caption;
+        document.getElementById('hero-progress').style.width = next.progress;
+      });
+    });
+
+    document.querySelectorAll('[data-nav]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('[data-nav]').forEach((candidate) => candidate.setAttribute('aria-selected', String(candidate === button)));
+      });
+    });
+
+    let amount = '';
+    let transactionType = 'expense';
+    const entryValue = document.getElementById('entry-value');
+    const entrySign = document.getElementById('entry-sign');
+    const entryAmount = document.getElementById('entry-amount');
+    const swipeLabel = document.getElementById('swipe-label');
+
+    function renderAmount() {
+      entryValue.textContent = amount || '0';
+    }
+
+    document.querySelectorAll('[data-key]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const key = button.dataset.key;
+        if (key === 'backspace') amount = amount.slice(0, -1);
+        else if (key === '.' && !amount.includes('.')) amount = (amount || '0') + '.';
+        else if (key !== '.' && amount.replace('.', '').length < 7) amount += key;
+        renderAmount();
+      });
+    });
+
+    document.querySelectorAll('[data-type]').forEach((button) => {
+      button.addEventListener('click', () => {
+        transactionType = button.dataset.type;
+        document.querySelectorAll('[data-type]').forEach((candidate) => candidate.setAttribute('aria-selected', String(candidate === button)));
+        const income = transactionType === 'income';
+        entrySign.textContent = income ? '+' : '-';
+        entryAmount.classList.toggle('income', income);
+        swipeLabel.textContent = income ? 'Swipe to save income' : 'Swipe to save expense';
+      });
+    });
+
+    const pickerOptions = {
+      date: ['Today', 'Yesterday', 'Aug 28'],
+      category: ['Groceries', 'Transport', 'Dining'],
+      account: ['Joined card', 'Anas card', 'Salma card']
+    };
+    const pickerTargets = {
+      date: document.getElementById('date-choice'),
+      category: document.getElementById('category-choice'),
+      account: document.getElementById('account-choice')
+    };
+    const pickerPopover = document.getElementById('picker-popover');
+
+    document.querySelectorAll('[data-picker]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const kind = button.dataset.picker;
+        pickerPopover.innerHTML = '';
+        pickerOptions[kind].forEach((option) => {
+          const choice = document.createElement('button');
+          choice.type = 'button';
+          choice.textContent = option;
+          choice.addEventListener('click', () => {
+            pickerTargets[kind].textContent = option;
+            pickerPopover.classList.remove('open');
+          });
+          pickerPopover.appendChild(choice);
+        });
+        pickerPopover.classList.add('open');
+      });
+    });
+
+    const swipeControl = document.getElementById('swipe-control');
+    const swipeThumb = document.getElementById('swipe-thumb');
+    const saveToast = document.getElementById('save-toast');
+    let dragging = false;
+    let dragStart = 0;
+    let dragOffset = 0;
+
+    function maxSwipe() { return swipeControl.clientWidth - swipeThumb.clientWidth - 8; }
+    function setSwipe(value, animated = false) {
+      dragOffset = Math.max(0, Math.min(maxSwipe(), value));
+      swipeThumb.style.transitionDuration = animated ? '180ms' : '0ms';
+      swipeThumb.style.transform = `translateX(${dragOffset}px)`;
+    }
+
+    function completeSave() {
+      setSwipe(maxSwipe(), true);
+      const category = document.getElementById('category-choice').textContent;
+      saveToast.textContent = `Saved to ${category}`;
+      saveToast.classList.add('show');
+      setTimeout(() => {
+        saveToast.classList.remove('show');
+        amount = '';
+        renderAmount();
+        setSwipe(0, true);
+      }, 900);
+    }
+
+    swipeThumb.addEventListener('pointerdown', (event) => {
+      dragging = true;
+      dragStart = event.clientX - dragOffset;
+      swipeThumb.setPointerCapture(event.pointerId);
+    });
+    swipeThumb.addEventListener('pointermove', (event) => {
+      if (dragging) setSwipe(event.clientX - dragStart);
+    });
+    swipeThumb.addEventListener('pointerup', () => {
+      dragging = false;
+      if (dragOffset > maxSwipe() * 0.78) completeSave();
+      else setSwipe(0, true);
+    });
+    swipeThumb.addEventListener('click', (event) => {
+      if (event.detail === 0) completeSave();
+    });
+    swipeThumb.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        completeSave();
+      }
+    });
+
+    const requestedView = new URLSearchParams(window.location.search).get('view');
+    if (requestedView === 'add') showView('add');
+    refreshIcons();
+  </script>
+</body>
+</html>

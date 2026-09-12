@@ -26,6 +26,7 @@ type RebalanceSheetProps = {
 type MonthContext = "past" | "current" | "future";
 type Transfer = { fromId: string; toId: string; amount: number };
 type TopUp = { id: string; amount: number };
+type Release = { id: string; amount: number };
 
 function getMonthContext(homeMonth: string): MonthContext {
   const current = new Date().toISOString().slice(0, 7);
@@ -51,10 +52,10 @@ function formatMonth(ym: string) {
  * leftover is money pulled in from the unallocated pool rather than moved
  * between categories, so it's reported separately as `topUps`.
  */
-function computeTransfersAndTopUps(
+export function computeRebalanceOperations(
   funded: { id: string; original: number }[],
   allocations: Record<string, number>,
-): { transfers: Transfer[]; topUps: TopUp[] } {
+): { transfers: Transfer[]; topUps: TopUp[]; releases: Release[] } {
   const sources: { id: string; rem: number }[] = [];
   const dests: { id: string; rem: number }[] = [];
 
@@ -82,7 +83,12 @@ function computeTransfersAndTopUps(
     if (dests[k].rem >= 1) topUps.push({ id: dests[k].id, amount: Math.round(dests[k].rem) });
   }
 
-  return { transfers, topUps };
+  const releases: Release[] = [];
+  for (let k = si; k < sources.length; k++) {
+    if (sources[k].rem >= 1) releases.push({ id: sources[k].id, amount: Math.round(sources[k].rem) });
+  }
+
+  return { transfers, topUps, releases };
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -204,8 +210,8 @@ export function RebalanceSheet({
     [budgetScope, visibleItems, catById, allocations],
   );
 
-  const { transfers: liveTransfers, topUps: liveTopUps } = useMemo(
-    () => computeTransfersAndTopUps(allItems, allocations),
+  const { transfers: liveTransfers, topUps: liveTopUps, releases: liveReleases } = useMemo(
+    () => computeRebalanceOperations(allItems, allocations),
     [allItems, allocations],
   );
 
@@ -224,8 +230,13 @@ export function RebalanceSheet({
       if (!to) continue;
       rows.push({ key: `u-${tu.id}`, fromLabel: "Unallocated", fromIcon: null, toLabel: to.name, toIcon: to.icon, amount: tu.amount });
     }
+    for (const release of liveReleases) {
+      const from = catById.get(release.id);
+      if (!from) continue;
+      rows.push({ key: `r-${release.id}`, fromLabel: from.name, fromIcon: from.icon, toLabel: "Unallocated", toIcon: null, amount: release.amount });
+    }
     return rows;
-  }, [liveTransfers, liveTopUps, catById]);
+  }, [liveTransfers, liveTopUps, liveReleases, catById]);
 
   const unallocatedHint = unallocatedForGroup > 0 ? (
     <div style={unallocatedHintStyle}>
@@ -294,7 +305,7 @@ export function RebalanceSheet({
       metaLabel="Before"
       rebalanceMode
       onSave={async () => {
-        if (liveTransfers.length === 0 && liveTopUps.length === 0) return;
+        if (liveTransfers.length === 0 && liveTopUps.length === 0 && liveReleases.length === 0) return;
         const date = today();
         await Promise.all([
           ...liveTransfers.map((t) =>
@@ -319,7 +330,7 @@ export function RebalanceSheet({
           // so they're funded directly (bump this month's Planned) instead of transferred.
           ...liveTopUps.map((tu) => {
             const cat = catById.get(tu.id);
-            const nextPlanned = Math.max(0, (cat?.planned ?? 0) + tu.amount);
+            const nextPlanned = Math.max(0, (plannedByCategory.get(tu.id) ?? cat?.planned ?? 0) + tu.amount);
             return fetch("/api/monthly-planning/funds", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -333,6 +344,28 @@ export function RebalanceSheet({
               if (!r.ok) {
                 const d = await r.json();
                 throw new Error(d.error ?? "Failed to fund category");
+              }
+            });
+          }),
+          // A reduction with no destination releases money back to the
+          // unallocated pool by lowering this month's planned funding.
+          ...liveReleases.map((release) => {
+            const cat = catById.get(release.id);
+            const nextPlanned = Math.max(0, (plannedByCategory.get(release.id) ?? cat?.planned ?? 0) - release.amount);
+            return fetch("/api/monthly-planning/funds", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                month: homeMonth,
+                categoryId: release.id,
+                planned: nextPlanned,
+                accountId: cat?.defaultAccount ?? null,
+                mode: "set",
+              }),
+            }).then(async (r) => {
+              if (!r.ok) {
+                const d = await r.json();
+                throw new Error(d.error ?? "Failed to release category funds");
               }
             });
           }),

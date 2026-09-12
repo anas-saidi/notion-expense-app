@@ -216,6 +216,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         <section style={formSectionStyle}>
           <input
             id="transaction-description"
+            className="composer-text-input"
             type="text"
             aria-label="Transaction description"
             value={props.name}

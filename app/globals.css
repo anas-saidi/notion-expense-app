@@ -53,6 +53,7 @@
   --text: #0e0f0c;
   --text2: #454745;
   --muted: #6e6e6d;
+  --focus-ring: color-mix(in srgb, var(--text) 62%, transparent);
   --danger: #d03238;
   --success: #054d28;
   --radius-control: 12px;
@@ -534,9 +535,21 @@ button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 82%, 
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 82%, var(--text));
+  outline: none;
+}
+
+html[data-input-modality="keyboard"] input:focus-visible,
+html[data-input-modality="keyboard"] select:focus-visible,
+html[data-input-modality="keyboard"] textarea:focus-visible {
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
-  border-color: var(--accent);
+  border-color: var(--border2);
+}
+
+html[data-input-modality="keyboard"] .amount-hero-input:focus-visible,
+html[data-input-modality="keyboard"] .composer-text-input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 -3px 0 var(--focus-ring);
 }
 
 html {
@@ -1241,6 +1254,21 @@ button:hover .rebalance-btn-icon {
   outline-offset: -3px;
 }
 
+.settings-navigation-row:hover {
+  color: var(--text2) !important;
+}
+
+.settings-navigation-row:active {
+  transform: none;
+  color: var(--muted) !important;
+}
+
+.settings-navigation-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-control);
+}
+
 @media (max-width: 600px) {
   .home-recent-header {
     margin-bottom: 14px !important;
@@ -1484,17 +1512,9 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
 
 .app-nav-add {
   pointer-events: auto;
-  width: 98px !important;
+  width: 58px !important;
   height: 58px !important;
-  border-radius: 999px !important;
-  gap: 6px;
-}
-
-.app-nav-add-label {
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 750;
-  letter-spacing: -0.01em;
+  border-radius: 50% !important;
 }
 
 .home-category-list {
@@ -1673,11 +1693,10 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
   .app-nav-add {
     position: absolute;
     left: 20px;
-    right: 20px;
     bottom: calc(24px + env(safe-area-inset-bottom));
-    width: auto !important;
+    width: 52px !important;
     height: 52px !important;
-    border-radius: 18px !important;
+    border-radius: 50% !important;
   }
   .planning-content {
     max-width: 720px;
@@ -1817,11 +1836,6 @@ button[aria-label^="Close" i]:focus-visible {
     align-items: center;
     gap: 16px;
     flex-shrink: 0;
-  }
-
-  /* Constrain month nav width so space-between stays compact in the flex row */
-  .insights-month-nav {
-    min-width: 180px;
   }
 
   /* Cards: auto-fit columns — 3 cards → 3 cols, 2 cards → 2 cols */
@@ -2069,10 +2083,13 @@ button[aria-label^="Close" i]:focus-visible {
 .date-calendar button { min-height: 44px; min-width: 36px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text); cursor: pointer; }
 .date-month { margin: 0 0 4px; font-size: 14px; }
 .date-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 2px; text-align: center; }
+.month-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; text-align: center; }
 .date-grid > span { color: var(--muted); font-size: 12px; padding: 4px 0; }
 .date-grid button[aria-current="date"] { background: var(--accent-dim); color: var(--accent-ink); font-weight: 700; }
+.month-grid button[aria-current="date"] { box-shadow: inset 0 0 0 2px var(--accent-foreground); color: var(--accent-foreground); font-weight: 700; }
 .date-calendar button[aria-pressed="true"] { background: var(--text); color: var(--bg); font-weight: 700; }
 .date-grid button[aria-current="date"][aria-pressed="true"] { background: var(--accent-foreground); color: var(--bg); }
+.month-grid button[aria-current="date"][aria-pressed="true"] { background: var(--accent-foreground); color: var(--bg); box-shadow: none; }
 .date-calendar button:disabled { opacity: .35; cursor: default; }
 .transaction-type { min-width: 112px; height: 40px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 650; cursor: pointer; transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease; }
 .transaction-type[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--elevation-card); }

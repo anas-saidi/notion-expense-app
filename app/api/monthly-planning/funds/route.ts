@@ -107,10 +107,11 @@ export async function POST(req: NextRequest) {
   const categoryId = String(body.categoryId);
   const accountId = body.accountId ? String(body.accountId) : null;
   const shouldIncrement = body.mode === "increment" || body.increment === true;
+  const shouldSet = body.mode === "set";
   // mode:"add" always creates a new "Additional" record — preserves the original Monthly plan
   const shouldAdd = body.mode === "add";
 
-  if (planned <= 0 && !shouldIncrement) {
+  if ((planned < 0 || planned === 0) && !shouldIncrement && !shouldSet) {
     return NextResponse.json({ fund: null, mode: "skipped" });
   }
 

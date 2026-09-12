@@ -56,6 +56,23 @@ export function AppShell({
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const useKeyboardModality = (event: KeyboardEvent) => {
+      if (event.key === "Tab") root.dataset.inputModality = "keyboard";
+    };
+    const usePointerModality = () => {
+      root.dataset.inputModality = "pointer";
+    };
+    window.addEventListener("keydown", useKeyboardModality, true);
+    window.addEventListener("pointerdown", usePointerModality, true);
+    return () => {
+      window.removeEventListener("keydown", useKeyboardModality, true);
+      window.removeEventListener("pointerdown", usePointerModality, true);
+      delete root.dataset.inputModality;
+    };
+  }, []);
+
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content) return;
@@ -136,7 +153,6 @@ export function AppShell({
               }}
             >
               <PlusIcon size={22} strokeWidth={2.5} />
-              <span className="app-nav-add-label">Add</span>
             </button>
           )}
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, PlusIcon, FreezeIcon, XIcon, TransferIcon } from "./ui/icons";
+import { FundIcon, FreezeIcon, XIcon, TransferIcon, ArrowUpIcon, CalendarRangeIcon } from "./ui/icons";
 import type { Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -133,40 +133,36 @@ export function CategoryDetailsSheet({
             <h2 style={titleStyle}>{details?.name ?? category.name}</h2>
           </div>
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            {onFreeze && (
-              <button onClick={onFreeze} aria-label="Freeze category" style={headerIconBtnStyle}>
-                <FreezeIcon size={16} strokeWidth={2} />
-              </button>
-            )}
             <button className="sheet-close-button" onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
               <XIcon strokeWidth={2.2} />
             </button>
           </div>
         </header>
 
-        {/* ── Stats + bar ── */}
+        {/* ── Budget summary ── */}
         <section style={statsWrapStyle}>
-          <div style={spotlightStyle}>
-            <div style={statItemStyle}>
-              <span style={statLabelStyle}>Available</span>
-              <span style={statValueStyle}><Money value={available} /></span>
+          <div style={availableStyle}>
+            <span style={statLabelStyle}>Available</span>
+            <span style={availableValueStyle}><Money value={available} /></span>
+          </div>
+          <div style={supportingStatsStyle}>
+            <div style={supportingStatStyle}>
+              <span style={supportingLabelStyle}>Planned</span>
+              <span style={supportingValueStyle}><Money value={planned} /></span>
             </div>
-            <div style={statDividerStyle} />
-            <div style={statItemStyle}>
-              <span style={statLabelStyle}>Planned</span>
-              <span style={statValueStyle}><Money value={planned} /></span>
-            </div>
-            <div style={statDividerStyle} />
-            <div style={statItemStyle}>
-              <span style={statLabelStyle}>Spent</span>
-              <span style={{ ...statValueStyle, color: spentPct >= 100 ? "var(--danger)" : spentPct >= 85 ? "var(--warning)" : "var(--text2)" }}>
+            <div style={supportingStatStyle}>
+              <span style={supportingLabelStyle}>Spent</span>
+              <span style={{ ...supportingValueStyle, color: spentPct >= 100 ? "var(--danger)" : spentPct >= 85 ? "var(--warning)" : "var(--text2)" }}>
                 <Money value={spent} />
               </span>
             </div>
           </div>
-          {planned > 0 && (
-            <div style={progressRailStyle} role="progressbar" aria-label="Budget spent" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(spentPct)}>
-              <div style={{ ...progressFillStyle, transform: `scaleX(${spentPct / 100})` }} />
+          {planned > 0 && spent > 0 && (
+            <div style={progressGroupStyle}>
+              <span style={progressLabelStyle}>{Math.round(spentPct)}% of plan used</span>
+              <div style={progressRailStyle} role="progressbar" aria-label="Budget spent" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(spentPct)}>
+                <div style={{ ...progressFillStyle, transform: `scaleX(${spentPct / 100})` }} />
+              </div>
             </div>
           )}
         </section>
@@ -174,28 +170,41 @@ export function CategoryDetailsSheet({
         {/* ── Actions ── */}
         <div style={actionsRowStyle}>
           <ActionBtn
-            icon={<PlusIcon size={18} strokeWidth={2.2} />}
-            label="Add expense"
+            icon={<ArrowUpIcon size={17} strokeWidth={2.2} style={{ color: "var(--danger)" }} />}
+            label="Expense"
             ariaLabel="Add expense"
             bg="var(--text)"
             ink="var(--bg)"
+            border="1px solid transparent"
             onClick={onOpenAdd}
           />
           <ActionBtn
             icon={<FundIcon size={18} strokeWidth={2.2} />}
             label="Fund"
             ariaLabel="Fund category"
-            bg="var(--surface2)"
+            bg="var(--surface)"
             ink="var(--text2)"
+            border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
             onClick={onOpenFund}
           />
+          {onFreeze && (
+            <ActionBtn
+              icon={<FreezeIcon size={17} strokeWidth={2} />}
+              label="Freeze"
+              ariaLabel="Freeze category"
+              bg="transparent"
+              ink="var(--muted)"
+              border="1px solid transparent"
+              onClick={onFreeze}
+            />
+          )}
         </div>
 
         {/* ── Activity ── */}
         <section style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={sectionLabelStyle}>Activity</span>
-            <MonthPicker value={activeMonth} max={todayMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} style={monthFilterStyle} />
+            <MonthPicker value={activeMonth} max={todayMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} align="right" triggerIcon={<CalendarRangeIcon size={16} aria-hidden="true" />} triggerClassName="composer-picker-chip" showChevron={false} />
           </div>
 
           {loading && (
@@ -258,6 +267,7 @@ function ActionBtn({
   onClick,
   bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
   ink = "var(--text2)",
+  border = "1px solid transparent",
 }: {
   icon: React.ReactNode;
   label: string;
@@ -265,13 +275,14 @@ function ActionBtn({
   onClick: () => void;
   bg?: string;
   ink?: string;
+  border?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      style={{ ...actionBtnStyle, background: bg, color: ink }}
+      style={{ ...actionBtnStyle, background: bg, color: ink, border }}
     >
       <span style={actionIconStyle}>{icon}</span>
       <span>{label}</span>
@@ -355,29 +366,66 @@ const titleStyle: CSSProperties = {
 
 const statsWrapStyle: CSSProperties = {
   display: "grid",
-  gap: 10,
+  justifyItems: "center",
+  gap: 14,
+  padding: "4px 0 2px",
 };
 
-const spotlightStyle: CSSProperties = {
+const availableStyle: CSSProperties = {
+  display: "grid",
+  justifyItems: "center",
+  gap: 5,
+};
+
+const availableValueStyle: CSSProperties = {
+  fontSize: 34,
+  fontWeight: 500,
+  lineHeight: 1,
+  color: "var(--text)",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const supportingStatsStyle: CSSProperties = {
   display: "flex",
-  alignItems: "stretch",
-  padding: "4px 0",
+  justifyContent: "center",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: "8px 24px",
 };
 
-const statItemStyle: CSSProperties = {
-  flex: 1,
+const supportingStatStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "baseline",
+  gap: 6,
+};
+
+const supportingLabelStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 500,
+  color: "var(--muted)",
+};
+
+const supportingValueStyle: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 600,
+  lineHeight: 1,
+  color: "var(--text2)",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const progressGroupStyle: CSSProperties = {
+  width: "min(100%, 320px)",
   display: "flex",
   flexDirection: "column",
-  alignItems: "center",
-  gap: 3,
-  padding: "0 8px",
+  gap: 6,
 };
 
-const statDividerStyle: CSSProperties = {
-  width: 1,
-  background: "var(--border)",
-  flexShrink: 0,
-  margin: "4px 0",
+const progressLabelStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 500,
+  color: "var(--muted)",
+  textAlign: "center",
+  fontVariantNumeric: "tabular-nums",
 };
 
 const statLabelStyle: CSSProperties = {
@@ -386,14 +434,6 @@ const statLabelStyle: CSSProperties = {
   letterSpacing: 0.5,
   textTransform: "uppercase",
   color: "var(--muted)",
-};
-
-const statValueStyle: CSSProperties = {
-  fontSize: 17,
-  fontWeight: 600,
-  lineHeight: 1,
-  color: "var(--text2)",
-  fontVariantNumeric: "tabular-nums",
 };
 
 const progressRailStyle: CSSProperties = {
@@ -416,16 +456,18 @@ const progressFillStyle: CSSProperties = {
 /* Actions */
 
 const actionsRowStyle: CSSProperties = {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   alignItems: "center",
   gap: 8,
 };
 
 const actionBtnStyle: CSSProperties = {
   minHeight: 44,
-  padding: "0 14px",
+  width: "100%",
+  minWidth: 0,
+  padding: "0 8px",
   borderRadius: "var(--radius-control)",
-  border: "none",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
@@ -445,20 +487,6 @@ const actionIconStyle: CSSProperties = {
   justifyContent: "center",
 };
 
-const headerIconBtnStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
-  borderRadius: "50%",
-  background: "var(--surface2)",
-  color: "var(--muted)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
-
 /* Activity */
 
 const sectionLabelStyle: CSSProperties = {
@@ -473,19 +501,4 @@ const panelMessageStyle: CSSProperties = {
   padding: "10px 0",
   color: "var(--muted)",
   fontSize: 13,
-};
-
-/* Month nav */
-
-const monthFilterStyle: CSSProperties = {
-  position: "relative",
-  minHeight: 44,
-  padding: "0 10px",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  background: "var(--surface2)",
-  borderRadius: "var(--radius-control)",
-  color: "var(--text2)",
-  cursor: "pointer",
 };
