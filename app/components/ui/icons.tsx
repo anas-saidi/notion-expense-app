@@ -46,6 +46,9 @@ import {
   ChartPie,
   Settings,
   Delete,
+  MoreHorizontal,
+  ReceiptText,
+  WalletCards,
   type LucideProps,
 } from "lucide-react";
 
@@ -82,6 +85,9 @@ export const LandmarkIcon     = (p: LucideProps) => <Landmark      size={S} {...
 export const UserIcon         = (p: LucideProps) => <User          size={S} {...p} />;
 export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
 export const DeleteIcon       = (p: LucideProps) => <Delete        size={S} {...p} />;
+export const MoreIcon         = (p: LucideProps) => <MoreHorizontal size={S} {...p} />;
+export const ReceiptIcon      = (p: LucideProps) => <ReceiptText    size={S} {...p} />;
+export const WalletIcon       = (p: LucideProps) => <WalletCards    size={S} {...p} />;
 export const TrendingUpIcon      = (p: LucideProps) => <TrendingUp    size={S} {...p} />;
 export const AlertTriangleIcon   = (p: LucideProps) => <TriangleAlert size={S} {...p} />;
 export const MoonIcon            = (p: LucideProps) => <Moon          size={S} {...p} />;

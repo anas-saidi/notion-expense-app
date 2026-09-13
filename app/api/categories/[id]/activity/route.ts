@@ -205,12 +205,16 @@ export async function GET(
       name: titleText(categoryPage, "Category") || "Unnamed",
       icon: categoryPage.icon?.emoji ?? null,
     };
+    const fundedTotal = (fundsData.results ?? []).reduce(
+      (sum: number, page: NotionPage) => sum + Number(page.properties.Planned?.number ?? 0),
+      0,
+    );
 
     const summaryCategory = {
       id: category.id,
       name: category.name,
       icon: category.icon,
-      planned: categoryPage.properties.Planned?.number ?? null,
+      planned: fundedTotal,
       available:
         categoryPage.properties.Available?.formula?.number
         ?? categoryPage.properties.Available?.number
@@ -315,12 +319,12 @@ export async function GET(
 
     const summary = {
       month,
-      fundedTotal: fundedEvents.reduce((sum, item) => sum + item.amount, 0),
+      fundedTotal,
       movedInTotal: transferInEvents.reduce((sum, item) => sum + item.amount, 0),
       movedOutTotal: transferOutEvents.reduce((sum, item) => sum + item.amount, 0),
       spentTotal: expenseEvents.reduce((sum, item) => sum + item.amount, 0),
       netFlow:
-        fundedEvents.reduce((sum, item) => sum + item.amount, 0)
+        fundedTotal
         + transferInEvents.reduce((sum, item) => sum + item.amount, 0)
         - transferOutEvents.reduce((sum, item) => sum + item.amount, 0)
         - expenseEvents.reduce((sum, item) => sum + item.amount, 0),

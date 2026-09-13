@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, FreezeIcon, XIcon, TransferIcon, ArrowUpIcon, CalendarRangeIcon } from "./ui/icons";
-import type { Category } from "./app-types";
+import { FundIcon, FreezeIcon, XIcon, TransferIcon, CalendarRangeIcon, ScaleIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
+import type { Account, Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { TransactionRow } from "./ui/TransactionRow";
 import { MonthPicker } from "./DatePicker";
+import { FundTransactionSheet, type EditableFundTransaction } from "./FundTransactionSheet";
+import { CategoryAvailableSheet } from "./CategoryAvailableSheet";
+import { PickerPopover } from "./PickerPopover";
 
 type TimelineItem = {
   id: string;
@@ -18,6 +21,8 @@ type TimelineItem = {
   title: string;
   subtitle?: string;
   accountName?: string | null;
+  accountId?: string | null;
+  assignmentType?: "Monthly" | "Additional" | "Top-up" | null;
   relatedCategoryName?: string | null;
 };
 
@@ -45,25 +50,37 @@ type CategoryDetailsSheetProps = {
   open: boolean;
   category: Category | null;
   month: string;
+  accounts: Account[];
   onClose: () => void;
   onOpenAdd: () => void;
   onOpenFund: () => void;
   onFreeze?: () => void;
+  onUnfreeze?: () => void;
+  onTransactionsChanged?: () => void | Promise<void>;
 };
 
 export function CategoryDetailsSheet({
   open,
   category,
   month,
+  accounts,
   onClose,
   onOpenAdd,
   onOpenFund,
   onFreeze,
+  onUnfreeze,
+  onTransactionsChanged,
 }: CategoryDetailsSheetProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CategoryActivityPayload | null>(null);
   const [activeMonth, setActiveMonth] = useState<string>(month);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [editingFund, setEditingFund] = useState<EditableFundTransaction | null>(null);
+  const [adjustingAvailable, setAdjustingAvailable] = useState(false);
+  const [showMoreActions, setShowMoreActions] = useState(false);
+  const [confirmingFreeze, setConfirmingFreeze] = useState(false);
+  const moreActionsRef = useRef<HTMLDivElement>(null);
 
   // When the sheet opens or the external month changes, reset to that month
   useEffect(() => {
@@ -96,7 +113,7 @@ export function CategoryDetailsSheet({
       });
 
     return () => { cancelled = true; };
-  }, [open, category?.id, activeMonth]);
+  }, [open, category?.id, activeMonth, refreshKey]);
 
   const details = data?.category;
 
@@ -152,7 +169,7 @@ export function CategoryDetailsSheet({
             </div>
             <div style={supportingStatStyle}>
               <span style={supportingLabelStyle}>Spent</span>
-              <span style={{ ...supportingValueStyle, color: spentPct >= 100 ? "var(--danger)" : spentPct >= 85 ? "var(--warning)" : "var(--text2)" }}>
+              <span style={{ ...supportingValueStyle, color: "var(--danger)" }}>
                 <Money value={spent} />
               </span>
             </div>
@@ -170,7 +187,7 @@ export function CategoryDetailsSheet({
         {/* ── Actions ── */}
         <div style={actionsRowStyle}>
           <ActionBtn
-            icon={<ArrowUpIcon size={17} strokeWidth={2.2} style={{ color: "var(--danger)" }} />}
+            icon={<ReceiptIcon size={17} strokeWidth={2} />}
             label="Expense"
             ariaLabel="Add expense"
             bg="var(--text)"
@@ -179,7 +196,7 @@ export function CategoryDetailsSheet({
             onClick={onOpenAdd}
           />
           <ActionBtn
-            icon={<FundIcon size={18} strokeWidth={2.2} />}
+            icon={<WalletIcon size={18} strokeWidth={2} />}
             label="Fund"
             ariaLabel="Fund category"
             bg="var(--surface)"
@@ -187,17 +204,16 @@ export function CategoryDetailsSheet({
             border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
             onClick={onOpenFund}
           />
-          {onFreeze && (
-            <ActionBtn
-              icon={<FreezeIcon size={17} strokeWidth={2} />}
-              label="Freeze"
-              ariaLabel="Freeze category"
-              bg="transparent"
-              ink="var(--muted)"
-              border="1px solid transparent"
-              onClick={onFreeze}
-            />
-          )}
+          <div ref={moreActionsRef} style={{ position: "relative", minWidth: 0 }}>
+            <ActionBtn icon={<MoreIcon size={18} />} label="More" ariaLabel="More category actions" bg="transparent" ink="var(--muted)" border="1px solid transparent" onClick={() => setShowMoreActions(true)} />
+            <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} width="min(280px, calc(100vw - 32px))">
+              <div className="picker-options">
+                <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ScaleIcon size={17} />Adjust available</span></button>
+                {onFreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setConfirmingFreeze(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><FreezeIcon size={17} />Freeze category</span></button>}
+                {onUnfreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onUnfreeze(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ReviveIcon size={17} />Unfreeze category</span></button>}
+              </div>
+            </PickerPopover>
+          </div>
         </div>
 
         {/* ── Activity ── */}
@@ -249,6 +265,7 @@ export function CategoryDetailsSheet({
                       : item.kind === "expense"
                         ? <CategoryIcon icon={category.icon} size={20} />
                         : <TransferIcon size={14} />}
+                    onClick={item.kind === "funded" ? () => setEditingFund({ ...item, categoryAvailable: available }) : undefined}
                   />
                 );
               })}
@@ -256,6 +273,35 @@ export function CategoryDetailsSheet({
           )}
         </section>
       </div>
+      <FundTransactionSheet
+        transaction={editingFund}
+        accounts={accounts}
+        onClose={() => setEditingFund(null)}
+        onChanged={async () => {
+          setRefreshKey((value) => value + 1);
+          await onTransactionsChanged?.();
+        }}
+      />
+      <CategoryAvailableSheet
+        open={adjustingAvailable}
+        category={category}
+        currentAvailable={available}
+        month={activeMonth}
+        accounts={accounts}
+        funds={(data?.timeline ?? []).filter((item) => item.kind === "funded").map((item) => ({ ...item, categoryAvailable: available }))}
+        onClose={() => setAdjustingAvailable(false)}
+        onChanged={async () => { setRefreshKey((value) => value + 1); await onTransactionsChanged?.(); }}
+      />
+      <BottomSheet open={confirmingFreeze} onClose={() => setConfirmingFreeze(false)} label="Confirm freeze category" detent="content" layered maxWidth="440px" zIndex={150} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+        <div style={confirmWrapStyle}>
+          <span style={confirmIconStyle}><FreezeIcon size={20} /></span>
+          <div style={{ display: "grid", gap: 6 }}><h2 style={confirmTitleStyle}>Freeze {category.name}?</h2><p style={confirmCopyStyle}>It will leave the active budget and move to Frozen. Existing activity and balances stay intact.</p></div>
+          <div style={confirmActionsStyle}>
+            <button type="button" onClick={() => setConfirmingFreeze(false)} style={confirmCancelStyle}>Cancel</button>
+            <button type="button" onClick={() => { setConfirmingFreeze(false); onFreeze?.(); }} style={confirmFreezeStyle}>Freeze category</button>
+          </div>
+        </div>
+      </BottomSheet>
     </BottomSheet>
   );
 }
@@ -478,6 +524,13 @@ const actionBtnStyle: CSSProperties = {
   fontWeight: 750,
   transition: "background 0.15s ease, color 0.15s ease",
 };
+const confirmWrapStyle: CSSProperties = { padding: "12px 20px calc(20px + env(safe-area-inset-bottom, 0px))", display: "grid", gap: 16 };
+const confirmIconStyle: CSSProperties = { width: 44, height: 44, borderRadius: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--surface2)", color: "var(--text2)" };
+const confirmTitleStyle: CSSProperties = { margin: 0, color: "var(--text)", fontSize: 20, lineHeight: 1.2 };
+const confirmCopyStyle: CSSProperties = { margin: 0, color: "var(--muted)", fontSize: 14, lineHeight: 1.45 };
+const confirmActionsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: 8 };
+const confirmCancelStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", font: "inherit", fontWeight: 700 };
+const confirmFreezeStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--text)", color: "var(--bg)", font: "inherit", fontWeight: 750 };
 
 const actionIconStyle: CSSProperties = {
   width: 22,

@@ -259,7 +259,7 @@ export function InsightsScreen({
       {assignedByCategory === null || transactionsLoading ? (
         <div className="skeleton" style={{ height: 84, borderRadius: 12 }} />
       ) : (
-        <NarrativeSummary burnRate={burnRate} totalPlanned={totalPlanned} />
+        <NarrativeSummary burnRate={burnRate} totalPlanned={totalPlanned} totalSpent={totalSpent} />
       )}
 
       {/* ── Transaction history — full width ── */}
@@ -344,9 +344,10 @@ export function InsightsScreen({
   );
 }
 
-function NarrativeSummary({ burnRate, totalPlanned }: {
+function NarrativeSummary({ burnRate, totalPlanned, totalSpent }: {
   burnRate: { spentPct: number; expectedPct: number; isAhead: boolean; isOver: boolean; gapPct: number; daysLeft: number; vsLastMonth: number | null };
   totalPlanned: number;
+  totalSpent: number;
 }) {
   if (totalPlanned <= 0) {
     return (
@@ -362,7 +363,7 @@ function NarrativeSummary({ burnRate, totalPlanned }: {
     <section aria-label="Monthly insight summary" style={narrativeSummaryStyle}>
       <span style={summaryLabelStyle}><ChartPieIcon size={16} />Summary</span>
       <span>
-        You’ve used <InlineMetric icon={<FlameIcon size={12} />} label={`${Math.round(burnRate.spentPct)}% of plan`} tone={burnRate.isOver ? "danger" : "accent"} /> of this month’s plan.
+        This month’s plan is <InlineMetric icon={<ChartPieIcon size={12} />} label={`${fmt(totalPlanned)} MAD`} tone="neutral" />. You’ve spent <InlineMetric icon={<FlameIcon size={12} />} label={`${fmt(totalSpent)} MAD · ${Math.round(burnRate.spentPct)}%`} tone={burnRate.isOver ? "danger" : "accent"} />.
         {comparison !== null && (
           <> Spending is <InlineMetric icon={comparison <= 0 ? <ArrowDownIcon size={12} /> : <ArrowUpIcon size={12} />} label={`${Math.abs(comparison)}% ${comparison <= 0 ? "lower" : "higher"}`} tone={comparison <= 0 ? "positive" : "warning"} /> than the prior period.</>
         )}
@@ -789,7 +790,7 @@ const summaryLabelStyle: CSSProperties = {
 const inlineMetricStyle = (tone: "neutral" | "accent" | "positive" | "warning" | "danger"): CSSProperties => {
   const color = tone === "danger" ? "var(--danger)"
     : tone === "warning" ? "var(--warning)"
-    : tone === "positive" || tone === "accent" ? "var(--accent-ink)"
+    : tone === "positive" || tone === "accent" ? "var(--accent-foreground)"
     : "var(--text2)";
   const background = tone === "danger" ? "color-mix(in srgb, var(--danger) 10%, transparent)"
     : tone === "warning" ? "color-mix(in srgb, var(--warning) 12%, transparent)"

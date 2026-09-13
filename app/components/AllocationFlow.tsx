@@ -11,6 +11,7 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
+import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
 import type { Account, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
 import { fmt, getLeftToAssignByScope } from "./app-utils";
 
@@ -22,14 +23,6 @@ export type AllocationGroup = {
   items: PlanningAllocationItem[];
   onChange: (items: PlanningAllocationItem[]) => void;
 };
-
-function getPracticalStep(span: number): number {
-  if (span <= 0) return 1;
-  const target = span / 24;
-  const magnitude = 10 ** Math.floor(Math.log10(target));
-  const candidates = [1, 2, 2.5, 5, 10].map(value => value * magnitude);
-  return Math.max(1, Math.round(candidates.reduce((best, value) => Math.abs(value - target) < Math.abs(best - target) ? value : best)));
-}
 
 type AllocationFlowProps = {
   open: boolean;
@@ -172,18 +165,6 @@ export function AllocationFlow({
   // Range math
   const rangeMin = activeItem ? getSpentFloor(activeItem) : 0;
   const rangeMax = activeItem ? Math.max(rangeMin, activeItem.amount + Math.max(0, leftToAssign)) : 0;
-  const rangeStops = useMemo(() => {
-    const span = Math.max(0, rangeMax - rangeMin);
-    if (span === 0) return [rangeMin];
-    const step = getPracticalStep(span);
-    const stops = Array.from({ length: Math.floor(span / step) + 1 }, (_, index) => rangeMin + (index * step));
-    if (stops[stops.length - 1] !== rangeMax) stops.push(rangeMax);
-    return stops;
-  }, [rangeMin, rangeMax]);
-  const activeStopIndex = activeItem
-    ? rangeStops.reduce((best, stop, index) => Math.abs(stop - activeItem.amount) < Math.abs(rangeStops[best] - activeItem.amount) ? index : best, 0)
-    : 0;
-  const rangeStep = getPracticalStep(Math.max(0, rangeMax - rangeMin));
   const updateActiveAmount = (nextAmount: number) => {
     if (!activeItem) return;
     setHasInteracted(true);
@@ -377,26 +358,7 @@ export function AllocationFlow({
           </div>
 
           <div aria-label="Budget control" style={slimBarPanelStyle}>
-            <div className="planning-step-control" style={stepControlStyle}>
-              <div style={stepTicksStyle} aria-hidden="true">
-                {rangeStops.map((stop, index) => (
-                  <span key={`${stop}-${index}`} style={stepTickStyle(index === activeStopIndex, index < activeStopIndex)} />
-                ))}
-              </div>
-              <input
-                className="planning-dial-range"
-                type="range"
-                min={0}
-                max={Math.max(0, rangeStops.length - 1)}
-                step={1}
-                value={activeStopIndex}
-                disabled={readOnly}
-                onChange={(event) => updateActiveAmount(rangeStops[Number(event.target.value)] ?? rangeMin)}
-                aria-label={`Adjust planned amount for ${activeItem.name}`}
-                aria-valuetext={`${fmt(activeItem.amount)} MAD; ${fmt(rangeStep)} MAD per step`}
-                style={steppedRangeStyle}
-              />
-            </div>
+            <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
             {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
             {confirming && (
               <div role="status" style={confirmationStyle}>

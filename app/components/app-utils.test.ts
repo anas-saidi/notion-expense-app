@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { comparisonPeriods, expenseBalancePreview, fmt, isExpenseTransaction, resolveTransactionScopes } from "./app-utils";
+import { comparisonPeriods, expenseBalancePreview, fmt, getLeftToAssignByScope, isExpenseTransaction, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
 
 const accounts: Account[] = [
   { id: "joint", label: "Joined account", icon: "", type: null, balance: 900, readyToAssign: 0 },
@@ -13,6 +13,19 @@ const categories: Category[] = [
 ];
 
 describe("transaction scope", () => {
+  it("treats the current generic saving account as Anas personal", () => {
+    expect(scopeFromAccountLabel("Saving Account")).toBe("anas");
+  });
+
+  it("uses live contribution remaining instead of the stored joint due when provided", () => {
+    const scopedAccounts: Account[] = [
+      { id: "anas", label: "Hubby Account", icon: "", type: "Checking", balance: 12334, readyToAssign: 12334, jointDue: 12068 },
+      { id: "salma", label: "Wife Account", icon: "", type: "Checking", balance: 1000, readyToAssign: 1000, jointDue: 0 },
+    ];
+    expect(getLeftToAssignByScope(scopedAccounts).anas).toBe(266);
+    expect(getLeftToAssignByScope(scopedAccounts, { anas: 11072 }).anas).toBe(1262);
+  });
+
   it("uses category ownership first for expenses and includes uncategorized account expenses", () => {
     expect(resolveTransactionScopes({ id: "1", name: "x", amount: 1, date: "", category: "food", accountId: "anas", type: "Expense" }, categories, accounts)).toEqual(["joint"]);
     expect(resolveTransactionScopes({ id: "2", name: "x", amount: 1, date: "", category: null, accountId: "salma", type: "Expense" }, categories, accounts)).toEqual(["salma"]);

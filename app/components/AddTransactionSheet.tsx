@@ -52,6 +52,7 @@ type AddTransactionSheetProps = {
   onSelectAccount: (id: string) => void;
   onCatSearchChange: (value: string) => void;
   onSubmit: () => void;
+  onDelete?: () => Promise<boolean>;
   dateRef: RefObject<HTMLDivElement>;
   catRef: RefObject<HTMLDivElement>;
   accountRef: RefObject<HTMLDivElement>;
@@ -60,12 +61,16 @@ type AddTransactionSheetProps = {
 export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const [fundingSourceId, setFundingSourceId] = useState<string | null>(null);
   const [showFundPicker, setShowFundPicker] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fundPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!props.open) {
       setShowFundPicker(false);
       setFundingSourceId(null);
+      setConfirmingDelete(false);
+      setDeleting(false);
     }
   }, [props.open]);
 
@@ -168,7 +173,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
         {/* ── Amount hero ── */}
         <section style={heroWrapStyle}>
-          <span style={currencyLabelStyle}>MAD</span>
           <div className="amount-hero-sizer" data-value={props.amount || "0"} style={{ width: "100%" }}>
             <input
               type="text"
@@ -201,12 +205,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             />
           </div>
           {isExpression(props.amount) && (
-            <p style={exprPreviewStyle}>
+            <p style={{ ...exprPreviewStyle, color: isIncome ? "var(--action-income)" : "var(--danger)" }}>
               = {fmt(evalExpr(props.amount))} MAD
             </p>
           )}
           {visibleBalance !== null && props.amount.trim() !== "" && (
-            <p style={{ ...heroCopyStyle, color: visibleBalance >= 0 ? "var(--success)" : "var(--danger)" }}>
+            <p style={{ ...heroCopyStyle, color: isIncome && visibleBalance >= 0 ? "var(--action-income)" : "var(--danger)" }}>
               Balance after: <Money value={visibleBalance} />
             </p>
           )}
@@ -225,11 +229,14 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             placeholder={isIncome ? "Where did it come from?" : "What was it for?"}
             style={{
               width: "100%",
+              minHeight: 56,
+              boxSizing: "border-box",
+              marginTop: 8,
               background: "transparent",
               border: "none",
-              padding: "8px 0 14px",
+              padding: "0 16px",
               color: "var(--text2)",
-              fontSize: 16,
+              fontSize: 18,
               lineHeight: 1.25,
               fontWeight: 400,
               textAlign: "center",
@@ -452,7 +459,19 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>
           )}
 
-          {/* Save button */}
+          {/* Edit actions / Save button */}
+          <div style={footerActionsStyle}>
+          {isEditMode && props.onDelete && (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={props.status === "saving"}
+              style={deleteActionStyle}
+            >
+              <DeleteIcon size={16} />
+              Delete
+            </button>
+          )}
           <button
             onClick={props.onSubmit}
             disabled={!props.canSubmit}
@@ -465,6 +484,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             className="pressable cta-save"
             style={{
               width: "100%",
+              flex: isEditMode ? "1.5 1 0" : undefined,
               minHeight: 52,
               borderRadius: 14,
               border: "none",
@@ -497,9 +517,47 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
             )}
           </button>
+          </div>
 
         </section>
       </div>
+
+      {confirmingDelete && props.onDelete && (
+        <BottomSheet
+          open
+          onClose={() => !deleting && setConfirmingDelete(false)}
+          label="Confirm delete expense"
+          detent="content"
+          layered
+          maxWidth="440px"
+          zIndex={150}
+          panelStyle={confirmPanelStyle}
+        >
+          <div style={confirmContentStyle}>
+            <div style={confirmIconStyle}><DeleteIcon size={20} /></div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <h2 style={confirmTitleStyle}>Delete this expense?</h2>
+              <p style={confirmCopyStyle}>It will be removed from activity and budget totals. You can undo immediately afterward.</p>
+            </div>
+            <div style={confirmActionsStyle}>
+              <button type="button" onClick={() => setConfirmingDelete(false)} disabled={deleting} style={cancelDeleteStyle}>Cancel</button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true);
+                  const deleted = await props.onDelete!();
+                  setDeleting(false);
+                  if (deleted) props.onClose();
+                }}
+                style={confirmDeleteStyle}
+              >
+                {deleting ? "Deleting…" : "Delete expense"}
+              </button>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
     </BottomSheet>
   );
 }
@@ -532,6 +590,57 @@ const formSectionStyle: CSSProperties = {
   flexDirection: "column",
   gap: 10,
 };
+
+const footerActionsStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "stretch",
+  gap: 10,
+};
+
+const deleteActionStyle: CSSProperties = {
+  minHeight: 52,
+  flex: "0.85 1 0",
+  padding: "0 14px",
+  border: 0,
+  borderRadius: 14,
+  background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
+  color: "var(--danger)",
+  fontSize: 14,
+  fontWeight: 700,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 7,
+};
+
+const confirmPanelStyle: CSSProperties = {
+  borderRadius: "var(--radius-sheet)",
+  background: "var(--surface)",
+};
+
+const confirmContentStyle: CSSProperties = {
+  padding: "12px 20px 22px",
+  display: "grid",
+  gap: 18,
+};
+
+const confirmIconStyle: CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: 14,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "color-mix(in srgb, var(--danger) 10%, var(--surface))",
+  color: "var(--danger)",
+};
+
+const confirmTitleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: 1.2, color: "var(--text)" };
+const confirmCopyStyle: CSSProperties = { margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--text2)" };
+const confirmActionsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: 10 };
+const cancelDeleteStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: 14, background: "var(--surface2)", color: "var(--text2)", fontWeight: 700, cursor: "pointer" };
+const confirmDeleteStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: 14, background: "var(--danger)", color: "white", fontWeight: 750, cursor: "pointer" };
 
 const topBarStyle: CSSProperties = {
   display: "flex",
@@ -577,27 +686,14 @@ const closeButtonStyle: CSSProperties = {
 
 const heroWrapStyle: CSSProperties = {
   position: "relative",
-  flex: 1,
-  minHeight: 96,
+  flex: "0 0 auto",
+  minHeight: 240,
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
   gap: 6,
   justifyContent: "center",
   padding: "0 0 8px",
-};
-
-const currencyLabelStyle: CSSProperties = {
-  position: "absolute",
-  right: 4,
-  bottom: 14,
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  fontWeight: 600,
-  letterSpacing: 1.4,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  opacity: 0.6,
 };
 
 const heroCopyStyle: CSSProperties = {
@@ -777,8 +873,6 @@ const exprPreviewStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: 13,
   fontWeight: 500,
-  color: "var(--accent-ink)",
   letterSpacing: 0.2,
-  opacity: 0.8,
   animation: "fadeUp 0.15s ease both",
 };

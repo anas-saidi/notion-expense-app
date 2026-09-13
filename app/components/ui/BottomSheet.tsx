@@ -38,6 +38,8 @@ type BottomSheetProps = {
   align?: "bottom" | "center";
   /** Desktop only: fill the full viewport (width 100vw, height 100dvh, no border-radius). */
   desktopFullscreen?: boolean;
+  /** Mobile modal presented above another sheet; preserves a small visible edge of the parent layer. */
+  layered?: boolean;
 };
 
 export function BottomSheet({
@@ -55,6 +57,8 @@ export function BottomSheet({
   backdropStrength = 0.16,
   align = "bottom",
   desktopFullscreen = false,
+  detent = "default",
+  layered = false,
 }: BottomSheetProps) {
   const [mounted, setMounted] = useState(false);
   const localPanelRef = useRef<HTMLDivElement>(null);
@@ -185,12 +189,13 @@ export function BottomSheet({
                 }
             : {
                 position: "fixed",
-                top: MOBILE_SHEET_TOP,
+                top: detent === "content" ? "auto" : layered ? "calc(var(--safe-top) + 88px)" : MOBILE_SHEET_TOP,
                 bottom: 0,
                 left: "50%",
                 x: "-50%",
                 width: `min(${maxWidth}, 90vw)`,
                 height: "auto",
+                maxHeight: `calc(100dvh - ${MOBILE_SHEET_TOP})`,
                 zIndex,
                 display: "flex",
                 flexDirection: "column",
@@ -209,7 +214,7 @@ export function BottomSheet({
           aria-labelledby={labelledBy}
           tabIndex={-1}
           style={{
-            flex: 1,
+            flex: detent === "content" ? "0 1 auto" : 1,
             minHeight: 0,
             display: "flex",
             flexDirection: "column",
@@ -244,7 +249,7 @@ export function BottomSheet({
 
           <div
             style={{
-              flex: 1,
+              flex: detent === "content" ? "0 1 auto" : 1,
               minHeight: 0,
               overflow: "auto",
               ...contentStyle,

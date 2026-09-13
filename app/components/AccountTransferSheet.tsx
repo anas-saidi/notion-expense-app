@@ -14,11 +14,14 @@ type AccountTransferSheetProps = {
   open: boolean;
   account: Account | null;
   accounts: Account[];
+  initialToAccountId?: string;
+  initialAmount?: number;
+  initialNote?: string;
   onClose: () => void;
   onSuccess: (message: string) => void;
 };
 
-export function AccountTransferSheet({ open, account, accounts, onClose, onSuccess }: AccountTransferSheetProps) {
+export function AccountTransferSheet({ open, account, accounts, initialToAccountId, initialAmount, initialNote, onClose, onSuccess }: AccountTransferSheetProps) {
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
   const [amount, setAmount] = useState("");
@@ -30,13 +33,16 @@ export function AccountTransferSheet({ open, account, accounts, onClose, onSucce
   useEffect(() => {
     if (!open) return;
     setFromAccountId(account?.id ?? accounts[0]?.id ?? "");
-    setToAccountId(accounts.find((entry) => entry.id !== account?.id)?.id ?? "");
-    setAmount("");
-    setNote("Account transfer");
+    const presetDestination = accounts.some((entry) => entry.id === initialToAccountId && entry.id !== account?.id)
+      ? initialToAccountId ?? ""
+      : accounts.find((entry) => entry.id !== account?.id)?.id ?? "";
+    setToAccountId(presetDestination);
+    setAmount(initialAmount != null && initialAmount > 0 ? String(Math.round(initialAmount * 100) / 100) : "");
+    setNote(initialNote ?? "Account transfer");
     setDate(today());
     setStatus("idle");
     setError("");
-  }, [account?.id, accounts, open]);
+  }, [account?.id, accounts, initialAmount, initialNote, initialToAccountId, open]);
 
   const fromAccount = useMemo(
     () => accounts.find((entry) => entry.id === fromAccountId) ?? null,

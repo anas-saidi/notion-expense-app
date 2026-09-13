@@ -202,6 +202,16 @@ export function AccountDetailsSheet({
     onClose();
   };
 
+  const closeReconcile = () => {
+    setShowReconcile(false);
+    setActualBalance("");
+    setReconcileStatus("idle");
+    setReconcileError("");
+    setShowAddTxn(false);
+    setAddedTxns([]);
+    setTxnError("");
+  };
+
   // All loaded transactions for this account (for recent activity list)
   const accountTxns = useMemo(() => {
     if (!account) return [];
@@ -564,21 +574,23 @@ export function AccountDetailsSheet({
           <ActionBtn
             icon={<ScaleIcon size={18} strokeWidth={2.2} />}
             ariaLabel="Reconcile balance"
-            bg={showReconcile
-              ? "color-mix(in srgb, var(--accent) 12%, var(--surface))"
-              : "color-mix(in srgb, var(--surface2) 54%, var(--surface))"}
-            ink={showReconcile ? "var(--accent-ink)" : "var(--text2)"}
-            onClick={() => setShowReconcile(v => !v)}
+            bg="color-mix(in srgb, var(--surface2) 54%, var(--surface))"
+            ink="var(--text2)"
+            onClick={() => setShowReconcile(true)}
           />
         </div>
 
         {/* Reconcile form */}
         {showReconcile && (
+          <BottomSheet open onClose={closeReconcile} label="Reconcile balance" detent="default" layered maxWidth="500px" zIndex={140} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
           <div style={reconcilePanelStyle}>
-            <p style={reconcileTitleStyle}>Reconcile balance</p>
-            <p style={reconcileHintStyle}>
-              Enter the real balance from your bank or statement.
-            </p>
+            <header style={reconcileHeaderStyle}>
+              <div style={{ display: "grid", gap: 5 }}>
+                <h2 style={reconcileTitleStyle}>Reconcile balance</h2>
+                <p style={reconcileHintStyle}>Enter the real balance from your bank or statement.</p>
+              </div>
+              <button type="button" className="sheet-close-button" onClick={closeReconcile} aria-label="Close reconciliation"><XIcon size={18} /></button>
+            </header>
             <div style={reconcileRowStyle}>
               <label style={reconcileFieldStyle}>
                 <span style={reconcileLabelStyle}>App balance</span>
@@ -757,6 +769,7 @@ export function AccountDetailsSheet({
                "Save reconciliation"}
             </button>
           </div>
+          </BottomSheet>
         )}
 
         {/* Category breakdown */}
@@ -1082,25 +1095,34 @@ const actionIconStyle: CSSProperties = {
 
 // Reconcile panel
 const reconcilePanelStyle: CSSProperties = {
-  padding: "16px 16px 18px",
-  borderRadius: 16,
-  background: "color-mix(in srgb, var(--surface2) 40%, var(--surface))",
-  border: "1px solid color-mix(in srgb, var(--border) 30%, transparent)",
-  display: "grid",
+  minHeight: "100%",
+  padding: "8px 20px 24px",
+  display: "flex",
+  flexDirection: "column",
   gap: 14,
 };
 
+const reconcileHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "start",
+  justifyContent: "space-between",
+  gap: 16,
+  marginBottom: 4,
+};
+
 const reconcileTitleStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 700,
-  color: "var(--text2)",
+  margin: 0,
+  fontSize: 20,
+  lineHeight: 1.2,
+  fontWeight: 750,
+  color: "var(--text)",
 };
 
 const reconcileHintStyle: CSSProperties = {
   fontSize: 12,
   color: "var(--muted)",
   lineHeight: 1.5,
-  marginTop: -6,
+  margin: 0,
 };
 
 const reconcileRowStyle: CSSProperties = {
@@ -1331,6 +1353,7 @@ const undoBtnStyle: CSSProperties = {
 const reconcileSubmitStyle: CSSProperties = {
   width: "100%",
   minHeight: 48,
+  marginTop: "auto",
   borderRadius: 14,
   border: "none",
   cursor: "pointer",

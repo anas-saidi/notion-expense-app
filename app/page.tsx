@@ -144,6 +144,7 @@ export default function App() {
   const [categoryManageDefaultType, setCategoryManageDefaultType] = useState<string | undefined>(undefined);
   const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
   const [transferAccount, setTransferAccount] = useState<Account | null>(null);
+  const [transferPreset, setTransferPreset] = useState<{ toAccountId: string; amount: number; note: string } | null>(null);
   const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
   const [homeSearch, setHomeSearch] = useState("");
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
@@ -424,7 +425,10 @@ export default function App() {
   // Refetch monthly summary whenever the viewed home month changes
   useEffect(() => {
     if (!initialLoadComplete.current) return;
-    fetchMonthlySummary(homeMonth); // eslint-disable-line react-hooks/exhaustive-deps
+    void fetchMonthlySummary(homeMonth).catch((error) => {
+      console.error("[app] Failed to refresh monthly summary:", error);
+      setRefreshState("stale");
+    }); // eslint-disable-line react-hooks/exhaustive-deps
   }, [homeMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -713,7 +717,6 @@ export default function App() {
   const plannerUsesFallbackData =
     !plannerSummaryReady || plannerMonth !== formatMonthInput(today());
 
-  const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(accounts), [accounts]);
   const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
   const jointUnassigned = useMemo(() => getJointAccountUnassigned(accounts), [accounts]);
   const savingPool = useMemo(
@@ -827,7 +830,7 @@ export default function App() {
     setShowMonthStartPlanner(true);
   };
 
-  const reviveCategory = async (category: Category) => {
+  const reviveCategory = async (category: Category, openFunding = true) => {
     try {
       const res = await fetch("/api/categories", {
         method: "PATCH",
@@ -837,8 +840,10 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to revive category");
       refreshBudgetData(`${category.name} revived`);
-      setCategoryManageCategory({ ...category, snoozed: false });
-      setCategoryManageMode("fund");
+      if (openFunding) {
+        setCategoryManageCategory({ ...category, snoozed: false });
+        setCategoryManageMode("fund");
+      }
     } catch (error: unknown) {
       showToast(error instanceof Error ? error.message : "Failed to revive");
     }
@@ -957,7 +962,7 @@ export default function App() {
   // Joint contribution status — single source of truth for the Home partner cards.
   // Uses the current month's transactions already loaded for the Home screen.
   const contribStatus = useMemo(() => {
-    if (budgetScope !== "joint" || !accounts.length) return null;
+    if (!accounts.length) return null;
     const jointSummary = getMonthlySummaryForScope("joint");
     const totalPlanned = jointSummary.totalAssigned;
     if (totalPlanned <= 0) return null;
@@ -1013,7 +1018,20 @@ export default function App() {
       anasTransferred: anasFunded,
       salmaTransferred: salmaFunded,
     };
-  }, [budgetScope, accounts, transactions, homeMonth, categories, getMonthlySummaryForScope]);
+  }, [accounts, transactions, homeMonth, categories, getMonthlySummaryForScope]);
+
+  const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(
+    accounts,
+    contribStatus ? {
+      anas: Math.max(0, contribStatus.anasPlan - contribStatus.anasActual),
+      salma: Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual),
+    } : undefined,
+  ), [accounts, contribStatus]);
+  const contributionRemainingByScope = useMemo((): Record<BudgetScope, number> => ({
+    joint: 0,
+    anas: contribStatus ? Math.max(0, contribStatus.anasPlan - contribStatus.anasActual) : 0,
+    salma: contribStatus ? Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual) : 0,
+  }), [contribStatus]);
 
   const selectedDateLabel =
     date === today() ? "Today" :
@@ -1278,6 +1296,8 @@ export default function App() {
           categories={categories}
           frozenCategories={frozenCategories}
           accounts={accounts}
+          readyToAssignByScope={readyToAssignByScope}
+          contributionRemainingByScope={contributionRemainingByScope}
           monthlySummary={monthlySummary}
           homeMonth={homeMonth}
           budgetScope={budgetScope}
@@ -1288,6 +1308,21 @@ export default function App() {
           onFreezeCategory={freezeCategory}
           onReviveCategory={reviveCategory}
           onFundCategory={openFundCategory}
+          onMoveContribution={() => {
+            const sourceNeedle = budgetScope === "anas" ? "hubb" : "wife";
+            const source = accounts.find(account => !isSavingsAccount(account) && account.label.toLowerCase().includes(sourceNeedle));
+            const destination = accounts.find(account => account.label.toLowerCase().includes("joined") || account.label.toLowerCase().includes("joint"));
+            if (!source || !destination) {
+              showToast("Personal or Joint account is missing");
+              return;
+            }
+            setTransferPreset({
+              toAccountId: destination.id,
+              amount: contributionRemainingByScope[budgetScope],
+              note: `Joint contribution · ${homeMonth}`,
+            });
+            setTransferAccount(source);
+          }}
           onOpenNewCategory={openNewCategory}
           loading={budgetRefreshing || refreshState === "updating"}
         />
@@ -1421,6 +1456,7 @@ export default function App() {
         }}
         onCatSearchChange={setCatSearch}
         onSubmit={submit}
+        onDelete={editingTransactionId ? () => deleteTransaction(editingTransactionId) : undefined}
         dateRef={dateRef}
         catRef={catRef}
         accountRef={accountRef}
@@ -1437,6 +1473,7 @@ export default function App() {
         open={showCategoryDetails}
         category={detailsCategory}
         month={(monthlySummary.start || today()).slice(0, 7)}
+        accounts={accounts}
         onClose={() => setShowCategoryDetails(false)}
         onOpenAdd={() => {
           if (detailsCategory) selectCategory(detailsCategory);
@@ -1448,7 +1485,9 @@ export default function App() {
         onOpenFund={() => {
           if (detailsCategory) openFundCategory(detailsCategory);
         }}
-        onFreeze={detailsCategory ? () => freezeCategory(detailsCategory) : undefined}
+        onFreeze={detailsCategory && !detailsCategory.snoozed ? () => freezeCategory(detailsCategory) : undefined}
+        onUnfreeze={detailsCategory?.snoozed ? () => { void reviveCategory(detailsCategory, false); setShowCategoryDetails(false); } : undefined}
+        onTransactionsChanged={refreshBudgetData}
       />
 
       <CategoryManageSheet
@@ -1472,7 +1511,7 @@ export default function App() {
         categories={categories}
         homeMonth={homeMonth}
         onClose={() => setDetailsAccount(null)}
-        onMove={(acct) => { setDetailsAccount(null); setTransferAccount(acct); }}
+        onMove={(acct) => { setDetailsAccount(null); setTransferPreset(null); setTransferAccount(acct); }}
         onIncome={(acct) => { setDetailsAccount(null); setIncomeAccount(acct); }}
         onReconcileSuccess={(msg) => { refreshAccountsData(msg); }}
         onTransactionsChanged={() => { fetchTransactions(); refreshBudgetData(); }}
@@ -1489,8 +1528,15 @@ export default function App() {
         open={transferAccount !== null}
         account={transferAccount}
         accounts={accounts}
-        onClose={() => setTransferAccount(null)}
-        onSuccess={refreshAccountsData}
+        initialToAccountId={transferPreset?.toAccountId}
+        initialAmount={transferPreset?.amount}
+        initialNote={transferPreset?.note}
+        onClose={() => { setTransferAccount(null); setTransferPreset(null); }}
+        onSuccess={(message) => {
+          refreshAccountsData(message);
+          fetchTransactions();
+          refreshBudgetData();
+        }}
       />
 
       <RebalanceSheet

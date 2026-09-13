@@ -118,7 +118,7 @@ const heroAmountStyle: CSSProperties = { display: "inline-flex", justifyContent:
 const readyMetricStyle = (negative: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "baseline", gap: 8, minHeight: 32, marginTop: 4, padding: "7px 10px", borderRadius: 9,
   background: negative ? "color-mix(in srgb, var(--danger) 10%, var(--surface))" : "var(--accent-dim)",
-  color: negative ? "var(--danger)" : "var(--accent-ink)", fontSize: 12, fontWeight: 650,
+  color: negative ? "var(--danger)" : "var(--accent-foreground)", fontSize: 12, fontWeight: 650,
 });
 
 const accountsSectionStyle: CSSProperties = { display: "grid", gap: 12 };

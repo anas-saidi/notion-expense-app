@@ -4,16 +4,19 @@ import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react"
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { CheckIcon, ChevronRightIcon, PlusIcon } from "./ui/icons";
+import { CheckIcon, ChevronRightIcon, PlusIcon, TransferIcon } from "./ui/icons";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
-import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope } from "./app-utils";
+import { Banner } from "./ui/Banner";
+import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, scopeFromAccountLabel } from "./app-utils";
 
 type Props = {
   categories: Category[];
   frozenCategories: Category[];
   accounts: Account[];
+  readyToAssignByScope: Record<BudgetScope, number>;
+  contributionRemainingByScope: Record<BudgetScope, number>;
   monthlySummary: MonthlySummary;
   homeMonth: string;
   budgetScope: BudgetScope;
@@ -24,6 +27,7 @@ type Props = {
   onFreezeCategory: (cat: Category) => void;
   onReviveCategory: (cat: Category) => void;
   onFundCategory: (cat: Category) => void;
+  onMoveContribution: () => void;
   onOpenNewCategory?: (defaultType: string) => void;
   loading?: boolean;
 };
@@ -47,6 +51,8 @@ export function CategoriesScreen({
   categories,
   frozenCategories,
   accounts,
+  readyToAssignByScope,
+  contributionRemainingByScope,
   monthlySummary,
   homeMonth,
   budgetScope,
@@ -55,6 +61,7 @@ export function CategoriesScreen({
   onFreezeCategory,
   onReviveCategory,
   onFundCategory,
+  onMoveContribution,
   onOpenNewCategory,
   loading = false,
 }: Props) {
@@ -118,11 +125,23 @@ export function CategoriesScreen({
   const visibleGroup = activeGroups.find(group => group.label === visibleSection);
   const budgetHealth = useMemo(() => {
     const rows = activeGroups.flatMap(group => group.items);
-    const allocated = rows.reduce((sum, row) => sum + row.planned, 0);
-    const spent = rows.reduce((sum, row) => sum + row.spent, 0);
-    const remaining = Math.max(0, allocated - spent);
+    // Available is the authoritative category balance: it includes carryover,
+    // reversals, transfers, and expenses, unlike planned minus spent.
+    const remaining = rows.reduce((sum, row) => sum + Math.max(0, row.available ?? 0), 0);
     return { remaining };
   }, [activeGroups]);
+  const leftToAllocate = useMemo(
+    () => readyToAssignByScope[budgetScope] ?? 0,
+    [readyToAssignByScope, budgetScope],
+  );
+  const contributionRemaining = contributionRemainingByScope[budgetScope] ?? 0;
+  const scopedBalance = useMemo(
+    () => accounts.reduce((sum, account) => {
+      const scope = scopeFromAccountLabel(account.label);
+      return scope === null || scope === budgetScope ? sum + (account.balance ?? 0) : sum;
+    }, 0),
+    [accounts, budgetScope],
+  );
   const monthLabel = useMemo(() => {
     const parsed = /^\d{4}-\d{2}$/.test(homeMonth) ? new Date(`${homeMonth}-01T12:00:00`) : new Date(homeMonth);
     return Number.isNaN(parsed.getTime()) ? "Monthly budget" : parsed.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -156,14 +175,39 @@ export function CategoriesScreen({
               </button>
             : null
         : <>
-            <section aria-label={`${fmt(Math.round(budgetHealth.remaining))} MAD available in ${monthLabel}`} style={budgetHealthStyle}>
+            <section aria-label={`${fmt(Math.round(budgetHealth.remaining))} MAD allocated in ${monthLabel}; ${fmt(Math.round(leftToAllocate))} MAD left to allocate; ${fmt(Math.round(scopedBalance))} MAD account balance`} style={budgetHealthStyle}>
               <span style={budgetHealthTitleStyle}>{monthLabel}</span>
-              <span style={budgetHealthLabelStyle}>Available</span>
+              <span style={budgetHealthLabelStyle}>Allocated</span>
               <span style={budgetHealthAmountStyle}>
                 <AnimatedCounter value={budgetHealth.remaining} animateOnMount />
                 <small style={budgetHealthCurrencyStyle}>MAD</small>
               </span>
+              <span style={budgetHealthSecondaryRowStyle}>
+                <span style={budgetHealthSecondaryStyle}>
+                  <span>Left</span>
+                  <strong>{fmt(Math.round(leftToAllocate))} MAD</strong>
+                </span>
+                <span style={budgetHealthSecondaryStyle}>
+                  <span>Balance</span>
+                  <strong>{fmt(Math.round(scopedBalance))} MAD</strong>
+                </span>
+              </span>
             </section>
+
+            {budgetScope !== "joint" && contributionRemaining > 0 && (
+              <Banner
+                tone="accent"
+                icon={<TransferIcon size={18} strokeWidth={2.2} />}
+                title={`${fmt(Math.round(contributionRemaining))} MAD still due to Joint`}
+                action={(
+                  <button type="button" onClick={onMoveContribution} style={contributionActionStyle}>
+                    Move money
+                  </button>
+                )}
+              >
+                Transfer the remaining contribution from your personal account.
+              </Banner>
+            )}
 
             <div role="tablist" aria-label="Budget category groups" style={groupPillsStyle}>
               {activeGroups.map(group => {
@@ -600,6 +644,41 @@ const budgetHealthCurrencyStyle: CSSProperties = {
   fontWeight: 500,
   letterSpacing: 0,
   color: "var(--muted)",
+};
+
+const budgetHealthSecondaryStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "baseline",
+  gap: 6,
+  padding: "5px 9px",
+  borderRadius: 8,
+  background: "var(--surface2)",
+  color: "var(--muted)",
+  fontSize: 12,
+  lineHeight: 1,
+  fontVariantNumeric: "tabular-nums",
+};
+
+const budgetHealthSecondaryRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexWrap: "wrap",
+  gap: 6,
+  marginTop: 2,
+};
+
+const contributionActionStyle: CSSProperties = {
+  minHeight: 44,
+  padding: "0 12px",
+  border: 0,
+  borderRadius: "var(--radius-control)",
+  background: "var(--accent)",
+  color: "var(--accent-ink)",
+  fontSize: 12,
+  fontWeight: 750,
+  whiteSpace: "nowrap",
+  cursor: "pointer",
 };
 
 const groupPillsStyle: CSSProperties = {

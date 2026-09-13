@@ -94,9 +94,11 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
           style={{
             position: "absolute",
             inset: 0,
-            background: isPast
-              ? actionColor
-              : `color-mix(in srgb, ${actionColor} ${Math.round(65 * progress)}%, var(--surface))`,
+            background: progress === 0
+              ? "transparent"
+              : isPast
+                ? actionColor
+                : `color-mix(in srgb, ${actionColor} ${Math.round(65 * progress)}%, transparent)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",

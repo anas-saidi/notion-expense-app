@@ -491,6 +491,17 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
 
+/* Shared large monetary input — retains the display-number hierarchy on mobile. */
+.display-amount-input {
+  -webkit-text-size-adjust: 100%;
+  font-size: clamp(48px, 15vw, 72px) !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
 /* Amount hero input — prevent iOS Safari from overriding font-size */
 .amount-hero-input {
   -webkit-text-size-adjust: 100%;

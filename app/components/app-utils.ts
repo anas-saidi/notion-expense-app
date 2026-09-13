@@ -128,29 +128,31 @@ export const getBalanceByScope = (accounts: Account[]): Record<BudgetScope, numb
   };
 };
 
-export const getLeftToAssignByScope = (accounts: Account[]): Record<BudgetScope, number> => {
+export const getLeftToAssignByScope = (
+  accounts: Account[],
+  contributionRemaining?: Partial<Record<Exclude<BudgetScope, "joint">, number>>,
+): Record<BudgetScope, number> => {
   const norm = (value: string) => value.toLowerCase();
-  const applyJointDue = (account: Account) => {
-    const base = account.readyToAssign ?? 0;
-    const jointDue = account.jointDue ?? 0;
-    if (jointDue <= 0) return base;
-    return base - jointDue;
-  };
 
-  const salmaTotal = accounts.reduce((sum, account) => {
+  const salmaReady = accounts.reduce((sum, account) => {
     if (isSavingsAccount(account)) return sum;
     if (!norm(account.label).includes("wife")) return sum;
-    return sum + applyJointDue(account);
+    return sum + (account.readyToAssign ?? 0);
   }, 0);
 
-  const anasTotal = accounts.reduce((sum, account) => {
+  const anasReady = accounts.reduce((sum, account) => {
     if (isSavingsAccount(account)) return sum;
     if (!norm(account.label).includes("hubb")) return sum;
-    return sum + applyJointDue(account);
+    return sum + (account.readyToAssign ?? 0);
   }, 0);
 
-  const salma = Math.max(0, salmaTotal);
-  const anas = Math.max(0, anasTotal);
+  const notionDue = (scope: "anas" | "salma") => accounts.reduce((sum, account) => {
+    const label = norm(account.label);
+    const matches = scope === "anas" ? label.includes("hubb") : label.includes("wife");
+    return matches && !isSavingsAccount(account) ? sum + Math.max(0, account.jointDue ?? 0) : sum;
+  }, 0);
+  const salma = Math.max(0, salmaReady - (contributionRemaining?.salma ?? notionDue("salma")));
+  const anas = Math.max(0, anasReady - (contributionRemaining?.anas ?? notionDue("anas")));
 
   return {
     joint: salma + anas,
@@ -176,7 +178,7 @@ export const getJointAccountUnassigned = (accounts: Account[]): number => {
 
 export const scopeFromAccountLabel = (label: string): BudgetScope | null => {
   const l = label.toLowerCase();
-  if (l.includes("hubb") || l.includes("husband") || l.includes("anas")) return "anas";
+  if (l.includes("hubb") || l.includes("husband") || l.includes("anas") || l.includes("saving")) return "anas";
   if (l.includes("wife") || l.includes("salma")) return "salma";
   if (l.includes("joined") || l.includes("joint")) return "joint";
   return null;
