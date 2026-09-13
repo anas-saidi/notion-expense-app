@@ -312,14 +312,15 @@ export default function App() {
       d.setMonth(d.getMonth() - (4 - i));
       return d.toISOString().slice(0, 7);
     });
-    const results = await Promise.allSettled(
-      months.map(async (m) => {
+    const results: Array<{ month: string; totalSpent: number }> = [];
+    for (const m of months) {
+      try {
         const { start, end } = monthBounds(`${m}-01`);
         const data = await fetch(`/api/monthly-summary?start=${start}&end=${end}`).then(r => r.json());
-        return { month: m, totalSpent: data.summary?.totalSpent ?? 0 };
-      })
-    );
-    setMonthlyTrend(results.flatMap(r => r.status === "fulfilled" ? [r.value] : []));
+        results.push({ month: m, totalSpent: data.summary?.totalSpent ?? 0 });
+      } catch {}
+    }
+    setMonthlyTrend(results);
   };
 
   const fetchPending = async () => {
@@ -1004,7 +1005,13 @@ export default function App() {
     const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
     const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
     const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
-    const needFromPersonal = Math.max(0, totalPlanned - organicBalance);
+    // Current category availability carries prior-month reserves. Add this
+    // month's spending back to reconstruct the opening Joint requirement.
+    const jointAvailable = categories
+      .filter(category => categoryMatchesScope(category, "joint"))
+      .reduce((sum, category) => sum + (category.available ?? 0), 0);
+    const requiredJointReserves = jointAvailable + anasPocket + salmaPocket + sharedSpend;
+    const needFromPersonal = Math.max(0, requiredJointReserves - organicBalance);
 
     const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
     const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;

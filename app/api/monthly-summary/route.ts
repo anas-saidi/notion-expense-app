@@ -29,6 +29,11 @@ const sumByCategory = (pages: any[], valueGetter: (page: any) => number) => {
   }));
 };
 
+const signedPlannedAmount = (page: any) => {
+  const amount = page.properties.Planned?.number ?? 0;
+  return page.properties.Reverse?.checkbox ? -amount : amount;
+};
+
 export async function GET(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
@@ -99,15 +104,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: transactionsData.message || "Failed to load transactions" }, { status: transactionsRes.status });
     }
 
-    const totalAssigned = (fundsData.results ?? []).reduce((sum: number, page: any) => {
-      return sum + (page.properties.Planned?.number ?? 0);
-    }, 0);
+    const totalAssigned = (fundsData.results ?? []).reduce(
+      (sum: number, page: any) => sum + signedPlannedAmount(page),
+      0,
+    );
 
     const totalSpent = (transactionsData.results ?? []).reduce((sum: number, page: any) => {
       return sum + (page.properties.Amount?.number ?? 0);
     }, 0);
 
-    const assignedByCategory = sumByCategory(fundsData.results ?? [], (page) => page.properties.Planned?.number ?? 0);
+    const assignedByCategory = sumByCategory(fundsData.results ?? [], signedPlannedAmount);
     const spentByCategory = sumByCategory(transactionsData.results ?? [], (page) => page.properties.Amount?.number ?? 0);
 
     return NextResponse.json({
