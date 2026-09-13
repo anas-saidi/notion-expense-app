@@ -373,6 +373,9 @@ function ContribCard({ scope, name, actual, plan, color, onSelect }: {
   const left = Math.max(0, -difference);
   const done = plan > 0 && actual >= plan * 0.99;
   const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
+  const statusText = done
+    ? `${fmt(Math.round(actual))} MAD covered`
+    : `${fmt(Math.round(left))} MAD left`;
 
   return (
     <button
@@ -380,7 +383,7 @@ function ContribCard({ scope, name, actual, plan, color, onSelect }: {
       className="partner-summary-card"
       style={contribCardStyle}
       onClick={() => onSelect(scope)}
-      aria-label={`Open ${name} contribution. ${done ? "Covered" : `${fmt(Math.round(left))} MAD left`}.`}
+      aria-label={`Open ${name} contribution. ${statusText}.`}
     >
       <span style={contribRingStyle(pct, color)} aria-hidden="true">
           <span style={{ ...contribAvatarStyle, background: `color-mix(in srgb, ${color} 24%, var(--surface))`, color }}>
@@ -389,7 +392,7 @@ function ContribCard({ scope, name, actual, plan, color, onSelect }: {
       </span>
       <span style={contribIdentityStyle}>
         <span style={contribNameStyle}>{name}</span>
-        <span style={contribAmountStyle}>{done ? "Covered" : `${fmt(Math.round(left))} MAD left`}</span>
+        <span style={contribAmountStyle}>{statusText}</span>
       </span>
     </button>
   );
