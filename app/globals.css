@@ -84,6 +84,7 @@
   --layer-toast: 100;
   --elevation-card: 0 2px 8px rgba(14, 15, 12, 0.055), 0 10px 28px rgba(14, 15, 12, 0.045);
   --elevation-float: 0 8px 20px rgba(14, 15, 12, 0.09), 0 24px 48px rgba(14, 15, 12, 0.07);
+  --elevation-sheet: 0 -2px 8px rgba(14, 15, 12, 0.06);
   --card-shadow: var(--elevation-card);
   --card-radius: var(--radius-card);
   --card-border: rgba(14, 15, 12, 0.12);
@@ -171,6 +172,7 @@ html[data-theme="dark"] {
   --summary-accent-dim: rgba(169, 148, 255, 0.16);
   --elevation-card: 0 2px 8px rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.18);
   --elevation-float: 0 8px 20px rgba(0, 0, 0, 0.32), 0 24px 48px rgba(0, 0, 0, 0.26);
+  --elevation-sheet: 0 -2px 8px rgba(0, 0, 0, 0.24);
   --card-shadow: var(--elevation-card);
   --card-border: rgba(255, 255, 255, 0.06);
 
@@ -1255,6 +1257,9 @@ button:hover .rebalance-btn-icon {
   top: 0;
   z-index: 80;
   min-height: 44px;
+  /* Extend the header surface through the content rail’s side gutters. */
+  margin-inline: calc(-1 * var(--space-4));
+  padding-inline: var(--space-4);
   padding-top: calc(var(--safe-top) + var(--space-4));
   padding-bottom: var(--space-4);
   background: var(--bg);
@@ -2110,6 +2115,17 @@ button[aria-label^="Close" i]:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .donut-legend-row { animation: none !important; }
+}
+
+/* Bottom sheets use an opaque surface; never let the backdrop tint the panel. */
+.bottom-sheet-frame,
+.bottom-sheet-panel {
+  background-color: #fff !important;
+}
+
+html[data-theme="dark"] .bottom-sheet-frame,
+html[data-theme="dark"] .bottom-sheet-panel {
+  background-color: #161816 !important;
 }
 
 /* Shared single-choice and calendar controls. */

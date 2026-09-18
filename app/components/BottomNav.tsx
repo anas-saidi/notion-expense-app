@@ -1,5 +1,6 @@
 import type { AppTab } from "./app-types";
 import { HomeIcon, SlidersIcon, TrendingUpIcon } from "./ui/icons";
+import { useAppHaptics } from "./ui/useAppHaptics";
 
 type BottomNavProps = {
   tab: AppTab;
@@ -8,6 +9,7 @@ type BottomNavProps = {
 };
 
 export function BottomNav({ tab, onTabChange }: BottomNavProps) {
+  const { haptic } = useAppHaptics();
   const items: { key: AppTab; label: string }[] = [
     { key: "home", label: "Home" },
     { key: "budget", label: "Budget" },
@@ -27,7 +29,10 @@ export function BottomNav({ tab, onTabChange }: BottomNavProps) {
               role="tab"
               aria-selected={tab === item.key}
               aria-controls={`panel-${item.key}`}
-              onClick={() => onTabChange(item.key)}
+              onClick={() => {
+                if (tab !== item.key) haptic("selection");
+                onTabChange(item.key);
+              }}
               className="app-nav-btn"
               style={{ color: tab === item.key ? activeColor : "var(--muted)" }}
             >

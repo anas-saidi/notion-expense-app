@@ -4,6 +4,7 @@ import { type CSSProperties } from "react";
 import { UsersRound } from "lucide-react";
 import type { BudgetScope } from "../app-types";
 import { ManIcon, WomanIcon } from "./icons";
+import { useAppHaptics } from "./useAppHaptics";
 
 /* ─── Scope color tokens (single source of truth) ─────────────── */
 
@@ -63,6 +64,7 @@ type ScopeChipBarProps = {
 /* ─── Bar component ───────────────────────────────────────────── */
 
 export function ScopeChipBar({ chips, value, onChange, ariaLabel = "Scope" }: ScopeChipBarProps) {
+  const { haptic } = useAppHaptics();
   return (
     <div style={railStyle} role="tablist" aria-label={ariaLabel}>
       {chips.map(chip => (
@@ -70,7 +72,10 @@ export function ScopeChipBar({ chips, value, onChange, ariaLabel = "Scope" }: Sc
           key={chip.key}
           chip={chip}
           active={chip.key === value}
-          onClick={() => onChange(chip.key)}
+          onClick={() => {
+            if (chip.key !== value) haptic("selection");
+            onChange(chip.key);
+          }}
         />
       ))}
     </div>
@@ -88,6 +93,7 @@ export function GlobalBudgetScopePicker({
   onChange: (scope: BudgetScope) => void;
   personalScope: Exclude<BudgetScope, "joint">;
 }) {
+  const { haptic } = useAppHaptics();
   const chips: ScopeChipItem[] = [
     { key: "joint", label: "Joint" },
     { key: "personal", label: "Personal" },
@@ -104,7 +110,10 @@ export function GlobalBudgetScopePicker({
             role="tab"
             aria-selected={active}
             className="global-scope-option"
-            onClick={() => onChange(chip.key === "joint" ? "joint" : personalScope)}
+            onClick={() => {
+              if (!active) haptic("selection");
+              onChange(chip.key === "joint" ? "joint" : personalScope);
+            }}
           >
             <ScopeIcon className="global-scope-icon" size={13} strokeWidth={2.2} aria-hidden="true" />
             <span>{chip.label}</span>

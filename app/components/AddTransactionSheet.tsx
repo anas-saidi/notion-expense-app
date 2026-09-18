@@ -11,6 +11,7 @@ import { PickerPopover } from "./PickerPopover";
 import { Banner } from "./ui/Banner";
 import { DateCalendar, DatePickerTrigger } from "./DatePicker";
 import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, XIcon } from "./ui/icons";
+import { useAppHaptics } from "./ui/useAppHaptics";
 
 type AddTransactionSheetProps = {
   open: boolean;
@@ -65,6 +66,7 @@ type AddTransactionSheetProps = {
 };
 
 export function AddTransactionSheet(props: AddTransactionSheetProps) {
+  const { haptic } = useAppHaptics();
   const [fundingSourceId, setFundingSourceId] = useState<string | null>(null);
   const [showFundPicker, setShowFundPicker] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -74,6 +76,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const fundPickerRef = useRef<HTMLDivElement>(null);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const sheetContentRef = useRef<HTMLDivElement>(null);
+  const previousStatusRef = useRef(props.status);
 
   useEffect(() => {
     if (props.open) {
@@ -90,6 +93,14 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       setAmountFocused(false);
     }
   }, [props.open]);
+
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+    previousStatusRef.current = props.status;
+    if (!props.open || previousStatus === props.status) return;
+    if (props.status === "success") haptic("success");
+    if (props.status === "error") haptic("error");
+  }, [haptic, props.open, props.status]);
 
   useEffect(() => {
     if (!showFundPicker) return;
@@ -151,6 +162,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     props.onAmountChange(props.amount === "0" ? key : `${props.amount}${key}`);
   };
 
+  const selectTransactionType = (type: "Expense" | "Income") => {
+    if (props.transactionType !== type) haptic("selection");
+    props.onTransactionTypeChange(type);
+  };
+
   const keypadKeys = [
     { value: "7", label: "7" }, { value: "8", label: "8" }, { value: "9", label: "9" }, { value: "/", label: "÷", ariaLabel: "Divide" },
     { value: "4", label: "4" }, { value: "5", label: "5" }, { value: "6", label: "6" }, { value: "*", label: "×", ariaLabel: "Multiply" },
@@ -182,8 +198,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
         {!isEditMode && (
           <div role="tablist" aria-label="Transaction type" style={typeSwitcherStyle}>
-            <button type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" onClick={() => props.onTransactionTypeChange("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></button>
-            <button type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" onClick={() => props.onTransactionTypeChange("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></button>
+            <button type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" onClick={() => selectTransactionType("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></button>
+            <button type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" onClick={() => selectTransactionType("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></button>
           </div>
         )}
 
@@ -286,7 +302,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 <div id="account-picker" style={{ maxHeight: 236, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
                   <div style={{ display: "grid", gap: 2 }}>
                     {props.filteredAccounts.map((acct) => (
-                      <button className="picker-option" aria-pressed={acct.id === props.selectedAccount?.id} key={acct.id} onClick={() => props.onSelectAccount(acct.id)} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                      <button className="picker-option" aria-pressed={acct.id === props.selectedAccount?.id} key={acct.id} onClick={() => { if (acct.id !== props.selectedAccount?.id) haptic("selection"); props.onSelectAccount(acct.id); }} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
                         <div style={pickerIconStyle}>
                           {acct.icon ?? "$"}
                         </div>
@@ -329,7 +345,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       {props.filteredCats.map((cat) => {
                         const meta = [cat.type[0] ?? null, cat.id === props.lastUsedCatId ? "Last used" : null].filter(Boolean).join(" / ");
                         return (
-                          <button className="picker-option" aria-pressed={cat.id === props.selectedCat?.id} key={cat.id} onClick={() => props.onSelectCategory(cat)} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
+                          <button className="picker-option" aria-pressed={cat.id === props.selectedCat?.id} key={cat.id} onClick={() => { if (cat.id !== props.selectedCat?.id) haptic("selection"); props.onSelectCategory(cat); }} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
                             <div style={pickerIconStyle}>
                               {cat.icon ?? "#"}
                             </div>
@@ -469,6 +485,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             aria-expanded={showKeypad}
             aria-controls="amount-keypad"
             onClick={() => {
+              haptic("selection");
               setShowKeypad((visible) => {
                 const next = !visible;
                 if (next) amountInputRef.current?.blur();
@@ -489,7 +506,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   key={key.value}
                   type="button"
                   aria-label={key.ariaLabel ?? key.label}
-                  onClick={() => enterAmount(key.value)}
+                  onClick={() => {
+                    haptic("rigid");
+                    enterAmount(key.value);
+                  }}
                   style={keypadButtonStyle}
                 >
                   {key.value === "delete" ? <DeleteIcon size={19} aria-hidden="true" /> : key.label}
@@ -528,7 +548,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           {isEditMode && props.onDelete && (
             <button
               type="button"
-              onClick={() => setConfirmingDelete(true)}
+              onClick={() => { haptic("warning"); setConfirmingDelete(true); }}
               disabled={props.status === "saving"}
               style={deleteActionStyle}
             >
@@ -612,7 +632,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   setDeleting(true);
                   const deleted = await props.onDelete!();
                   setDeleting(false);
-                  if (deleted) props.onClose();
+                  if (deleted) {
+                    haptic("success");
+                    props.onClose();
+                  } else {
+                    haptic("error");
+                  }
                 }}
                 style={confirmDeleteStyle}
               >
@@ -629,7 +654,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const panelStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
+  background: "var(--surface)",
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
@@ -658,11 +683,10 @@ const formSectionStyle: CSSProperties = {
 
 const footerActionsStyle: CSSProperties = {
   marginTop: "auto",
-  position: "sticky",
-  bottom: 0,
-  zIndex: 2,
+  position: "relative",
+  flexShrink: 0,
   paddingTop: 2,
-  background: "var(--surface)",
+  background: "transparent",
   display: "flex",
   alignItems: "stretch",
   gap: 10,
@@ -785,9 +809,15 @@ const keypadToggleStyle: CSSProperties = {
 };
 
 const recentSectionStyle: CSSProperties = {
+  flex: "1 1 auto",
+  minHeight: 0,
   display: "grid",
+  alignContent: "start",
   gap: 6,
   padding: "2px 0 0",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  scrollbarWidth: "none",
 };
 
 const recentHeaderStyle: CSSProperties = {

@@ -132,6 +132,11 @@ export function BottomSheet({
   const usesContentDetent = detent === "content" && layered;
   const preservesGlobalHeader = !isDesktop && !layered && !desktopFullscreen && !!document.querySelector(".app-header");
   const resolvedBackdropTop = backdropTop ?? (preservesGlobalHeader ? MOBILE_SHEET_TOP : "0px");
+  // Main mobile sheets sit below an interactive header. Keep their rounded
+  // corners on the page canvas instead of exposing a gray rectangle behind them.
+  const backdropOpacity = preservesGlobalHeader
+    ? 0
+    : isDesktop ? Math.max(backdropStrength, 0.25) : backdropStrength;
 
   const sheet = (
     <>
@@ -139,7 +144,7 @@ export function BottomSheet({
       <motion.div
         key="sheet-backdrop"
         initial={reduceMotion ? false : { opacity: 0 }}
-        animate={{ opacity: isDesktop ? Math.max(backdropStrength, 0.25) : backdropStrength }}
+        animate={{ opacity: backdropOpacity }}
         exit={{ opacity: 0 }}
         transition={{ duration: reduceMotion ? 0 : 0.22 }}
         onClick={onClose}
@@ -164,6 +169,7 @@ export function BottomSheet({
        */}
       <motion.div
         key="sheet-panel"
+        className="bottom-sheet-frame"
         initial={reduceMotion ? false : isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
         animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
         exit={isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
@@ -193,6 +199,7 @@ export function BottomSheet({
                   inset: 0,
                   width: "100vw",
                   height: "100dvh",
+                  background: "var(--surface)",
                   borderRadius: 0,
                   zIndex,
                   display: "flex",
@@ -209,6 +216,7 @@ export function BottomSheet({
                   height: "auto",
                   maxHeight: "calc(100dvh - 80px)",
                   borderRadius: "var(--radius-sheet)",
+                  background: "var(--surface)",
                   zIndex,
                   display: "flex",
                   flexDirection: "column",
@@ -223,6 +231,10 @@ export function BottomSheet({
                 width: mobileFullWidth ? "100vw" : `min(${maxWidth}, 90vw)`,
                 height: "auto",
                 maxHeight: mobileTop ? `calc(100dvh - ${mobileTop})` : `calc(100dvh - ${MOBILE_SHEET_TOP})`,
+                background: "var(--surface)",
+                borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0",
+                boxShadow: "var(--elevation-sheet)",
+                overflow: "hidden",
                 zIndex,
                 display: "flex",
                 flexDirection: "column",
@@ -235,6 +247,7 @@ export function BottomSheet({
          */}
         <div
           ref={panelRef ?? localPanelRef}
+          className="bottom-sheet-panel"
           role={isDesktop ? "dialog" : "region"}
           aria-modal={isDesktop ? "true" : undefined}
           aria-label={label}
@@ -248,7 +261,7 @@ export function BottomSheet({
             overflow: "hidden",
             boxShadow: isDesktop
               ? "0 20px 56px rgba(20, 24, 22, 0.16)"
-              : "0 -8px 28px rgba(20, 24, 22, 0.10)",
+              : "none",
             ...panelStyle,
             ...(desktopFullscreen && isDesktop ? { borderRadius: 0 } : {}),
           }}

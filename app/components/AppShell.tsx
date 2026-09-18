@@ -4,6 +4,7 @@ import { BottomNav } from "./BottomNav";
 import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon } from "./ui/icons";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import { SettingsSheet } from "./SettingsSheet";
+import { useAppHaptics } from "./ui/useAppHaptics";
 
 export function AppShell({
   tab,
@@ -44,6 +45,7 @@ export function AppShell({
   hideHeader?: boolean;
   children?: ReactNode;
 }) {
+  const { haptic } = useAppHaptics();
   // On desktop (≥ 1100px) the sidebar is always visible — immersive mode only
   // applies on mobile where the bottom nav needs to be hidden.
   const [isDesktop, setIsDesktop] = useState(false);
@@ -134,7 +136,10 @@ export function AppShell({
 
           {showAddButton && (
             <button
-              onClick={onOpenAdd}
+              onClick={() => {
+                haptic("light");
+                onOpenAdd();
+              }}
               className="fab-add app-nav-add"
               aria-label="Add transaction"
               style={{
