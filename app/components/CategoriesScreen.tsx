@@ -72,7 +72,10 @@ export function CategoriesScreen({
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
 
   useEffect(() => {
-    const openSearch = () => setSearchOpen(true);
+    const openSearch = () => setSearchOpen((isOpen) => {
+      if (isOpen) setSearch("");
+      return !isOpen;
+    });
     window.addEventListener("open-budget-search", openSearch);
     return () => window.removeEventListener("open-budget-search", openSearch);
   }, []);
@@ -161,6 +164,7 @@ export function CategoriesScreen({
           onClose={() => { setSearch(""); setSearchOpen(false); }}
           placeholder="Search categories"
           ariaLabel="Search categories"
+          showClose={false}
         />
       )}
 

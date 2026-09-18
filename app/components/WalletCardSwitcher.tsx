@@ -1,15 +1,11 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
+import type { ContributionStatus } from "./contribution-utils";
 import { fmt } from "./app-utils";
 import { UsersRoundIcon } from "./ui/icons";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 
-export type ContribStatus = {
-  anasPlan: number; salmaPlan: number;
-  anasActual: number; salmaActual: number;
-  anasDirectSpend: number; salmaDirectSpend: number;
-  anasTransferred: number; salmaTransferred: number;
-};
+export type ContribStatus = ContributionStatus;
 
 type WalletCardSwitcherProps = {
   value: BudgetScope;
@@ -86,9 +82,20 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
   const remaining = Math.max(0, (planned ?? 0) - spent);
   const progress  = hasPlan ? Math.min(100, Math.round((spent / planned) * 100)) : 0;
   const isBudgetOver = hasPlan && spent > planned;
-  const contributionRemaining = contribStatus
-    ? Math.max(0, contribStatus.anasPlan + contribStatus.salmaPlan - contribStatus.anasActual - contribStatus.salmaActual)
+  const anasDifference = contribStatus ? contribStatus.anasActual - contribStatus.anasPlan : 0;
+  const salmaDifference = contribStatus ? contribStatus.salmaActual - contribStatus.salmaPlan : 0;
+  const fundingGap = contribStatus
+    ? Math.max(0, contribStatus.partnerRequirement - contribStatus.anasActual - contribStatus.salmaActual)
     : 0;
+  const contributionSummary = anasDifference > 0.5 && salmaDifference > 0.5
+    ? "Joined owes partners " + fmt(Math.round(anasDifference + salmaDifference)) + " MAD"
+    : anasDifference > 0.5
+      ? "Joined owes Anas " + fmt(Math.round(anasDifference)) + " MAD"
+      : salmaDifference > 0.5
+        ? "Joined owes Salma " + fmt(Math.round(salmaDifference)) + " MAD"
+        : fundingGap > 0.5
+          ? fmt(Math.round(fundingGap)) + " MAD funding gap"
+          : "Contributions settled";
 
   const cycleJointView = () => {
     setJointView(v => {
@@ -198,7 +205,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
             <span style={contribSharedStyle}>
               <span style={contribConnectorStyle} aria-hidden="true"><UsersRoundIcon size={15} /></span>
               <span style={contribGapStyle}>
-                {contributionRemaining > 0 ? `${fmt(Math.round(contributionRemaining))} MAD remaining` : "Covered together"}
+                {contributionSummary}
               </span>
             </span>
             <ContribCard
@@ -370,12 +377,14 @@ function ContribCard({ scope, name, actual, plan, color, onSelect }: {
   onSelect: (scope: BudgetScope) => void;
 }) {
   const difference = actual - plan;
-  const left = Math.max(0, -difference);
-  const done = plan > 0 && actual >= plan * 0.99;
+  const due = Math.max(0, -difference);
+  const overpaid = Math.max(0, difference);
   const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
-  const statusText = done
-    ? `${fmt(Math.round(actual))} MAD covered`
-    : `${fmt(Math.round(left))} MAD left`;
+  const statusText = due > 0.5
+    ? fmt(Math.round(due)) + " MAD due"
+    : overpaid > 0.5
+      ? fmt(Math.round(overpaid)) + " MAD overpaid"
+      : "Settled";
 
   return (
     <button

@@ -20,6 +20,7 @@ import { JointAllocateSheet } from "./components/JointAllocateSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import { TransactionDetailsSheet } from "./components/TransactionDetailsSheet";
+import { calculateContributionStatus } from "./components/contribution-utils";
 import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
   categoryMatchesScope,
@@ -109,6 +110,7 @@ export default function App() {
   const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [contributionTransactions, setContributionTransactions] = useState<Transaction[]>([]);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary>({
     start: "",
@@ -295,7 +297,11 @@ export default function App() {
   const fetchMonthlySummary = async (month?: string) => {
     const target = month ?? formatMonthInput(today());
     const { start, end } = monthBounds(`${target}-01`);
-    const data = await fetchApiJson<{ summary?: MonthlySummary }>(`/api/monthly-summary?start=${start}&end=${end}`);
+    const [data, transactionData] = await Promise.all([
+      fetchApiJson<{ summary?: MonthlySummary }>(`/api/monthly-summary?start=${start}&end=${end}`),
+      fetchApiJson<{ transactions?: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&page_size=100`),
+    ]);
+    setContributionTransactions(transactionData.transactions ?? []);
     setMonthlySummary({
       start,
       end,
@@ -513,10 +519,10 @@ export default function App() {
   useEffect(() => {
     if (!categories.length) return;
     const current = categories.find((category) => category.id === categoryId);
-    if (current && categoryMatchesScope(current, budgetScope)) return;
-    const nextCategory = categories.find((category) => categoryMatchesScope(category, budgetScope));
+    if (current && categoryMatchesScope(current, budgetScope, accounts)) return;
+    const nextCategory = categories.find((category) => categoryMatchesScope(category, budgetScope, accounts));
     if (nextCategory) setCategoryId(nextCategory.id);
-  }, [budgetScope, categories, categoryId]);
+  }, [budgetScope, categories, categoryId, accounts]);
 
   useEffect(() => {
     const raw = localStorage.getItem("expenseCorpus");
@@ -867,7 +873,7 @@ export default function App() {
   };
 
   const filteredCats = categories
-    .filter((c) => categoryMatchesScope(c, budgetScope))
+    .filter((c) => categoryMatchesScope(c, budgetScope, accounts))
     .filter((c) => c.name.toLowerCase().includes(catSearch.toLowerCase()))
     .sort((a, b) => {
       if (a.id === lastUsedCatId) return -1;
@@ -960,72 +966,15 @@ export default function App() {
     [budgetScope, categories, pendingItems],
   );
 
-  // Joint contribution status — single source of truth for the Home partner cards.
-  // Uses the current month's transactions already loaded for the Home screen.
-  const contribStatus = useMemo(() => {
-    if (!accounts.length) return null;
-    const jointSummary = getMonthlySummaryForScope("joint");
-    const totalPlanned = jointSummary.totalAssigned;
-    if (totalPlanned <= 0) return null;
-
-    const acctLabel = (id: string | null | undefined) =>
-      id ? (accounts.find(a => a.id === id)?.label ?? "").toLowerCase() : "";
-
-    const anasAcc  = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("hubb"));
-    const salmaAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("wife"));
-    const anasContribPct  = anasAcc?.contributionPercent  ?? null;
-    const salmaContribPct = salmaAcc?.contributionPercent ?? null;
-    if (anasContribPct == null && salmaContribPct == null) return null;
-
-    // Joint scope includes:
-    // personal-account expenses on joint categories + all category-less transfers
-    const jointTxns = transactions.filter(
-      (transaction) => transaction.date?.startsWith(homeMonth) && transactionMatchesScope(transaction, categories, "joint", accounts),
-    );
-    const expenseTxns = jointTxns.filter(t => t.category && (!t.type || t.type === "Expense"));
-
-    let anasPocket = 0, salmaPocket = 0, sharedSpend = 0;
-    for (const t of expenseTxns) {
-      const label = acctLabel(t.accountId);
-      if (label.includes("hubb")) anasPocket += t.amount;
-      else if (label.includes("wife")) salmaPocket += t.amount;
-      else sharedSpend += t.amount;
-    }
-
-    const joinedAccId = accounts.find(a => a.label.toLowerCase().includes("joined"))?.id;
-    let anasFunded = 0, salmaFunded = 0;
-    for (const t of jointTxns) {
-      if (t.type !== "Transfer") continue;
-      if (!t.toAccountId || t.toAccountId !== joinedAccId) continue;
-      const fromLabel = acctLabel(t.fromAccountId);
-      if (fromLabel.includes("hubb"))      anasFunded  += t.amount;
-      else if (fromLabel.includes("wife")) salmaFunded += t.amount;
-    }
-
-    const joinedAcc = accounts.find(a => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes("joined"));
-    const joinedBalance = Math.max(0, joinedAcc?.balance ?? 0);
-    const organicBalance = Math.max(0, joinedBalance - anasFunded - salmaFunded + sharedSpend);
-    // Current category availability carries prior-month reserves. Add this
-    // month's spending back to reconstruct the opening Joint requirement.
-    const jointAvailable = categories
-      .filter(category => categoryMatchesScope(category, "joint"))
-      .reduce((sum, category) => sum + (category.available ?? 0), 0);
-    const requiredJointReserves = jointAvailable + anasPocket + salmaPocket + sharedSpend;
-    const needFromPersonal = Math.max(0, requiredJointReserves - organicBalance);
-
-    const anasPlan  = anasContribPct  != null ? anasContribPct  * needFromPersonal : 0;
-    const salmaPlan = salmaContribPct != null ? salmaContribPct * needFromPersonal : 0;
-
-    return {
-      anasPlan, salmaPlan,
-      anasActual: anasPocket + anasFunded,
-      salmaActual: salmaPocket + salmaFunded,
-      anasDirectSpend: anasPocket,
-      salmaDirectSpend: salmaPocket,
-      anasTransferred: anasFunded,
-      salmaTransferred: salmaFunded,
-    };
-  }, [accounts, transactions, homeMonth, categories, getMonthlySummaryForScope]);
+  // Freeze the month opening Joined Account balance mathematically by reversing
+  // every cash movement since month start. Monthly assignments set the
+  // obligation; later balance changes never rewrite that obligation.
+  const contribStatus = useMemo(() => calculateContributionStatus({
+    accounts,
+    categories,
+    transactions: contributionTransactions,
+    monthlySummary,
+  }), [accounts, categories, contributionTransactions, monthlySummary]);
 
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(
     accounts,
@@ -1368,6 +1317,7 @@ export default function App() {
         selectedAccount={selectedAccount}
         filteredCats={filteredCats}
         filteredAccounts={filteredAccounts}
+        recentTransactions={scopedTransactions.filter((transaction) => (transactionType === "Income" ? transaction.type === "Income" : (!transaction.type || transaction.type === "Expense")) && transaction.id !== editingTransactionId).slice(0, 3)}
         lastUsedCatId={lastUsedCatId}
         displayedBalance={displayedBalance}
         amountAfterBalance={amountAfterBalance}
@@ -1447,11 +1397,14 @@ export default function App() {
           setShowDatePicker(false);
           setShowAccountPicker(false);
         }}
+        onCloseCatPicker={() => setShowCatPicker(false)}
         onToggleAccountPicker={() => {
           setShowAccountPicker((v) => !v);
           setShowDatePicker(false);
           setShowCatPicker(false);
         }}
+        onCloseAccountPicker={() => setShowAccountPicker(false)}
+        onCloseDatePicker={() => setShowDatePicker(false)}
         onSelectDate={(value) => {
           setDate(value);
           setShowDatePicker(false);

@@ -9,7 +9,8 @@ export const SearchField = forwardRef<HTMLInputElement, {
   onClose: () => void;
   placeholder: string;
   ariaLabel: string;
-}>(function SearchField({ value, onChange, onClose, placeholder, ariaLabel }, ref) {
+  showClose?: boolean;
+}>(function SearchField({ value, onChange, onClose, placeholder, ariaLabel, showClose = true }, ref) {
   return (
     <label style={wrapStyle}>
       <SearchIcon size={15} aria-hidden="true" style={{ color: "var(--muted)", flexShrink: 0 }} />
@@ -22,9 +23,11 @@ export const SearchField = forwardRef<HTMLInputElement, {
         placeholder={placeholder}
         style={inputStyle}
       />
+      {showClose && (
       <button type="button" onClick={onClose} aria-label={`Close ${ariaLabel.toLowerCase()}`} style={closeStyle}>
         <XIcon size={16} aria-hidden="true" />
       </button>
+      )}
     </label>
   );
 });

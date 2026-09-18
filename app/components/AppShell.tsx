@@ -222,5 +222,5 @@ const headerStyle = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 8,
-  marginBottom: 16,
+  marginBottom: 0,
 };

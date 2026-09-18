@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 
 const DESKTOP_BREAKPOINT = 600;
 const MOBILE_SHEET_TOP = "calc(var(--safe-top) + 76px)";
+let openSheetCount = 0;
 
 type BottomSheetProps = {
   open: boolean;
@@ -28,6 +29,8 @@ type BottomSheetProps = {
   panelStyle?: CSSProperties;
   contentStyle?: CSSProperties;
   backdropStrength?: number;
+  /** Keep a global header interactive by starting the backdrop below it. */
+  backdropTop?: string;
   /** Height ratios (0–1). E.g. [0, 0.62, 1] — initialSnap index sets opening height. */
   snapPoints?: number[];
   /** Index into snapPoints that sets the opening height. */
@@ -40,6 +43,12 @@ type BottomSheetProps = {
   desktopFullscreen?: boolean;
   /** Mobile modal presented above another sheet; preserves a small visible edge of the parent layer. */
   layered?: boolean;
+  /** Let task-focused mobile sheets use the full viewport width. */
+  mobileFullWidth?: boolean;
+  /** Override the mobile top inset for tall task sheets. */
+  mobileTop?: string;
+  /** Enable swipe-to-dismiss on mobile. */
+  draggable?: boolean;
 };
 
 export function BottomSheet({
@@ -55,10 +64,14 @@ export function BottomSheet({
   panelStyle,
   contentStyle,
   backdropStrength = 0.16,
+  backdropTop,
   align = "bottom",
   desktopFullscreen = false,
   detent = "default",
   layered = false,
+  mobileFullWidth = true,
+  mobileTop,
+  draggable = true,
 }: BottomSheetProps) {
   const [mounted, setMounted] = useState(false);
   const localPanelRef = useRef<HTMLDivElement>(null);
@@ -69,6 +82,16 @@ export function BottomSheet({
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    openSheetCount += 1;
+    document.documentElement.classList.add("has-open-sheet");
+    return () => {
+      openSheetCount = Math.max(0, openSheetCount - 1);
+      if (openSheetCount === 0) document.documentElement.classList.remove("has-open-sheet");
+    };
+  }, [open]);
 
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
@@ -106,6 +129,9 @@ export function BottomSheet({
 
   if (!mounted) return null;
 
+  const preservesGlobalHeader = !isDesktop && !layered && !desktopFullscreen && !!document.querySelector(".app-header");
+  const resolvedBackdropTop = backdropTop ?? (preservesGlobalHeader ? MOBILE_SHEET_TOP : "0px");
+
   const sheet = (
     <>
       {/* Backdrop */}
@@ -118,7 +144,7 @@ export function BottomSheet({
         onClick={onClose}
         style={{
           position: "fixed",
-          top: 0,
+          top: resolvedBackdropTop,
           right: 0,
           bottom: 0,
           left: 0,
@@ -147,7 +173,7 @@ export function BottomSheet({
             ? { type: "spring", stiffness: 400, damping: 32 }
             : { type: "spring", stiffness: 380, damping: 38 }
         }
-        {...(!isDesktop && {
+        {...(!isDesktop && draggable && {
           drag: "y" as const,
           dragConstraints: { top: 0 },
           dragElastic: { top: 0.05, bottom: 0.4 },
@@ -189,13 +215,13 @@ export function BottomSheet({
                 }
             : {
                 position: "fixed",
-                top: detent === "content" ? "auto" : layered ? "calc(var(--safe-top) + 88px)" : MOBILE_SHEET_TOP,
+                top: detent === "content" ? "auto" : mobileTop ?? (layered ? "calc(var(--safe-top) + 88px)" : MOBILE_SHEET_TOP),
                 bottom: 0,
                 left: "50%",
                 x: "-50%",
-                width: `min(${maxWidth}, 90vw)`,
+                width: mobileFullWidth ? "100vw" : `min(${maxWidth}, 90vw)`,
                 height: "auto",
-                maxHeight: `calc(100dvh - ${MOBILE_SHEET_TOP})`,
+                maxHeight: mobileTop ? `calc(100dvh - ${mobileTop})` : `calc(100dvh - ${MOBILE_SHEET_TOP})`,
                 zIndex,
                 display: "flex",
                 flexDirection: "column",

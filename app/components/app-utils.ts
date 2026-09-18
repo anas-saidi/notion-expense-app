@@ -216,8 +216,11 @@ export const getCategoryScope = (category: Category, accounts?: Account[]): Budg
   return null;
 };
 
-export const categoryMatchesScope = (category: Category, scope: BudgetScope) =>
-  getCategoryScope(category) === scope;
+export const categoryMatchesScope = (
+  category: Category,
+  scope: BudgetScope,
+  accounts?: Account[],
+) => getCategoryScope(category, accounts) === scope;
 
 export const resolveTransactionScopes = (
   transaction: Transaction,
