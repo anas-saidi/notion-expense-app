@@ -247,7 +247,7 @@ export function AllocationFlow({
             <div style={heroPoolWrapStyle}>
               <span style={heroPoolLabelStyle}>{poolLabel}</span>
               <span style={heroPoolNumberStyle}>
-                <Money value={availablePool} animated animateOnMount />
+                <Money value={availablePool} animated />
               </span>
               <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
                 {isBalanced ? (
@@ -311,10 +311,8 @@ export function AllocationFlow({
 
           {!activeItem && <div style={emptyStyle}>No categories found for {active.label}.</div>}
         </section>
-      </div>
 
-      {activeItem && (
-        <div className={`planning-stack${isBalanced ? " planning-stack--balanced" : isOver ? " planning-stack--over" : ""}`} style={stackedUnitStyle}>
+        {activeItem && (
           <div className="planning-editor" style={editorStyle}>
             <div key={activeItem.categoryId} className="planning-category-enter planning-amount-canvas" style={amountCanvasStyle}>
               <span style={amountCurrencyBigStyle}>MAD</span>
@@ -356,24 +354,26 @@ export function AllocationFlow({
               </div>
             </div>
           </div>
+        )}
+      </div>
 
-          <div aria-label="Budget control" style={slimBarPanelStyle}>
-            <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
-            {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
-            {confirming && (
-              <div role="status" style={confirmationStyle}>
-                <span>
-                  <strong style={confirmationTitleStyle}>Apply this rebalance?</strong>
-                  <span style={confirmationCopyStyle}>{isBalanced ? "Every available dirham stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} MAD will remain unassigned.`}</span>
-                </span>
-                <button type="button" onClick={() => setConfirming(false)} style={confirmationBackStyle}>Back</button>
-              </div>
-            )}
-            <button type="button" onClick={() => confirming ? savePlan() : setConfirming(true)} disabled={!canSave} className={isBalanced ? "planning-save--balanced" : undefined} style={{ ...saveButtonStyle, opacity: canSave ? 1 : 0.55, cursor: canSave ? "pointer" : "not-allowed" }}>
-              <Save size={15} />
-              {saveState === "saving" ? "Saving..." : confirming ? "Confirm" : saveButtonLabel}
-            </button>
-          </div>
+      {activeItem && (
+        <div aria-label="Budget control" style={slimBarPanelStyle}>
+          <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
+          {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
+          {confirming && (
+            <div role="status" style={confirmationStyle}>
+              <span>
+                <strong style={confirmationTitleStyle}>Apply this rebalance?</strong>
+                <span style={confirmationCopyStyle}>{isBalanced ? "Every available dirham stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} MAD will remain unassigned.`}</span>
+              </span>
+              <button type="button" onClick={() => setConfirming(false)} style={confirmationBackStyle}>Back</button>
+            </div>
+          )}
+          <button type="button" onClick={() => confirming ? savePlan() : setConfirming(true)} disabled={!canSave} className={isBalanced ? "planning-save--balanced" : undefined} style={{ ...saveButtonStyle, opacity: canSave ? 1 : 0.55, cursor: canSave ? "pointer" : "not-allowed" }}>
+            <Save size={15} />
+            {saveState === "saving" ? "Saving..." : confirming ? "Confirm" : saveButtonLabel}
+          </button>
         </div>
       )}
     </>
@@ -452,7 +452,7 @@ const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: 
 const screenHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "44px 1fr auto", alignItems: "center", gap: 8, padding: "14px 16px 12px", flexShrink: 0 };
 const backButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text2)" };
-const sheetScrollStyle: CSSProperties = { overflowY: "auto", overflowX: "hidden", padding: "8px 12px 12px", display: "grid", alignContent: "start", gap: 12 };
+const sheetScrollStyle: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", padding: "8px 12px 12px", display: "grid", alignContent: "start", gap: 12 };
 const monthPickerButtonStyle: CSSProperties = { minHeight: 44, padding: "0 4px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" };
 const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
 const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
@@ -476,7 +476,6 @@ const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 148, minH
 const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "color-mix(in srgb, var(--accent) 42%, var(--surface))", color: "var(--accent-ink)" };
 const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActive ? "var(--accent-ink)" : "var(--text2)", flexShrink: 0 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
-const stackedUnitStyle: CSSProperties = { overflow: "hidden", flex: "1 1 auto", minHeight: 0, marginTop: 16, background: "var(--surface)", boxShadow: "none", display: "flex", flexDirection: "column" };
 const editorStyle: CSSProperties = { display: "grid" };
 const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gridTemplateRows: "minmax(68px, auto) auto", gap: 8, minHeight: 132, padding: "14px 10px 12px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
 const amountCurrencyBigStyle: CSSProperties = { position: "absolute", left: 18, top: 18, color: "color-mix(in srgb, var(--muted) 24%, transparent)", fontFamily: "var(--font-body)", fontSize: 22, lineHeight: 1, fontWeight: 600, opacity: 0.6, zIndex: 1 };
@@ -501,7 +500,7 @@ const dialStatusStyle: CSSProperties = { fontSize: 12, fontWeight: 850, textTran
 const dialTitleStyle: CSSProperties = { fontSize: 15, lineHeight: 1.2, fontWeight: 850 };
 const dialBodyStyle: CSSProperties = { maxWidth: 260, fontSize: 12, lineHeight: 1.35, opacity: 0.78 };
 const rangeWrapStyle: CSSProperties = { display: "grid", gap: 4 };
-const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "1 1 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `14px 18px calc(12px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)", boxShadow: "none" };
+const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "0 0 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `14px 18px calc(12px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)", boxShadow: "none" };
 const saveButtonStyle: CSSProperties = { width: "100%", marginTop: "auto", minHeight: 52, borderRadius: 16, border: "none", background: "var(--accent)", color: "var(--accent-ink)", padding: "0 20px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "none" };
 
 // ── Chips content wrap ────────────────────────────────────────────────────────

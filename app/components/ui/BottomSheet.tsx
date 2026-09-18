@@ -11,7 +11,10 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createPortal } from "react-dom";
 
-const DESKTOP_BREAKPOINT = 600;
+// The app's mobile content rail remains fluid through 640px. Keep sheets in
+// their bottom-attached presentation beyond that rail so a small width change
+// does not abruptly turn a phone layout into a cramped desktop dialog.
+const DESKTOP_BREAKPOINT = 768;
 const MOBILE_SHEET_TOP = "calc(var(--safe-top) + 76px)";
 let openSheetCount = 0;
 
@@ -59,6 +62,7 @@ export function BottomSheet({
   labelledBy,
   panelRef,
   maxWidth = "520px",
+  maxHeight,
   zIndex = 70,
   showHandle = true,
   panelStyle,
@@ -93,7 +97,9 @@ export function BottomSheet({
     };
   }, [open]);
 
-  const [isDesktop, setIsDesktop] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= DESKTOP_BREAKPOINT,
+  );
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
     check();
@@ -170,7 +176,7 @@ export function BottomSheet({
       <motion.div
         key="sheet-panel"
         className="bottom-sheet-frame"
-        initial={reduceMotion ? false : isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
+        initial={reduceMotion ? false : isDesktop ? { scale: 0.97 } : { y: "100%" }}
         animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
         exit={isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
         transition={
@@ -213,8 +219,10 @@ export function BottomSheet({
                   x: "-50%",
                   y: "-50%",
                   width: `min(${maxWidth}, calc(100vw - 48px))`,
-                  height: "auto",
-                  maxHeight: "calc(100dvh - 80px)",
+                  height: detent === "default"
+                    ? `min(760px, ${maxHeight ?? "calc(100dvh - 80px)"})`
+                    : "auto",
+                  maxHeight: maxHeight ?? "calc(100dvh - 80px)",
                   borderRadius: "var(--radius-sheet)",
                   background: "var(--surface)",
                   zIndex,
@@ -230,7 +238,7 @@ export function BottomSheet({
                 x: "-50%",
                 width: mobileFullWidth ? "100vw" : `min(${maxWidth}, 90vw)`,
                 height: "auto",
-                maxHeight: mobileTop ? `calc(100dvh - ${mobileTop})` : `calc(100dvh - ${MOBILE_SHEET_TOP})`,
+                maxHeight: maxHeight ?? (mobileTop ? `calc(100dvh - ${mobileTop})` : `calc(100dvh - ${MOBILE_SHEET_TOP})`),
                 background: "var(--surface)",
                 borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0",
                 boxShadow: "var(--elevation-sheet)",

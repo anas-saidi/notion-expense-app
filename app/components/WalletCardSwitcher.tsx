@@ -127,7 +127,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
 
         <div style={numberGroupStyle}>
           <div style={amountRowStyle}>
-            <span style={bigNumberStyle(isOver && jointView === "balance")}><AnimatedCounter value={value === "joint" ? heroNumber : (balance ?? available ?? 0)} animateOnMount /></span>
+            <span style={bigNumberStyle(isOver && jointView === "balance")}><AnimatedCounter value={value === "joint" ? heroNumber : (balance ?? available ?? 0)} /></span>
             <span style={unitStyle(isOver && jointView === "balance")}>{heroUnit}</span>
           </div>
           {value === "joint" && (
