@@ -47,6 +47,8 @@ const LOADING_LINES = [
 ];
 
 
+type SessionUser = { email: string | null; name: string | null; avatarUrl: string | null };
+
 const FALLBACK_ACCOUNTS: Account[] = [];
 
 const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
@@ -104,6 +106,7 @@ function SectionHeader({
 
 export default function App() {
   const [mounted, setMounted] = useState(false);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [mode, setMode] = useState<"wife" | "husband">("husband");
   const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -214,6 +217,13 @@ export default function App() {
       document.documentElement.dataset.theme = savedTheme;
     }
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => setSessionUser(data?.user ?? null))
+      .catch(() => setSessionUser(null));
   }, []);
 
   useEffect(() => {
@@ -966,6 +976,17 @@ export default function App() {
     [budgetScope, categories, pendingItems],
   );
 
+  const partnerAvatars = useMemo(() => {
+    if (!sessionUser?.avatarUrl) return undefined;
+    const identity = ((sessionUser.name || "") + " " + (sessionUser.email || "")).toLowerCase();
+    const partner = identity.includes("salma") || identity.includes("wife")
+      ? "salma"
+      : identity.includes("anas") || identity.includes("husband")
+        ? "anas"
+        : null;
+    return partner ? { [partner]: sessionUser.avatarUrl } : undefined;
+  }, [sessionUser]);
+
   // Freeze the month opening Joined Account balance mathematically by reversing
   // every cash movement since month start. Monthly assignments set the
   // obligation; later balance changes never rewrite that obligation.
@@ -1192,6 +1213,7 @@ export default function App() {
           onOpenBudgetTab={() => setTab("budget")}
           onFundCategory={openFundCategory}
           contribStatus={contribStatus}
+          partnerAvatars={partnerAvatars}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
           leftToSpendByScope={leftToSpendByScope}

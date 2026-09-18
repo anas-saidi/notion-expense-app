@@ -1,5 +1,5 @@
-const CACHE_NAME = "expense-app-v2";
-const SHELL_ASSETS = ["/"];
+const CACHE_NAME = "expense-app-v3";
+const SHELL_ASSETS = ["/icon.png", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -20,8 +20,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // API calls and POST/PATCH — always network, never cache
-  if (request.url.includes("/api/") || request.method !== "GET") return;
+  // Authenticated documents, API calls, and mutations always go to the network.
+  // Caching a document can preserve a login redirect as the installed PWA shell.
+  if (request.mode === "navigate" || request.url.includes("/api/") || request.method !== "GET") return;
 
   // App shell — network first, fall back to cache
   event.respondWith(

@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
 
   const email: string | null = owner.person?.email ?? null;
   const name: string | null = owner.name ?? null;
+  const avatarUrl: string | null = owner.avatar_url ?? null;
 
   if (!isAllowedNotionIdentity({ email, id: owner.id })) {
     return failure("not_allowed");
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
   const sessionToken = await createSessionToken({
     email,
     name,
+    avatarUrl,
     notionUserId: owner.id,
   });
 
@@ -80,6 +82,7 @@ export async function GET(request: NextRequest) {
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: SESSION_MAX_AGE,
+    expires: new Date(Date.now() + SESSION_MAX_AGE * 1000),
   });
   return response;
 }

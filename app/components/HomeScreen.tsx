@@ -22,6 +22,7 @@ type HomeScreenProps = {
   onOpenHistory?: () => void;
   onClickTransaction?: (txn: Transaction) => void;
   contribStatus?: ContribStatus | null;
+  partnerAvatars?: Partial<Record<"anas" | "salma", string>>;
   monthlySummary: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   leftToSpendByScope: Record<BudgetScope, number>;
@@ -54,6 +55,7 @@ export function HomeScreen({
   onOpenHistory,
   onClickTransaction,
   contribStatus,
+  partnerAvatars,
   monthlySummary,
   walletSummaries,
   leftToSpendByScope,
@@ -188,6 +190,7 @@ export function HomeScreen({
           leftToSpendByScope={leftToSpendByScope}
           balanceByScope={balanceByScope}
           contribStatus={contribStatus}
+          partnerAvatars={partnerAvatars}
           onOpenJointAllocate={isCurrentMonth ? onOpenJointAllocate : undefined}
         />
       </div>

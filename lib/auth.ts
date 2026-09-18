@@ -16,6 +16,7 @@ export const PUBLIC_PATHS = [
 export type SessionPayload = {
   email: string | null;
   name: string | null;
+  avatarUrl: string | null;
   notionUserId: string;
 };
 
@@ -42,6 +43,7 @@ export async function verifySessionToken(
     return {
       email: (payload.email as string | null) ?? null,
       name: (payload.name as string | null) ?? null,
+      avatarUrl: (payload.avatarUrl as string | null) ?? null,
       notionUserId: payload.notionUserId as string,
     };
   } catch {

@@ -42,6 +42,7 @@ import {
   Sun,
   TriangleAlert,
   Flame,
+  Heart,
   UsersRound,
   ChartPie,
   Settings,
@@ -93,6 +94,7 @@ export const AlertTriangleIcon   = (p: LucideProps) => <TriangleAlert size={S} {
 export const MoonIcon            = (p: LucideProps) => <Moon          size={S} {...p} />;
 export const SunIcon             = (p: LucideProps) => <Sun           size={S} {...p} />;
 export const FlameIcon           = (p: LucideProps) => <Flame         size={S} {...p} />;
+export const HeartIcon           = (p: LucideProps) => <Heart         size={S} {...p} />;
 export const UsersRoundIcon      = (p: LucideProps) => <UsersRound    size={S} {...p} />;
 export const ChartPieIcon        = (p: LucideProps) => <ChartPie      size={S} {...p} />;
 export const SettingsIcon        = (p: LucideProps) => <Settings      size={S} {...p} />;

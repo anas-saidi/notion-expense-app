@@ -129,6 +129,7 @@ export function BottomSheet({
 
   if (!mounted) return null;
 
+  const usesContentDetent = detent === "content" && layered;
   const preservesGlobalHeader = !isDesktop && !layered && !desktopFullscreen && !!document.querySelector(".app-header");
   const resolvedBackdropTop = backdropTop ?? (preservesGlobalHeader ? MOBILE_SHEET_TOP : "0px");
 
@@ -215,7 +216,7 @@ export function BottomSheet({
                 }
             : {
                 position: "fixed",
-                top: detent === "content" ? "auto" : mobileTop ?? (layered ? "calc(var(--safe-top) + 88px)" : MOBILE_SHEET_TOP),
+                top: usesContentDetent ? "auto" : layered ? "calc(var(--safe-top) + 88px)" : MOBILE_SHEET_TOP,
                 bottom: 0,
                 left: "50%",
                 x: "-50%",
@@ -240,7 +241,7 @@ export function BottomSheet({
           aria-labelledby={labelledBy}
           tabIndex={-1}
           style={{
-            flex: detent === "content" ? "0 1 auto" : 1,
+            flex: usesContentDetent ? "0 1 auto" : 1,
             minHeight: 0,
             display: "flex",
             flexDirection: "column",
@@ -275,7 +276,7 @@ export function BottomSheet({
 
           <div
             style={{
-              flex: detent === "content" ? "0 1 auto" : 1,
+              flex: usesContentDetent ? "0 1 auto" : 1,
               minHeight: 0,
               overflow: "auto",
               ...contentStyle,

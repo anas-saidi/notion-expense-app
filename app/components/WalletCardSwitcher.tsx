@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
 import { fmt } from "./app-utils";
-import { UsersRoundIcon } from "./ui/icons";
+import { HeartIcon } from "./ui/icons";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 
 export type ContribStatus = ContributionStatus;
@@ -15,6 +15,7 @@ type WalletCardSwitcherProps = {
   leftToSpendByScope?: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
   contribStatus?: ContribStatus | null;
+  partnerAvatars?: Partial<Record<"anas" | "salma", string>>;
   onOpenJointAllocate?: () => void;
 };
 
@@ -63,7 +64,7 @@ const JOINT_VIEW_COLOR: Record<JointView, string> = {
 const JOINT_VIEW_DOT_ACTIVE = "color-mix(in srgb, var(--text) 70%, transparent)";
 const JOINT_VIEW_DOT_INACTIVE = "color-mix(in srgb, var(--text) 20%, transparent)";
 
-export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope, contribStatus, onOpenJointAllocate }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope, contribStatus, partnerAvatars, onOpenJointAllocate }: WalletCardSwitcherProps) {
   const [jointView, setJointView] = useState<JointView>("balance");
 
   // Reset cycling when switching scopes
@@ -142,10 +143,22 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
 
         {/* Progress bar + caption */}
         {(() => {
-          const barColor = isBudgetOver
+          const barColor = progress >= 100
             ? "var(--spend-over)"
-            : progress >= 85 ? "var(--spend-caution)"
-            : "var(--budget-used)";
+            : progress >= 85
+              ? "var(--spend-caution-deep)"
+              : progress >= 70
+                ? "var(--spend-caution)"
+                : "var(--accent-foreground)";
+          const progressStatus = isBudgetOver
+            ? fmt(spent - (planned || 0)) + " MAD over budget"
+            : progress >= 100
+              ? "Plan fully used"
+              : progress >= 85
+                ? "Budget nearly used"
+                : progress >= 70
+                  ? "Spending is getting close"
+                  : "On track";
           return (
             <div style={barGroupStyle}>
               {hasPlan && (
@@ -161,7 +174,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={hasPlan ? progress : 0}
-                aria-valuetext={hasPlan ? `${progress}% spent, ${fmt(remaining)} MAD left` : "No monthly plan"}
+                aria-valuetext={hasPlan ? progress + "% spent, " + fmt(remaining) + " MAD left, " + progressStatus : "No monthly plan"}
               >
                 <div style={barRailStyle}>
                   <div
@@ -175,7 +188,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
               </div>
               <div style={captionRowStyle}>
                 {hasPlan ? (
-                  <span style={captionStyle}>{progress}% used{isBudgetOver ? ` · ${fmt(spent - (planned ?? 0))} MAD over budget` : progress >= 85 ? " · Budget nearly used" : ""}</span>
+                  <span style={captionStyle}>{progress}% used · {progressStatus}</span>
                 ) : (
                   <span style={captionStyle}>No monthly plan</span>
                 )}
@@ -200,10 +213,11 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
               actual={contribStatus.anasActual}
               plan={contribStatus.anasPlan}
               color="var(--partner-husband)"
+              avatarUrl={partnerAvatars?.anas}
               onSelect={onChange}
             />
             <span style={contribSharedStyle}>
-              <span style={contribConnectorStyle} aria-hidden="true"><UsersRoundIcon size={15} /></span>
+              <span className="contribution-heart" style={contribConnectorStyle} aria-hidden="true"><HeartIcon size={24} strokeWidth={2} fill="currentColor" /></span>
               <span style={contribGapStyle}>
                 {contributionSummary}
               </span>
@@ -214,6 +228,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
               actual={contribStatus.salmaActual}
               plan={contribStatus.salmaPlan}
               color="var(--partner-wife)"
+              avatarUrl={partnerAvatars?.salma}
               onSelect={onChange}
             />
             </div>
@@ -329,7 +344,7 @@ const barFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: 999,
   transformOrigin: "left center",
-  transition: "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)",
+  transition: "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
 };
 
 const captionRowStyle: CSSProperties = {
@@ -368,14 +383,16 @@ const jointDotsStyle: CSSProperties = {
   paddingTop: 4,
 };
 
-function ContribCard({ scope, name, actual, plan, color, onSelect }: {
+function ContribCard({ scope, name, actual, plan, color, avatarUrl, onSelect }: {
   scope: BudgetScope;
   name: string;
   actual: number;
   plan: number;
   color: string;
+  avatarUrl?: string;
   onSelect: (scope: BudgetScope) => void;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const difference = actual - plan;
   const due = Math.max(0, -difference);
   const overpaid = Math.max(0, difference);
@@ -396,7 +413,11 @@ function ContribCard({ scope, name, actual, plan, color, onSelect }: {
     >
       <span style={contribRingStyle(pct, color)} aria-hidden="true">
           <span style={{ ...contribAvatarStyle, background: `color-mix(in srgb, ${color} 24%, var(--surface))`, color }}>
-            <PartnerPortrait partner={scope === "anas" ? "anas" : "salma"} />
+            {avatarUrl && !imageFailed ? (
+              <img src={avatarUrl} alt="" onError={() => setImageFailed(true)} style={contribAvatarImageStyle} />
+            ) : (
+              <PartnerPortrait partner={scope === "anas" ? "anas" : "salma"} />
+            )}
           </span>
       </span>
       <span style={contribIdentityStyle}>
@@ -408,25 +429,26 @@ function ContribCard({ scope, name, actual, plan, color, onSelect }: {
 }
 
 function PartnerPortrait({ partner }: { partner: "anas" | "salma" }) {
+  const isAnas = partner === "anas";
   return (
     <svg width="42" height="42" viewBox="0 0 42 42" fill="none" aria-hidden="true">
-      {partner === "anas" ? (
+      <circle cx="21" cy="21" r="18" fill="currentColor" opacity=".12" />
+      {isAnas ? (
         <>
-          <path d="M11 17c1-7 6-11 12-11 5 0 9 2 11 7-3-2-6-3-10-2-5 1-8 4-13 6Z" fill="currentColor" opacity=".2" />
-          <path d="M12 18c0 10 4 16 10 16s10-6 10-16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <path d="M10 17c2-1 4-4 5-7m17 7c-1-3-3-6-6-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <path d="M17 21h.1M27 21h.1" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-          <path d="M18 27c2 2 6 2 8 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M11.5 18.5c.4-7.2 4.2-11 10-11 5.1 0 8.4 2.7 9.3 7.7-2.7-1.9-5.8-2.7-9.1-2.1-4.4.8-6.7 3.2-10.2 5.4Z" fill="currentColor" opacity=".72" />
+          <path d="M12.5 18.2c0 9.4 3.6 15.2 8.8 15.2s8.8-5.8 8.8-15.2" fill="var(--surface)" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M14.2 29c1.9 4.7 12.1 4.7 14.1 0-1.6 5-4 7-7.1 7s-5.4-2-7-7Z" fill="currentColor" opacity=".3" />
         </>
       ) : (
         <>
-          <path d="M8 21C8 11 13 5 21 5s13 6 13 16c0 7-3 12-6 15l-2-9H16l-2 9c-3-3-6-8-6-15Z" fill="currentColor" opacity=".2" />
-          <path d="M12 19c0 9 4 15 9 15s9-6 9-15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <path d="M11 18c3-1 5-4 6-8 3 4 7 6 13 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <path d="M16.5 21h.1M25.5 21h.1" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-          <path d="M17 27c2 2 6 2 8 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M8.5 21.2C8.5 11.8 13.2 6 21 6s12.5 5.8 12.5 15.2c0 6.7-2.7 11.7-6.2 15l-1.5-9.6h-9.6l-1.5 9.6c-3.5-3.3-6.2-8.3-6.2-15Z" fill="currentColor" opacity=".7" />
+          <path d="M12.5 18.5c0 9.2 3.5 14.8 8.5 14.8s8.5-5.6 8.5-14.8c-4.9-.4-8.7-2.2-11.5-5.5-1 2.6-2.8 4.5-5.5 5.5Z" fill="var(--surface)" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
         </>
       )}
+      <path d="M16.7 21.4h.1M25.2 21.4h.1" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+      <circle cx="15.2" cy="25.2" r="1.8" fill="currentColor" opacity=".16" />
+      <circle cx="26.8" cy="25.2" r="1.8" fill="currentColor" opacity=".16" />
+      <path d="M17.5 26.6c1.8 2.1 5.2 2.1 7 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -445,7 +467,7 @@ const contribPanelStyle: CSSProperties = { display: "grid", padding: "8px 10px 6
 const contribSharedStyle: CSSProperties = { display: "grid", justifyItems: "center", alignContent: "start", gap: 7, paddingTop: 17 };
 const contribGapStyle: CSSProperties = { maxWidth: 88, fontSize: 10, lineHeight: 1.25, color: "var(--text2)", fontWeight: 600, fontVariantNumeric: "tabular-nums", textAlign: "center" };
 const contribGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "104px 88px 104px", justifyContent: "center", alignItems: "start", gap: 0 };
-const contribConnectorStyle: CSSProperties = { width: 32, height: 32, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--text)", color: "var(--bg)", boxShadow: "var(--elevation-card)" };
+const contribConnectorStyle: CSSProperties = { width: 36, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--partner-wife)" };
 
 const contribCardStyle: CSSProperties = {
   display: "grid",
@@ -468,6 +490,8 @@ const contribIdentityStyle: CSSProperties = {
   justifyItems: "center",
   gap: 4,
 };
+
+const contribAvatarImageStyle: CSSProperties = { width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" };
 
 const contribAvatarStyle: CSSProperties = {
   display: "inline-flex",

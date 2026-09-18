@@ -14,6 +14,7 @@ export default async function middleware(request: NextRequest) {
     ["localhost", "127.0.0.1", "[::1]"].includes(request.nextUrl.hostname);
 
   if (isLocalDevelopment) {
+    if (pathname === "/api/auth/session") return NextResponse.next();
     if (pathname === "/login" || pathname.startsWith("/api/auth/")) {
       return NextResponse.redirect(new URL("/", request.url));
     }

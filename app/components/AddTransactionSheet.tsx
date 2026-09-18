@@ -371,65 +371,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>
           </div>
 
-          <button
-            type="button"
-            aria-expanded={showKeypad}
-            aria-controls="amount-keypad"
-            onClick={() => {
-              setShowKeypad((visible) => {
-                const next = !visible;
-                if (next) amountInputRef.current?.blur();
-                else requestAnimationFrame(() => amountInputRef.current?.focus());
-                return next;
-              });
-            }}
-            style={keypadToggleStyle}
-          >
-            <span>{showKeypad ? "Hide keypad" : "Show keypad"}</span>
-            <ChevronDownIcon size={15} style={{ transform: showKeypad ? "rotate(180deg)" : "none", transition: "transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)" }} />
-          </button>
-
-          {showKeypad && (
-            <div id="amount-keypad" aria-label="Amount keypad" style={keypadStyle}>
-              {keypadKeys.map(key => (
-                <button
-                  key={key.value}
-                  type="button"
-                  aria-label={key.ariaLabel ?? key.label}
-                  onClick={() => enterAmount(key.value)}
-                  style={keypadButtonStyle}
-                >
-                  {key.value === "delete" ? <DeleteIcon size={19} aria-hidden="true" /> : key.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {!showKeypad && !isEditMode && props.recentTransactions.length > 0 && (
-            <section aria-label="Recent transactions" style={recentSectionStyle}>
-              <div style={recentHeaderStyle}>Recent</div>
-              <div style={recentListStyle}>
-                {props.recentTransactions.map((transaction) => {
-                  const recentCategory = props.allCategories?.find((category) => category.id === transaction.category);
-                  const isRecentIncome = transaction.type === "Income";
-                  return (
-                    <TransactionRow
-                      key={transaction.id}
-                      className="home-txn-row"
-                      title={transaction.name || recentCategory?.name || (isRecentIncome ? "Income" : "Expense")}
-                      subtitle={recentCategory?.name}
-                      amount={transaction.amount}
-                      tone={isRecentIncome ? "income" : "expense"}
-                      prefix={isRecentIncome ? "+" : "−"}
-                      date={transaction.date ? fmtDate(transaction.date) : undefined}
-                      icon={isRecentIncome ? <BanknoteIcon size={13} /> : <CategoryIcon icon={recentCategory?.icon ?? null} size={22} />}
-                    />
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
           {/* Budget warnings */}
           {!isIncome && (props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
             <div style={{ display: "grid", gap: 10 }}>
@@ -521,6 +462,65 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 </Banner>
               )}
             </div>
+          )}
+
+          <button
+            type="button"
+            aria-expanded={showKeypad}
+            aria-controls="amount-keypad"
+            onClick={() => {
+              setShowKeypad((visible) => {
+                const next = !visible;
+                if (next) amountInputRef.current?.blur();
+                else requestAnimationFrame(() => amountInputRef.current?.focus());
+                return next;
+              });
+            }}
+            style={keypadToggleStyle}
+          >
+            <span>{showKeypad ? "Hide keypad" : "Show keypad"}</span>
+            <ChevronDownIcon size={15} style={{ transform: showKeypad ? "rotate(180deg)" : "none", transition: "transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)" }} />
+          </button>
+
+          {showKeypad && (
+            <div id="amount-keypad" aria-label="Amount keypad" style={keypadStyle}>
+              {keypadKeys.map(key => (
+                <button
+                  key={key.value}
+                  type="button"
+                  aria-label={key.ariaLabel ?? key.label}
+                  onClick={() => enterAmount(key.value)}
+                  style={keypadButtonStyle}
+                >
+                  {key.value === "delete" ? <DeleteIcon size={19} aria-hidden="true" /> : key.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!showKeypad && !isEditMode && props.recentTransactions.length > 0 && (
+            <section aria-label="Recent transactions" style={recentSectionStyle}>
+              <div style={recentHeaderStyle}>Recent</div>
+              <div style={recentListStyle}>
+                {props.recentTransactions.map((transaction) => {
+                  const recentCategory = props.allCategories?.find((category) => category.id === transaction.category);
+                  const isRecentIncome = transaction.type === "Income";
+                  return (
+                    <TransactionRow
+                      key={transaction.id}
+                      className="home-txn-row"
+                      title={transaction.name || recentCategory?.name || (isRecentIncome ? "Income" : "Expense")}
+                      subtitle={recentCategory?.name}
+                      amount={transaction.amount}
+                      tone={isRecentIncome ? "income" : "expense"}
+                      prefix={isRecentIncome ? "+" : "−"}
+                      date={transaction.date ? fmtDate(transaction.date) : undefined}
+                      icon={isRecentIncome ? <BanknoteIcon size={13} /> : <CategoryIcon icon={recentCategory?.icon ?? null} size={22} />}
+                    />
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           {/* Edit actions / Save button */}

@@ -641,6 +641,22 @@ button:hover .rebalance-btn-icon {
   to { transform: rotate(360deg); }
 }
 
+@keyframes contribution-heartbeat {
+  0%, 38%, 100% { transform: scale(1); }
+  12% { transform: scale(1.16); }
+  24% { transform: scale(1.04); }
+  30% { transform: scale(1.12); }
+}
+
+.contribution-heart {
+  animation: contribution-heartbeat 1.45s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contribution-heart { animation: none; }
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
