@@ -1489,7 +1489,8 @@ html[data-theme="dark"] .global-scope-option[aria-selected="true"] {
 }
 
 .app-nav-wrap {
-  position: fixed;
+  /* Anchor to the full-height shell; its content scrolls independently. */
+  position: absolute;
   --app-nav-base-transform: translateX(-50%);
   left: 50%;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));

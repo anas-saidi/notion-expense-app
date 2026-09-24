@@ -57,23 +57,30 @@ export function PickerPopover({
       // Use visualViewport for accurate dimensions when virtual keyboard is open
       const vv = window.visualViewport;
       const viewportHeight = vv?.height ?? window.innerHeight;
-      const viewportWidth = window.innerWidth;
+      const viewportWidth = vv?.width ?? window.innerWidth;
+      const viewportTop = vv?.offsetTop ?? 0;
+      const viewportLeft = vv?.offsetLeft ?? 0;
       const gutter = 16;
+      const availableHeight = Math.max(160, viewportHeight - gutter * 2);
+      const visiblePopoverHeight = Math.min(popoverRect.height, availableHeight);
 
       // Keep the menu beside its trigger on phones and desktop.
       let left = align === "right"
         ? anchorRect.right - popoverRect.width
         : anchorRect.left;
-      left = Math.min(Math.max(gutter, left), viewportWidth - popoverRect.width - gutter);
+      const minLeft = viewportLeft + gutter;
+      const maxLeft = viewportLeft + viewportWidth - popoverRect.width - gutter;
+      left = Math.min(Math.max(minLeft, left), Math.max(minLeft, maxLeft));
 
       // Lock direction once so filtering the list doesn't flip it mid-session
       if (lockedPlacementRef.current === null) {
         const preferredTop =
           placement === "bottom"
             ? anchorRect.bottom + 10
-            : anchorRect.top - popoverRect.height - 10;
+            : anchorRect.top - visiblePopoverHeight - 10;
         const fits =
-          preferredTop >= gutter && preferredTop + popoverRect.height <= viewportHeight - gutter;
+          preferredTop >= viewportTop + gutter &&
+          preferredTop + visiblePopoverHeight <= viewportTop + viewportHeight - gutter;
         lockedPlacementRef.current = fits
           ? placement
           : placement === "bottom" ? "top" : "bottom";
@@ -83,10 +90,18 @@ export function PickerPopover({
       let top =
         resolvedPlacement === "bottom"
           ? anchorRect.bottom + 10
-          : anchorRect.top - popoverRect.height - 10;
-      top = Math.min(Math.max(gutter, top), viewportHeight - popoverRect.height - gutter);
+          : anchorRect.top - visiblePopoverHeight - 10;
+      const minTop = viewportTop + gutter;
+      const maxTop = viewportTop + viewportHeight - visiblePopoverHeight - gutter;
+      top = Math.min(Math.max(minTop, top), Math.max(minTop, maxTop));
 
-      setPositionStyle({ position: "fixed", left, top, visibility: "visible" });
+      setPositionStyle({
+        position: "fixed",
+        left,
+        top,
+        maxHeight: availableHeight,
+        visibility: "visible",
+      });
     };
 
     const scheduleUpdate = () => {
@@ -151,8 +166,7 @@ export function PickerPopover({
         ...positionStyle,
         width: isMobilePinned ? "auto" : width,
         maxWidth: "min(calc(100vw - 16px), calc(100dvw - 16px))",
-        // On mobile give a sensible max-height so the picker doesn't cover the whole screen
-        maxHeight: "calc(100dvh - 32px)",
+        // positionStyle owns max-height so iOS keyboard changes use the visual viewport.
         background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
         border: "1px solid color-mix(in srgb, var(--border2) 64%, transparent)",
         borderRadius: "var(--radius-card)",
