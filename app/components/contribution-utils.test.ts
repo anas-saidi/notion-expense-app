@@ -22,30 +22,76 @@ const transactions: Transaction[] = [
   { id: "sd", name: "Salma direct", amount: 3529, date: "2026-09-10", category: "household", accountId: "salma", type: "Expense" },
 ];
 
-describe("calculateContributionStatus", () => {
-  it("reconstructs opening cash and preserves independent partner obligations", () => {
-    const result = calculateContributionStatus({ accounts, categories, transactions, monthlySummary });
-    expect(result).toMatchObject({
-      openingJointBalance: 2257,
-      jointPlan: 19291,
-      partnerRequirement: 17034,
-      anasPlan: 11072.1,
-      salmaPlan: 5961.9,
-      anasActual: 2295,
-      salmaActual: 6994,
-    });
-    expect(result!.anasPlan - result!.anasActual).toBeCloseTo(8777.1);
-    expect(result!.salmaActual - result!.salmaPlan).toBeCloseTo(1032.1);
-  });
+const calculate = (cash = 1194, available = 3844.5, activity: Transaction[] = [
+  { ...transactions[0], amount: 4500 },
+  transactions[1],
+  { ...transactions[3], amount: 4934 },
+  transactions[4],
+]) => calculateContributionStatus({
+  accounts: accounts.map(a => a.id === "joint" ? { ...a, balance: cash } : a),
+  categories: [{ ...categories[0], available }], transactions: activity, monthlySummary,
+})!;
+const due = (result: NonNullable<ReturnType<typeof calculateContributionStatus>>) => [result.anasPlan - result.anasActual, result.salmaPlan - result.salmaActual];
 
-  it("keeps the reconstructed opening balance stable as new activity arrives", () => {
-    const before = calculateContributionStatus({ accounts, categories, transactions, monthlySummary });
-    const afterAccounts = accounts.map((account) => account.id === "joint" ? { ...account, balance: 2400 } : account);
-    const afterTransactions = [...transactions,
-      { id: "new-transfer", name: "New transfer", amount: 500, date: "2026-09-18", category: null, accountId: null, type: "Transfer" as const, fromAccountId: "anas", toAccountId: "joint" },
-      { id: "new-expense", name: "New expense", amount: 100, date: "2026-09-18", category: "household", accountId: "joint", type: "Expense" as const },
-    ];
-    const after = calculateContributionStatus({ accounts: afterAccounts, categories, transactions: afterTransactions, monthlySummary });
-    expect(after!.openingJointBalance).toBe(before!.openingJointBalance);
+describe("reconciled contributions", () => {
+  it("includes carry-over and credits personal joint spending", () => {
+    const result = calculate();
+    expect(result.fundingGap).toBe(2650.5);
+    expect(result.anasActual).toBe(9434);
+    expect(result.salmaActual).toBe(6994);
+    expect(due(result)[0]).toBeCloseTo(2650.5);
+    expect(due(result)[1]).toBeCloseTo(0);
+  });
+  it("closes the shortfall exactly after both displayed contributions arrive", () => {
+    const before = calculate();
+    const [anasDue, salmaDue] = due(before);
+    const original: Transaction[] = [ { ...transactions[0], amount: 4500 }, transactions[1], { ...transactions[3], amount: 4934 }, transactions[4] ];
+    const after = calculate(1194 + anasDue + salmaDue, 3844.5, [...original,
+      { ...transactions[0], id: "pay-a", amount: anasDue },
+      { ...transactions[1], id: "pay-s", amount: salmaDue },
+    ]);
+    expect(after.fundingGap).toBe(0);
+    expect(due(after)).toEqual([0, 0]);
+  });
+  it("reduces dues by a partial transfer without moving the target", () => {
+    const activity = [{ ...transactions[0], amount: 500 }];
+    const before = calculate(0, 1000, []);
+    const after = calculate(500, 1000, activity);
+    expect(due(before)).toEqual([650, 350]);
+    expect(due(after)).toEqual([150, 350]);
+  });
+  it("keeps dues unchanged when joint spending reduces cash and availability together", () => {
+    expect(due(calculate(1094, 3744.5))).toEqual(due(calculate()));
+  });
+  it("credits direct personal spending while reducing the remaining allocation", () => {
+    const after = calculate(0, 900, [{ ...transactions[3], amount: 100 }]);
+    expect(due(after)).toEqual([550, 350]);
+  });
+  it("does not demand overfunding when one partner is ahead", () => {
+    const result = calculate(0, 100, [{ ...transactions[1], amount: 1000 }]);
+    expect(due(result)).toEqual([100, 0]);
+  });
+  it("supports carry-over without new monthly assignments", () => {
+    const result = calculateContributionStatus({ accounts, categories: [{ ...categories[0], available: 3000 }], transactions: [], monthlySummary: { ...monthlySummary, assignedByCategory: [], totalAssigned: 0 } })!;
+    expect(due(result)).toEqual([650, 350]);
+  });
+  it("rounds once to cents, keeps dues nonnegative, and never exceeds the gap", () => {
+    for (const available of [0, 0.01, 0.03, 1.01, 3844.5]) {
+      const result = calculate(0, available, []);
+      const [a, s] = due(result);
+      expect(a).toBeGreaterThanOrEqual(0);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(Math.round((a + s) * 100)).toBe(Math.round(available * 100));
+    }
+    expect(due(calculate(4000))).toEqual([0, 0]);
+  });
+  it("subtracts refunds from transfer credit", () => {
+    const result = calculate(0, 100, [{ ...transactions[0], amount: 500 }, { ...transactions[0], id: "refund", amount: 100, fromAccountId: "joint", toAccountId: "anas" }]);
+    expect(result.anasTransferred).toBe(400);
+    expect(due(result)).toEqual([0, 100]);
+  });
+  it("does not invent obligations when balances or split settings are missing", () => {
+    expect(calculateContributionStatus({ accounts: accounts.map(a => a.id === "joint" ? { ...a, balance: null } : a), categories, transactions, monthlySummary })).toBeNull();
+    expect(calculateContributionStatus({ accounts: accounts.map(a => a.id === "anas" ? { ...a, contributionPercent: null } : a), categories, transactions, monthlySummary })).toBeNull();
   });
 });

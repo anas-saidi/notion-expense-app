@@ -25,7 +25,7 @@ type HomeScreenProps = {
   partnerAvatars?: Partial<Record<"anas" | "salma", string>>;
   monthlySummary: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
-  leftToSpendByScope: Record<BudgetScope, number>;
+  categoryAvailableByScope: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
   readyToAssignByScope: Record<BudgetScope, number>;
   budgetScope: BudgetScope;
@@ -58,7 +58,7 @@ export function HomeScreen({
   partnerAvatars,
   monthlySummary,
   walletSummaries,
-  leftToSpendByScope,
+  categoryAvailableByScope,
   balanceByScope,
   readyToAssignByScope,
   budgetScope,
@@ -187,7 +187,7 @@ export function HomeScreen({
           onChange={onBudgetScopeChange}
           monthlySummary={monthlySummary}
           walletSummaries={walletSummaries}
-          leftToSpendByScope={leftToSpendByScope}
+          categoryAvailableByScope={categoryAvailableByScope}
           balanceByScope={balanceByScope}
           contribStatus={contribStatus}
           partnerAvatars={partnerAvatars}
@@ -217,10 +217,9 @@ export function HomeScreen({
         <Banner
           tone="accent"
           style={{ marginBottom: 16 }}
-          title="Joint account has unassigned money"
+          title="Unassigned money"
           action={<span style={assignRightStyle}><span style={assignAmountStyle}>{fmt(jointUnassigned ?? 0)} MAD</span><button type="button" onClick={onOpenJointAllocate} style={bannerActionButtonStyle}>Allocate →</button></span>}
         >
-          Sitting in the joint account, not yet budgeted
         </Banner>
       )}
 
@@ -229,7 +228,7 @@ export function HomeScreen({
         <Banner
           tone="accent"
           style={{ marginBottom: 16 }}
-          title={plannedCount > 0 ? `${planningNextMonthLabel} · ${plannedCount}/3 scopes` : `Plan ${planningNextMonthLabel}`}
+          title={plannedCount > 0 ? `${planningNextMonthLabel} · ${plannedCount}/3 budgets` : `Plan ${planningNextMonthLabel}`}
           action={<button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>{plannedCount > 0 ? "Resume →" : "Plan →"}</button>}
         >
           {planningTiming}

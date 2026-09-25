@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { accountOwnerScope, categoryOwnerPeople } from "../../../lib/category-owners";
 
 const CATEGORIES_DB = process.env.NOTION_CATEGORIES_DB ?? "1926a2be-8922-8029-9b90-c7d8bb55fabd";
 const NOTION_VERSION = "2022-06-28";
@@ -10,6 +11,25 @@ const notionHeaders = (token: string) => ({
   "Notion-Version": NOTION_VERSION,
   "Content-Type": "application/json",
 });
+
+const accountsDb = () => process.env.NOTION_ACCOUNTS_DB ?? "1926a2be-8922-8014-bb54-d9f5e9d1234b";
+const sameDb = (a?: string, b?: string) => Boolean(a && b) && a!.replace(/-/g, "") === b!.replace(/-/g, "");
+
+// Notion only accepts a single emoji as a page icon.
+const isEmoji = (value: string) =>
+  [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value)].length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(value);
+
+/** Read the account's Notion owners; returns an error response instead when it can't. */
+async function readAccountOwners(token: string, accountId: string): Promise<{ people: { id: string }[] } | NextResponse> {
+  const accountRes = await fetch(`https://api.notion.com/v1/pages/${accountId}`, { headers: notionHeaders(token), cache: "no-store" });
+  const account = await accountRes.json();
+  if (!accountRes.ok) return NextResponse.json({ error: "Could not read account owners" }, { status: accountRes.status });
+  if (!sameDb(account.parent?.database_id, accountsDb())) {
+    return NextResponse.json({ error: "Choose an account from the accounts database" }, { status: 400 });
+  }
+  try { return { people: categoryOwnerPeople(account.properties, accountOwnerScope(account.properties)) }; }
+  catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
+}
 
 const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -123,13 +143,34 @@ export async function PATCH(req: NextRequest) {
   const properties: Record<string, unknown> = {};
   if (typeof body.snoozed === "boolean") properties.Snooze = { checkbox: body.snoozed };
   if (typeof body.archived === "boolean") properties.Archived = { checkbox: body.archived };
-  if (!Object.keys(properties).length) return NextResponse.json({ error: "No category updates provided" }, { status: 400 });
+  const editing = ["name", "icon", "type", "accountId"].some(key => key in body);
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const accountId = typeof body.accountId === "string" ? body.accountId.trim() : "";
+  if (editing && (!name || !accountId || typeof body.icon !== "string" || typeof body.type !== "string")) {
+    return NextResponse.json({ error: "Provide a name, icon, type and default account" }, { status: 400 });
+  }
+  if (editing && body.icon.trim() && !isEmoji(body.icon.trim())) return NextResponse.json({ error: "Icon must be a single emoji" }, { status: 400 });
+  if (!editing && !Object.keys(properties).length) return NextResponse.json({ error: "No category updates provided" }, { status: 400 });
 
   try {
+    if (editing) {
+      const categoryRes = await fetch(`https://api.notion.com/v1/pages/${id}`, { headers: notionHeaders(token), cache: "no-store" });
+      const category = await categoryRes.json();
+      if (!categoryRes.ok) return NextResponse.json({ error: category.message || "Could not read category" }, { status: categoryRes.status });
+      if (!sameDb(category.parent?.database_id, CATEGORIES_DB)) {
+        return NextResponse.json({ error: "Choose a category from the categories database" }, { status: 400 });
+      }
+      const owners = await readAccountOwners(token, accountId);
+      if (owners instanceof NextResponse) return owners;
+      properties.Category = { title: [{ text: { content: name } }] };
+      properties.Type = { multi_select: body.type.trim() ? [{ name: body.type.trim() }] : [] };
+      properties.Default = { relation: [{ id: accountId }] };
+      properties.Owner = { people: owners.people };
+    }
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: notionHeaders(token),
-      body: JSON.stringify({ properties }),
+      body: JSON.stringify({ properties, ...(editing ? { icon: body.icon.trim() ? { type: "emoji", emoji: body.icon.trim() } : null } : {}) }),
     });
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: data.message || "Failed to update category" }, { status: res.status });
@@ -151,6 +192,7 @@ export async function POST(req: NextRequest) {
   const accountId = typeof body?.accountId === "string" && body.accountId ? body.accountId : null;
 
   if (!name) return NextResponse.json({ error: "Missing category name" }, { status: 400 });
+  if (icon && !isEmoji(icon)) return NextResponse.json({ error: "Icon must be a single emoji" }, { status: 400 });
 
   try {
     const metaRes = await fetch(`https://api.notion.com/v1/databases/${CATEGORIES_DB}`, {
@@ -170,7 +212,8 @@ export async function POST(req: NextRequest) {
     if (!titleKey) return NextResponse.json({ error: "Categories database needs a title property" }, { status: 400 });
 
     const typeKey = pickByTypeAndAliases(props, "multi_select", ["Type", "Types", "Category Type"]);
-    const ownerKey = pickByTypeAndAliases(props, "select", ["Owner", "Scope", "Person"]);
+    const ownerKey = props.find(p => p.type === "people" && norm(p.name) === "owner")?.name;
+    const selectOwnerKey = props.find(p => p.type === "select" && ["owner", "scope", "person"].includes(norm(p.name)))?.name;
     const defaultKey = pickByTypeAndAliases(props, "relation", ["Default", "Default Account", "Account"]);
     const snoozeKey = pickByTypeAndAliases(props, "checkbox", ["Snooze", "Hidden", "Frozen"]);
     const archivedKey = pickByTypeAndAliases(props, "checkbox", ["Archived", "Archive"]);
@@ -183,9 +226,13 @@ export async function POST(req: NextRequest) {
       properties[typeKey] = { multi_select: [{ name: categoryType }] };
     }
 
-    const owner = scopeToOwner(scope);
-    if (ownerKey && owner) {
-      properties[ownerKey] = { select: { name: owner } };
+    if (ownerKey) {
+      if (!accountId) return NextResponse.json({ error: "Choose an account to assign category owners" }, { status: 400 });
+      const owners = await readAccountOwners(token, accountId);
+      if (owners instanceof NextResponse) return owners;
+      properties[ownerKey] = { people: owners.people };
+    } else if (selectOwnerKey) {
+      properties[selectOwnerKey] = { select: { name: scope === "joint" ? "Joint" : scopeToOwner(scope) } };
     }
 
     if (defaultKey && accountId) {
@@ -208,20 +255,7 @@ export async function POST(req: NextRequest) {
     const data = await createRes.json();
     if (!createRes.ok) return NextResponse.json({ error: data.message || "Failed to create category", full: data }, { status: createRes.status });
 
-    return NextResponse.json({
-      category: {
-        id: data.id,
-        name,
-        icon: data.icon?.emoji ?? (icon || null),
-        type: typeKey && categoryType ? [categoryType] : [],
-        owner,
-        defaultAccount: accountId,
-        available: null,
-        planned: null,
-        lastMonthSpent: null,
-        isTeamFund: scope === "joint",
-      },
-    });
+    return NextResponse.json({ category: mapCategoryPage(data) });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to create category" }, { status: 500 });
   }

@@ -1,7 +1,9 @@
 import type { Account, Category, MonthlySummary, Transaction } from "./app-types";
+import { getCategoryAvailableByScope } from "./wallet-utils";
 import { categoryMatchesScope } from "./app-utils";
 
 export type ContributionStatus = {
+  fundingGap: number;
   openingJointBalance: number;
   jointPlan: number;
   partnerRequirement: number;
@@ -42,7 +44,10 @@ export function calculateContributionStatus({
   );
   const anasPercent = anasAccount?.contributionPercent ?? null;
   const salmaPercent = salmaAccount?.contributionPercent ?? null;
-  if (anasPercent == null && salmaPercent == null) return null;
+  if (anasPercent == null || salmaPercent == null || anasPercent < 0 || salmaPercent < 0 ||
+      Math.abs(anasPercent + salmaPercent - 1) > 0.000001 || joinedAccount.balance == null) return null;
+  const jointCategories = categories.filter(category => categoryMatchesScope(category, "joint", accounts));
+  if (jointCategories.some(category => category.available == null)) return null;
 
   const jointAssignments = monthlySummary.assignedByCategory.filter((entry) => {
     const label = accountLabel(accounts, entry.accountId);
@@ -52,7 +57,6 @@ export function calculateContributionStatus({
     return category ? categoryMatchesScope(category, "joint", accounts) : false;
   });
   const jointPlan = jointAssignments.reduce((sum, entry) => sum + entry.total, 0);
-  if (jointPlan <= 0) return null;
 
   let joinedInflows = 0;
   let joinedOutflows = 0;
@@ -69,7 +73,12 @@ export function calculateContributionStatus({
         if (fromLabel.includes("hubb")) anasTransferred += transaction.amount;
         else if (fromLabel.includes("wife")) salmaTransferred += transaction.amount;
       }
-      if (transaction.fromAccountId === joinedAccount.id) joinedOutflows += transaction.amount;
+      if (transaction.fromAccountId === joinedAccount.id) {
+        joinedOutflows += transaction.amount;
+        const toLabel = accountLabel(accounts, transaction.toAccountId);
+        if (toLabel.includes("hubb")) anasTransferred -= transaction.amount;
+        else if (toLabel.includes("wife")) salmaTransferred -= transaction.amount;
+      }
       continue;
     }
 
@@ -91,18 +100,32 @@ export function calculateContributionStatus({
   }
 
   const openingJointBalance = (joinedAccount.balance ?? 0) - joinedInflows + joinedOutflows;
-  const partnerRequirement = Math.max(0, jointPlan - openingJointBalance);
-  const anasPlan = (anasPercent ?? 0) * partnerRequirement;
-  const salmaPlan = (salmaPercent ?? 0) * partnerRequirement;
+  // Current ledger availability includes carry-over and category rebalancing.
+  // Reconstruct the total funding target from credited contributions + cash still needed.
+  // Once both displayed dues are transferred, cash covers availability exactly.
+  const cents = (amount: number) => Math.round((amount + Number.EPSILON) * 100);
+  const anasActual = anasTransferred + anasDirectSpend;
+  const salmaActual = salmaTransferred + salmaDirectSpend;
+  const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance));
+  const targetCents = cents(anasActual) + cents(salmaActual) + gapCents;
+  // A partner already above their share owes zero; cap the other partner at
+  // the household shortfall so paying dues never demands an implicit refund.
+  const anasDueCents = Math.max(0, Math.min(gapCents, Math.round(targetCents * anasPercent) - cents(anasActual)));
+  const salmaDueCents = gapCents - anasDueCents;
+  const fundingGap = gapCents / 100;
+  const anasPlan = anasActual + anasDueCents / 100;
+  const salmaPlan = salmaActual + salmaDueCents / 100;
+  const partnerRequirement = anasPlan + salmaPlan;
 
   return {
+    fundingGap,
     openingJointBalance,
     jointPlan,
     partnerRequirement,
     anasPlan,
     salmaPlan,
-    anasActual: anasTransferred + anasDirectSpend,
-    salmaActual: salmaTransferred + salmaDirectSpend,
+    anasActual,
+    salmaActual,
     anasDirectSpend,
     salmaDirectSpend,
     anasTransferred,

@@ -20,6 +20,7 @@ import { JointAllocateSheet } from "./components/JointAllocateSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import { TransactionDetailsSheet } from "./components/TransactionDetailsSheet";
+import { getCategoryAvailableByScope, scopeMonthlySummary } from "./components/wallet-utils";
 import { calculateContributionStatus } from "./components/contribution-utils";
 import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
@@ -144,7 +145,7 @@ export default function App() {
   const [showJointAllocate, setShowJointAllocate] = useState(false);
   const [showManageScreen, setShowManageScreen] = useState(false);
   const [showMonthStartPlanner, setShowMonthStartPlanner] = useState(false);
-  const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | null>(null);
+  const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | "edit" | null>(null);
   const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
   const [categoryManageDefaultType, setCategoryManageDefaultType] = useState<string | undefined>(undefined);
   const [incomeAccount, setIncomeAccount] = useState<Account | null>(null);
@@ -747,11 +748,11 @@ export default function App() {
     const fundedIds = new Set(nextMonthFunds.filter((f) => f.planned > 0).map((f) => f.categoryId));
     const all = [...categories, ...frozenCategories];
     return {
-      joint: all.filter((c) => getCategoryScope(c) === "joint").some((c) => fundedIds.has(c.id)),
-      anas:  all.filter((c) => getCategoryScope(c) === "anas").some((c) => fundedIds.has(c.id)),
-      salma: all.filter((c) => getCategoryScope(c) === "salma").some((c) => fundedIds.has(c.id)),
+      joint: all.filter((c) => getCategoryScope(c, accounts) === "joint").some((c) => fundedIds.has(c.id)),
+      anas:  all.filter((c) => getCategoryScope(c, accounts) === "anas").some((c) => fundedIds.has(c.id)),
+      salma: all.filter((c) => getCategoryScope(c, accounts) === "salma").some((c) => fundedIds.has(c.id)),
     };
-  }, [nextMonthFunds, categories, frozenCategories]);
+  }, [nextMonthFunds, categories, frozenCategories, accounts]);
 
   // Planning is always for the NEXT month (we close the current month and plan the upcoming one)
   const monthStartPlannerMonth = useMemo(() => {
@@ -905,40 +906,7 @@ export default function App() {
     });
 
   const getMonthlySummaryForScope = useCallback((scope: BudgetScope): MonthlySummary => {
-    const accountLabel = (entry: { accountId?: string | null }) => {
-      if (!entry.accountId) return "";
-      return (accounts.find(a => a.id === entry.accountId)?.label ?? "").toLowerCase();
-    };
-
-    const assignmentMatchesScope = (entry: { categoryId: string; accountId?: string | null }) => {
-      const label = accountLabel(entry);
-      // Savings accounts are never part of operational planned budget
-      if (label.includes("saving")) return false;
-      // Primary: use account label (ground truth for who made the assignment)
-      if (label.includes("hubb")) return scope === "anas";
-      if (label.includes("wife")) return scope === "salma";
-      if (label.includes("joined")) return scope === "joint";
-      // Fallback: use category scope when account is unknown
-      const cat = categories.find(c => c.id === entry.categoryId);
-      if (!cat) return scope === "joint";
-      const catScope = getCategoryScope(cat);
-      return catScope === scope;
-    };
-
-    const assignedByCategory = monthlySummary.assignedByCategory.filter(assignmentMatchesScope);
-
-    const categoryIds = new Set(
-      categories.filter(c => categoryMatchesScope(c, scope)).map(c => c.id),
-    );
-    const spentByCategory = monthlySummary.spentByCategory.filter((entry) => categoryIds.has(entry.categoryId));
-
-    return {
-      ...monthlySummary,
-      totalAssigned: assignedByCategory.reduce((sum, entry) => sum + entry.total, 0),
-      totalSpent: spentByCategory.reduce((sum, entry) => sum + entry.total, 0),
-      assignedByCategory,
-      spentByCategory,
-    };
+    return scopeMonthlySummary(monthlySummary, categories, accounts, scope);
   }, [categories, accounts, monthlySummary]);
 
   const scopedMonthlySummary = useMemo(() => {
@@ -953,13 +921,9 @@ export default function App() {
     };
   }, [getMonthlySummaryForScope]);
 
-  const leftToSpendByScope = useMemo<Record<BudgetScope, number>>(() => {
-    const sum = (scope: BudgetScope) =>
-      categories
-        .filter(c => categoryMatchesScope(c, scope) && !isSavingsCategory(c))
-        .reduce((s, c) => s + (c.available ?? 0), 0);
-    return { joint: sum("joint"), anas: sum("anas"), salma: sum("salma") };
-  }, [categories]);
+  const categoryAvailableByScope = useMemo<Record<BudgetScope, number>>(() => {
+    return getCategoryAvailableByScope(categories, accounts);
+  }, [categories, accounts]);
 
   const scopedTransactions = useMemo(
     () => transactions.filter((transaction) => transactionMatchesScope(transaction, categories, budgetScope, accounts)),
@@ -987,9 +951,7 @@ export default function App() {
     return partner ? { [partner]: sessionUser.avatarUrl } : undefined;
   }, [sessionUser]);
 
-  // Freeze the month opening Joined Account balance mathematically by reversing
-  // every cash movement since month start. Monthly assignments set the
-  // obligation; later balance changes never rewrite that obligation.
+  // Remaining partner contributions reconcile current allocations with account cash.
   const contribStatus = useMemo(() => calculateContributionStatus({
     accounts,
     categories,
@@ -1216,7 +1178,7 @@ export default function App() {
           partnerAvatars={partnerAvatars}
           monthlySummary={scopedMonthlySummary}
           walletSummaries={walletMonthlySummaries}
-          leftToSpendByScope={leftToSpendByScope}
+          categoryAvailableByScope={categoryAvailableByScope}
           balanceByScope={balanceByScope}
           readyToAssignByScope={readyToAssignByScope}
           budgetScope={budgetScope}
@@ -1463,6 +1425,11 @@ export default function App() {
           setTransactionType("Expense");
           setShowCategoryDetails(false);
           setShowAddModal(true);
+        }}
+        onEdit={() => {
+          setCategoryManageCategory(detailsCategory);
+          setCategoryManageMode("edit");
+          setShowCategoryDetails(false);
         }}
         onOpenFund={() => {
           if (detailsCategory) openFundCategory(detailsCategory);

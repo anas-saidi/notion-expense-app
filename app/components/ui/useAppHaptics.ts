@@ -20,9 +20,10 @@ export function useAppHaptics() {
   }, []);
 
   const haptic = useCallback((preset: AppHaptic) => {
-    if (!isSupported || typeof navigator === "undefined" || navigator.maxTouchPoints < 1) return;
+    // isSupported detects navigator.vibrate only; trigger also provides the iOS fallback.
+    if (typeof navigator === "undefined" || navigator.maxTouchPoints < 1) return;
     void hapticsRef.current?.trigger(preset);
-  }, [isSupported]);
+  }, []);
 
   return { haptic, isSupported };
 }

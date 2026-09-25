@@ -37,3 +37,6 @@ yarn-error.log*
 .next-dev.out.log
 .next-dev.err.log
 .env*
+
+# Local visual-verification output (screenshots, scripts)
+artifacts/

@@ -587,7 +587,7 @@ export function AccountDetailsSheet({
             <header style={reconcileHeaderStyle}>
               <div style={{ display: "grid", gap: 5 }}>
                 <h2 style={reconcileTitleStyle}>Reconcile balance</h2>
-                <p style={reconcileHintStyle}>Enter the real balance from your bank or statement.</p>
+                <p style={reconcileHintStyle}>Enter your bank balance.</p>
               </div>
               <button type="button" className="sheet-close-button" onClick={closeReconcile} aria-label="Close reconciliation"><XIcon size={18} /></button>
             </header>
@@ -626,7 +626,7 @@ export function AccountDetailsSheet({
             {/* Add missed transaction — shrinks the difference above instead of reconciling it away */}
             <div style={addTxnSectionStyle}>
               <div style={addTxnHeaderRowStyle}>
-                <p style={addTxnHintStyle}>Missed a transaction? Add it instead of reconciling it away.</p>
+                <p style={addTxnHintStyle}>Missing a transaction? Add it first.</p>
                 <button
                   type="button"
                   onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }}

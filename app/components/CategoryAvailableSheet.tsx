@@ -90,7 +90,7 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
               : <><strong>{Math.abs(delta).toLocaleString("en-US")} MAD</strong> will return to {source?.label ?? "the default account"}.</>}
           </p>
         )}
-        {delta !== 0 && !valid && <Banner tone="danger" compact>The requested adjustment is outside the available balance.</Banner>}
+        {delta !== 0 && !valid && <Banner tone="danger" compact>Adjustment exceeds the available balance.</Banner>}
         {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
         <button type="button" disabled={!valid || saving} onClick={submit} style={{ ...saveStyle, opacity: valid && !saving ? 1 : .45 }}>{saving ? "Applying…" : "Apply adjustment"}</button>
       </div>

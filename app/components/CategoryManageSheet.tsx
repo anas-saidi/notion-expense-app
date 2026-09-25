@@ -10,9 +10,15 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
 
+// Keep one emoji: typing or picking a new one replaces the previous icon.
+const lastGrapheme = (value: string) => {
+  const parts = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value.trim())];
+  return parts.at(-1)?.segment ?? "";
+};
+
 type CategoryManageSheetProps = {
   open: boolean;
-  mode: "fund" | "create";
+  mode: "fund" | "create" | "edit";
   category: Category | null;
   month: string;
   accounts: Account[];
@@ -55,30 +61,32 @@ export function CategoryManageSheet({
     if (!open) return;
     setStatus("idle");
     setError("");
-    setName("");
-    setIcon(category?.icon ?? "🧾");
-    setCategoryType(defaultType ?? availableTypes?.[0] ?? "");
-    setAccountId(category?.defaultAccount ?? accounts[0]?.id ?? "");
+    setName(mode === "edit" ? category?.name ?? "" : "");
+    setIcon(category?.icon ?? (mode === "edit" ? "" : "🧾"));
+    setCategoryType(mode === "edit" ? category?.type?.[0] ?? "" : defaultType ?? availableTypes?.[0] ?? "");
+    // Editing never guesses an account: it rewrites the category's owners.
+    setAccountId(category?.defaultAccount ?? (mode === "edit" ? "" : accounts[0]?.id ?? ""));
     setAmount("");
-  }, [accounts, availableTypes, category, defaultType, open]);
+  }, [accounts, availableTypes, category, defaultType, open, mode]);
 
   const isCreate = mode === "create";
+  const isEdit = mode === "edit";
+  const isMetadata = isCreate || isEdit;
   const selectedAccount = accounts.find((account) => account.id === accountId) ?? null;
   const parsedAmount = amount ? Number(amount) : 0;
   const canSubmit =
-    status === "idle" &&
+    (status === "idle" || status === "error") &&
     accountId &&
-    (isCreate ? name.trim().length > 0 : Boolean(category?.id)) &&
-    (!amount || (Number.isFinite(parsedAmount) && parsedAmount > 0));
+    (isMetadata ? name.trim().length > 0 && (!isEdit || Boolean(category?.id)) : Boolean(category?.id)) &&
+    (isEdit || ((isCreate && !amount) || (Number.isFinite(parsedAmount) && parsedAmount > 0)));
 
-  const title = isCreate ? "New category" : `Fund ${category?.name ?? "category"}`;
-  const eyebrow = isCreate ? "Budget setup" : "Monthly funding";
+  const title = isEdit ? "Edit category" : isCreate ? "New category" : `Fund ${category?.name ?? "category"}`;
   const actionLabel = useMemo(() => {
-    if (status === "saving") return isCreate ? "Creating..." : "Funding...";
-    if (status === "success") return isCreate ? "Created" : "Funded";
+    if (status === "saving") return isEdit ? "Saving..." : isCreate ? "Creating..." : "Funding...";
+    if (status === "success") return isEdit ? "Saved" : isCreate ? "Created" : "Funded";
     if (status === "error") return "Try again";
-    return isCreate ? "Create category" : "Fund category";
-  }, [isCreate, status]);
+    return isEdit ? "Save changes" : isCreate ? "Create category" : "Fund category";
+  }, [isCreate, isEdit, status]);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -88,20 +96,20 @@ export function CategoryManageSheet({
       let categoryId = category?.id ?? "";
       let categoryName = category?.name ?? name.trim();
 
-      if (isCreate) {
+      if (isMetadata) {
         const createRes = await fetch("/api/categories", {
-          method: "POST",
+          method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), icon, scope, type: categoryType, accountId }),
+          body: JSON.stringify({ ...(isEdit ? { id: category?.id } : {}), name: name.trim(), icon, scope, type: categoryType, accountId }),
         });
         const createData = await createRes.json();
-        if (!createRes.ok) throw new Error(createData.error || "Failed to create category");
+        if (!createRes.ok) throw new Error(createData.error || (isEdit ? "Failed to save category" : "Failed to create category"));
         categoryId = createData.category?.id;
         categoryName = createData.category?.name ?? categoryName;
         if (!categoryId) throw new Error("Category was created without an id");
       }
 
-      if (parsedAmount > 0) {
+      if (!isEdit && parsedAmount > 0) {
         const fundRes = await fetch("/api/monthly-planning/funds", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -119,7 +127,7 @@ export function CategoryManageSheet({
       }
 
       setStatus("success");
-      onSuccess(parsedAmount > 0 ? `${categoryName} funded` : `${categoryName} created`);
+      onSuccess(isEdit ? `${name.trim()} saved` : parsedAmount > 0 ? `${categoryName} funded` : `${categoryName} created`);
       onClose();
     } catch (err: unknown) {
       setStatus("error");
@@ -138,15 +146,14 @@ export function CategoryManageSheet({
       detent="content"
       maxHeight="calc(100dvh - 20px)"
       panelStyle={sheetStyle}
-      contentStyle={{ paddingTop: 0 }}
+      contentStyle={{ paddingTop: 0, overflow: "hidden", display: "flex", minHeight: 0 }}
       zIndex={zIndex}
     >
       <div style={innerStyle}>
         <header style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <CategoryIcon icon={isCreate ? icon : category?.icon} style={{ fontSize: 28, flexShrink: 0 }} />
+            <CategoryIcon icon={isMetadata ? icon : category?.icon} style={{ fontSize: 28, flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
-              <div style={eyebrowStyle}>{eyebrow}</div>
               <h2 style={titleStyle}>{title}</h2>
             </div>
           </div>
@@ -155,7 +162,8 @@ export function CategoryManageSheet({
           </button>
         </header>
 
-        {isCreate && (
+        <div style={{ display: "grid", gap: 16, alignContent: "start", overflowY: "auto", minHeight: 0 }}>
+        {isMetadata && (
           <section style={sectionStyle}>
             <label style={fieldStyle}>
               <span style={labelStyle}>Name</span>
@@ -170,15 +178,15 @@ export function CategoryManageSheet({
             <div style={twoColStyle}>
               <label style={fieldStyle}>
                 <span style={labelStyle}>Icon</span>
-                <input value={icon} onChange={(event) => setIcon(event.target.value.slice(0, 4))} style={inputStyle} />
+                <input value={icon} onChange={(event) => setIcon(lastGrapheme(event.target.value))} placeholder="🧾" aria-label="Icon (one emoji)" style={inputStyle} />
               </label>
               <label style={fieldStyle}>
                 <span style={labelStyle}>Type</span>
                 <ChoicePicker aria-label="Category type" value={categoryType} onChange={(event) => setCategoryType(event.target.value)} style={inputStyle}>
-                  {(availableTypes ?? []).map((t) => (
+                  {[...new Set([...(availableTypes ?? []), ...(category?.type ?? [])])].map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
-                  {!availableTypes?.length && <option value="">No types</option>}
+                  <option value="">No type</option>
                 </ChoicePicker>
               </label>
             </div>
@@ -188,8 +196,8 @@ export function CategoryManageSheet({
 
         <section style={sectionStyle}>
           <label style={fieldStyle}>
-            <span style={labelStyle}>Default account</span>
-            <ChoicePicker aria-label="Default account" value={accountId} onChange={(event) => setAccountId(event.target.value)} style={inputStyle}>
+            <span style={labelStyle}>{isMetadata ? "Default account" : "Funding account"}</span>
+            <ChoicePicker aria-label={isMetadata ? "Default account" : "Funding account"} value={accountId} onChange={(event) => setAccountId(event.target.value)} style={inputStyle}>
               <option value="" disabled>Choose account</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.icon} {account.label}</option>
@@ -197,7 +205,7 @@ export function CategoryManageSheet({
             </ChoicePicker>
           </label>
 
-          <label style={fieldStyle}>
+          {!isEdit && <label style={fieldStyle}>
             <span style={labelStyle}>{isCreate ? "Fund this month" : "Amount to add"}</span>
             <div style={amountWrapStyle}>
               <input
@@ -208,9 +216,10 @@ export function CategoryManageSheet({
               />
               <span style={currencyStyle}>MAD</span>
             </div>
-          </label>
+          </label>}
 
-          {selectedAccount?.readyToAssign !== null && selectedAccount?.readyToAssign !== undefined && (
+          {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Owners match the account.</p>}
+          {!isEdit && selectedAccount?.readyToAssign !== null && selectedAccount?.readyToAssign !== undefined && (
             <div style={accountHintStyle}>
               <span>Ready to assign from {selectedAccount.label}</span>
               <strong><Money value={selectedAccount.readyToAssign} /></strong>
@@ -220,9 +229,10 @@ export function CategoryManageSheet({
 
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
+        </div>
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
           {status === "success" && <CheckIcon size={16} />}
-          {status === "idle" && (isCreate ? <PlusIcon size={16} strokeWidth={2.3} /> : <FundIcon size={16} strokeWidth={2.3} />)}
+          {status === "idle" && (isEdit ? <CheckIcon size={16} /> : isCreate ? <PlusIcon size={16} strokeWidth={2.3} /> : <FundIcon size={16} strokeWidth={2.3} />)}
           {actionLabel}
         </button>
       </div>
@@ -239,7 +249,11 @@ const sheetStyle: CSSProperties = {
 const innerStyle: CSSProperties = {
   padding: "18px 18px 22px",
   display: "grid",
-  gap: 18,
+  gap: 16,
+  gridTemplateRows: "auto minmax(0, 1fr) auto",
+  minHeight: 0,
+  width: "100%",
+  boxSizing: "border-box",
 };
 
 const headerStyle: CSSProperties = {
@@ -249,14 +263,6 @@ const headerStyle: CSSProperties = {
   gap: 12,
 };
 
-
-const eyebrowStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-};
 
 const titleStyle: CSSProperties = {
   margin: "4px 0 0",

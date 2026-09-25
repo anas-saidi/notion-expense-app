@@ -188,7 +188,7 @@ export function CategoriesScreen({
               </span>
               <span style={budgetHealthSecondaryRowStyle}>
                 <span style={budgetHealthSecondaryStyle}>
-                  <span>Left</span>
+                  <span>Unassigned</span>
                   <strong>{fmt(Math.round(leftToAllocate))} MAD</strong>
                 </span>
                 <span style={budgetHealthSecondaryStyle}>
@@ -202,14 +202,13 @@ export function CategoriesScreen({
               <Banner
                 tone="accent"
                 icon={<TransferIcon size={18} strokeWidth={2.2} />}
-                title={`${fmt(Math.round(contributionRemaining))} MAD still due to Joint`}
+                title={`${fmt(Math.round(contributionRemaining))} MAD due to Joint`}
                 action={(
                   <button type="button" onClick={onMoveContribution} style={contributionActionStyle}>
-                    Move money
+                    Contribute
                   </button>
                 )}
               >
-                Transfer the remaining contribution from your personal account.
               </Banner>
             )}
 
@@ -441,7 +440,7 @@ function BudgetDistributionChart({
         <div style={emptyChartStyle}>
           {chartData.hasCategories ? <CheckIcon size={24} /> : <PlusIcon size={22} />}
           <strong>{chartData.hasCategories ? "Nothing left" : "No categories yet"}</strong>
-          <span>{chartData.hasCategories ? "All available funds are assigned or spent." : "Add a category below to start planning."}</span>
+          <span>{chartData.hasCategories ? "Nothing available." : "Add a category to start."}</span>
         </div>
       </div>
     );

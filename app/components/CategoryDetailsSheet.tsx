@@ -54,6 +54,7 @@ type CategoryDetailsSheetProps = {
   onClose: () => void;
   onOpenAdd: () => void;
   onOpenFund: () => void;
+  onEdit?: () => void;
   onFreeze?: () => void;
   onUnfreeze?: () => void;
   onTransactionsChanged?: () => void | Promise<void>;
@@ -67,6 +68,7 @@ export function CategoryDetailsSheet({
   onClose,
   onOpenAdd,
   onOpenFund,
+  onEdit,
   onFreeze,
   onUnfreeze,
   onTransactionsChanged,
@@ -208,6 +210,7 @@ export function CategoryDetailsSheet({
             <ActionBtn icon={<MoreIcon size={18} />} label="More" ariaLabel="More category actions" bg="transparent" ink="var(--muted)" border="1px solid transparent" onClick={() => setShowMoreActions(true)} />
             <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} width="min(280px, calc(100vw - 32px))">
               <div className="picker-options">
+                {onEdit && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onEdit(); }}>Edit category</button>}
                 <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ScaleIcon size={17} />Adjust available</span></button>
                 {onFreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setConfirmingFreeze(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><FreezeIcon size={17} />Freeze category</span></button>}
                 {onUnfreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onUnfreeze(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ReviveIcon size={17} />Unfreeze category</span></button>}
@@ -295,7 +298,7 @@ export function CategoryDetailsSheet({
       <BottomSheet open={confirmingFreeze} onClose={() => setConfirmingFreeze(false)} label="Confirm freeze category" detent="content" layered maxWidth="440px" zIndex={150} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
         <div style={confirmWrapStyle}>
           <span style={confirmIconStyle}><FreezeIcon size={20} /></span>
-          <div style={{ display: "grid", gap: 6 }}><h2 style={confirmTitleStyle}>Freeze {category.name}?</h2><p style={confirmCopyStyle}>It will leave the active budget and move to Frozen. Existing activity and balances stay intact.</p></div>
+          <div style={{ display: "grid", gap: 6 }}><h2 style={confirmTitleStyle}>Freeze {category.name}?</h2><p style={confirmCopyStyle}>Moves to Frozen. Balance and activity are kept.</p></div>
           <div style={confirmActionsStyle}>
             <button type="button" onClick={() => setConfirmingFreeze(false)} style={confirmCancelStyle}>Cancel</button>
             <button type="button" onClick={() => { setConfirmingFreeze(false); onFreeze?.(); }} style={confirmFreezeStyle}>Freeze category</button>

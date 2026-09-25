@@ -8,9 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev        # Start dev server at http://localhost:3000
 npm run build      # Production build
 npx tsc --noEmit   # Type-check without emitting (run before every commit)
+npm test           # Vitest unit tests
 ```
 
-There is no test suite. TypeScript (`npx tsc --noEmit`) is the primary correctness check — always run it after changes.
+TypeScript (`npx tsc --noEmit`) is the primary correctness check — always run it after changes. Unit tests use Vitest (`npm test`, files named `*.test.ts` next to the code they cover); run them when touching utilities or API routes.
 
 ## Environment
 

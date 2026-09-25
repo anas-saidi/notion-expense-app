@@ -1,8 +1,10 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import type { BudgetScope, MonthlySummary } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
+import { Money } from "./Money";
 import { fmt } from "./app-utils";
 import { HeartIcon } from "./ui/icons";
+import { useAppHaptics } from "./ui/useAppHaptics";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 
 export type ContribStatus = ContributionStatus;
@@ -12,7 +14,7 @@ type WalletCardSwitcherProps = {
   onChange: (scope: BudgetScope) => void;
   monthlySummary?: MonthlySummary;
   walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
-  leftToSpendByScope?: Record<BudgetScope, number>;
+  categoryAvailableByScope?: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
   contribStatus?: ContribStatus | null;
   partnerAvatars?: Partial<Record<"anas" | "salma", string>>;
@@ -21,50 +23,18 @@ type WalletCardSwitcherProps = {
 
 
 
-const STATUS_COLOR: Record<string, string> = {
-  "On track":  "var(--accent-ink)",
-  "Together":  "var(--accent-ink)",
-  "Low":       "var(--warning)",
-  "Over":      "var(--danger)",
-  "No plan":   "var(--muted)",
-  "Quiet":     "var(--muted)",
-};
-
-const STATUS_BACKGROUND: Record<string, string> = {
-  "On track": "var(--accent-dim)",
-  "Together": "var(--accent-dim)",
-  "Low": "var(--warning-dim)",
-  "Over": "color-mix(in srgb, var(--danger) 12%, var(--surface))",
-  "No plan": "var(--surface2)",
-  "Quiet": "var(--surface2)",
-};
-
-
-const getStatus = (available: number | null, planned: number | null, scope?: BudgetScope) => {
-  if (planned === null || planned <= 0) return "No plan";
-  if (available === null) return "Quiet";
-  if (available < 0) return "Over";
-  if (available / planned <= 0.18) return "Low";
-  return scope === "joint" ? "Together" : "On track";
-};
-
 type JointView = "balance" | "budgeted" | "spent";
 const JOINT_VIEWS: JointView[] = ["balance", "budgeted", "spent"];
 const JOINT_VIEW_LABEL: Record<JointView, string> = {
-  balance:  "Account balance",
+  balance:  "Joint balance",
   budgeted: "Planned this month",
   spent:    "Spent this month",
-};
-// Each view gets its own accent so the number feels distinct at a glance
-const JOINT_VIEW_COLOR: Record<JointView, string> = {
-  balance:  "var(--text)",
-  budgeted: "color-mix(in srgb, var(--text) 80%, #a8d8ff)",  // cool blue tint
-  spent:    "color-mix(in srgb, var(--text) 80%, #ffd6a5)",  // warm amber tint
 };
 const JOINT_VIEW_DOT_ACTIVE = "color-mix(in srgb, var(--text) 70%, transparent)";
 const JOINT_VIEW_DOT_INACTIVE = "color-mix(in srgb, var(--text) 20%, transparent)";
 
-export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, leftToSpendByScope, balanceByScope, contribStatus, partnerAvatars, onOpenJointAllocate }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSummaries, categoryAvailableByScope, balanceByScope, contribStatus, partnerAvatars, onOpenJointAllocate }: WalletCardSwitcherProps) {
+  const { haptic } = useAppHaptics();
   const [jointView, setJointView] = useState<JointView>("balance");
 
   // Reset cycling when switching scopes
@@ -73,46 +43,27 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
   const currentSummary = monthlySummary ?? walletSummaries?.[value];
   // Hero number: real account balance by scope (from Notion accounts database)
   const balance   = balanceByScope != null ? balanceByScope[value] : null;
-  // Curve/progress still uses category-based left-to-spend for spend % display
-  const available = leftToSpendByScope != null ? leftToSpendByScope[value] : currentSummary ? currentSummary.totalAssigned - currentSummary.totalSpent : null;
+  // Current ledger snapshot is independent of the monthly summary.
+  const available = categoryAvailableByScope != null ? categoryAvailableByScope[value] : null;
   const planned   = currentSummary?.totalAssigned ?? null;
-  const status    = getStatus(balance, planned, value);
   const isOver    = balance !== null && balance < 0;
   const hasPlan   = planned !== null && planned > 0;
-  const spent     = Math.max(0, currentSummary?.totalSpent ?? (planned ?? 0) - (available ?? 0));
-  const remaining = Math.max(0, (planned ?? 0) - spent);
+  const spent     = currentSummary?.totalSpent ?? 0;
   const progress  = hasPlan ? Math.min(100, Math.round((spent / planned) * 100)) : 0;
-  const isBudgetOver = hasPlan && spent > planned;
-  const anasDifference = contribStatus ? contribStatus.anasActual - contribStatus.anasPlan : 0;
-  const salmaDifference = contribStatus ? contribStatus.salmaActual - contribStatus.salmaPlan : 0;
-  const fundingGap = contribStatus
-    ? Math.max(0, contribStatus.partnerRequirement - contribStatus.anasActual - contribStatus.salmaActual)
-    : 0;
-  const contributionSummary = anasDifference > 0.5 && salmaDifference > 0.5
-    ? "Joined owes partners " + fmt(Math.round(anasDifference + salmaDifference)) + " MAD"
-    : anasDifference > 0.5
-      ? "Joined owes Anas " + fmt(Math.round(anasDifference)) + " MAD"
-      : salmaDifference > 0.5
-        ? "Joined owes Salma " + fmt(Math.round(salmaDifference)) + " MAD"
-        : fundingGap > 0.5
-          ? fmt(Math.round(fundingGap)) + " MAD funding gap"
-          : "Contributions settled";
-
-  const cycleJointView = () => {
-    setJointView(v => {
-      const idx = JOINT_VIEWS.indexOf(v);
-      return JOINT_VIEWS[(idx + 1) % JOINT_VIEWS.length];
-    });
-  };
+  const fundingGap = contribStatus?.fundingGap ?? 0;
+  const contributionSummary = fundingGap > 0
+    ? fmt(fundingGap) + " MAD to contribute"
+    : "Fully funded";
 
   // What to show in the hero number when joint
   const jointSummary = walletSummaries?.joint;
   const heroNumber = value === "joint"
     ? jointView === "budgeted" ? (planned ?? 0)
     : jointView === "spent"    ? (jointSummary?.totalSpent ?? 0)
-    : (balance ?? available ?? 0)
-    : (balance ?? available ?? 0);
+    : (balance ?? 0)
+    : (balance ?? 0);
 
+  const heroColor = isOver && jointView === "balance" ? "var(--danger)" : value === "joint" && jointView === "spent" ? "var(--danger)" : value === "joint" && jointView === "budgeted" ? "var(--accent-foreground)" : "var(--text)";
   const heroUnit = "MAD";
   return (
     <div style={switcherStyle}>
@@ -126,14 +77,15 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
       <div style={heroStyle} key={value}>
 
         <div style={numberGroupStyle}>
-          <div style={amountRowStyle}>
-            <span style={bigNumberStyle(isOver && jointView === "balance")}><AnimatedCounter value={value === "joint" ? heroNumber : (balance ?? available ?? 0)} /></span>
-            <span style={unitStyle(isOver && jointView === "balance")}>{heroUnit}</span>
+          {value !== "joint" && <span style={barContextStyle}>Account cash</span>}
+          <div style={amountRowStyle} aria-label={value === "joint" ? JOINT_VIEW_LABEL[jointView] : "Account cash"}>
+            <span style={{ ...bigNumberStyle(isOver && jointView === "balance"), color: heroColor }}><AnimatedCounter value={value === "joint" ? heroNumber : (balance ?? 0)} /></span>
+            <span style={{ ...unitStyle(isOver && jointView === "balance"), color: heroColor, opacity: 0.65 }}>{heroUnit}</span>
           </div>
           {value === "joint" && (
             <div role="group" aria-label="Balance view" style={{ display: "flex", gap: 8 }}>
               {JOINT_VIEWS.map(view => (
-                <button key={view} type="button" aria-pressed={view === jointView} onClick={() => setJointView(view)} style={{ minHeight: 44, padding: "0 12px", border: 0, borderRadius: "var(--radius-control)", background: view === jointView ? "var(--surface2)" : "transparent", color: view === jointView ? "var(--text)" : "var(--muted)", fontWeight: view === jointView ? 700 : 500, cursor: "pointer" }}>
+                <button key={view} type="button" aria-pressed={view === jointView} onClick={() => { if (view !== jointView) haptic("selection"); setJointView(view); }} style={{ minHeight: 44, padding: "0 12px", border: 0, borderRadius: "var(--radius-control)", background: view === jointView ? "var(--surface2)" : "transparent", color: view === jointView ? "var(--text)" : "var(--muted)", fontWeight: view === jointView ? 700 : 500, cursor: "pointer" }}>
                   {view === "balance" ? "Balance" : view === "budgeted" ? "Planned" : "Spent"}
                 </button>
               ))}
@@ -141,7 +93,14 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
           )}
         </div>
 
-        {/* Progress bar + caption */}
+        <div style={barGroupStyle}>
+          <div style={barLabelRowStyle}>
+            <span style={barContextStyle}>Category available</span>
+            <span style={barValueStyle}>{available === null ? "Unavailable" : <Money value={available} />}</span>
+          </div>
+        </div>
+
+        {/* Monthly activity is historical, separate from current availability. */}
         {(() => {
           const barColor = progress >= 100
             ? "var(--spend-over)"
@@ -149,22 +108,13 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
               ? "var(--spend-caution-deep)"
               : progress >= 70
                 ? "var(--spend-caution)"
-                : "var(--accent-foreground)";
-          const progressStatus = isBudgetOver
-            ? fmt(spent - (planned || 0)) + " MAD over budget"
-            : progress >= 100
-              ? "Plan fully used"
-              : progress >= 85
-                ? "Budget nearly used"
-                : progress >= 70
-                  ? "Spending is getting close"
-                  : "On track";
+                : "var(--budget-used)";
           return (
             <div style={barGroupStyle}>
               {hasPlan && (
                 <div style={barLabelRowStyle}>
-                  <span style={barContextStyle}>Monthly plan</span>
-                  <span style={barValueStyle}>{fmt(remaining)} MAD left</span>
+                  <span style={barContextStyle}>This month</span>
+                  <span style={barValueStyle}>{Math.round(spent / (planned ?? 1) * 100)}%</span>
                 </div>
               )}
               <div
@@ -174,7 +124,7 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={hasPlan ? progress : 0}
-                aria-valuetext={hasPlan ? progress + "% spent, " + fmt(remaining) + " MAD left, " + progressStatus : "No monthly plan"}
+                aria-valuetext={hasPlan ? Math.round(spent / planned * 100) + "% of assignments spent, " + fmt(spent) + " MAD spent against " + fmt(planned ?? 0) + " MAD allocated" : "No monthly plan"}
               >
                 <div style={barRailStyle}>
                   <div
@@ -186,13 +136,12 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
                   />
                 </div>
               </div>
-              <div style={captionRowStyle}>
-                {hasPlan ? (
-                  <span style={captionStyle}>{progress}% used · {progressStatus}</span>
-                ) : (
-                  <span style={captionStyle}>No monthly plan</span>
-                )}
-              </div>
+              {hasPlan ? (
+                <div style={barLabelRowStyle}>
+                  <span style={barValueStyle}><Money value={spent} /> spent</span>
+                  <span style={barValueStyle}><Money value={planned ?? 0} /> allocated</span>
+                </div>
+              ) : <span style={captionStyle}>No monthly plan</span>}
             </div>
           );
         })()}
@@ -200,7 +149,13 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
       </div>
       </section>
 
-      {value === "joint" && contribStatus && (contribStatus.anasPlan > 0 || contribStatus.salmaPlan > 0) && (
+      {value === "joint" && !contribStatus && (
+        <p style={contribUnavailableStyle} role="note">
+          Contributions unavailable: set both partners' split percentages (totalling 100%) and check the joint balance and category balances.
+        </p>
+      )}
+
+      {value === "joint" && contribStatus && (contribStatus.anasPlan > 0 || contribStatus.salmaPlan > 0 || available !== null) && (
         <div style={contribSectionStyle} aria-label="Partner budgets">
           <div style={contribHeaderStyle}>
             <strong style={contribHeadingStyle}>Contributions</strong>
@@ -241,6 +196,8 @@ export function WalletCardSwitcher({ value, onChange, monthlySummary, walletSumm
 
 /* ─── Styles ──────────────────────────────────────────────────── */
 
+const contribUnavailableStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.4, color: "var(--muted)", textAlign: "center" };
+
 const switcherStyle: CSSProperties = {
   display: "grid",
   gap: 16,
@@ -265,19 +222,6 @@ const numberGroupStyle: CSSProperties = {
   justifyItems: "center",
   textAlign: "center",
 };
-
-const statusStyle = (status: string): CSSProperties => ({
-  display: "inline-flex",
-  alignItems: "center",
-  minHeight: 26,
-  padding: "3px 8px",
-  borderRadius: 8,
-  background: STATUS_BACKGROUND[status] ?? "var(--surface2)",
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: 0,
-  color: STATUS_COLOR[status] ?? "var(--muted)",
-});
 
 const amountRowStyle: CSSProperties = {
   display: "flex",
@@ -397,10 +341,10 @@ function ContribCard({ scope, name, actual, plan, color, avatarUrl, onSelect }: 
   const due = Math.max(0, -difference);
   const overpaid = Math.max(0, difference);
   const pct = plan > 0 ? Math.min(100, (actual / plan) * 100) : 0;
-  const statusText = due > 0.5
-    ? fmt(Math.round(due)) + " MAD due"
-    : overpaid > 0.5
-      ? fmt(Math.round(overpaid)) + " MAD overpaid"
+  const statusText = due > 0.005
+    ? fmt(Math.round(due * 100) / 100) + " MAD due"
+    : overpaid > 0.005
+      ? fmt(Math.round(overpaid * 100) / 100) + " MAD above plan"
       : "Settled";
 
   return (
@@ -465,7 +409,7 @@ const contribHeaderStyle: CSSProperties = {
 const contribHeadingStyle: CSSProperties = { fontSize: 14, color: "var(--text)" };
 const contribPanelStyle: CSSProperties = { display: "grid", padding: "8px 10px 6px", background: "transparent" };
 const contribSharedStyle: CSSProperties = { display: "grid", justifyItems: "center", alignContent: "start", gap: 7, paddingTop: 17 };
-const contribGapStyle: CSSProperties = { maxWidth: 88, fontSize: 10, lineHeight: 1.25, color: "var(--text2)", fontWeight: 600, fontVariantNumeric: "tabular-nums", textAlign: "center" };
+const contribGapStyle: CSSProperties = { maxWidth: 88, fontSize: 12, lineHeight: 1.4, color: "var(--text2)", fontWeight: 600, fontVariantNumeric: "tabular-nums", textAlign: "center" };
 const contribGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "104px 88px 104px", justifyContent: "center", alignItems: "start", gap: 0 };
 const contribConnectorStyle: CSSProperties = { width: 36, height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--partner-wife)" };
 
@@ -522,7 +466,7 @@ const contribNameStyle: CSSProperties = {
 };
 
 const contribAmountStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 500,
   color: "var(--muted)",
   fontVariantNumeric: "tabular-nums",
