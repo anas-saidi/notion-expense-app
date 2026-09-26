@@ -145,7 +145,10 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   // A fully clear jar reads as an empty outline once the pool runs low, so its glass
   // carries a faint wash of the scope's colours: still a body when there's nothing in it.
   // Lighter in a pool than behind emojis, so the liquid stays clearly the fill.
-  const wash = requested.fill !== undefined ? 0.14 : hasItems ? 0.24 : isJar && !frame.coins ? 0.14 : 0; // a pool, even at zero
+  const isPool = requested.fill !== undefined;
+  const wash = isPool ? POOL_WASH : hasItems ? 0.24 : isJar && !frame.coins ? POOL_WASH : 0; // a pool, even at zero
+  // The rim defines the silhouette; lighter on a pool, where the glass should read as nearly clear.
+  const rim = isPool ? 0.22 : 0.32;
 
   // Body layer: the Shape body's fill. A jar's glass is clear, so it draws nothing here.
   const shellLayer = isJar ? null : (
@@ -205,7 +208,7 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
           {wash > 0 && <path d={frame.body} fill={`url(#${ids}-partner)`} opacity={wash} />}
           {/* Glass thickness: the wash deepens softly towards the edge (a blurred stroke,
               clipped inside), so the silhouette reads without an outline. */}
-          {wash > 0 && <path d={frame.body} fill="none" stroke={`url(#${ids}-partner)`} strokeWidth={26} opacity={0.32} filter={`url(#${ids}-rim)`} />}
+          {wash > 0 && <path d={frame.body} fill="none" stroke={`url(#${ids}-partner)`} strokeWidth={26} opacity={rim} filter={`url(#${ids}-rim)`} />}
           {frame.coins && [...frame.coins].sort((a, b) => a.z - b.z).map((coin, i) => (
             <Coin key={i} {...coin} coinStyle={coinStyle} outlineColor="var(--bg)" glyphFilter={hasItems ? `url(#${ids}-sticker)` : undefined} />
           ))}
@@ -294,6 +297,8 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
 
 /** How far the partner colours are lightened towards white in the liquid (and wash). */
 const SOFTEN = 0.35;
+/** How much of the scope's colour tints a pool's empty glass: just enough to give it a body. */
+const POOL_WASH = 0.07;
 /** A warning pool starts turning red below this level, and the red it turns (the --danger hue). */
 const LOW_FROM = 0.2;
 const DANGER_HEX = "#d03238";
