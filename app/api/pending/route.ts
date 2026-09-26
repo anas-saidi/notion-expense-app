@@ -1,4 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
+import { queryDatabaseAll } from "@/lib/notion-api";
 export const dynamic = "force-dynamic";
 
 const PENDING_DB = process.env.NOTION_PENDING_DB ?? "d2db101b-faec-467d-8c57-eee6d8780311";
@@ -62,13 +63,8 @@ export async function GET() {
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
   try {
     const keys = await getPendingPropKeys(token);
-    const res = await fetch(`https://api.notion.com/v1/databases/${PENDING_DB}/query`, {
-      method: "POST", headers: HDR(token), cache: "no-store",
-      body: JSON.stringify({ sorts: [{ timestamp: "created_time", direction: "ascending" }], page_size: 50 }),
-    });
-    const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
-    const items = data.results.map((page: any) => {
+    const results = await queryDatabaseAll(token, PENDING_DB, { sorts: [{ timestamp: "created_time", direction: "ascending" }] });
+    const items = results.map((page: any) => {
       const rawClaimed = keys.claimedBy ? page.properties[keys.claimedBy]?.select?.name ?? null : null;
       return {
         id: page.id,

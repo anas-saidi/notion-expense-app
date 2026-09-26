@@ -10,7 +10,7 @@ import { Banner } from "./ui/Banner";
 import { TransactionRow } from "./ui/TransactionRow";
 import { Money, Currency } from "./Money";
 import type { Account, Category, Transaction } from "./app-types";
-import { fmt, fmtDate, monthBounds } from "./app-utils";
+import { fmt, fmtDate, monthBounds, parseAmount } from "./app-utils";
 import {
   BanknoteIcon,
   TransferIcon,
@@ -278,7 +278,7 @@ export function AccountDetailsSheet({
   }, [monthTxns]);
 
   // Reconcile
-  const parsedActual = parseFloat(actualBalance.replace(/[^0-9.\-]/g, ""));
+  const parsedActual = parseAmount(actualBalance) ?? NaN;
   const difference = Number.isFinite(parsedActual) ? parsedActual - liveBalance : null;
   const isFullyReconciled = difference !== null && Math.abs(difference) < 0.01;
 
@@ -321,7 +321,7 @@ export function AccountDetailsSheet({
 
   const submitAddTxn = async () => {
     if (!account) return;
-    const amt = parseFloat(txnAmount.replace(/[^0-9.\-]/g, ""));
+    const amt = parseAmount(txnAmount) ?? NaN;
     if (!Number.isFinite(amt) || amt <= 0) {
       setTxnError("Enter a valid amount");
       return;

@@ -7,7 +7,7 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
 import { BanknoteIcon, CheckIcon, XIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
-import { today } from "./app-utils";
+import { parseAmount, today } from "./app-utils";
 
 type AccountIncomeSheetProps = {
   open: boolean;
@@ -32,7 +32,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
     setError("");
   }, [open]);
 
-  const parsedAmount = amount ? Number(amount) : 0;
+  const parsedAmount = parseAmount(amount) ?? 0;
   const canSubmit = Boolean(account?.id && name.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0 && status === "idle");
 
   const submit = async () => {
@@ -104,7 +104,8 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
             <div style={amountWrapStyle}>
               <input
                 value={amount}
-                onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
+                inputMode="decimal"
+                onChange={(event) => setAmount(event.target.value.replace(/[^0-9.,]/g, ""))}
                 placeholder="0"
                 style={amountInputStyle}
               />

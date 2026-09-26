@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "@/app/components/app-utils";
+import { queryDatabaseAll } from "@/lib/notion-api";
 
 const FUNDS_DB = "1936a2be-8922-8058-990d-c549172f1d45";
 const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
-
-const notionHeaders = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-  "Notion-Version": "2022-06-28",
-  "Content-Type": "application/json",
-});
 
 const sumByCategory = (pages: any[], valueGetter: (page: any) => number) => {
   const totals = new Map<string, number>();
@@ -60,61 +55,39 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [fundsRes, transactionsRes] = await Promise.all([
-      fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
-        method: "POST",
-        headers: notionHeaders(token),
-        cache: "no-store",
-        body: JSON.stringify({
-          filter: {
-            and: [
-              { property: "Date", date: { on_or_after: rangeStart } },
-              { property: "Date", date: { on_or_before: rangeEnd } },
-              { property: "Category", relation: { is_not_empty: true } },
-            ],
-          },
-          page_size: 100,
-        }),
+    const [funds, transactions] = await Promise.all([
+      queryDatabaseAll(token, FUNDS_DB, {
+        filter: {
+          and: [
+            { property: "Date", date: { on_or_after: rangeStart } },
+            { property: "Date", date: { on_or_before: rangeEnd } },
+            { property: "Category", relation: { is_not_empty: true } },
+          ],
+        },
       }),
-      fetch(`https://api.notion.com/v1/databases/${TRANSACTIONS_DB}/query`, {
-        method: "POST",
-        headers: notionHeaders(token),
-        cache: "no-store",
-        body: JSON.stringify({
-          filter: {
-            and: [
-              { property: "Type", select: { equals: "Expense" } },
-              { property: "Date", date: { on_or_after: rangeStart } },
-              { property: "Date", date: { on_or_before: rangeEnd } },
-              { property: "Category", relation: { is_not_empty: true } },
-            ],
-          },
-          page_size: 100,
-        }),
+      queryDatabaseAll(token, TRANSACTIONS_DB, {
+        filter: {
+          and: [
+            { property: "Type", select: { equals: "Expense" } },
+            { property: "Date", date: { on_or_after: rangeStart } },
+            { property: "Date", date: { on_or_before: rangeEnd } },
+            { property: "Category", relation: { is_not_empty: true } },
+          ],
+        },
       }),
     ]);
 
-    const [fundsData, transactionsData] = await Promise.all([fundsRes.json(), transactionsRes.json()]);
-
-    if (!fundsRes.ok) {
-      return NextResponse.json({ error: fundsData.message || "Failed to load funds" }, { status: fundsRes.status });
-    }
-
-    if (!transactionsRes.ok) {
-      return NextResponse.json({ error: transactionsData.message || "Failed to load transactions" }, { status: transactionsRes.status });
-    }
-
-    const totalAssigned = (fundsData.results ?? []).reduce(
+    const totalAssigned = funds.reduce(
       (sum: number, page: any) => sum + signedPlannedAmount(page),
       0,
     );
 
-    const totalSpent = (transactionsData.results ?? []).reduce((sum: number, page: any) => {
+    const totalSpent = transactions.reduce((sum: number, page: any) => {
       return sum + (page.properties.Amount?.number ?? 0);
     }, 0);
 
-    const assignedByCategory = sumByCategory(fundsData.results ?? [], signedPlannedAmount);
-    const spentByCategory = sumByCategory(transactionsData.results ?? [], (page) => page.properties.Amount?.number ?? 0);
+    const assignedByCategory = sumByCategory(funds, signedPlannedAmount);
+    const spentByCategory = sumByCategory(transactions, (page) => page.properties.Amount?.number ?? 0);
 
     return NextResponse.json({
       summary: {
@@ -128,6 +101,6 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to load monthly summary" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Failed to load monthly summary" }, { status: err.status ?? 500 });
   }
 }

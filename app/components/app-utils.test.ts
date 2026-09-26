@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { comparisonPeriods, expenseBalancePreview, fmt, getLeftToAssignByScope, isExpenseTransaction, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
+import { comparisonPeriods, evalExpr, expenseBalancePreview, fmt, getLeftToAssignByScope, isExpenseTransaction, parseAmount, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
 
 const accounts: Account[] = [
   { id: "joint", label: "Joined account", icon: "", type: null, balance: 900, readyToAssign: 0 },
@@ -60,4 +60,34 @@ describe("money and time calculations", () => {
     expect(fmt(12)).not.toMatch(/[,.]00$/);
     expect(fmt(12.5)).toMatch(/12[,.]50/);
   });
+});
+
+describe("amount parsing", () => {
+  it.each([
+    ["50", 50],
+    ["12.50", 12.5],
+    ["12,50", 12.5],
+    ["1500,50", 1500.5],
+    ["1.234,56", 1234.56],
+    ["1,234.56", 1234.56],
+    ["50+30", 80],
+    ["2+3*4", 14],
+    ["-50", -50],
+    ["-5+3", -2],
+    ["2*-3", -6],
+    ["100/4", 25],
+    ["0.1+0.2", 0.3],
+    [" 1 000 ", 1000],
+    ["0-0", 0],
+  ])("parses %s as %s", (input, expected) => {
+    expect(parseAmount(input)).toBe(expected);
+  });
+
+  it.each(["", "abc", "50x", "5*", "5-", "100/0+20", "(2+3)*4", "1e3", "12.5.3", "5..5", "1,2,3", "12.34,5.6"])(
+    "rejects %j",
+    (input) => {
+      expect(parseAmount(input)).toBeNull();
+      expect(evalExpr(input)).toBe(0);
+    },
+  );
 });

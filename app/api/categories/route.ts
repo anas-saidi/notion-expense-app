@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { accountOwnerScope, categoryOwnerPeople } from "../../../lib/category-owners";
+import { queryDatabaseAll } from "../../../lib/notion-api";
 
 const CATEGORIES_DB = process.env.NOTION_CATEGORIES_DB ?? "1926a2be-8922-8029-9b90-c7d8bb55fabd";
 const NOTION_VERSION = "2022-06-28";
@@ -108,27 +109,18 @@ export async function GET(req: NextRequest) {
       filters.unshift({ property: "Snooze", checkbox: { equals: false } });
     }
 
-    const res = await fetch(`https://api.notion.com/v1/databases/${CATEGORIES_DB}/query`, {
-      method: "POST",
-      headers: notionHeaders(token),
-      cache: "no-store",
-      body: JSON.stringify({
-        filter: { and: filters },
-        sorts: [{ property: "Category", direction: "ascending" }],
-        page_size: 100,
-      }),
+    const results = await queryDatabaseAll(token, CATEGORIES_DB, {
+      filter: { and: filters },
+      sorts: [{ property: "Category", direction: "ascending" }],
     });
-
-    const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
 
     // Use the database query payload directly. Fetching every category page in
     // parallel exhausts Notion's request budget during initial app loading.
-    const categories = (data.results ?? []).map(mapCategoryPage);
+    const categories = results.map(mapCategoryPage);
 
     return NextResponse.json({ categories });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: err.status ?? 500 });
   }
 }
 

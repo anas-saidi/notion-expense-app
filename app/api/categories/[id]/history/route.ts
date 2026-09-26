@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { queryDatabaseAll } from "@/lib/notion-api";
 
-const NOTION_VERSION = "2022-06-28";
 const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
 
@@ -21,19 +21,7 @@ function getLastNMonths(n: number): Array<{ month: string; start: string; end: s
 }
 
 async function notionQuery(token: string, databaseId: string, body: Record<string, unknown>) {
-  const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Notion-Version": NOTION_VERSION,
-      "Content-Type": "application/json",
-    },
-    cache: "no-store",
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Notion query failed");
-  return data;
+  return { results: await queryDatabaseAll(token, databaseId, body) };
 }
 
 export async function GET(

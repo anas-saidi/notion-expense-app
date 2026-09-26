@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { queryDatabaseAll } from "@/lib/notion-api";
 
 const NOTION_VERSION = "2022-06-28";
 const CATEGORIES_DB = process.env.NOTION_CATEGORIES_DB ?? "1926a2be-8922-8029-9b90-c7d8bb55fabd";
@@ -52,20 +53,7 @@ function getMonthRange(monthParam?: string | null) {
 }
 
 async function notionQuery(token: string, databaseId: string, body: Record<string, unknown>) {
-  const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Notion-Version": NOTION_VERSION,
-      "Content-Type": "application/json",
-    },
-    cache: "no-store",
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Notion query failed");
-  return data;
+  return { results: await queryDatabaseAll(token, databaseId, body) };
 }
 
 async function notionPage(token: string, pageId: string) {

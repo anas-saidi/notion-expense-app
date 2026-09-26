@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { notionFetchJson } from "@/lib/notion-api";
+import { notionFetchJson, queryDatabaseAll } from "@/lib/notion-api";
 
 const ACCOUNTS_DB = process.env.NOTION_ACCOUNTS_DB ?? "1926a2be-8922-8014-bb54-d9f5e9d1234b";
 
@@ -78,9 +78,7 @@ export async function GET(req: NextRequest) {
       pickByTypeAndAliases(props, "formula", ["Contribution ( percent )", "Contribution %", "Contribution Percent"]) ??
       pickByTypeAndAliases(props, "rollup", ["Contribution ( percent )", "Contribution %", "Contribution Percent"]);
 
-    const queryBody: Record<string, unknown> = {
-      page_size: 50,
-    };
+    const queryBody: Record<string, unknown> = {};
 
     if (disabledKey) {
       queryBody.filter = {
@@ -93,13 +91,9 @@ export async function GET(req: NextRequest) {
       queryBody.sorts = [{ property: nameKey, direction: "ascending" }];
     }
 
-    const { data } = await notionFetchJson<any>(token, `/databases/${ACCOUNTS_DB}/query`, {
-      method: "POST",
-      body: queryBody,
-      cache: "no-store",
-    });
+    const results = await queryDatabaseAll(token, ACCOUNTS_DB, queryBody);
 
-    const accounts = (data.results ?? []).map((page: any) => {
+    const accounts = results.map((page: any) => {
       const properties = page.properties ?? {};
       const nameProp = nameKey ? properties[nameKey] : null;
       const typeProp = typeKey ? properties[typeKey] : null;

@@ -1,49 +1,80 @@
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 
 /**
- * Safely evaluate a simple arithmetic expression string (+ - * /).
- * No eval() — uses a recursive descent parser.
- * Returns 0 for empty or invalid input.
+ * Parse one number token. Accepts "." or "," as the decimal mark (fr-MA
+ * displays "1.234,50"); when both appear, the last one is the decimal mark
+ * and the others are thousands separators. Returns null if malformed.
  */
-export function evalExpr(input: string): number {
-  const s = input.replace(/\s/g, "");
-  if (!s) return 0;
+function parseNumberToken(token: string): number | null {
+  if (!token) return null;
+  const lastDot = token.lastIndexOf(".");
+  const lastComma = token.lastIndexOf(",");
+  let normalized: string;
+  if (lastDot !== -1 && lastComma !== -1) {
+    const decimalMark = lastDot > lastComma ? "." : ",";
+    const thousandsMark = decimalMark === "." ? "," : ".";
+    const [intPart, fracPart, ...rest] = token.split(decimalMark);
+    if (rest.length > 0) return null;
+    if (!new RegExp(`^\\d{1,3}(\\${thousandsMark}\\d{3})*$`).test(intPart)) return null;
+    normalized = `${intPart.split(thousandsMark).join("")}.${fracPart}`;
+  } else {
+    normalized = token.replace(",", ".");
+  }
+  return /^(\d+\.?\d*|\.\d+)$/.test(normalized) ? parseFloat(normalized) : null;
+}
+
+/**
+ * Safely evaluate a simple arithmetic expression string (+ - * /).
+ * No eval() — uses a recursive descent parser. Rounds to cents.
+ * Returns null for empty or invalid input (unparsed characters, malformed
+ * numbers, division by zero, dangling operators).
+ */
+export function parseAmount(input: string): number | null {
+  const s = input.replace(/[\s  ]/g, "");
+  if (!s) return null;
   let pos = 0;
 
-  function parseExpr(): number {
+  function parseExpr(): number | null {
     let left = parseTerm();
-    while (pos < s.length && (s[pos] === "+" || s[pos] === "-")) {
+    while (left !== null && pos < s.length && (s[pos] === "+" || s[pos] === "-")) {
       const op = s[pos++];
       const right = parseTerm();
+      if (right === null) return null;
       left = op === "+" ? left + right : left - right;
     }
     return left;
   }
 
-  function parseTerm(): number {
+  function parseTerm(): number | null {
     let left = parseFactor();
-    while (pos < s.length && (s[pos] === "*" || s[pos] === "/")) {
+    while (left !== null && pos < s.length && (s[pos] === "*" || s[pos] === "/")) {
       const op = s[pos++];
       const right = parseFactor();
-      left = op === "*" ? left * right : right !== 0 ? left / right : 0;
+      if (right === null || (op === "/" && right === 0)) return null;
+      left = op === "*" ? left * right : left / right;
     }
     return left;
   }
 
-  function parseFactor(): number {
-    const neg = s[pos] === "-" && pos++;
+  function parseFactor(): number | null {
+    const neg = s[pos] === "-";
+    if (neg) pos++;
     const start = pos;
-    while (pos < s.length && /[0-9.]/.test(s[pos])) pos++;
-    const n = parseFloat(s.slice(start, pos)) || 0;
+    while (pos < s.length && /[0-9.,]/.test(s[pos])) pos++;
+    const n = parseNumberToken(s.slice(start, pos));
+    if (n === null) return null;
     return neg ? -n : n;
   }
 
-  try {
-    const result = parseExpr();
-    return isFinite(result) ? Math.round(result * 100) / 100 : 0;
-  } catch {
-    return 0;
-  }
+  const result = parseExpr();
+  if (result === null || pos < s.length || !isFinite(result)) return null;
+  const rounded = Math.round(result * 100) / 100;
+  return rounded === 0 ? 0 : rounded; // normalize -0
+}
+
+/** Like parseAmount, but returns 0 for empty or invalid input. */
+export function evalExpr(input: string): number {
+  return parseAmount(input) ?? 0;
 }
 
 /** Returns true when the input string looks like an expression (contains operators after digits) */

@@ -4,7 +4,7 @@ import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
-import { today } from "./app-utils";
+import { parseAmount, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
 import { CheckIcon, TransferIcon, XIcon } from "./ui/icons";
@@ -54,7 +54,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
   );
 
   const destinationAccounts = accounts.filter((entry) => entry.id !== fromAccountId);
-  const parsedAmount = amount ? Number(amount) : 0;
+  const parsedAmount = parseAmount(amount) ?? 0;
   const canSubmit = Boolean(
     fromAccountId
     && toAccountId
@@ -158,10 +158,8 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
             <div style={amountWrapStyle}>
               <input
                 value={amount}
-                onChange={(event) => {
-                  const cleaned = event.target.value.replace(/[^0-9.]/g, "");
-                  if ((cleaned.match(/\./g) || []).length <= 1) setAmount(cleaned);
-                }}
+                inputMode="decimal"
+                onChange={(event) => setAmount(event.target.value.replace(/[^0-9.,]/g, ""))}
                 placeholder="0"
                 style={amountInputStyle}
               />
