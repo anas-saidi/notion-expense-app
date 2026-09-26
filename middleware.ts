@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { PUBLIC_PATHS, SESSION_COOKIE, verifySessionToken } from "./lib/auth";
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|manifest.json|sw.js).*)"],
+  // App icons stay public: the home screen and browsers fetch them before anyone signs in.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|icon-192.png|icon-512.png|icon-maskable-512.png|apple-touch-icon.png|manifest.json|sw.js).*)"],
 };
 
 export default async function middleware(request: NextRequest) {

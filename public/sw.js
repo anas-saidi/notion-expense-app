@@ -1,5 +1,5 @@
-const CACHE_NAME = "expense-app-v3";
-const SHELL_ASSETS = ["/icon.png", "/manifest.json"];
+const CACHE_NAME = "expense-app-v4";
+const SHELL_ASSETS = ["/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

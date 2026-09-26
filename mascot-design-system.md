@@ -173,6 +173,11 @@ Two capsule eyes on a sphere-projected face; size, spacing, tilt and head direct
 | Loading | 112 px | |
 | Partner (family) | 64 px | |
 
+### App icon
+- The shared (joint) jar, filled to 0.68 with the partner blend, **idle** face (the tall capsule eyes read best at small sizes; happy's flat eyes read as sleepy), contact shadow, on a light warm neutral (`#f6f5f2`).
+- The jar fills ~62% of the tile, nudged so jar + shadow sit centred; the maskable version keeps everything inside the central 80% safe circle.
+- Rendered from the engine itself (same frame, same tokens resolved to literals), never redrawn by hand: `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png` (180). Icon files must stay outside any sign-in gate.
+
 ---
 
 ## 11. Where it belongs
