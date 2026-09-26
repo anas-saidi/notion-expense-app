@@ -1,9 +1,9 @@
 "use client";
 import { ChoicePicker } from "./ChoicePicker";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Account, Category, BudgetScope } from "./app-types";
-import { assignableOf, fmt, scopeFromAccountLabel } from "./app-utils";
+import { assignableOf, fmt, scopeFromAccountLabel, today } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
@@ -51,6 +51,9 @@ export function CategoryManageSheet({
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [error, setError] = useState("");
+  // A transfer already made for this funding (amount + accounts), so a retry after a
+  // failed funding doesn't move the money a second time.
+  const movedRef = useRef<string | null>(null);
 
   // Scope is always derived from the selected account — never manually set
   const scope: BudgetScope = useMemo(() => {
@@ -68,6 +71,7 @@ export function CategoryManageSheet({
     // Editing never guesses an account: it rewrites the category's owners.
     setAccountId(category?.defaultAccount ?? (mode === "edit" ? "" : accounts[0]?.id ?? ""));
     setAmount("");
+    movedRef.current = null;
   }, [accounts, availableTypes, category, defaultType, open, mode]);
 
   const isCreate = mode === "create";
@@ -79,6 +83,14 @@ export function CategoryManageSheet({
   const keptForJoint = selectedAccount && selectedAccount.readyToAssign !== null && selectedAssignable !== null
     ? Math.round(selectedAccount.readyToAssign - selectedAssignable)
     : 0;
+  // Notion reserves a category's money against its Default account, whichever account
+  // a funding record names. Funding from another account therefore also has to move the
+  // money there, or the source still looks unassigned and the holding account goes short.
+  const holdingAccount = mode === "fund" && category?.defaultAccount
+    ? accounts.find((account) => sameId(account.id, category.defaultAccount)) ?? null
+    : null;
+  const moveNeeded = !!holdingAccount && !!selectedAccount && holdingAccount.id !== selectedAccount.id;
+  const moveKey = moveNeeded ? `${selectedAccount.id}>${holdingAccount.id}:${parsedAmount}` : null;
   const canSubmit =
     (status === "idle" || status === "error") &&
     accountId &&
@@ -93,7 +105,7 @@ export function CategoryManageSheet({
     if (status === "success") return isEdit ? "Saved" : isCreate ? "Created" : "Funded";
     if (status === "error") return "Try again";
     return isEdit ? "Save changes" : isCreate ? "Create category" : addingToSavings ? "Add to savings" : "Fund category";
-  }, [isCreate, isEdit, status]);
+  }, [addingToSavings, isCreate, isEdit, status]);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -116,6 +128,23 @@ export function CategoryManageSheet({
         if (!categoryId) throw new Error("Category was created without an id");
       }
 
+      if (!isEdit && parsedAmount > 0 && moveNeeded && moveKey && movedRef.current !== moveKey) {
+        const moveRes = await fetch("/api/account-transfer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fromAccountId: selectedAccount.id,
+            toAccountId: holdingAccount.id,
+            amount: parsedAmount,
+            date: today(),
+            note: `To ${categoryName}`,
+          }),
+        });
+        const moveData = await moveRes.json().catch(() => ({}));
+        if (!moveRes.ok) throw new Error(moveData.error || `Couldn't move the money to ${holdingAccount.label}`);
+        movedRef.current = moveKey;
+      }
+
       if (!isEdit && parsedAmount > 0) {
         const fundRes = await fetch("/api/monthly-planning/funds", {
           method: "POST",
@@ -130,7 +159,13 @@ export function CategoryManageSheet({
           }),
         });
         const fundData = await fundRes.json();
-        if (!fundRes.ok) throw new Error(fundData.error || "Failed to fund category");
+        if (!fundRes.ok) {
+          const base = fundData.error || "Failed to fund category";
+          // The money already moved; say so, so a retry (which won't move it again) makes sense.
+          throw new Error(movedRef.current === moveKey && moveNeeded
+            ? `${fmt(parsedAmount)} moved to ${holdingAccount?.label}, but funding failed: ${base}`
+            : base);
+        }
       }
 
       setStatus("success");
@@ -235,6 +270,14 @@ export function CategoryManageSheet({
           {/* What the partner owes Joint is kept back, so say so when it changes the figure. */}
           {!isEdit && selectedAccount && keptForJoint > 0 && (
             <p style={keptNoteStyle}>{fmt(keptForJoint)} is kept back for your Joint contribution.</p>
+          )}
+          {moveNeeded && holdingAccount && selectedAccount && (
+            <p style={moveNoteStyle}>
+              {category?.name} is held in {holdingAccount.label}.{" "}
+              {parsedAmount > 0
+                ? `This also moves ${fmt(parsedAmount)} from ${selectedAccount.label} to ${holdingAccount.label}.`
+                : `The amount also moves from ${selectedAccount.label} to ${holdingAccount.label}.`}
+            </p>
           )}
           {!isEdit && selectedAssignable !== null && parsedAmount > Math.max(0, selectedAssignable) && (
             <p role="alert" style={{ ...keptNoteStyle, color: "var(--danger)" }}>
@@ -345,6 +388,9 @@ const amountInputStyle: CSSProperties = {
   fontWeight: 800,
 };
 
+
+const moveNoteStyle: CSSProperties = { margin: 0, padding: "10px 12px", borderRadius: 12, background: "var(--surface2)", fontSize: 12, lineHeight: 1.4, color: "var(--text2)" };
+const sameId = (a: string, b: string | null | undefined) => !!b && a.replace(/-/g, "") === b.replace(/-/g, "");
 
 const keptNoteStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.35, color: "var(--muted)" };
 

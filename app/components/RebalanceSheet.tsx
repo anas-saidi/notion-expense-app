@@ -292,7 +292,9 @@ export function RebalanceSheet({
     return scoped.totalAssigned > 0 ? 1 - scoped.totalSpent / scoped.totalAssigned : 1;
   }, [monthlySummary, categories, accounts, budgetScope]);
 
-  const poolLabel = monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Available";
+  // "Funded", not "Available": this is money already in categories (plus any unassigned
+  // shown just below), not money free to assign.
+  const poolLabel = monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Funded";
 
   return (
     <AllocationFlow

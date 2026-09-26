@@ -142,10 +142,9 @@ export function CategoryDetailsSheet({
       onClose={onClose}
       label={`${category.name} details`}
       maxWidth="520px"
-      maxHeight="calc(100dvh - 20px - 88px - env(safe-area-inset-bottom, 0px))"
+      // Standard main sheet: from under the header to the bottom edge, like Accounts
+      // and Settings. A shorter custom height left the page exposed (and scrollable) below it.
       detent="default"
-      snapPoints={[0, 0.82, 1]}
-      initialSnap={1}
       panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0 }}
     >
@@ -167,7 +166,7 @@ export function CategoryDetailsSheet({
         {/* ── Budget summary ── */}
         <section style={statsWrapStyle}>
           <div style={availableStyle}>
-            <span style={statLabelStyle}>Available</span>
+            <span style={statLabelStyle}>Funded</span>
             <span style={availableValueStyle}><Money value={available} currency /></span>
           </div>
           <div style={supportingStatsStyle}>
@@ -391,15 +390,14 @@ function eventKindLabel(kind: TimelineItem["kind"]) {
 const sheetStyle: CSSProperties = {
   position: "relative",
   overflow: "hidden",
-  background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
+  background: "var(--surface)",
   display: "flex",
   flexDirection: "column",
   borderRadius: "var(--radius-sheet)",
 };
 
 const sheetInnerStyle: CSSProperties = {
-  padding: "18px 18px 32px",
-  overflowY: "auto",
+  padding: "18px 18px calc(32px + env(safe-area-inset-bottom, 0px))",
   display: "grid",
   gap: 16,
 };
