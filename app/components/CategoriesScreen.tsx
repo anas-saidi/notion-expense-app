@@ -13,7 +13,8 @@ import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned } from "./app-utils";
 import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
-import { MascotHero } from "./mascot/MascotHero";
+import { MascotHero, MASCOT_HERO_SIZE } from "./mascot/MascotHero";
+import { MascotSpill } from "./mascot/MascotSpill";
 import { budgetJarItems } from "./mascot/budgetJar";
 import { JointFamily } from "./WalletCardSwitcher";
 import type { ContributionStatus } from "./contribution-utils";
@@ -183,6 +184,7 @@ export function CategoriesScreen({
     () => budgetJarItems(monthCategories, budgetScope, accounts),
     [monthCategories, budgetScope, accounts],
   );
+  const [jarOpen, setJarOpen] = useState(false);
   // The jar's face follows the whole scope's month, never the search results.
   const jarSpentPct = useMemo(() => {
     let planned = 0;
@@ -199,6 +201,14 @@ export function CategoriesScreen({
     const scoped = scopeMonthlySummary(monthlySummary, categories, accounts, budgetScope);
     return scoped.totalAssigned > 0 ? 1 - scoped.totalSpent / scoped.totalAssigned : 1;
   }, [monthlySummary, categories, accounts, budgetScope]);
+  const jarDetails = jarItems.length > 0
+    ? `Money left in ${jarItems.length} categor${jarItems.length === 1 ? "y" : "ies"}`
+    : "No category has money left";
+  const budgetJar = (
+    <MascotSpill size={MASCOT_HERO_SIZE} label={jarDetails} details={jarDetails} onOpenChange={setJarOpen}>
+      <MascotHero variant="pool" scope={budgetScope} level={poolLevel} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={leftToAllocate} />
+    </MascotSpill>
+  );
   const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
 
   return (
@@ -229,17 +239,14 @@ export function CategoriesScreen({
             : null
         : <>
             <section aria-label={`${fmt(Math.round(availableInCategories))} MAD currently available in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
-              {/* How the month's budget splits across categories: one emoji each, sized by share. */}
-              {/* The same liquid jar as Home, with the categories' emojis dropped into it, so the
-                  mascot varies by screen instead of changing design. Joint keeps its family around
-                  it, as on Home. */}
-              {jarItems.length > 0 && (budgetScope === "joint" && contribStatus ? (
-                <JointFamily contribStatus={contribStatus}>
-                  <MascotHero variant="pool" scope={budgetScope} level={poolLevel} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} />
-                </JointFamily>
+              {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
+                  emojis stay tucked away until the jar is tapped; then every category that still
+                  has money drops in, sized by its share of Available. */}
+              {budgetScope === "joint" && contribStatus ? (
+                <JointFamily contribStatus={contribStatus}>{budgetJar}</JointFamily>
               ) : (
-                <MascotHero variant="pool" scope={budgetScope} level={poolLevel} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
-              ))}
+                <div style={{ marginBottom: 4 }}>{budgetJar}</div>
+              )}
               <span style={budgetHealthLabelStyle}>Available</span>
               <span style={budgetHealthAmountStyle}>
                 <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
