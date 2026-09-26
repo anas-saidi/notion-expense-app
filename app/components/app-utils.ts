@@ -91,6 +91,16 @@ const toLocalDateString = (date: Date) => {
 
 export const today = () => toLocalDateString(new Date());
 
+/** Current month as "YYYY-MM", in local time. */
+export const currentMonth = () => today().slice(0, 7);
+
+/**
+ * Category Available is a Notion formula relative to today, so it only means
+ * something for the current month (and planning ahead). For past months the
+ * app shows 0 rather than today's figure.
+ */
+export const isPastMonth = (month: string) => month < currentMonth();
+
 export const shiftDate = (dateStr: string, days: number) => {
   const date = new Date(`${dateStr}T00:00:00`);
   date.setDate(date.getDate() + days);
@@ -340,4 +350,30 @@ export const categoryIdMatchesScope = (
   const category = categories.find((entry) => entry.id === categoryId);
   if (!category) return true;
   return categoryMatchesScope(category, scope);
+};
+
+/**
+ * Whether an expense needs budget in its category first. Only the spending
+ * this entry adds is checked: when editing an expense in the same category,
+ * its original amount is already counted in `available`, so fixing a name or
+ * lowering the amount is never blocked. An overspent category (available
+ * below zero) counts as unfunded rather than slipping past the check.
+ */
+export const expenseBudgetGate = ({
+  available,
+  amount,
+  originalAmount = 0,
+}: {
+  available: number | null;
+  amount: number;
+  /** Original amount when editing an expense that stays in the same category. */
+  originalAmount?: number;
+}) => {
+  const added = amount - originalAmount;
+  if (available === null || added <= 0.005) return { unfunded: false, overBudget: false, shortfall: 0 };
+  if (available <= 0.005) return { unfunded: true, overBudget: false, shortfall: Math.round(added * 100) / 100 };
+  const shortfall = Math.round((added - available) * 100) / 100;
+  return shortfall > 0.005
+    ? { unfunded: false, overBudget: true, shortfall }
+    : { unfunded: false, overBudget: false, shortfall: 0 };
 };

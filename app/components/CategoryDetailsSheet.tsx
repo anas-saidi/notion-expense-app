@@ -11,6 +11,7 @@ import { MonthPicker } from "./DatePicker";
 import { FundTransactionSheet, type EditableFundTransaction } from "./FundTransactionSheet";
 import { CategoryAvailableSheet } from "./CategoryAvailableSheet";
 import { PickerPopover } from "./PickerPopover";
+import { currentMonth, isPastMonth } from "./app-utils";
 
 type TimelineItem = {
   id: string;
@@ -119,9 +120,11 @@ export function CategoryDetailsSheet({
 
   const details = data?.category;
 
-  const spent = details?.spent ?? 0;
+  // The category's Spent/Available properties are Notion formulas relative to
+  // today; use the selected month's own expenses, and 0 Available for past months.
+  const spent = data?.summary?.spentTotal ?? details?.spent ?? 0;
   const planned = details?.planned ?? 0;
-  const available = details?.available ?? category?.available ?? 0;
+  const available = isPastMonth(activeMonth) ? 0 : details?.available ?? category?.available ?? 0;
 
   const spentPct = useMemo(() => {
     const safePlanned = Math.max(1, planned || 0);
@@ -223,7 +226,7 @@ export function CategoryDetailsSheet({
         <section style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={sectionLabelStyle}>Activity</span>
-            <MonthPicker value={activeMonth} max={todayMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} align="right" triggerIcon={<CalendarRangeIcon size={16} aria-hidden="true" />} triggerClassName="composer-picker-chip" showChevron={false} />
+            <MonthPicker value={activeMonth} max={currentMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} align="right" triggerIcon={<CalendarRangeIcon size={16} aria-hidden="true" />} triggerClassName="composer-picker-chip" showChevron={false} />
           </div>
 
           {loading && (
@@ -340,10 +343,6 @@ function ActionBtn({
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function todayMonth(): string {
-  return new Date().toISOString().slice(0, 7);
-}
 
 function formatMonth(m: string): string {
   const [y, mo] = m.split("-").map(Number);

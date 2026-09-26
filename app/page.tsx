@@ -27,6 +27,8 @@ import {
   categoryMatchesScope,
   categoryIdMatchesScope,
   evalExpr,
+  expenseBudgetGate,
+  isPastMonth,
   expenseBalancePreview,
   fmtDate,
   getCategoryScope,
@@ -160,7 +162,7 @@ export default function App() {
   const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
   const [homeSearch, setHomeSearch] = useState("");
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
-  const [editingOriginal, setEditingOriginal] = useState<{ amount: number; accountId: string } | null>(null);
+  const [editingOriginal, setEditingOriginal] = useState<{ amount: number; accountId: string; categoryId: string | null } | null>(null);
   const [detailsTransaction, setDetailsTransaction] = useState<Transaction | null>(null);
   const [archivedTransaction, setArchivedTransaction] = useState<Transaction | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<"idle" | "archiving" | "archived" | "restoring" | "error">("idle");
@@ -666,7 +668,7 @@ export default function App() {
     }
     setEditingTransactionId(transaction.id);
     setTransactionType("Expense");
-    setEditingOriginal({ amount: transaction.amount, accountId: transaction.accountId ?? "" });
+    setEditingOriginal({ amount: transaction.amount, accountId: transaction.accountId ?? "", categoryId: transaction.category ?? null });
     setName(transaction.name);
     setAmount(transaction.amount ? String(transaction.amount) : "");
     setDate(transaction.date || today());
@@ -939,8 +941,9 @@ export default function App() {
   }, [getMonthlySummaryForScope]);
 
   const categoryAvailableByScope = useMemo<Record<BudgetScope, number>>(() => {
+    if (isPastMonth(homeMonth)) return { joint: 0, anas: 0, salma: 0 };
     return getCategoryAvailableByScope(categories, accounts);
-  }, [categories, accounts]);
+  }, [categories, accounts, homeMonth]);
 
   const scopedTransactions = useMemo(
     () => transactions.filter((transaction) => transactionMatchesScope(transaction, categories, budgetScope, accounts)),
@@ -1134,8 +1137,15 @@ export default function App() {
 
   const parsedAmount = amount ? evalExpr(amount) : 0;
   const isEditingTransaction = Boolean(editingTransactionId);
-  const categoryUnfunded = transactionType === "Expense" && !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available === 0);
-  const categoryOverBudget = transactionType === "Expense" && !isEditingTransaction && !!(selectedCat && selectedCat.available !== null && selectedCat.available > 0 && parsedAmount > selectedCat.available);
+  const budgetGate = transactionType === "Expense" && selectedCat
+    ? expenseBudgetGate({
+      available: selectedCat.available,
+      amount: parsedAmount,
+      originalAmount: isEditingTransaction && editingOriginal?.categoryId === selectedCat.id ? editingOriginal.amount : 0,
+    })
+    : { unfunded: false, overBudget: false, shortfall: 0 };
+  const categoryUnfunded = budgetGate.unfunded;
+  const categoryOverBudget = budgetGate.overBudget;
   const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && accountId && (transactionType === "Income" || categoryId) && status === "idle" && !categoryUnfunded && !categoryOverBudget);
   const suggestedCategory = suggestedCatId ? categories.find((c) => c.id === suggestedCatId) : undefined;
 
@@ -1351,6 +1361,7 @@ export default function App() {
         parsedAmount={parsedAmount}
         categoryUnfunded={categoryUnfunded}
         categoryOverBudget={categoryOverBudget}
+        categoryShortfall={budgetGate.shortfall}
         canSubmit={canSubmit}
         allCategories={categories.filter(c => !isSavingsCategory(c))}
         modeVariant={editingTransactionId ? "edit" : "create"}

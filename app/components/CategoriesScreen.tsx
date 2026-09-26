@@ -16,6 +16,8 @@ import { getCategoryAvailableByScope } from "./wallet-utils";
 import { MascotHero } from "./mascot/MascotHero";
 import { budgetJarItems } from "./mascot/budgetJar";
 
+import { isPastMonth } from "./app-utils";
+
 type Props = {
   categories: Category[];
   frozenCategories: Category[];
@@ -118,9 +120,17 @@ export function CategoriesScreen({
     return map;
   }, [monthlySummary.assignedByCategory]);
 
+  // Available is today's figure; past months show 0 instead (see isPastMonth).
+  const monthCategories = useMemo(
+    () => isPastMonth(homeMonth)
+      ? categories.map(cat => ({ ...cat, available: cat.available === null ? null : 0 }))
+      : categories,
+    [categories, homeMonth],
+  );
+
   const activeGroups = useMemo(() => {
     const q = search.toLowerCase().trim();
-    const items = categories
+    const items = monthCategories
       .filter(cat => {
         if (q && !cat.name.toLowerCase().includes(q) && !cat.type.some(t => t.toLowerCase().includes(q))) return false;
         if (getCategoryScope(cat, accounts) !== budgetScope) return false;
@@ -142,7 +152,7 @@ export function CategoriesScreen({
       map.get(row.section)!.push(row);
     }
     return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
-  }, [categories, search, budgetScope, accounts, spentByCategory, plannedByCategory]);
+  }, [monthCategories, search, budgetScope, accounts, spentByCategory, plannedByCategory]);
 
   const visibleSection = activeGroups.some(group => group.label === selectedSection)
     ? selectedSection
@@ -150,8 +160,8 @@ export function CategoriesScreen({
   const visibleGroup = activeGroups.find(group => group.label === visibleSection);
   // Same figure as Home: category Available (carry-over included), savings excluded.
   const availableInCategories = useMemo(
-    () => getCategoryAvailableByScope(categories, accounts)[budgetScope],
-    [categories, accounts, budgetScope],
+    () => getCategoryAvailableByScope(monthCategories, accounts)[budgetScope],
+    [monthCategories, accounts, budgetScope],
   );
   // Joint's unassigned money is the joint account's own ready-to-assign, not the
   // partners' personal balances. Negative means over-assigned (covered by contributions).
@@ -162,8 +172,8 @@ export function CategoriesScreen({
   const contributionRemaining = contributionRemainingByScope[budgetScope] ?? 0;
   // Budget jar: an emoji per category with money left, sized by its share of Available.
   const jarItems = useMemo(
-    () => budgetJarItems(categories, budgetScope, accounts),
-    [categories, budgetScope, accounts],
+    () => budgetJarItems(monthCategories, budgetScope, accounts),
+    [monthCategories, budgetScope, accounts],
   );
   // The jar's face follows the whole scope's month, never the search results.
   const jarSpentPct = useMemo(() => {

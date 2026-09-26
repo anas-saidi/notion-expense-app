@@ -38,6 +38,8 @@ type AddTransactionSheetProps = {
   parsedAmount: number;
   categoryUnfunded: boolean;
   categoryOverBudget: boolean;
+  /** Budget this expense still needs in its category (0 when covered). */
+  categoryShortfall: number;
   canSubmit: boolean;
   allCategories?: Category[];
   modeVariant?: "create" | "edit";
@@ -117,9 +119,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
   if (!props.open) return null;
 
-  const deficit = props.categoryUnfunded
-    ? props.parsedAmount
-    : Math.max(0, props.parsedAmount - (props.selectedCat?.available ?? 0));
+  const deficit = props.categoryShortfall;
 
   const sourceCandidates = (props.allCategories ?? [])
     .filter(c => c.id !== props.selectedCat?.id && (c.available ?? 0) > 0)

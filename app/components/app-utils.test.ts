@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { comparisonPeriods, evalExpr, expenseBalancePreview, fmt, getLeftToAssignByScope, isExpenseTransaction, parseAmount, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
+import { comparisonPeriods, evalExpr, expenseBalancePreview, expenseBudgetGate, fmt, getLeftToAssignByScope, isExpenseTransaction, isPastMonth, parseAmount, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
 
 const accounts: Account[] = [
   { id: "joint", label: "Joined account", icon: "", type: null, balance: 900, readyToAssign: 0 },
@@ -90,4 +90,36 @@ describe("amount parsing", () => {
       expect(evalExpr(input)).toBe(0);
     },
   );
+});
+
+describe("expense budget gate", () => {
+  it.each([
+    ["within budget", { available: 100, amount: 60 }, { unfunded: false, overBudget: false, shortfall: 0 }],
+    ["exactly the budget", { available: 100, amount: 100 }, { unfunded: false, overBudget: false, shortfall: 0 }],
+    ["over budget", { available: 50, amount: 60 }, { unfunded: false, overBudget: true, shortfall: 10 }],
+    ["no budget", { available: 0, amount: 60 }, { unfunded: true, overBudget: false, shortfall: 60 }],
+    ["already overspent", { available: -200, amount: 500 }, { unfunded: true, overBudget: false, shortfall: 500 }],
+    ["float dust on zero", { available: 1e-13, amount: 5 }, { unfunded: true, overBudget: false, shortfall: 5 }],
+    ["unknown available", { available: null, amount: 60 }, { unfunded: false, overBudget: false, shortfall: 0 }],
+    ["edit with unchanged amount in overspent category", { available: -50, amount: 100, originalAmount: 100 }, { unfunded: false, overBudget: false, shortfall: 0 }],
+    ["edit lowering the amount", { available: -50, amount: 80, originalAmount: 100 }, { unfunded: false, overBudget: false, shortfall: 0 }],
+    ["edit raising the amount within budget", { available: 30, amount: 120, originalAmount: 100 }, { unfunded: false, overBudget: false, shortfall: 0 }],
+    ["edit raising the amount past budget", { available: 30, amount: 150, originalAmount: 100 }, { unfunded: false, overBudget: true, shortfall: 20 }],
+  ] as const)("%s", (_label, input, expected) => {
+    expect(expenseBudgetGate(input)).toEqual(expected);
+  });
+});
+
+describe("isPastMonth", () => {
+  it("compares against the local current month, including across a year boundary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 1, 0, 30)); // 1 Jan 2026, 00:30 local
+    try {
+      expect(isPastMonth("2025-12")).toBe(true);
+      expect(isPastMonth("2026-01")).toBe(false);
+      expect(isPastMonth("2026-02")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
