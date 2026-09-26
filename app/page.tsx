@@ -39,6 +39,9 @@ import {
   today,
   transactionMatchesScope,
 } from "./components/app-utils";
+import { Mascot } from "./components/mascot/Mascot";
+
+const LOADING_MASCOT_SIZE = 112;
 
 const LOADING_LINES = [
   "Warming up Notion...",
@@ -1083,7 +1086,11 @@ export default function App() {
     return (
       <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 28, height: 28, border: "2px solid var(--border2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          {/* The mascot dozes while Notion wakes up; before mount, an empty box of the same size
+              keeps the server and first client render identical. */}
+          {mounted
+            ? <Mascot target={{ scope: budgetScope, gap: 0, mood: "sleepy", fill: 0, outline: "partner" }} size={LOADING_MASCOT_SIZE} />
+            : <div style={{ width: LOADING_MASCOT_SIZE, height: LOADING_MASCOT_SIZE }} />}
           {mounted && (
             <p style={{ fontSize: 11, letterSpacing: 0.2, color: "var(--muted)", fontWeight: 600, animation: "fadeUp 0.2s ease both" }}>
               {LOADING_LINES[loadingLineIdx]}

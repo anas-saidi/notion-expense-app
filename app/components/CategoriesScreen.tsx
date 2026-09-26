@@ -5,7 +5,7 @@ import { Currency } from "./Money";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { CheckIcon, ChevronRightIcon, PlusIcon, TransferIcon } from "./ui/icons";
+import { AlertTriangleIcon, CheckIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
@@ -203,16 +203,37 @@ export function CategoriesScreen({
                 <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
                 <Currency />
               </span>
-              {/* Nothing left to assign is the goal, not news: only show it when there's some. */}
-              {Math.round(leftToAllocate) !== 0 && (
-                <span style={budgetHealthSecondaryRowStyle}>
-                  <span style={budgetHealthSecondaryStyle}>
-                    <span>Unassigned</span>
-                    <strong>{fmt(Math.round(leftToAllocate))}</strong>
-                  </span>
-                </span>
-              )}
             </section>
+
+            {/* Money not yet in a category is something to act on, so it's an action banner
+                (nothing left to assign is the goal, so then there's no banner). Rebalance
+                moves unassigned money into categories, or takes it back when over-assigned. */}
+            {Math.round(leftToAllocate) > 0 && (
+              <Banner
+                tone="accent"
+                icon={<FundIcon size={18} strokeWidth={2.2} />}
+                title={`${fmt(Math.round(leftToAllocate))} unassigned`}
+                action={(
+                  <button type="button" onClick={onOpenRebalance} style={contributionActionStyle}>
+                    Assign
+                  </button>
+                )}
+              >
+              </Banner>
+            )}
+            {Math.round(leftToAllocate) < 0 && (
+              <Banner
+                tone="danger"
+                icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
+                title={`${fmt(Math.abs(Math.round(leftToAllocate)))} over-assigned`}
+                action={(
+                  <button type="button" onClick={onOpenRebalance} style={alertActionStyle}>
+                    Rebalance
+                  </button>
+                )}
+              >
+              </Banner>
+            )}
 
             {budgetScope !== "joint" && contributionRemaining > 0 && (
               <Banner
@@ -657,26 +678,17 @@ const budgetHealthAmountStyle: CSSProperties = {
 };
 
 
-const budgetHealthSecondaryStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "baseline",
-  gap: 6,
-  padding: "5px 9px",
-  borderRadius: 8,
-  background: "var(--surface2)",
-  color: "var(--muted)",
+/** Action inside an alert banner: neutral, so it doesn't clash with the danger tone. */
+const alertActionStyle: CSSProperties = {
+  minHeight: 44,
+  padding: "0 12px",
+  border: 0,
+  borderRadius: "var(--radius-control)",
+  background: "var(--text)",
+  color: "var(--bg)",
   fontSize: 12,
-  lineHeight: 1,
-  fontVariantNumeric: "tabular-nums",
-};
-
-const budgetHealthSecondaryRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexWrap: "wrap",
-  gap: 6,
-  marginTop: 2,
+  fontWeight: 750,
+  cursor: "pointer",
 };
 
 const contributionActionStyle: CSSProperties = {
