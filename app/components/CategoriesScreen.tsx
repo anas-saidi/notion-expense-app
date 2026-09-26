@@ -15,6 +15,8 @@ import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned }
 import { getCategoryAvailableByScope, scopeMonthlySummary } from "./wallet-utils";
 import { MascotHero } from "./mascot/MascotHero";
 import { budgetJarItems } from "./mascot/budgetJar";
+import { JointFamily } from "./WalletCardSwitcher";
+import type { ContributionStatus } from "./contribution-utils";
 
 import { isPastMonth } from "./app-utils";
 
@@ -40,6 +42,8 @@ type Props = {
   monthError?: boolean;
   onRetryMonth: () => void;
   loading?: boolean;
+  /** Partners' contributions to Joint: shown as their jars beside the Joint pool, as on Home. */
+  contribStatus?: ContributionStatus | null;
 };
 
 type ScopeChip = BudgetScope;
@@ -88,6 +92,7 @@ export function CategoriesScreen({
   monthError = false,
   onRetryMonth,
   loading = false,
+  contribStatus = null,
 }: Props) {
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -222,12 +227,15 @@ export function CategoriesScreen({
         : <>
             <section aria-label={`${fmt(Math.round(availableInCategories))} MAD currently available in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* How the month's budget splits across categories: one emoji each, sized by share. */}
-              {/* Trial (husband only): the same liquid jar as Home, with the categories'
-                  emojis dropped into it, so the mascot varies by screen instead of changing design. */}
-              {jarItems.length > 0 && (budgetScope === "anas" ? (
-                <MascotHero variant="pool" scope={budgetScope} level={poolLevel} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
+              {/* The same liquid jar as Home, with the categories' emojis dropped into it, so the
+                  mascot varies by screen instead of changing design. Joint keeps its family around
+                  it, as on Home. */}
+              {jarItems.length > 0 && (budgetScope === "joint" && contribStatus ? (
+                <JointFamily contribStatus={contribStatus}>
+                  <MascotHero variant="pool" scope={budgetScope} level={poolLevel} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} />
+                </JointFamily>
               ) : (
-                <MascotHero variant="split" scope={budgetScope} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
+                <MascotHero variant="pool" scope={budgetScope} level={poolLevel} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
               ))}
               <span style={budgetHealthLabelStyle}>Available</span>
               <span style={budgetHealthAmountStyle}>

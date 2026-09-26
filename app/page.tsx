@@ -1293,6 +1293,7 @@ export default function App() {
           }}
           monthError={monthError}
           onRetryMonth={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }}
+          contribStatus={contribStatus}
           budgetScope={budgetScope}
           selectedCategoryId={categoryId}
           onSelectCategory={selectCategory}

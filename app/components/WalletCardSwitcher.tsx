@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { BudgetScope, Category, MonthlySummary } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
 import { Currency, Money } from "./Money";
@@ -96,11 +96,9 @@ export function WalletCardSwitcher({ value, monthlySummary, walletSummaries, cat
           {isJoint && contribStatus ? (
             // Joint: the pooled jar in the middle, each partner's own jar beside it,
             // filled by how much of their share they've put in this month.
-            <div style={familyRowStyle}>
-              <PartnerJar scope="anas" name="Anas" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} />
+            <JointFamily contribStatus={contribStatus}>
               {pool || <span style={captionStyle}>No monthly plan</span>}
-              <PartnerJar scope="salma" name="Salma" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} />
-            </div>
+            </JointFamily>
           ) : (
             pool || <span style={captionStyle}>No monthly plan</span>
           )}
@@ -120,6 +118,21 @@ export function WalletCardSwitcher({ value, monthlySummary, walletSummaries, cat
           Contributions unavailable: set both partners' split percentages (totalling 100%) and check the joint balance and category balances.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Joint's mascot family: the pool (children) with each partner's jar cuddled
+ * against it. Shared by Home and Budget so Joint looks the same on both; the
+ * pool must be MASCOT_HERO_SIZE for the cuddle geometry to line up.
+ */
+export function JointFamily({ contribStatus, children }: { contribStatus: ContribStatus; children: ReactNode }) {
+  return (
+    <div style={familyRowStyle}>
+      <PartnerJar scope="anas" name="Anas" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} />
+      {children}
+      <PartnerJar scope="salma" name="Salma" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} />
     </div>
   );
 }
