@@ -31,6 +31,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  --app-sidebar-width: 220px;
+  --app-desktop-content-width: min(1100px, calc(100vw - var(--app-sidebar-width)));
   --bg: #ffffff;
   --surface: #ffffff;
   --surface2: #f1f1f1;
@@ -87,7 +89,7 @@
   --layer-toast: 100;
   --elevation-card: 0 2px 8px rgba(14, 15, 12, 0.055), 0 10px 28px rgba(14, 15, 12, 0.045);
   --elevation-float: 0 8px 20px rgba(14, 15, 12, 0.09), 0 24px 48px rgba(14, 15, 12, 0.07);
-  --elevation-sheet: 0 -2px 8px rgba(14, 15, 12, 0.06);
+  --elevation-sheet: 0 -4px 16px rgba(14, 15, 12, 0.08), 0 -1px 4px rgba(14, 15, 12, 0.04);
   --card-shadow: var(--elevation-card);
   --card-radius: var(--radius-card);
   --card-border: rgba(14, 15, 12, 0.12);
@@ -1269,7 +1271,7 @@ button:hover .rebalance-btn-icon {
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 80;
+  z-index: 60;
   min-height: 44px;
   /* Extend the header surface through the content rail’s side gutters. */
   margin-inline: calc(-1 * var(--space-4));
@@ -1277,6 +1279,13 @@ button:hover .rebalance-btn-icon {
   padding-top: calc(var(--safe-top) + var(--space-4));
   padding-bottom: var(--space-4);
   background: var(--bg);
+}
+
+/* Desktop dialogs dim the entire shell, including its sticky header. */
+@media (min-width: 768px) {
+  .app-header {
+    z-index: 20;
+  }
 }
 
 html.has-open-sheet .app-content {
@@ -1696,8 +1705,13 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
 
 /* ── Desktop (≥ 1100px) — sidebar nav ─────────────────────── */
 @media (min-width: 1100px) {
+  :root {
+    --sheet-center-x: calc(var(--app-sidebar-width) + var(--app-desktop-content-width) / 2);
+  }
+
   .app-content {
-    margin-left: 220px;
+    margin-left: var(--app-sidebar-width);
+    width: var(--app-desktop-content-width);
     max-width: 1100px;
     padding-bottom: 64px;
     padding-left: 48px;
@@ -1720,7 +1734,7 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     left: 0;
     bottom: 0;
     transform: var(--app-nav-base-transform);
-    width: 220px;
+    width: var(--app-sidebar-width);
     display: block;
     pointer-events: none;
   }
@@ -1729,7 +1743,7 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     top: 0;
     right: 0;
     bottom: 88px;
-    width: 220px;
+    width: var(--app-sidebar-width);
     border-radius: 0;
     border: none;
     border-right: 1px solid color-mix(in srgb, var(--border2) 56%, transparent);

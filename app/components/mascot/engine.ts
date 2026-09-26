@@ -514,6 +514,8 @@ export class MascotEngine {
       });
     });
 
+    // Idle breathing belongs to the shell, not the settled contents.
+    const contentsSy = sy / live.breath;
     let coins: CoinFrame[] | undefined;
     if (this.sim) {
       if (this.simT !== null && t > this.simT) this.sim.step(t - this.simT);
@@ -522,7 +524,7 @@ export class MascotEngine {
       coins = sim.coins.map(coin => {
         const v = sim.view(coin);
         return {
-          x: r2(v.x * SCALE * sx), y: r2((v.y * sy + cy) * SCALE), rot: r2(v.rot), owner: coin.owner, opacity: r2(v.opacity),
+          x: r2(v.x * SCALE * sx), y: r2((v.y * contentsSy + cy) * SCALE), rot: r2(v.rot), owner: coin.owner, opacity: r2(v.opacity),
           aspect: r2(v.aspect ?? coin.look.aspect), scale: coin.look.scale, z: coin.look.z, dust: r2(v.dust),
           glyph: coin.item?.glyph, itemRadius: coin.item?.radius, arrive: r2(v.arrive ?? 1),
         };
@@ -535,7 +537,7 @@ export class MascotEngine {
         const rattle = slosh * 0.012 * Math.sin(t * 22 + i * 1.7);
         return {
           x: r2(p.x * SCALE * sx),
-          y: r2(((p.y + rattle) * sy + cy) * SCALE),
+          y: r2(((p.y + rattle) * contentsSy + cy) * SCALE),
           rot: r2(coin.look.rot),
           owner: coin.owner,
           opacity: r2(1 - leaving),

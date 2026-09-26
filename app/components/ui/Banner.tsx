@@ -78,3 +78,17 @@ export function Banner({ tone = "neutral", icon, title, children, action, role =
 
   return <div role={role} style={sharedStyle}>{content}</div>;
 }
+
+/** Neutral action for warning/error banners; shared with compact composer alerts. */
+export const bannerActionStyle: CSSProperties = {
+  minHeight: 44,
+  padding: "0 12px",
+  border: 0,
+  borderRadius: "var(--radius-control)",
+  background: "var(--text)",
+  color: "var(--bg)",
+  fontSize: 12,
+  fontWeight: 750,
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+};

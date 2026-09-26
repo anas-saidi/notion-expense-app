@@ -262,7 +262,6 @@ export function AllocationFlow({
               scope={jarScope}
               items={jarItems}
               spentPct={null}
-              size={FLOW_JAR_SIZE}
               remember={false}
               mood={isOver ? "worried" : isBalanced ? "excited" : leftToAssign > 0.5 ? "curious" : "idle"}
               style={{ marginBottom: heroPool ? -8 : 4 }}
@@ -482,8 +481,6 @@ const monthPickerButtonStyle: CSSProperties = { minHeight: 44, padding: "0 4px",
 const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
 const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
-/** The flows are sheets with a keypad and editor below, so the jar is a little smaller than a screen hero. */
-const FLOW_JAR_SIZE = 140;
 const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };

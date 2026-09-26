@@ -8,7 +8,7 @@ import { Money } from "./Money";
 import { TransactionRow } from "./ui/TransactionRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { PickerPopover } from "./PickerPopover";
-import { Banner } from "./ui/Banner";
+import { Banner, bannerActionStyle } from "./ui/Banner";
 import { DateCalendar, DatePickerTrigger } from "./DatePicker";
 import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, XIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -464,7 +464,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     )}
 
                     {props.onOpenRebalance && (
-                      <button type="button" onClick={() => props.onOpenRebalance!()} style={rebalanceLinkStyle}>
+                      <button type="button" onClick={() => props.onOpenRebalance!()} style={bannerActionStyle}>
                         Rebalance
                       </button>
                     )}
@@ -961,21 +961,9 @@ const monoSmallStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-const rebalanceLinkStyle: CSSProperties = {
-  padding: 0,
-  border: "none",
-  background: "transparent",
-  fontSize: 12,
-  fontWeight: 500,
-  color: "var(--muted)",
-  cursor: "pointer",
-  textDecoration: "underline",
-  textUnderlineOffset: 2,
-  flexShrink: 0,
-};
-
 const fundTriggerStyle = (loading: boolean): CSSProperties => ({
-  padding: 0,
+  minHeight: 44,
+  padding: "0 4px",
   border: "none",
   background: "transparent",
   fontFamily: "var(--font-body)",

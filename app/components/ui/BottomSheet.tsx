@@ -170,8 +170,8 @@ export function BottomSheet({
        * Kept separate from panelStyle so the consumer's `position:"relative"`
        * (or any other positional style) never clobbers our fixed layout.
        *
-       * Desktop (≥ 600px): centered modal with fade+scale animation, no drag.
-       * Mobile (< 600px): bottom sheet with slide-up animation and drag-to-close.
+       * Desktop (≥ 768px): centered modal with fade+scale animation, no drag.
+       * Mobile (< 768px): bottom sheet with slide-up animation and drag-to-close.
        */}
       <motion.div
         key="sheet-panel"
@@ -215,7 +215,7 @@ export function BottomSheet({
               : {
                   position: "fixed",
                   top: "50%",
-                  left: "50%",
+                  left: "var(--sheet-center-x, 50%)",
                   x: "-50%",
                   y: "-50%",
                   width: `min(${maxWidth}, calc(100vw - 48px))`,

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MascotEngine, SCALE, VIEWBOX_HALF, type CoinFrame, type MascotFrame, type MascotTarget, type PhysicsMode } from "./engine";
 import { BEAD_SCALE, COIN_R, dustSpecks, type CoinOwner } from "./coins";
 import { mixHex, TAU } from "./math";
@@ -358,7 +358,7 @@ const EMOJI_FILL = 0.85;
 /** Gold tones of the coin emoji, for its dust. */
 const EMOJI_DUST = { face: "#e2b650", edge: "#b98a2f" };
 
-function Coin(coin: CoinFrame & { coinStyle: CoinStyle; outlineColor: string; glyphFilter?: string }) {
+const Coin = memo(function Coin(coin: CoinFrame & { coinStyle: CoinStyle; outlineColor: string; glyphFilter?: string }) {
   const { x, y, rot, owner, opacity, aspect, scale, dust, coinStyle } = coin;
   const m = COIN_METAL[owner];
   const rx = COIN_RX * scale;
@@ -384,7 +384,7 @@ function Coin(coin: CoinFrame & { coinStyle: CoinStyle; outlineColor: string; gl
       {aspect > 0.45 && <ellipse rx={rx * 0.7} ry={ry * 0.7} fill="none" stroke={m.ring} strokeWidth={0.8} opacity={0.35} />}
     </g>
   );
-}
+});
 
 /**
  * A spend in the jar: its category emoji, upright-ish, sized by the amount.
