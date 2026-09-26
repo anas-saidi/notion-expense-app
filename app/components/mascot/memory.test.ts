@@ -28,6 +28,7 @@ describe("remembered jar", () => {
   it("validates stored values", () => {
     expect(parseSeenItems([house])).toEqual([house]);
     expect(parseSeenItems([{ ...house, radius: Number.NaN }])).toBeNull();
+    expect(parseSeenItems([{ ...house, radius: 0 }])).toBeNull();
     expect(parseSeenItems({})).toBeNull();
     expect(parseSeenLevel(1.4)).toBe(1);
     expect(parseSeenLevel(Number.POSITIVE_INFINITY)).toBeNull();

@@ -147,12 +147,17 @@ export function CategoriesScreen({
     () => budgetJarItems(categories, budgetScope, accounts),
     [categories, budgetScope, accounts],
   );
+  // The jar's face follows the whole scope's month, never the search results.
   const jarSpentPct = useMemo(() => {
-    const rows = activeGroups.flatMap(group => group.items);
-    const planned = rows.reduce((sum, row) => sum + row.planned, 0);
-    const spent = rows.reduce((sum, row) => sum + row.spent, 0);
+    let planned = 0;
+    let spent = 0;
+    for (const cat of categories) {
+      if (getCategoryScope(cat, accounts) !== budgetScope) continue;
+      planned += plannedByCategory.get(cat.id) ?? 0;
+      spent += spentByCategory.get(cat.id) ?? 0;
+    }
     return planned > 0 ? (spent / planned) * 100 : null;
-  }, [activeGroups]);
+  }, [categories, accounts, budgetScope, plannedByCategory, spentByCategory]);
   const monthLabel = useMemo(() => {
     const parsed = /^\d{4}-\d{2}$/.test(homeMonth) ? new Date(`${homeMonth}-01T12:00:00`) : new Date(homeMonth);
     return Number.isNaN(parsed.getTime()) ? "Monthly budget" : parsed.toLocaleDateString(undefined, { month: "long", year: "numeric" });

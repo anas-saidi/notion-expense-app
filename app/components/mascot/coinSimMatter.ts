@@ -52,6 +52,9 @@ interface MatterCoin {
 /** A spend dropped into the jar: its category emoji, sized by amount. */
 export interface JarItem { id: string; glyph: string; radius: number }
 
+/** Smallest body an emoji can have: a zero radius makes matter-js positions NaN. */
+const MIN_ITEM_RADIUS = 0.02;
+
 /** Emojis settle upright (stable at 0°); a flipped 🍕 would read as broken. */
 const UPRIGHT = 0.01;
 
@@ -122,7 +125,7 @@ export class MatterCoinSim implements CoinPhysics {
 
   private makeBody(coin: MatterCoin, x: number, y: number) {
     const body = coin.item
-      ? Matter.Bodies.circle(x, y, coin.item.radius * U, COIN_BODY)
+      ? Matter.Bodies.circle(x, y, Math.max(MIN_ITEM_RADIUS, coin.item.radius) * U, COIN_BODY)
       : this.shape === "bead"
         ? Matter.Bodies.circle(x, y, COIN_R * BEAD_SCALE * coin.look.scale * U, COIN_BODY)
         : Matter.Bodies.fromVertices(x, y, [coinVertices(coin.look)], COIN_BODY);
@@ -177,14 +180,28 @@ export class MatterCoinSim implements CoinPhysics {
 
   /** Suck several emojis out through the top, the top-most first. */
   removeItems(ids: string[], stagger = 0.05) {
+    // One still queued (never dropped in, so never seen) just leaves the queue.
+    this.coins = this.coins.filter(c => !(c.item && !c.body && c.leftAt === undefined && ids.includes(c.item.id)));
     const leaving = this.coins
-      .filter(c => c.item && c.leftAt === undefined && ids.includes(c.item.id))
-      .sort((a, b) => (a.body?.position.y ?? -Infinity) - (b.body?.position.y ?? -Infinity));
+      .filter(c => c.item && c.body && c.leftAt === undefined && ids.includes(c.item.id))
+      .sort((a, b) => a.body!.position.y - b.body!.position.y);
     leaving.forEach((c, i) => { c.leftAt = this.clock + i * stagger; });
+  }
+
+  /** A category's emoji changed (its icon was edited): swap the glyph in place. */
+  updateGlyph(id: string, glyph: string) {
+    const coin = this.coins.find(c => c.item?.id === id && c.leftAt === undefined);
+    if (coin?.item && coin.item.glyph !== glyph) coin.item = { ...coin.item, glyph };
+  }
+
+  /** Current glyph of a staying emoji, or undefined. */
+  itemGlyph(id: string) {
+    return this.coins.find(c => c.item?.id === id && c.leftAt === undefined)?.item?.glyph;
   }
 
   /** Grow or shrink an emoji in place (its share changed); it eases to the new size. */
   resizeItem(id: string, radius: number) {
+    if (!(radius > 0)) return;
     const coin = this.coins.find(c => c.item?.id === id && c.leftAt === undefined);
     if (!coin?.item) return;
     if (!coin.body) { coin.item = { ...coin.item, radius }; return; }

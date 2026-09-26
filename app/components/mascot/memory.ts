@@ -33,7 +33,7 @@ function write(key: string, value: unknown) {
 /** Stored items, or null if there's no valid record. */
 export function parseSeenItems(value: unknown): JarItem[] | null {
   if (!Array.isArray(value)) return null;
-  const ok = value.every(v => v && typeof v.id === "string" && typeof v.glyph === "string" && typeof v.radius === "number" && Number.isFinite(v.radius));
+  const ok = value.every(v => v && typeof v.id === "string" && typeof v.glyph === "string" && typeof v.radius === "number" && Number.isFinite(v.radius) && v.radius > 0);
   return ok ? (value as JarItem[]) : null;
 }
 

@@ -139,7 +139,8 @@ function PartnerJar({ scope, name, actual, plan }: {
   const due = Math.max(0, plan - actual);
   const overpaid = Math.max(0, actual - plan);
   const settled = due <= 0.005;
-  const amount = fmt(Math.max(1, Math.round(settled ? overpaid : due)));
+  const rounded = Math.round(settled ? overpaid : due);
+  const amount = rounded > 0 ? fmt(rounded) : "<1";
   const note = !settled ? "due" : overpaid > 0.005 ? "above plan" : null;
   // Shown without the currency (the app has one); spoken with it.
   const status = note ? `${amount} ${note}` : "Settled";

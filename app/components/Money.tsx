@@ -28,7 +28,7 @@ export function Money({
       {animated
         ? <AnimatedCounter value={displayValue} animateOnMount={animateOnMount} />
         : <span>{fmt(displayValue)}</span>}
-      {currency && <Currency />}
+      {currency ? <Currency /> : <span style={srOnlyStyle}> {MONEY_CURRENCY}</span>}
     </span>
   );
 }
@@ -51,6 +51,9 @@ export const currencyStyle: CSSProperties = {
   color: "var(--muted)",
   opacity: 0.8,
 };
+
+/** Shown without the currency, a number still says it to screen readers. */
+const srOnlyStyle: CSSProperties = { position: "absolute", width: 1, height: 1, margin: -1, padding: 0, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap", border: 0 };
 
 const moneyWrapStyle: CSSProperties = {
   display: "inline-flex",

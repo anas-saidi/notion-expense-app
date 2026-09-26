@@ -305,3 +305,31 @@ describe("pool level in frames", () => {
     expect(new MascotEngine({ scope: "anas", gap: 0, mood: "idle", outline: "partner", items: [] }).sample(0).level).toBeUndefined();
   });
 });
+
+describe("emoji jar edge cases", () => {
+  const pool = (items: Array<{ id: string; glyph: string; radius: number }>): MascotTarget => ({ scope: "joint", gap: 0, mood: "idle", outline: "partner", fill: 0.2, items });
+  const run = (e: MascotEngine, from: number, to: number) => { let f: MascotFrame = e.sample(from); for (let t = from; t <= to; t += 1 / 60) f = e.sample(t); return f; };
+
+  it("never flashes emojis that were still queued when the pool closes right after opening", () => {
+    const e = new MascotEngine(pool([]));
+    run(e, 0, 0.2);
+    e.setTarget(pool([{ id: "a", glyph: "🚗", radius: 0.2 }, { id: "b", glyph: "🛒", radius: 0.2 }, { id: "c", glyph: "🏠", radius: 0.2 }]), 0.2);
+    run(e, 0.2, 0.22); // only the first has dropped in
+    e.setTarget(pool([]), 0.22);
+    for (let t = 0.22; t <= 1.2; t += 1 / 60) {
+      const f = e.sample(t);
+      for (const c of f.coins ?? []) if (c.glyph !== "🚗") expect(c.opacity).toBe(0);
+    }
+    expect(e.sample(1.3).coins).toEqual([]);
+  });
+
+  it("swaps an emoji in place when its category's icon changes", () => {
+    const jar = (glyph: string): MascotTarget => ({ scope: "anas", gap: 0, mood: "idle", outline: "partner", items: [{ id: "rent", glyph, radius: 0.25 }] });
+    const e = new MascotEngine(jar("🏠"));
+    run(e, 0, 0.3);
+    e.setTarget(jar("🏡"), 0.3);
+    const f = run(e, 0.3, 0.4);
+    expect(f.coins!.map(c => c.glyph)).toEqual(["🏡"]);
+    expect(f.coins![0].dust ?? 0).toBe(0);
+  });
+});

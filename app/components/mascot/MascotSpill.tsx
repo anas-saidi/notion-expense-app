@@ -58,11 +58,14 @@ export function MascotSpill({ children, details, label, size, hintKey, side = "b
     if (!hintKey) return;
     try {
       if (window.localStorage.getItem(hintKey)) return;
-      window.localStorage.setItem(hintKey, "1");
     } catch {
       return;
     }
-    const id = window.setTimeout(() => setOpen(true), 900);
+    // Marked as seen only once it has actually opened, so a quick remount doesn't use it up.
+    const id = window.setTimeout(() => {
+      setOpen(true);
+      try { window.localStorage.setItem(hintKey, "1"); } catch { /* storage blocked: may show again */ }
+    }, 900);
     return () => window.clearTimeout(id);
   }, [hintKey]);
 

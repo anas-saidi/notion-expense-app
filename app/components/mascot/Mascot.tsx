@@ -82,7 +82,7 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   const engine = useMemo(() => new MascotEngine(target, { calm: still, physics, coinShape }), [still, physics, coinShape]); // eslint-disable-line react-hooks/exhaustive-deps
   const [frame, setFrame] = useState<MascotFrame>(() => engine.sample(0));
 
-  const targetKey = `${target.scope}|${target.gap.toFixed(3)}|${target.mood}|${target.celebrate ? 1 : 0}|${target.fill?.toFixed(3) ?? "-"}|${target.coins ? `${(target.coins.anas ?? 0).toFixed(3)},${(target.coins.salma ?? 0).toFixed(3)}` : "-"}|${target.outline ?? "orb"}|${target.salmaShape ?? "egg"}|${target.lookYaw ?? 0}|${target.items ? target.items.map(i => `${i.id}@${i.radius.toFixed(2)}`).join(",") : "-"}`;
+  const targetKey = `${target.scope}|${target.gap.toFixed(3)}|${target.mood}|${target.celebrate ? 1 : 0}|${target.fill?.toFixed(3) ?? "-"}|${target.coins ? `${(target.coins.anas ?? 0).toFixed(3)},${(target.coins.salma ?? 0).toFixed(3)}` : "-"}|${target.outline ?? "orb"}|${target.salmaShape ?? "egg"}|${target.lookYaw ?? 0}|${target.items ? target.items.map(i => `${i.id}@${i.radius.toFixed(2)}${i.glyph}`).join(",") : "-"}`;
   useEffect(() => {
     engine.setTarget(target, now());
     // Redraw once even when not animating (still, off-screen or a background tab),

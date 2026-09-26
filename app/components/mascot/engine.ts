@@ -302,8 +302,10 @@ export class MascotEngine {
     // staying ones whose share changed grow or shrink in place.
     sim.removeItems([...have].filter(id => !want.has(id)));
     for (const item of items) {
-      const r = have.has(item.id) ? sim.itemRadius(item.id) : undefined;
+      if (!have.has(item.id)) continue;
+      const r = sim.itemRadius(item.id);
       if (r !== undefined && Math.abs(r - item.radius) > 0.005) sim.resizeItem(item.id, item.radius);
+      if (sim.itemGlyph(item.id) !== item.glyph) sim.updateGlyph(item.id, item.glyph);
     }
     let delay = -0.06;
     for (const item of items) if (!have.has(item.id)) sim.addItem(item, Math.min((delay += 0.06), 0.6));
