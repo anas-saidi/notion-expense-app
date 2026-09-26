@@ -262,9 +262,10 @@ export function AllocationFlow({
               scope={jarScope}
               items={jarItems}
               spentPct={null}
-              size={FLOW_JAR_SIZE}
               remember={false}
-              mood={isOver ? "worried" : isBalanced ? "excited" : leftToAssign > 0.5 ? "curious" : "idle"}
+              // Same face vocabulary as every other jar: content ("happy", like a funded Joint)
+              // when balanced, not the oversized "excited" eyes nothing else uses.
+              mood={isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle"}
               style={{ marginBottom: heroPool ? -8 : 4 }}
             />
           )}
@@ -329,6 +330,10 @@ export function AllocationFlow({
                 <button key={item.categoryId} type="button" onClick={() => setActiveCategoryId(item.categoryId)} style={{ ...(isActive ? categoryPillActiveStyle : categoryPillStyle) }} aria-pressed={isActive}>
                   <CategoryIcon icon={item.icon} size={17} style={categoryIconStyle(isActive)} />
                   <span style={categoryNameStyle}>{item.name}</span>
+                  {/* Rebalancing: each category's live available, so you can see where money is without tapping. */}
+                  {rebalanceMode && Math.round(item.amount) !== 0 && (
+                    <span style={categoryAmountStyle(isActive, item.amount < 0)}>{fmt(Math.round(item.amount))}</span>
+                  )}
                 </button>
               );
             })}
@@ -482,8 +487,6 @@ const monthPickerButtonStyle: CSSProperties = { minHeight: 44, padding: "0 4px",
 const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
 const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
-/** The flows are sheets with a keypad and editor below, so the jar is a little smaller than a screen hero. */
-const FLOW_JAR_SIZE = 140;
 const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };
@@ -499,9 +502,10 @@ const deltaChipStyle = (isOver: boolean): CSSProperties => ({
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
-const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 148, minHeight: 44, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)", background: "var(--surface)", color: "var(--text2)", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", boxShadow: "none", transition: "background-color var(--motion-standard) ease, color var(--motion-standard) ease" };
+const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 196, minHeight: 44, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)", background: "var(--surface)", color: "var(--text2)", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", boxShadow: "none", transition: "background-color var(--motion-standard) ease, color var(--motion-standard) ease" };
 const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "color-mix(in srgb, var(--accent) 42%, var(--surface))", color: "var(--accent-ink)" };
 const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActive ? "var(--accent-ink)" : "var(--text2)", flexShrink: 0 });
+const categoryAmountStyle = (isActive: boolean, negative: boolean): CSSProperties => ({ flexShrink: 0, fontSize: 12, fontWeight: 650, fontVariantNumeric: "tabular-nums", color: negative ? "var(--danger)" : isActive ? "var(--accent-ink)" : "var(--muted)", opacity: isActive ? 0.72 : 1 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
 const editorStyle: CSSProperties = { display: "grid" };
 const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gridTemplateRows: "minmax(68px, auto) auto", gap: 8, minHeight: 132, padding: "14px 10px 12px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };

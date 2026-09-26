@@ -79,7 +79,13 @@ function coinVertices(look: CoinLook): Matter.Vector[] {
 
 export class MatterCoinSim implements CoinPhysics {
   coins: MatterCoin[] = [];
-  tilt = 0;
+  private currentTilt = 0;
+  get tilt() { return this.currentTilt; }
+  set tilt(value: number) {
+    if (value === this.currentTilt) return;
+    this.currentTilt = value;
+    for (const coin of this.coins) if (coin.body) Matter.Sleeping.set(coin.body, false);
+  }
   private engine = Matter.Engine.create({ enableSleeping: true, positionIterations: 10, velocityIterations: 8 });
   private walls: Matter.Body[] = [];
   private outline = circleProfile(1);
@@ -248,6 +254,12 @@ export class MatterCoinSim implements CoinPhysics {
   }
 
   step(dt: number) {
+    // Pending arrivals, exits and resizes still advance; resting piles need no solver.
+    if (this.coins.every(c => c.body?.isSleeping && c.leftAt === undefined && c.targetRadius === undefined)) {
+      this.clock += dt;
+      this.pending = 0;
+      return;
+    }
     this.engine.gravity.x = Math.sin(this.tilt);
     this.engine.gravity.y = Math.cos(this.tilt);
     // Fixed time step. matter-js rescales velocity by the ratio of consecutive

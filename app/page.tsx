@@ -128,6 +128,9 @@ export default function App() {
     spentByCategory: [],
   });
   const [loading, setLoading] = useState(true);
+  const [monthLoading, setMonthLoading] = useState(false);
+  const [monthError, setMonthError] = useState(false);
+  const monthRequest = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshState, setRefreshState] = useState<"idle" | "updating" | "stale">("idle");
   const [budgetRefreshing, setBudgetRefreshing] = useState(false);
@@ -309,21 +312,32 @@ export default function App() {
   }, [tab, historyMonth, fetchHistoryTransactions]);
 
   const fetchMonthlySummary = async (month?: string) => {
-    const target = month ?? formatMonthInput(today());
-    const { start, end } = monthBounds(`${target}-01`);
-    const [data, transactionData] = await Promise.all([
-      fetchApiJson<{ summary?: MonthlySummary }>(`/api/monthly-summary?start=${start}&end=${end}`),
-      fetchApiJson<{ transactions?: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&page_size=100`),
-    ]);
-    setContributionTransactions(transactionData.transactions ?? []);
-    setMonthlySummary({
-      start,
-      end,
-      totalAssigned: data.summary?.totalAssigned ?? 0,
-      totalSpent: data.summary?.totalSpent ?? 0,
-      assignedByCategory: data.summary?.assignedByCategory ?? [],
-      spentByCategory: data.summary?.spentByCategory ?? [],
-    });
+    const request = ++monthRequest.current;
+    setMonthLoading(true);
+    setMonthError(false);
+    try {
+      const target = month ?? formatMonthInput(today());
+      const { start, end } = monthBounds(`${target}-01`);
+      const [data, transactionData] = await Promise.all([
+        fetchApiJson<{ summary?: MonthlySummary }>(`/api/monthly-summary?start=${start}&end=${end}`),
+        fetchApiJson<{ transactions?: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&page_size=100`),
+      ]);
+      if (request !== monthRequest.current) return;
+      setContributionTransactions(transactionData.transactions ?? []);
+      setMonthlySummary({
+        start,
+        end,
+        totalAssigned: data.summary?.totalAssigned ?? 0,
+        totalSpent: data.summary?.totalSpent ?? 0,
+        assignedByCategory: data.summary?.assignedByCategory ?? [],
+        spentByCategory: data.summary?.spentByCategory ?? [],
+      });
+    } catch (error) {
+      if (request === monthRequest.current) setMonthError(true);
+      throw error;
+    } finally {
+      if (request === monthRequest.current) setMonthLoading(false);
+    }
   };
 
   const fetchMonthlyTrend = async () => {
@@ -943,16 +957,29 @@ export default function App() {
     [budgetScope, categories, pendingItems],
   );
 
-  const partnerAvatars = useMemo(() => {
-    if (!sessionUser?.avatarUrl) return undefined;
+  // Who is signed in, from the Notion identity: decides whose budget "personal" means.
+  const sessionPartner = useMemo((): "anas" | "salma" | null => {
+    if (!sessionUser) return null;
     const identity = ((sessionUser.name || "") + " " + (sessionUser.email || "")).toLowerCase();
-    const partner = identity.includes("salma") || identity.includes("wife")
-      ? "salma"
-      : identity.includes("anas") || identity.includes("husband")
-        ? "anas"
-        : null;
-    return partner ? { [partner]: sessionUser.avatarUrl } : undefined;
+    if (identity.includes("salma") || identity.includes("wife")) return "salma";
+    if (identity.includes("anas") || identity.includes("husband")) return "anas";
+    return null;
   }, [sessionUser]);
+
+  // The mode used to come only from a localStorage key nothing ever wrote, so every
+  // device defaulted to husband. Follow the signed-in person instead, and remember it.
+  useEffect(() => {
+    if (!sessionPartner) return;
+    const nextMode = sessionPartner === "salma" ? "wife" : "husband";
+    setMode(nextMode);
+    document.documentElement.dataset.mode = nextMode;
+    try { localStorage.setItem("identity", nextMode); } catch { /* private mode */ }
+  }, [sessionPartner]);
+
+  const partnerAvatars = useMemo(() => {
+    if (!sessionUser?.avatarUrl || !sessionPartner) return undefined;
+    return { [sessionPartner]: sessionUser.avatarUrl };
+  }, [sessionUser, sessionPartner]);
 
   // Remaining partner contributions reconcile current allocations with account cash.
   const contribStatus = useMemo(() => calculateContributionStatus({
@@ -1247,6 +1274,15 @@ export default function App() {
           contributionRemainingByScope={contributionRemainingByScope}
           monthlySummary={monthlySummary}
           homeMonth={homeMonth}
+          onHomeMonthChange={(month) => {
+            if (month === homeMonth) return;
+            monthRequest.current += 1;
+            setMonthLoading(true);
+            setMonthError(false);
+            setHomeMonth(month);
+          }}
+          monthError={monthError}
+          onRetryMonth={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }}
           budgetScope={budgetScope}
           selectedCategoryId={categoryId}
           onSelectCategory={selectCategory}
@@ -1271,7 +1307,7 @@ export default function App() {
             setTransferAccount(source);
           }}
           onOpenNewCategory={openNewCategory}
-          loading={budgetRefreshing || refreshState === "updating"}
+          loading={monthLoading || budgetRefreshing || refreshState === "updating"}
         />
       )}
 

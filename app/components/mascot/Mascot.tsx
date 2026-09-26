@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MascotEngine, SCALE, VIEWBOX_HALF, type CoinFrame, type MascotFrame, type MascotTarget, type PhysicsMode } from "./engine";
 import { BEAD_SCALE, COIN_R, dustSpecks, type CoinOwner } from "./coins";
 import { mixHex, TAU } from "./math";
@@ -79,7 +79,10 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
 
   // A new engine only when the still/animated mode flips; targets are pushed into it.
   const coinShape = coinStyle === "beads" ? "bead" : "coin";
-  const engine = useMemo(() => new MascotEngine(target, { calm: still, physics, coinShape }), [still, physics, coinShape]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A phase per jar keeps blinks and gaze drift out of sync between jars on one screen.
+  // Derived from the React id (not Math.random) so server and client render the same first frame.
+  const lifePhase = useMemo(() => phaseFromId(ids), [ids]);
+  const engine = useMemo(() => new MascotEngine(target, { calm: still, physics, coinShape, lifePhase }), [still, physics, coinShape]); // eslint-disable-line react-hooks/exhaustive-deps
   const [frame, setFrame] = useState<MascotFrame>(() => engine.sample(0));
 
   const targetKey = `${target.scope}|${target.gap.toFixed(3)}|${target.mood}|${target.celebrate ? 1 : 0}|${target.fill?.toFixed(3) ?? "-"}|${target.coins ? `${(target.coins.anas ?? 0).toFixed(3)},${(target.coins.salma ?? 0).toFixed(3)}` : "-"}|${target.outline ?? "orb"}|${target.salmaShape ?? "egg"}|${target.lookYaw ?? 0}|${target.items ? target.items.map(i => `${i.id}@${i.radius.toFixed(2)}${i.glyph}`).join(",") : "-"}`;
@@ -358,7 +361,7 @@ const EMOJI_FILL = 0.85;
 /** Gold tones of the coin emoji, for its dust. */
 const EMOJI_DUST = { face: "#e2b650", edge: "#b98a2f" };
 
-function Coin(coin: CoinFrame & { coinStyle: CoinStyle; outlineColor: string; glyphFilter?: string }) {
+const Coin = memo(function Coin(coin: CoinFrame & { coinStyle: CoinStyle; outlineColor: string; glyphFilter?: string }) {
   const { x, y, rot, owner, opacity, aspect, scale, dust, coinStyle } = coin;
   const m = COIN_METAL[owner];
   const rx = COIN_RX * scale;
@@ -384,7 +387,7 @@ function Coin(coin: CoinFrame & { coinStyle: CoinStyle; outlineColor: string; gl
       {aspect > 0.45 && <ellipse rx={rx * 0.7} ry={ry * 0.7} fill="none" stroke={m.ring} strokeWidth={0.8} opacity={0.35} />}
     </g>
   );
-}
+});
 
 /**
  * A spend in the jar: its category emoji, upright-ish, sized by the amount.
@@ -429,4 +432,11 @@ function CoinDust({ x, y, rot, owner, aspect, scale, z, dust, rx, ry, coinStyle 
       })}
     </>
   );
+}
+
+/** A stable 0–60 s offset from a string, spread well enough that neighbouring ids differ. */
+function phaseFromId(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 6000) / 100;
 }

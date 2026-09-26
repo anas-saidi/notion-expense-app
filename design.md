@@ -217,3 +217,8 @@ Use one anchored popover surface for single-choice controls, including Appearanc
 - **Concise copy:** labels name the value or action directly. Avoid explanatory subtitles that repeat the heading or button. Insights keeps its narrative summary. Home’s monthly rail uses one line: period and percentage spent; full Planned and Spent values remain available through the hero controls. Keep account/cash/category distinctions, money-movement context, and destructive-action consequences explicit.
 
 - **Home hero:** the selected Balance / Planned / Spent pill labels the joint amount; omit a duplicate heading. Balance is neutral, planned allocation green, spending red. The monthly rail pairs This month with the percentage alone, with spent and allocated values below. Preserve the full metric label for assistive technology.
+
+- **Desktop sheets:** from 768px, the shared sheet is a modal dialog with a full-window backdrop covering the sticky header and navigation. With the desktop sidebar (1100px+), center the dialog on the content rail; size that rail from the space remaining after the sidebar. Phone sheets retain their interactive global header. This follows the modal/non-modal distinction in the [Mobbin bottom-sheet guidance](https://mobbin.com/glossary/bottom-sheet). Allocation mascots use the same `MASCOT_HERO_SIZE` as screen heroes, without a smaller sheet override.
+
+- **Sheet separation:** phone sheets use the subtle upward `--elevation-sheet` shadow so their top edge reads above the white canvas.
+- **Warning banner actions:** compact composer alerts retain the shared semantic banner container and use `bannerActionStyle` for their primary corrective action, matching Budget warnings with a neutral filled button and a 44-point minimum target.

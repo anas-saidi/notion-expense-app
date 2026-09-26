@@ -296,7 +296,8 @@ export function RebalanceSheet({
       poolOverride={poolForGroup}
       poolLabel={poolLabel}
       title="Rebalance"
-      headerControls={<span style={scopeContextStyle}>{BUDGET_SCOPE_LABELS[budgetScope]}</span>}
+      // The global mode already names the scope, so the header carries no scope pill.
+      headerControls={false}
       balancedLabel="Balanced"
       saveButtonLabel="Apply"
       readOnly={isReadOnly}
@@ -470,17 +471,4 @@ const unallocatedHintTextStyle: CSSProperties = {
   fontWeight: 700,
   color: "var(--text2)",
   letterSpacing: 0.1,
-};
-
-
-const scopeContextStyle: CSSProperties = {
-  minHeight: 32,
-  padding: "0 11px",
-  borderRadius: "var(--radius-control)",
-  background: "var(--surface2)",
-  color: "var(--text2)",
-  display: "inline-flex",
-  alignItems: "center",
-  fontSize: 12,
-  fontWeight: 700,
 };

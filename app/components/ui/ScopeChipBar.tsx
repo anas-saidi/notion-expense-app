@@ -4,6 +4,7 @@ import { type CSSProperties } from "react";
 import { UsersRound } from "lucide-react";
 import type { BudgetScope } from "../app-types";
 import { ManIcon, WomanIcon } from "./icons";
+import { Mascot } from "../mascot/Mascot";
 import { useAppHaptics } from "./useAppHaptics";
 
 /* ─── Scope color tokens (single source of truth) ─────────────── */
@@ -84,6 +85,14 @@ export function ScopeChipBar({ chips, value, onChange, ariaLabel = "Scope" }: Sc
 
 /* ─── App-wide budget scope picker ─────────────────────────────── */
 
+const GLOBAL_SCOPE_NAMES: Record<BudgetScope, string> = { joint: "Joint", anas: "Anas", salma: "Salma" };
+const PICKER_MASCOT_SIZE = 30;
+
+/**
+ * Joint and both partners, each shown as its own mascot, so the mode reads the same
+ * way as the jars on screen. The selected option opens up to show its name;
+ * the others stay compact. The signed-in person sits next to Joint.
+ */
 export function GlobalBudgetScopePicker({
   value,
   onChange,
@@ -94,29 +103,33 @@ export function GlobalBudgetScopePicker({
   personalScope: Exclude<BudgetScope, "joint">;
 }) {
   const { haptic } = useAppHaptics();
-  const chips: ScopeChipItem[] = [
-    { key: "joint", label: "Joint" },
-    { key: "personal", label: "Personal" },
-  ];
+  const scopes: BudgetScope[] = ["joint", personalScope, personalScope === "anas" ? "salma" : "anas"];
   return (
     <div className="global-scope-picker" role="tablist" aria-label="App-wide budget scope">
-      {chips.map(chip => {
-        const active = chip.key === "joint" ? value === "joint" : value !== "joint";
-        const ScopeIcon = chip.key === "joint" ? UsersRound : personalScope === "anas" ? ManIcon : WomanIcon;
+      {scopes.map(scope => {
+        const active = scope === value;
         return (
           <button
-            key={chip.key}
+            key={scope}
             type="button"
             role="tab"
             aria-selected={active}
+            aria-label={GLOBAL_SCOPE_NAMES[scope]}
             className="global-scope-option"
+            data-scope={scope}
             onClick={() => {
               if (!active) haptic("selection");
-              onChange(chip.key === "joint" ? "joint" : personalScope);
+              onChange(scope);
             }}
           >
-            <ScopeIcon className="global-scope-icon" size={13} strokeWidth={2.2} aria-hidden="true" />
-            <span>{chip.label}</span>
+            {/* Only the selected jar is alive (blinks); the others rest still. */}
+            <Mascot
+              target={{ scope, gap: 0, mood: active ? "happy" : "idle", outline: "partner" }}
+              size={PICKER_MASCOT_SIZE}
+              calm={!active}
+              style={{ flexShrink: 0, margin: "-4px -3px" }}
+            />
+            <span className="global-scope-label">{GLOBAL_SCOPE_NAMES[scope]}</span>
           </button>
         );
       })}

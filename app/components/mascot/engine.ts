@@ -205,7 +205,7 @@ export class MascotEngine {
   /** Which jar is on screen; a change means a different pile, not a money event. */
   private jarId: string;
 
-  constructor(target: MascotTarget, private readonly opts: { calm?: boolean; physics?: PhysicsMode; coinShape?: CoinShape } = {}) {
+  constructor(target: MascotTarget, private readonly opts: { calm?: boolean; physics?: PhysicsMode; coinShape?: CoinShape; lifePhase?: number } = {}) {
     this.from = this.to = poseFor(target);
     this.hasCoins = Boolean(target.coins || target.items);
     this.jar = jarShape(target.outline, target.scope, target.salmaShape);
@@ -418,7 +418,9 @@ export class MascotEngine {
 
   sample(t: number): MascotFrame {
     const pose = this.composite(t);
-    const live = liveliness(t, this.opts.calm);
+    // Each jar lives on its own phase, so several on screen never blink or drift in unison.
+    const lifeT = t + (this.opts.lifePhase ?? 0);
+    const live = liveliness(lifeT, this.opts.calm);
 
     let sx = 1, sy = live.breath, cy = 0;
     // Waves settle after a morph or a reaction.
@@ -481,7 +483,7 @@ export class MascotEngine {
     const faces = pose.faces[0].x === pose.faces[1].x && pose.faces[0].y === pose.faces[1].y ? [pose.faces[0]] : pose.faces;
     faces.forEach((face, i) => {
       // The second face blinks a beat later, like two people.
-      const lid = i === 0 ? live.lid : liveliness(t - 0.08, this.opts.calm).lid;
+      const lid = i === 0 ? live.lid : liveliness(lifeT - 0.08, this.opts.calm).lid;
       const faceR = face.s * SCALE;
       faceRadius = faceR;
       const fx = face.x * SCALE * sx;
@@ -514,6 +516,8 @@ export class MascotEngine {
       });
     });
 
+    // Idle breathing belongs to the shell, not the settled contents.
+    const contentsSy = sy / live.breath;
     let coins: CoinFrame[] | undefined;
     if (this.sim) {
       if (this.simT !== null && t > this.simT) this.sim.step(t - this.simT);
@@ -522,7 +526,7 @@ export class MascotEngine {
       coins = sim.coins.map(coin => {
         const v = sim.view(coin);
         return {
-          x: r2(v.x * SCALE * sx), y: r2((v.y * sy + cy) * SCALE), rot: r2(v.rot), owner: coin.owner, opacity: r2(v.opacity),
+          x: r2(v.x * SCALE * sx), y: r2((v.y * contentsSy + cy) * SCALE), rot: r2(v.rot), owner: coin.owner, opacity: r2(v.opacity),
           aspect: r2(v.aspect ?? coin.look.aspect), scale: coin.look.scale, z: coin.look.z, dust: r2(v.dust),
           glyph: coin.item?.glyph, itemRadius: coin.item?.radius, arrive: r2(v.arrive ?? 1),
         };
@@ -535,7 +539,7 @@ export class MascotEngine {
         const rattle = slosh * 0.012 * Math.sin(t * 22 + i * 1.7);
         return {
           x: r2(p.x * SCALE * sx),
-          y: r2(((p.y + rattle) * sy + cy) * SCALE),
+          y: r2(((p.y + rattle) * contentsSy + cy) * SCALE),
           rot: r2(coin.look.rot),
           owner: coin.owner,
           opacity: r2(1 - leaving),

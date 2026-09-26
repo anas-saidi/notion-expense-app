@@ -280,14 +280,16 @@ export function InsightsScreen({
           )}
           <div role="group" aria-label="Activity filters" className="filter-chip-rail" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
             {(["All", "Expenses", "Income", "Transfers"] as const).map(filter => <ScreenChip key={filter} selected={activityType === filter} onClick={() => setActivityType(filter)}>{filter}</ScreenChip>)}
-            <ScreenChip
+            {/* Transactions no scope claims (missing account/category) appear in no mode's
+                history, so this chip surfaces them — but only while there's something to fix. */}
+            {(unassignedTransactions.length > 0 || activityType === "Needs review") && <ScreenChip
               selected={activityType === "Needs review"}
               onClick={() => setActivityType("Needs review")}
               badge={unassignedTransactions.length || undefined}
               ariaLabel={`Needs review: ${unassignedTransactions.length} transactions missing an account or category`}
             >
               Needs review
-            </ScreenChip>
+            </ScreenChip>}
           </div>
         </div>
         {transactionsLoading && (
@@ -304,7 +306,8 @@ export function InsightsScreen({
               <section key={label}>
                 <div style={groupHeaderStyle}>
                   <span style={groupLabelStyle}>{label}</span>
-                  <span style={groupSubtotalStyle}>{expenseTotal > 0 ? fmt(expenseTotal) : ""}{expenseTotal > 0 && incomeTotal > 0 ? " · " : ""}{incomeTotal > 0 ? `${fmt(incomeTotal)} income` : ""}</span>
+                  {/* A day with one transaction already shows its amount on the row. */}
+                  {items.length > 1 && <span style={groupSubtotalStyle}>{expenseTotal > 0 ? fmt(expenseTotal) : ""}{expenseTotal > 0 && incomeTotal > 0 ? " · " : ""}{incomeTotal > 0 ? `${fmt(incomeTotal)} income` : ""}</span>}
                 </div>
                 <div className="tx-group-list" style={transactionGroupStyle}>
                   {items.map(txn => {

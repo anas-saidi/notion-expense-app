@@ -8,7 +8,7 @@ import { Money } from "./Money";
 import { TransactionRow } from "./ui/TransactionRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { PickerPopover } from "./PickerPopover";
-import { Banner } from "./ui/Banner";
+import { Banner, bannerActionStyle } from "./ui/Banner";
 import { DateCalendar, DatePickerTrigger } from "./DatePicker";
 import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, XIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -205,7 +205,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
         {/* ── Amount hero ── */}
         <section style={{ ...heroWrapStyle, minHeight: showKeypad ? 96 : 120 }}>
-          <div className="amount-hero-sizer" data-value={props.amount || "0"} style={{ width: "100%" }}>
+          <div className="amount-hero-sizer" data-value={props.amount || "0"} data-empty={props.amount === "" ? "true" : undefined}>
             <input
               type="text"
               value={props.amount}
@@ -216,6 +216,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               inputMode="decimal"
               autoComplete="off"
               autoFocus
+              // size=1 drops the input's ~20-character intrinsic width, so the sizer's
+              // text mirror sets the width and the drawn caret lands at the end of the digits.
+              size={1}
               className="amount-hero-input"
               ref={amountInputRef}
               onFocus={() => setAmountFocused(true)}
@@ -464,7 +467,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     )}
 
                     {props.onOpenRebalance && (
-                      <button type="button" onClick={() => props.onOpenRebalance!()} style={rebalanceLinkStyle}>
+                      <button type="button" onClick={() => props.onOpenRebalance!()} style={bannerActionStyle}>
                         Rebalance
                       </button>
                     )}
@@ -751,7 +754,7 @@ const typeSwitcherStyle: CSSProperties = {
   gap: 2,
   height: 44,
   width: "fit-content",
-  margin: "0 auto",
+  margin: "0 auto 14px",
   padding: 3,
   boxSizing: "border-box",
   borderRadius: 999,
@@ -961,21 +964,9 @@ const monoSmallStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-const rebalanceLinkStyle: CSSProperties = {
-  padding: 0,
-  border: "none",
-  background: "transparent",
-  fontSize: 12,
-  fontWeight: 500,
-  color: "var(--muted)",
-  cursor: "pointer",
-  textDecoration: "underline",
-  textUnderlineOffset: 2,
-  flexShrink: 0,
-};
-
 const fundTriggerStyle = (loading: boolean): CSSProperties => ({
-  padding: 0,
+  minHeight: 44,
+  padding: "0 4px",
   border: "none",
   background: "transparent",
   fontFamily: "var(--font-body)",

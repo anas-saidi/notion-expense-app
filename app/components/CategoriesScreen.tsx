@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import { Currency } from "./Money";
+import { MonthPicker } from "./DatePicker";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
@@ -9,7 +10,7 @@ import { AlertTriangleIcon, CheckIcon, ChevronRightIcon, FundIcon, PlusIcon, Tra
 import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
-import { Banner } from "./ui/Banner";
+import { Banner, bannerActionStyle } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned } from "./app-utils";
 import { getCategoryAvailableByScope } from "./wallet-utils";
 import { MascotHero } from "./mascot/MascotHero";
@@ -23,6 +24,7 @@ type Props = {
   contributionRemainingByScope: Record<BudgetScope, number>;
   monthlySummary: MonthlySummary;
   homeMonth: string;
+  onHomeMonthChange: (month: string) => void;
   budgetScope: BudgetScope;
   selectedCategoryId: string;
   onSelectCategory: (cat: Category) => void;
@@ -33,6 +35,8 @@ type Props = {
   onFundCategory: (cat: Category) => void;
   onMoveContribution: () => void;
   onOpenNewCategory?: (defaultType: string) => void;
+  monthError?: boolean;
+  onRetryMonth: () => void;
   loading?: boolean;
 };
 
@@ -40,6 +44,17 @@ type ScopeChip = BudgetScope;
 type Health = "over" | "low" | "funded" | "unfunded";
 
 const HEALTH_SORT: Record<Health, number> = { over: 0, low: 1, funded: 2, unfunded: 3 };
+
+/**
+ * Categories with money in them come first so they're one tap away; overspent ones
+ * lead because they need action. Empty ones sink to the bottom, the ones touched
+ * this month (spent to zero) before the untouched.
+ */
+function budgetRowRank(row: { health: Health; available: number | null; spent: number }): number {
+  if (row.health === "over") return 0;
+  if (Math.round(row.available ?? 0) > 0) return 1 + HEALTH_SORT[row.health] / 10;
+  return Math.round(row.spent) !== 0 ? 2 : 3;
+}
 
 
 function getHealth(spent: number, assigned: number, available: number | null): Health {
@@ -59,6 +74,7 @@ export function CategoriesScreen({
   contributionRemainingByScope,
   monthlySummary,
   homeMonth,
+  onHomeMonthChange,
   budgetScope,
   onOpenCategoryDetails,
   onOpenRebalance,
@@ -67,6 +83,8 @@ export function CategoriesScreen({
   onFundCategory,
   onMoveContribution,
   onOpenNewCategory,
+  monthError = false,
+  onRetryMonth,
   loading = false,
 }: Props) {
   const [search, setSearch] = useState("");
@@ -116,7 +134,7 @@ export function CategoriesScreen({
         const section = cat.type[0] ?? "Other";
         return { cat, planned: assigned, spent, available, health, section };
       })
-      .sort((a, b) => HEALTH_SORT[a.health] - HEALTH_SORT[b.health]);
+      .sort((a, b) => budgetRowRank(a) - budgetRowRank(b) || (b.available ?? 0) - (a.available ?? 0));
 
     const map = new Map<string, typeof items>();
     for (const row of items) {
@@ -158,11 +176,6 @@ export function CategoriesScreen({
     }
     return planned > 0 ? (spent / planned) * 100 : null;
   }, [categories, accounts, budgetScope, plannedByCategory, spentByCategory]);
-  const monthLabel = useMemo(() => {
-    const parsed = /^\d{4}-\d{2}$/.test(homeMonth) ? new Date(`${homeMonth}-01T12:00:00`) : new Date(homeMonth);
-    return Number.isNaN(parsed.getTime()) ? "Monthly budget" : parsed.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  }, [homeMonth]);
-
   const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
 
   return (
@@ -192,12 +205,11 @@ export function CategoriesScreen({
               </button>
             : null
         : <>
-            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD available in categories, ${monthLabel}${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
+            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD currently available in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* How the month's budget splits across categories: one emoji each, sized by share. */}
               {jarItems.length > 0 && (
                 <MascotHero variant="split" scope={budgetScope} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
               )}
-              <span style={budgetHealthTitleStyle}>{monthLabel}</span>
               <span style={budgetHealthLabelStyle}>Available</span>
               <span style={budgetHealthAmountStyle}>
                 <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
@@ -227,7 +239,7 @@ export function CategoriesScreen({
                 icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
                 title={`${fmt(Math.abs(Math.round(leftToAllocate)))} over-assigned`}
                 action={(
-                  <button type="button" onClick={onOpenRebalance} style={alertActionStyle}>
+                  <button type="button" onClick={onOpenRebalance} style={bannerActionStyle}>
                     Rebalance
                   </button>
                 )}
@@ -280,6 +292,21 @@ export function CategoriesScreen({
               )}
             </div>
 
+            {!showFrozenAll && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <MonthPicker
+                  value={homeMonth}
+                  aria-label="Filter planned and spent by month"
+                  onChange={(event) => event.target.value && onHomeMonthChange(event.target.value)}
+                  triggerClassName="composer-picker-chip"
+                  showChevron={false}
+                />
+              </div>
+            )}
+            {!showFrozenAll && monthError && !loading && (
+              <Banner tone="danger" title="Couldn't load this month" action={<button type="button" onClick={onRetryMonth} style={bannerActionStyle}>Retry</button>} />
+            )}
+
             {!showFrozenAll && loading && (
               <section aria-label="Loading budget categories" aria-busy="true" style={{ minWidth: 0 }}>
                 <span style={srOnlyStyle} role="status">Loading budget categories</span>
@@ -288,7 +315,7 @@ export function CategoriesScreen({
                 </div>
               </section>
             )}
-            {!showFrozenAll && !loading && visibleGroup && (
+            {!showFrozenAll && !loading && !monthError && visibleGroup && (
               <section key={visibleGroup.label} style={{ minWidth: 0 }} aria-label={`${visibleGroup.label} categories`}>
                 <div className="home-scroll-rail" style={railStyle}>
                   {visibleGroup.items.map(({ cat, available, spent, planned, health }, i) => (
@@ -366,10 +393,10 @@ function CategoryCard({
   onOpenDetails: () => void;
 }) {
   const amountNum = Math.abs(available ?? 0);
+  // One question per bar: how much of this month's money is still left? The fill is
+  // Available, the track is what's been spent. Money moved out never shows as a gap.
   const availableAmount = Math.max(0, available ?? 0);
-  const barTotal = Math.max(planned, spent + availableAmount, 1);
-  const spentPct = Math.min(100, (spent / barTotal) * 100);
-  const availablePct = Math.min(Math.max(0, 100 - spentPct), (availableAmount / barTotal) * 100);
+  const leftPct = Math.min(100, (availableAmount / Math.max(spent + availableAmount, 1)) * 100);
 
   // Animate between values on updates; show instantly on mount
   const displayAmount = useCountUp(amountNum, 580);
@@ -395,10 +422,7 @@ function CategoryCard({
             {health === "over" ? (
               <span style={{ ...budgetBarSegmentStyle, width: "100%", background: "var(--danger)" }} />
             ) : (
-              <>
-                <span style={{ ...budgetBarSegmentStyle, width: `${spentPct}%`, background: health === "low" ? "var(--warning-dim)" : "var(--accent-dim)" }} />
-                <span style={{ ...budgetBarSegmentStyle, width: `${availablePct}%`, background: health === "low" ? "var(--warning)" : "var(--accent)" }} />
-              </>
+              <span style={{ ...budgetBarSegmentStyle, width: `${leftPct}%`, background: health === "low" ? "var(--warning)" : "var(--accent)" }} />
             )}
           </span>
           <span style={budgetMetaStyle}>
@@ -646,13 +670,6 @@ const budgetHealthStyle: CSSProperties = {
   isolation: "isolate",
 };
 
-const budgetHealthTitleStyle: CSSProperties = {
-  fontSize: 13,
-  lineHeight: 1,
-  fontWeight: 600,
-  color: "var(--muted)",
-};
-
 const budgetHealthLabelStyle: CSSProperties = {
   marginTop: 8,
   fontSize: 12,
@@ -677,19 +694,6 @@ const budgetHealthAmountStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-
-/** Action inside an alert banner: neutral, so it doesn't clash with the danger tone. */
-const alertActionStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 12px",
-  border: 0,
-  borderRadius: "var(--radius-control)",
-  background: "var(--text)",
-  color: "var(--bg)",
-  fontSize: 12,
-  fontWeight: 750,
-  cursor: "pointer",
-};
 
 const contributionActionStyle: CSSProperties = {
   minHeight: 44,

@@ -5,7 +5,7 @@ import type { Account, BudgetScope } from "./app-types";
 import { scopeFromAccountLabel } from "./app-utils";
 import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
-import { ChevronRightIcon, XIcon } from "./ui/icons";
+import { XIcon } from "./ui/icons";
 
 type ManageScreenProps = {
   accounts: Account[];
@@ -62,28 +62,29 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
         </div>
 
         {scopedAccounts.length > 0 ? (
-          <div className="manage-account-list" style={listSurfaceStyle}>
-            {scopedAccounts.map((account, index) => (
+          // Same anatomy as transaction rows elsewhere: flat, emoji, name over type,
+          // the figure on the right with its secondary line beneath.
+          <div className="manage-account-list" style={listStyle}>
+            {scopedAccounts.map((account) => (
               <button
                 key={account.id}
                 type="button"
                 onClick={() => onOpenDetails(account)}
                 aria-label={`View ${account.label} details`}
-                className="manage-account-row"
-                style={{ ...accountRowStyle, borderTop: index === 0 ? "none" : "1px solid var(--border)" }}
+                className="tx-row transaction-row manage-account-row"
+                style={accountRowStyle}
               >
                 <span style={accountIconStyle} aria-hidden="true">{account.icon}</span>
                 <span style={accountCopyStyle}>
-                  <strong style={rowTitleStyle}>{account.label}</strong>
+                  <span style={rowTitleStyle}>{account.label}</span>
                   <span style={rowMetaStyle}>{account.type ?? "Account"}</span>
                 </span>
                 <span style={amountStackStyle}>
-                  <strong style={balanceStyle}><Money value={account.balance ?? 0} /></strong>
+                  <span style={balanceStyle}><Money value={account.balance ?? 0} /></span>
                   <span style={readyStyle((account.readyToAssign ?? 0) < 0)}>
                     Ready <Money value={account.readyToAssign ?? 0} />
                   </span>
                 </span>
-                <ChevronRightIcon size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
               </button>
             ))}
           </div>
@@ -125,18 +126,15 @@ const accountsSectionStyle: CSSProperties = { display: "grid", gap: 12 };
 const sectionHeaderStyle: CSSProperties = { minHeight: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 };
 const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: 15, lineHeight: 1.2, fontWeight: 750, color: "var(--text)" };
 const accountCountStyle: CSSProperties = { minWidth: 28, height: 28, padding: "0 8px", borderRadius: 999, background: "var(--surface2)", color: "var(--text2)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 };
-const listSurfaceStyle: CSSProperties = { overflow: "hidden", borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" };
+const listStyle: CSSProperties = { display: "grid" };
 
-const accountRowStyle: CSSProperties = {
-  width: "calc(100% - 16px)", minHeight: 76, margin: "0 8px", padding: "12px 4px", borderRight: "none", borderBottom: "none", borderLeft: "none",
-  background: "transparent", color: "var(--text)", display: "grid", gridTemplateColumns: "44px minmax(0, 1fr) auto 16px", alignItems: "center", gap: 12, textAlign: "left", cursor: "pointer",
-};
-
-const accountIconStyle: CSSProperties = { width: 44, height: 44, borderRadius: "var(--radius-control)", background: "var(--surface2)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
-const accountCopyStyle: CSSProperties = { minWidth: 0, display: "grid", gap: 4 };
-const rowTitleStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, lineHeight: 1.2, fontWeight: 700, color: "var(--text)" };
-const rowMetaStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.2, color: "var(--muted)" };
-const amountStackStyle: CSSProperties = { display: "grid", gap: 4, justifyItems: "end", minWidth: 0, whiteSpace: "nowrap" };
-const balanceStyle: CSSProperties = { fontSize: 14, lineHeight: 1.1, fontWeight: 750, color: "var(--text2)" };
-const readyStyle = (negative: boolean): CSSProperties => ({ fontSize: 12, lineHeight: 1.1, color: negative ? "var(--danger)" : "var(--muted)" });
+// Mirrors ui/TransactionRow so account rows read like every other list in the app.
+const accountRowStyle: CSSProperties = { width: "100%", minHeight: 64, padding: "10px 2px", border: 0, background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer" };
+const accountIconStyle: CSSProperties = { width: 24, height: 24, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 20, lineHeight: 1 };
+const accountCopyStyle: CSSProperties = { flex: 1, minWidth: 0, display: "grid", gap: 3 };
+const rowTitleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, lineHeight: 1.2, fontWeight: 500, color: "var(--text2)" };
+const rowMetaStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.2, color: "var(--muted)" };
+const amountStackStyle: CSSProperties = { display: "grid", justifyItems: "end", gap: 6, flexShrink: 0, whiteSpace: "nowrap" };
+const balanceStyle: CSSProperties = { fontSize: 15, lineHeight: 1, fontWeight: 650, fontVariantNumeric: "tabular-nums", color: "var(--text2)" };
+const readyStyle = (negative: boolean): CSSProperties => ({ fontSize: 12, lineHeight: 1, color: negative ? "var(--danger)" : "var(--muted)" });
 const emptyStyle: CSSProperties = { minHeight: 120, display: "grid", placeItems: "center", borderRadius: "var(--radius-card)", background: "var(--surface2)", color: "var(--muted)", fontSize: 13 };
