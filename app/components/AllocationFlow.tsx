@@ -57,6 +57,12 @@ type AllocationFlowProps = {
    * category, sized by its share of the pool (unassigned money is empty space).
    */
   jarScope?: BudgetScope;
+  /**
+   * The scope's liquid level (0–1), as on Home and Budget. When set, the jar is the
+   * liquid pool with the emojis dropped in; the level stays put while only the
+   * emojis move with the allocation. Unset keeps the emoji-only jar.
+   */
+  jarLevel?: number;
 };
 
 export function AllocationFlow({
@@ -85,6 +91,7 @@ export function AllocationFlow({
   metaLabel = "Last month",
   rebalanceMode = false,
   jarScope,
+  jarLevel,
 }: AllocationFlowProps) {
   // Spent-floor per category, snapshotted on first activation.
   // Must NOT be recomputed from activeItem.amount after edits — that shifts the
@@ -256,19 +263,17 @@ export function AllocationFlow({
         )}
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
           {/* The jar fills as money is assigned: full when balanced, worried when over. */}
-          {jarScope && jarItems.length > 0 && (
-            <MascotHero
-              variant="split"
-              scope={jarScope}
-              items={jarItems}
-              spentPct={null}
-              remember={false}
-              // Same face vocabulary as every other jar: content ("happy", like a funded Joint)
-              // when balanced, not the oversized "excited" eyes nothing else uses.
-              mood={isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle"}
-              style={{ marginBottom: heroPool ? -8 : 4 }}
-            />
-          )}
+          {jarScope && jarItems.length > 0 && (() => {
+            // Same face vocabulary as every other jar: content ("happy", like a funded Joint)
+            // when balanced, not the oversized "excited" eyes nothing else uses.
+            const jarMood = isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle";
+            const jarStyle = { marginBottom: heroPool ? -8 : 4 };
+            return jarLevel !== undefined ? (
+              <MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} style={jarStyle} />
+            ) : (
+              <MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={jarStyle} />
+            );
+          })()}
           {heroPool ? (
             <div style={heroPoolWrapStyle}>
               <span style={heroPoolLabelStyle}>{poolLabel}</span>

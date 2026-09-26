@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
+import { isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Banner } from "./ui/Banner";
 import type { PlanningAllocationItem } from "./app-types";
@@ -149,10 +150,12 @@ export function RebalanceSheet({
     setAllocations(Object.fromEntries(allItems.map((f) => [f.id, f.original])));
   }, [open, allItems]);
 
+  // Savings is money set aside, not this month's money: it never enters the pool,
+  // so a slider drag can't move an emergency fund into groceries by accident.
   const visibleItems = useMemo(() => {
     return allItems.filter((f) => {
       const cat = catById.get(f.id);
-      return cat && getCategoryScope(cat, accounts) === budgetScope;
+      return cat && getCategoryScope(cat, accounts) === budgetScope && !isSavingsCategory(cat);
     });
   }, [allItems, catById, accounts, budgetScope]);
 
@@ -282,11 +285,19 @@ export function RebalanceSheet({
     </Banner>
   ) : undefined;
 
+  // The jar's liquid is the scope's month, from the same figures as Home and Budget,
+  // so it looks the same here; only the emojis move as money is rebalanced.
+  const jarLevel = useMemo(() => {
+    const scoped = scopeMonthlySummary(monthlySummary, categories, accounts, budgetScope);
+    return scoped.totalAssigned > 0 ? 1 - scoped.totalSpent / scoped.totalAssigned : 1;
+  }, [monthlySummary, categories, accounts, budgetScope]);
+
   const poolLabel = monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Available";
 
   return (
     <AllocationFlow
       jarScope={budgetScope}
+      jarLevel={jarLevel}
       open={open}
       mode="sheet"
       selectedMonth={homeMonth}

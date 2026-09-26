@@ -12,7 +12,7 @@ import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned } from "./app-utils";
-import { getCategoryAvailableByScope, scopeMonthlySummary } from "./wallet-utils";
+import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
 import { MascotHero } from "./mascot/MascotHero";
 import { budgetJarItems } from "./mascot/budgetJar";
 import { JointFamily } from "./WalletCardSwitcher";
@@ -156,7 +156,10 @@ export function CategoriesScreen({
       if (!map.has(row.section)) map.set(row.section, []);
       map.get(row.section)!.push(row);
     }
-    return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
+    // Savings is money set aside, not this month's: its tab comes last, after everything spendable.
+    return Array.from(map.entries())
+      .map(([label, items]) => ({ label, items, savings: items.every(row => isSavingsCategory(row.cat)) }))
+      .sort((a, b) => Number(a.savings) - Number(b.savings));
   }, [monthCategories, search, budgetScope, accounts, spentByCategory, plannedByCategory]);
 
   const visibleSection = activeGroups.some(group => group.label === selectedSection)
@@ -353,6 +356,7 @@ export function CategoriesScreen({
                       spent={spent}
                       planned={planned}
                       health={health}
+                      savings={isSavingsCategory(cat)}
                       index={i}
                       onOpenDetails={() => onOpenCategoryDetails(cat)}
                     />
@@ -412,11 +416,11 @@ function CategoryCardSkeleton() {
 /* ─── Category card (owns count-up + bar animation) ───────────── */
 
 function CategoryCard({
-  cat, available, spent, planned, health, index, onOpenDetails,
+  cat, available, spent, planned, health, savings = false, index, onOpenDetails,
 }: {
   cat: import("./app-types").Category;
   available: number | null; spent: number; planned: number;
-  health: Health; index: number;
+  health: Health; savings?: boolean; index: number;
   onOpenDetails: () => void;
 }) {
   const amountNum = Math.abs(available ?? 0);
@@ -437,14 +441,22 @@ function CategoryCard({
         <CategoryIcon icon={cat.icon} size={36} decorative />
       </span>
       <button type="button" onClick={onOpenDetails} style={cardBodyStyle}
-        aria-label={`${cat.name}${health === "over" ? ", overbudget" : health === "low" ? ", low" : health === "funded" ? ", funded" : ", unfunded"}`}>
+        aria-label={`${cat.name}${savings ? ", savings" : health === "over" ? ", overbudget" : health === "low" ? ", low" : health === "funded" ? ", funded" : ", unfunded"}`}>
         <span style={categoryContentStyle}>
           <span style={cardTopStyle}>
             <span style={cardNameStyle}>{cat.name}</span>
             <span style={cardBottomStyle}>
-              <span style={cardAmountStyle(health)}>{amountStr}</span>
+              <span style={cardAmountStyle(savings ? "funded" : health)}>{amountStr}</span>
             </span>
           </span>
+          {/* Savings isn't spent down, so a spend bar says nothing: just what moved in or out this month. */}
+          {savings ? (
+            <span style={budgetMetaStyle}>
+              {Math.round(planned) > 0 && <span style={savingsInStyle}>+{fmt(Math.round(planned))} this month</span>}
+              {Math.round(spent) > 0 && <span>{fmt(Math.round(spent))} used</span>}
+              {Math.round(planned) <= 0 && Math.round(spent) <= 0 && <span>Nothing moved this month</span>}
+            </span>
+          ) : <>
           <span style={budgetBarStyle} aria-hidden="true">
             {health === "over" ? (
               <span style={{ ...budgetBarSegmentStyle, width: "100%", background: "var(--danger)" }} />
@@ -456,6 +468,7 @@ function CategoryCard({
             {Math.round(spent) !== 0 && <span style={budgetSpentStyle(spent)}>{fmt(Math.round(spent))} spent</span>}
             {health === "over" && <span>{fmt(Math.round(Math.abs(available ?? 0)))} overspent</span>}
           </span>
+          </>}
         </span>
       </button>
     </div>
@@ -963,6 +976,8 @@ const budgetMetaStyle: CSSProperties = {
   fontSize: 11,
   fontVariantNumeric: "tabular-nums",
 };
+
+const savingsInStyle: CSSProperties = { color: "var(--success)", fontWeight: 650 };
 
 const budgetSpentStyle = (spent: number): CSSProperties => ({
   color: spent > 0 ? "var(--danger)" : "var(--muted)",
