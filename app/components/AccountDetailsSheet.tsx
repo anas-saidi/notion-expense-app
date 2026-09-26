@@ -10,7 +10,7 @@ import { Banner } from "./ui/Banner";
 import { TransactionRow } from "./ui/TransactionRow";
 import { Money, Currency } from "./Money";
 import type { Account, Category, Transaction } from "./app-types";
-import { fmt, fmtDate, monthBounds, parseAmount } from "./app-utils";
+import { fmt, fmtDate, monthBounds, parseAmount, assignableOf } from "./app-utils";
 import {
   BanknoteIcon,
   TransferIcon,
@@ -431,9 +431,9 @@ export function AccountDetailsSheet({
           <p style={{ ...heroValueStyle, color: isNegative ? "var(--danger)" : "var(--text)" }}>
             <Money value={liveBalance} absolute={isNegative} currency animated animateOnMount />
           </p>
-          {account.readyToAssign != null && (
+          {assignableOf(account) != null && (
             <p style={heroSubStyle}>
-              {fmt(account.readyToAssign)} ready to assign
+              {fmt(assignableOf(account) ?? 0)} ready to assign
             </p>
           )}
         </div>

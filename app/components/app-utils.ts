@@ -169,31 +169,33 @@ export const getBalanceByScope = (accounts: Account[]): Record<BudgetScope, numb
   };
 };
 
+/** Each partner's ready-to-assign (personal, non-savings accounts) and what they still owe Joint. */
+const personalReadyAndDue = (
+  accounts: Account[],
+  contributionRemaining?: Partial<Record<Exclude<BudgetScope, "joint">, number>>,
+) => {
+  const norm = (value: string) => value.toLowerCase();
+  const matches = (account: Account, scope: "anas" | "salma") =>
+    !isSavingsAccount(account) && norm(account.label).includes(scope === "anas" ? "hubb" : "wife");
+  const ready = (scope: "anas" | "salma") =>
+    accounts.reduce((sum, account) => matches(account, scope) ? sum + (account.readyToAssign ?? 0) : sum, 0);
+  const notionDue = (scope: "anas" | "salma") =>
+    accounts.reduce((sum, account) => matches(account, scope) ? sum + Math.max(0, account.jointDue ?? 0) : sum, 0);
+  return {
+    anasReady: ready("anas"),
+    salmaReady: ready("salma"),
+    anasDue: contributionRemaining?.anas ?? notionDue("anas"),
+    salmaDue: contributionRemaining?.salma ?? notionDue("salma"),
+  };
+};
+
 export const getLeftToAssignByScope = (
   accounts: Account[],
   contributionRemaining?: Partial<Record<Exclude<BudgetScope, "joint">, number>>,
 ): Record<BudgetScope, number> => {
-  const norm = (value: string) => value.toLowerCase();
-
-  const salmaReady = accounts.reduce((sum, account) => {
-    if (isSavingsAccount(account)) return sum;
-    if (!norm(account.label).includes("wife")) return sum;
-    return sum + (account.readyToAssign ?? 0);
-  }, 0);
-
-  const anasReady = accounts.reduce((sum, account) => {
-    if (isSavingsAccount(account)) return sum;
-    if (!norm(account.label).includes("hubb")) return sum;
-    return sum + (account.readyToAssign ?? 0);
-  }, 0);
-
-  const notionDue = (scope: "anas" | "salma") => accounts.reduce((sum, account) => {
-    const label = norm(account.label);
-    const matches = scope === "anas" ? label.includes("hubb") : label.includes("wife");
-    return matches && !isSavingsAccount(account) ? sum + Math.max(0, account.jointDue ?? 0) : sum;
-  }, 0);
-  const salma = Math.max(0, salmaReady - (contributionRemaining?.salma ?? notionDue("salma")));
-  const anas = Math.max(0, anasReady - (contributionRemaining?.anas ?? notionDue("anas")));
+  const { anasReady, salmaReady, anasDue, salmaDue } = personalReadyAndDue(accounts, contributionRemaining);
+  const salma = Math.max(0, salmaReady - salmaDue);
+  const anas = Math.max(0, anasReady - anasDue);
 
   return {
     joint: salma + anas,
@@ -201,6 +203,56 @@ export const getLeftToAssignByScope = (
     anas,
   };
 };
+
+/**
+ * Signed version of what's left once categories and dues are covered — negative
+ * means the accounts don't cover it ("short by"). Personal: ready − owed to Joint.
+ * Joint: the joint account's ready plus what the partners still owe it, since
+ * Joint may fund ahead of contributions that are on their way.
+ */
+export const getAssignBalanceByScope = (
+  accounts: Account[],
+  contributionRemaining?: Partial<Record<Exclude<BudgetScope, "joint">, number>>,
+): Record<BudgetScope, number> => {
+  const { anasReady, salmaReady, anasDue, salmaDue } = personalReadyAndDue(accounts, contributionRemaining);
+  return {
+    joint: getJointAccountUnassigned(accounts) + anasDue + salmaDue,
+    anas: anasReady - anasDue,
+    salma: salmaReady - salmaDue,
+  };
+};
+
+/**
+ * Adds `assignable` to each account: a partner's personal account keeps back what
+ * they still owe Joint, so funding a category can't spend the Joint contribution.
+ * With one personal account per partner (the usual case) it carries the live due;
+ * with several, each keeps back its own stored due. Joint and savings are unchanged.
+ */
+export const withAssignable = (
+  accounts: Account[],
+  contributionRemaining?: Partial<Record<Exclude<BudgetScope, "joint">, number>>,
+): Account[] => {
+  const personalScope = (account: Account): "anas" | "salma" | null => {
+    if (isSavingsAccount(account)) return null;
+    const label = account.label.toLowerCase();
+    return label.includes("hubb") ? "anas" : label.includes("wife") ? "salma" : null;
+  };
+  const countByScope = { anas: 0, salma: 0 };
+  for (const account of accounts) {
+    const scope = personalScope(account);
+    if (scope) countByScope[scope] += 1;
+  }
+  return accounts.map((account) => {
+    const scope = personalScope(account);
+    if (!scope || account.readyToAssign === null) return { ...account, assignable: account.readyToAssign };
+    const storedDue = Math.max(0, account.jointDue ?? 0);
+    const due = countByScope[scope] === 1 ? contributionRemaining?.[scope] ?? storedDue : storedDue;
+    return { ...account, assignable: account.readyToAssign - due };
+  });
+};
+
+/** What can be assigned from an account: `assignable` when derived, else Notion's ready to assign. */
+export const assignableOf = (account: Account): number | null => account.assignable ?? account.readyToAssign;
 
 /**
  * Money literally sitting in the joint bank account(s) that hasn't been

@@ -40,6 +40,11 @@ export type Account = {
   type: string | null;
   balance: number | null;
   readyToAssign: number | null;
+  /**
+   * What can really be assigned from this account: ready to assign minus what its
+   * owner still owes Joint. Derived in the app (see withAssignable), not from Notion.
+   */
+  assignable?: number | null;
   jointDue?: number | null;
   contributionPercent?: number | null;
 };

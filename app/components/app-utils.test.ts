@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { comparisonPeriods, evalExpr, expenseBalancePreview, expenseBudgetGate, fmt, getLeftToAssignByScope, isExpenseTransaction, isPastMonth, parseAmount, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
+import { comparisonPeriods, evalExpr, expenseBalancePreview, expenseBudgetGate, fmt, getAssignBalanceByScope, getLeftToAssignByScope, withAssignable, isExpenseTransaction, isPastMonth, parseAmount, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
 
 const accounts: Account[] = [
   { id: "joint", label: "Joined account", icon: "", type: null, balance: 900, readyToAssign: 0 },
@@ -24,6 +24,28 @@ describe("transaction scope", () => {
     ];
     expect(getLeftToAssignByScope(scopedAccounts).anas).toBe(266);
     expect(getLeftToAssignByScope(scopedAccounts, { anas: 11072 }).anas).toBe(1262);
+  });
+
+  it("reports a shortfall instead of clamping it to zero", () => {
+    const shortAccounts: Account[] = [
+      { id: "joint", label: "Joined account", icon: "", type: "Checking", balance: 695, readyToAssign: -1478 },
+      { id: "anas", label: "Hubby Account", icon: "", type: "Checking", balance: 1000, readyToAssign: 500, jointDue: 800 },
+      { id: "salma", label: "Wife Account", icon: "", type: "Checking", balance: 1000, readyToAssign: 1000, jointDue: 678 },
+    ];
+    // Anas owes 800 but only 500 is unfunded: 300 short, while the clamped figure says 0.
+    expect(getLeftToAssignByScope(shortAccounts).anas).toBe(0);
+    expect(getAssignBalanceByScope(shortAccounts)).toEqual({ joint: 0, anas: -300, salma: 322 });
+  });
+
+  it("keeps a partner's Joint due out of what their account can assign", () => {
+    const list: Account[] = [
+      { id: "joint", label: "Joined account", icon: "", type: "Checking", balance: 695, readyToAssign: -1478 },
+      { id: "anas", label: "Hubby Account", icon: "", type: "Checking", balance: 1905, readyToAssign: 1305, jointDue: 900 },
+      { id: "save", label: "Saving Account", icon: "", type: "Savings", balance: 5000, readyToAssign: 5000 },
+    ];
+    const byId = Object.fromEntries(withAssignable(list, { anas: 842 }).map(a => [a.id, a.assignable]));
+    expect(byId).toEqual({ joint: -1478, anas: 463, save: 5000 });
+    expect(withAssignable(list).find(a => a.id === "anas")?.assignable).toBe(405);
   });
 
   it("uses category ownership first for expenses and includes uncategorized account expenses", () => {

@@ -26,6 +26,8 @@ type Props = {
   frozenCategories: Category[];
   accounts: Account[];
   readyToAssignByScope: Record<BudgetScope, number>;
+  /** Signed: what's left once categories and dues are covered; negative = accounts fall short. */
+  assignBalanceByScope?: Record<BudgetScope, number>;
   contributionRemainingByScope: Record<BudgetScope, number>;
   monthlySummary: MonthlySummary;
   homeMonth: string;
@@ -78,6 +80,7 @@ export function CategoriesScreen({
   frozenCategories,
   accounts,
   readyToAssignByScope,
+  assignBalanceByScope,
   contributionRemainingByScope,
   monthlySummary,
   homeMonth,
@@ -179,6 +182,8 @@ export function CategoriesScreen({
     [accounts, readyToAssignByScope, budgetScope],
   );
   const contributionRemaining = contributionRemainingByScope[budgetScope] ?? 0;
+  // What the accounts can't cover: categories funded plus dues, beyond what's actually there.
+  const shortBy = Math.max(0, -Math.round(assignBalanceByScope?.[budgetScope] ?? 0));
   // Budget jar: an emoji per category with money left, sized by its share of Available.
   const jarItems = useMemo(
     () => budgetJarItems(monthCategories, budgetScope, accounts),
@@ -238,7 +243,7 @@ export function CategoriesScreen({
               </button>
             : null
         : <>
-            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD currently available in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
+            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD left to spend in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
                   emojis stay tucked away until the jar is tapped; then every category that still
                   has money drops in, sized by its share of Available. */}
@@ -247,7 +252,8 @@ export function CategoriesScreen({
               ) : (
                 <div style={{ marginBottom: 4 }}>{budgetJar}</div>
               )}
-              <span style={budgetHealthLabelStyle}>Available</span>
+              {/* Not money to assign: what's still in categories after spending. */}
+              <span style={budgetHealthLabelStyle}>Left to spend</span>
               <span style={budgetHealthAmountStyle}>
                 <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
                 <Currency />
@@ -256,7 +262,7 @@ export function CategoriesScreen({
 
             {/* Money not yet in a category is something to act on, so it's an action banner
                 (nothing left to assign is the goal, so then there's no banner). Rebalance
-                moves unassigned money into categories, or takes it back when over-assigned. */}
+                moves unassigned money into categories, or takes it back when the accounts fall short. */}
             {Math.round(leftToAllocate) > 0 && (
               <Banner
                 tone="accent"
@@ -270,17 +276,20 @@ export function CategoriesScreen({
               >
               </Banner>
             )}
-            {Math.round(leftToAllocate) < 0 && (
+            {shortBy > 0 && (
               <Banner
                 tone="danger"
                 icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
-                title={`${fmt(Math.abs(Math.round(leftToAllocate)))} over-assigned`}
+                title={`Short by ${fmt(shortBy)}`}
                 action={(
                   <button type="button" onClick={onOpenRebalance} style={bannerActionStyle}>
                     Rebalance
                   </button>
                 )}
               >
+                {budgetScope === "joint"
+                  ? "The Joint account plus what's still due doesn't cover what's funded."
+                  : "Your account doesn't cover what's funded plus what's due to Joint."}
               </Banner>
             )}
 

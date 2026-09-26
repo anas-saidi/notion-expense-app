@@ -33,6 +33,8 @@ import {
   expenseBalancePreview,
   fmtDate,
   getCategoryScope,
+  getAssignBalanceByScope,
+  withAssignable,
   getLeftToAssignByScope,
   getBalanceByScope,
   getJointAccountUnassigned,
@@ -995,6 +997,21 @@ export default function App() {
       salma: Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual),
     } : undefined,
   ), [accounts, contribStatus]);
+  const assignBalanceByScope = useMemo(() => getAssignBalanceByScope(
+    accounts,
+    contribStatus ? {
+      anas: Math.max(0, contribStatus.anasPlan - contribStatus.anasActual),
+      salma: Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual),
+    } : undefined,
+  ), [accounts, contribStatus]);
+  // Accounts as the UI shows them: personal "ready to assign" keeps back the Joint due.
+  const displayAccounts = useMemo(() => withAssignable(
+    accounts,
+    contribStatus ? {
+      anas: Math.max(0, contribStatus.anasPlan - contribStatus.anasActual),
+      salma: Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual),
+    } : undefined,
+  ), [accounts, contribStatus]);
   const contributionRemainingByScope = useMemo((): Record<BudgetScope, number> => ({
     joint: 0,
     anas: contribStatus ? Math.max(0, contribStatus.anasPlan - contribStatus.anasActual) : 0,
@@ -1175,7 +1192,7 @@ export default function App() {
       )}
       {showManageScreen && (
         <ManageScreen
-          accounts={accounts}
+          accounts={displayAccounts}
           budgetScope={budgetScope}
           onClose={() => setShowManageScreen(false)}
           onOpenDetails={setDetailsAccount}
@@ -1277,6 +1294,7 @@ export default function App() {
           frozenCategories={frozenCategories}
           accounts={accounts}
           readyToAssignByScope={readyToAssignByScope}
+          assignBalanceByScope={assignBalanceByScope}
           contributionRemainingByScope={contributionRemainingByScope}
           monthlySummary={monthlySummary}
           homeMonth={homeMonth}
@@ -1468,7 +1486,7 @@ export default function App() {
         open={showCategoryDetails}
         category={detailsCategory}
         month={(monthlySummary.start || today()).slice(0, 7)}
-        accounts={accounts}
+        accounts={displayAccounts}
         onClose={() => setShowCategoryDetails(false)}
         onOpenAdd={() => {
           if (detailsCategory) selectCategory(detailsCategory);
@@ -1505,7 +1523,7 @@ export default function App() {
         mode={categoryManageMode ?? "fund"}
         category={categoryManageCategory}
         month={homeMonth}
-        accounts={accounts}
+        accounts={displayAccounts}
         defaultScope={budgetScope}
         availableTypes={availableCategoryTypes}
         defaultType={categoryManageDefaultType}
@@ -1516,7 +1534,7 @@ export default function App() {
 
       <AccountDetailsSheet
         open={detailsAccount !== null}
-        account={detailsAccount}
+        account={detailsAccount && (displayAccounts.find((a) => a.id === detailsAccount.id) ?? detailsAccount)}
         transactions={transactions}
         categories={categories}
         homeMonth={homeMonth}

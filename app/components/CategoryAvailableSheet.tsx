@@ -1,5 +1,6 @@
 "use client";
 
+import { assignableOf } from "./app-utils";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category } from "./app-types";
 import type { EditableFundTransaction } from "./FundTransactionSheet";
@@ -29,7 +30,8 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const source = useMemo(() => accounts.find((account) => category.defaultAccount && norm(account.id) === norm(category.defaultAccount)) ?? null, [accounts, category.defaultAccount]);
-  const sourceCapacity = Math.max(0, source?.readyToAssign ?? source?.balance ?? 0);
+  // Joint dues are kept back, so a slider can't hand out a partner's Joint contribution.
+  const sourceCapacity = Math.max(0, (source ? assignableOf(source) : null) ?? source?.balance ?? 0);
   const parsed = Number(target);
   const delta = Number.isFinite(parsed) ? parsed - currentAvailable : 0;
   const valid = Number.isFinite(parsed) && parsed >= 0 && delta <= sourceCapacity && -delta <= currentAvailable && delta !== 0 && Boolean(source);

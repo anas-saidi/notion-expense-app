@@ -2,7 +2,7 @@
 
 import { useMemo, type CSSProperties } from "react";
 import type { Account, BudgetScope } from "./app-types";
-import { scopeFromAccountLabel } from "./app-utils";
+import { assignableOf, scopeFromAccountLabel } from "./app-utils";
 import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { XIcon } from "./ui/icons";
@@ -24,7 +24,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
   );
   const totals = useMemo(() => ({
     balance: scopedAccounts.reduce((sum, account) => sum + (account.balance ?? 0), 0),
-    ready: scopedAccounts.reduce((sum, account) => sum + (account.readyToAssign ?? 0), 0),
+    ready: scopedAccounts.reduce((sum, account) => sum + (assignableOf(account) ?? 0), 0),
   }), [scopedAccounts]);
 
   return (
@@ -81,8 +81,8 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
                 </span>
                 <span style={amountStackStyle}>
                   <span style={balanceStyle}><Money value={account.balance ?? 0} /></span>
-                  <span style={readyStyle((account.readyToAssign ?? 0) < 0)}>
-                    Ready <Money value={account.readyToAssign ?? 0} />
+                  <span style={readyStyle((assignableOf(account) ?? 0) < 0)}>
+                    Ready <Money value={assignableOf(account) ?? 0} />
                   </span>
                 </span>
               </button>

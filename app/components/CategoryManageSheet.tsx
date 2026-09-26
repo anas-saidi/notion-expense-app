@@ -3,7 +3,7 @@ import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category, BudgetScope } from "./app-types";
-import { scopeFromAccountLabel } from "./app-utils";
+import { assignableOf, fmt, scopeFromAccountLabel } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
@@ -75,6 +75,10 @@ export function CategoryManageSheet({
   const isMetadata = isCreate || isEdit;
   const selectedAccount = accounts.find((account) => account.id === accountId) ?? null;
   const parsedAmount = amount ? Number(amount) : 0;
+  const selectedAssignable = selectedAccount ? assignableOf(selectedAccount) : null;
+  const keptForJoint = selectedAccount && selectedAccount.readyToAssign !== null && selectedAssignable !== null
+    ? Math.round(selectedAccount.readyToAssign - selectedAssignable)
+    : 0;
   const canSubmit =
     (status === "idle" || status === "error") &&
     accountId &&
@@ -222,11 +226,20 @@ export function CategoryManageSheet({
           </label>}
 
           {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Owners match the account.</p>}
-          {!isEdit && selectedAccount?.readyToAssign !== null && selectedAccount?.readyToAssign !== undefined && (
+          {!isEdit && selectedAssignable !== null && selectedAccount && (
             <div style={accountHintStyle}>
               <span>Ready to assign from {selectedAccount.label}</span>
-              <strong><Money value={selectedAccount.readyToAssign} /></strong>
+              <strong><Money value={selectedAssignable} /></strong>
             </div>
+          )}
+          {/* What the partner owes Joint is kept back, so say so when it changes the figure. */}
+          {!isEdit && selectedAccount && keptForJoint > 0 && (
+            <p style={keptNoteStyle}>{fmt(keptForJoint)} is kept back for your Joint contribution.</p>
+          )}
+          {!isEdit && selectedAssignable !== null && parsedAmount > Math.max(0, selectedAssignable) && (
+            <p role="alert" style={{ ...keptNoteStyle, color: "var(--danger)" }}>
+              This leaves {selectedAccount?.label} short by {fmt(Math.round(parsedAmount - Math.max(0, selectedAssignable)))}.
+            </p>
           )}
         </section>
 
@@ -332,6 +345,8 @@ const amountInputStyle: CSSProperties = {
   fontWeight: 800,
 };
 
+
+const keptNoteStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.35, color: "var(--muted)" };
 
 const accountHintStyle: CSSProperties = {
   minHeight: 42,
