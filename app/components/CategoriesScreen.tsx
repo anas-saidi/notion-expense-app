@@ -347,6 +347,9 @@ export function CategoriesScreen({
                   triggerClassName="composer-picker-chip"
                   showChevron={false}
                 />
+                <span role="status" style={{ fontSize: 13, color: "var(--text2)" }}>
+                  {loading ? "Loading planned & spent…" : "Planned & spent"}
+                </span>
               </div>
             )}
             {!showFrozenAll && monthError && !loading && (
