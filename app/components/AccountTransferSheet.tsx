@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
 import { today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
-import { Money } from "./Money";
+import { Money, Currency } from "./Money";
 import { CheckIcon, TransferIcon, XIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
 
@@ -165,7 +165,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
                 placeholder="0"
                 style={amountInputStyle}
               />
-              <span style={currencyStyle}>MAD</span>
+              <Currency />
             </div>
           </label>
 
@@ -334,11 +334,6 @@ const amountInputStyle: CSSProperties = {
   fontWeight: 800,
 };
 
-const currencyStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  color: "var(--muted)",
-};
 
 const submitStyle: CSSProperties = {
   width: "100%",

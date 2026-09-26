@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
+import { Currency } from "./Money";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
@@ -9,7 +10,10 @@ import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
-import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, scopeFromAccountLabel } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned } from "./app-utils";
+import { getCategoryAvailableByScope } from "./wallet-utils";
+import { MascotHero } from "./mascot/MascotHero";
+import { budgetJarItems } from "./mascot/budgetJar";
 
 type Props = {
   categories: Category[];
@@ -126,25 +130,29 @@ export function CategoriesScreen({
     ? selectedSection
     : activeGroups[0]?.label ?? null;
   const visibleGroup = activeGroups.find(group => group.label === visibleSection);
-  const budgetHealth = useMemo(() => {
-    const rows = activeGroups.flatMap(group => group.items);
-    // Available is the authoritative category balance: it includes carryover,
-    // reversals, transfers, and expenses, unlike planned minus spent.
-    const remaining = rows.reduce((sum, row) => sum + Math.max(0, row.available ?? 0), 0);
-    return { remaining };
-  }, [activeGroups]);
+  // Same figure as Home: category Available (carry-over included), savings excluded.
+  const availableInCategories = useMemo(
+    () => getCategoryAvailableByScope(categories, accounts)[budgetScope],
+    [categories, accounts, budgetScope],
+  );
+  // Joint's unassigned money is the joint account's own ready-to-assign, not the
+  // partners' personal balances. Negative means over-assigned (covered by contributions).
   const leftToAllocate = useMemo(
-    () => readyToAssignByScope[budgetScope] ?? 0,
-    [readyToAssignByScope, budgetScope],
+    () => budgetScope === "joint" ? Math.max(0, getJointAccountUnassigned(accounts)) : readyToAssignByScope[budgetScope] ?? 0,
+    [accounts, readyToAssignByScope, budgetScope],
   );
   const contributionRemaining = contributionRemainingByScope[budgetScope] ?? 0;
-  const scopedBalance = useMemo(
-    () => accounts.reduce((sum, account) => {
-      const scope = scopeFromAccountLabel(account.label);
-      return scope === null || scope === budgetScope ? sum + (account.balance ?? 0) : sum;
-    }, 0),
-    [accounts, budgetScope],
+  // Budget jar: an emoji per category with money left, sized by its share of Available.
+  const jarItems = useMemo(
+    () => budgetJarItems(categories, budgetScope, accounts),
+    [categories, budgetScope, accounts],
   );
+  const jarSpentPct = useMemo(() => {
+    const rows = activeGroups.flatMap(group => group.items);
+    const planned = rows.reduce((sum, row) => sum + row.planned, 0);
+    const spent = rows.reduce((sum, row) => sum + row.spent, 0);
+    return planned > 0 ? (spent / planned) * 100 : null;
+  }, [activeGroups]);
   const monthLabel = useMemo(() => {
     const parsed = /^\d{4}-\d{2}$/.test(homeMonth) ? new Date(`${homeMonth}-01T12:00:00`) : new Date(homeMonth);
     return Number.isNaN(parsed.getTime()) ? "Monthly budget" : parsed.toLocaleDateString(undefined, { month: "long", year: "numeric" });
@@ -179,30 +187,33 @@ export function CategoriesScreen({
               </button>
             : null
         : <>
-            <section aria-label={`${fmt(Math.round(budgetHealth.remaining))} MAD allocated in ${monthLabel}; ${fmt(Math.round(leftToAllocate))} MAD left to allocate; ${fmt(Math.round(scopedBalance))} MAD account balance`} style={budgetHealthStyle}>
+            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD available in categories, ${monthLabel}${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
+              {/* How the month's budget splits across categories: one emoji each, sized by share. */}
+              {jarItems.length > 0 && (
+                <MascotHero variant="split" scope={budgetScope} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
+              )}
               <span style={budgetHealthTitleStyle}>{monthLabel}</span>
-              <span style={budgetHealthLabelStyle}>Allocated</span>
+              <span style={budgetHealthLabelStyle}>Available</span>
               <span style={budgetHealthAmountStyle}>
-                <AnimatedCounter value={budgetHealth.remaining} animateOnMount />
-                <small style={budgetHealthCurrencyStyle}>MAD</small>
+                <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
+                <Currency />
               </span>
-              <span style={budgetHealthSecondaryRowStyle}>
-                <span style={budgetHealthSecondaryStyle}>
-                  <span>Unassigned</span>
-                  <strong>{fmt(Math.round(leftToAllocate))} MAD</strong>
+              {/* Nothing left to assign is the goal, not news: only show it when there's some. */}
+              {Math.round(leftToAllocate) !== 0 && (
+                <span style={budgetHealthSecondaryRowStyle}>
+                  <span style={budgetHealthSecondaryStyle}>
+                    <span>Unassigned</span>
+                    <strong>{fmt(Math.round(leftToAllocate))}</strong>
+                  </span>
                 </span>
-                <span style={budgetHealthSecondaryStyle}>
-                  <span>Balance</span>
-                  <strong>{fmt(Math.round(scopedBalance))} MAD</strong>
-                </span>
-              </span>
+              )}
             </section>
 
             {budgetScope !== "joint" && contributionRemaining > 0 && (
               <Banner
                 tone="accent"
                 icon={<TransferIcon size={18} strokeWidth={2.2} />}
-                title={`${fmt(Math.round(contributionRemaining))} MAD due to Joint`}
+                title={`${fmt(Math.round(contributionRemaining))} due to Joint`}
                 action={(
                   <button type="button" onClick={onMoveContribution} style={contributionActionStyle}>
                     Contribute
@@ -223,7 +234,7 @@ export function CategoriesScreen({
                     selected={selected}
                     ariaLabel={`${group.label}, ${fmt(Math.round(groupAvailable))} MAD available`}
                     onClick={() => { setShowFrozenAll(false); setSelectedSection(group.label); }}
-                    badge={fmt(Math.round(groupAvailable))}
+                    badge={Math.round(groupAvailable) !== 0 ? fmt(Math.round(groupAvailable)) : undefined}
                     badgeTone="metric"
                   >
                     {group.label}
@@ -337,7 +348,6 @@ function CategoryCard({
   // Animate between values on updates; show instantly on mount
   const displayAmount = useCountUp(amountNum, 580);
   const amountStr = available === null ? "—" : fmt(Math.round(displayAmount));
-  const unitStr   = available === null ? "" : "MAD";
 
   return (
     <div
@@ -353,7 +363,6 @@ function CategoryCard({
             <span style={cardNameStyle}>{cat.name}</span>
             <span style={cardBottomStyle}>
               <span style={cardAmountStyle(health)}>{amountStr}</span>
-              <span style={cardUnitStyle}>{unitStr}</span>
             </span>
           </span>
           <span style={budgetBarStyle} aria-hidden="true">
@@ -367,7 +376,7 @@ function CategoryCard({
             )}
           </span>
           <span style={budgetMetaStyle}>
-            <span style={budgetSpentStyle(spent)}>{fmt(Math.round(spent))} spent</span>
+            {Math.round(spent) !== 0 && <span style={budgetSpentStyle(spent)}>{fmt(Math.round(spent))} spent</span>}
             {health === "over" && <span>{fmt(Math.round(Math.abs(available ?? 0)))} overspent</span>}
           </span>
         </span>
@@ -451,7 +460,7 @@ function BudgetDistributionChart({
       <div style={chartSummaryStyle}>
         <div>
           <span id="budget-available-heading" style={chartEyebrowStyle}>Available by category</span>
-          <strong style={chartTotalStyle}>{fmt(countedTotal)} <small>MAD</small></strong>
+          <strong style={chartTotalStyle}>{fmt(countedTotal)}</strong>
         </div>
         <span style={chartSummaryCopyStyle}>{chartData.items.length} funded categor{chartData.items.length === 1 ? "y" : "ies"}</span>
       </div>
@@ -466,7 +475,7 @@ function BudgetDistributionChart({
                 <span style={{ ...barFillStyle, width: `${Math.max(5, (available / largest) * 100)}%` }} />
               </span>
             </span>
-            <strong style={rankedAmountStyle}>{fmt(Math.round(available))}<small>MAD</small></strong>
+            <strong style={rankedAmountStyle}>{fmt(Math.round(available))}</strong>
             <ChevronRightIcon size={14} aria-hidden="true" />
           </button>
         ))}
@@ -642,12 +651,6 @@ const budgetHealthAmountStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-const budgetHealthCurrencyStyle: CSSProperties = {
-  fontSize: 16,
-  fontWeight: 500,
-  letterSpacing: 0,
-  color: "var(--muted)",
-};
 
 const budgetHealthSecondaryStyle: CSSProperties = {
   display: "inline-flex",
@@ -889,12 +892,6 @@ const cardAmountStyle = (health: Health): CSSProperties => ({
        :                          "var(--text2)",
 });
 
-const cardUnitStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 400,
-  color: "var(--muted)",
-  lineHeight: 1,
-};
 
 const budgetBarStyle: CSSProperties = {
   width: "100%",

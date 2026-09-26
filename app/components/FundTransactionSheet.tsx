@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { Currency } from "./Money";
 import type { Account } from "./app-types";
 import { ChoicePicker } from "./ChoicePicker";
 import { DatePicker } from "./DatePicker";
@@ -104,13 +105,13 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
 
         <label style={fieldStyle}>
           <span style={labelStyle}>Amount</span>
-          <span style={amountFieldStyle}><input className="display-amount-input" autoFocus inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} aria-label="Funding amount" style={amountInputStyle} /><span style={currencyStyle}>MAD</span></span>
+          <span style={amountFieldStyle}><input className="display-amount-input" autoFocus inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} aria-label="Funding amount" style={amountInputStyle} /><Currency /></span>
           <span style={{ fontSize: 12, color: reductionTooLarge ? "var(--danger)" : "var(--muted)" }}>
             {reductionTooLarge
-              ? `This fund cannot go below ${minimumAmount.toLocaleString("en-US")} MAD because the rest has already been used.`
+              ? `This fund cannot go below ${minimumAmount.toLocaleString("en-US")} because the rest has already been used.`
               : transaction.amount > transaction.categoryAvailable
-                ? `${transaction.categoryAvailable.toLocaleString("en-US")} MAD is available to remove. Delete is unavailable because part of this fund has been used.`
-                : `${transaction.categoryAvailable.toLocaleString("en-US")} MAD from this category is currently available to remove.`}
+                ? `${transaction.categoryAvailable.toLocaleString("en-US")} is available to remove. Delete is unavailable because part of this fund has been used.`
+                : `${transaction.categoryAvailable.toLocaleString("en-US")} from this category is currently available to remove.`}
           </span>
         </label>
         <div style={fieldStyle}>
@@ -148,7 +149,6 @@ const labelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWei
 const controlStyle: CSSProperties = { width: "100%", minHeight: 48, padding: "0 14px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text)", font: "inherit" };
 const amountFieldStyle: CSSProperties = { minHeight: 112, padding: "0 4px", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 };
 const amountInputStyle: CSSProperties = { width: "min(260px, 68vw)", height: 88, padding: 0, border: 0, outline: 0, background: "transparent", color: "var(--text)", textAlign: "right", font: "700 clamp(48px, 15vw, 72px)/1 var(--font, inherit)", fontVariantNumeric: "tabular-nums", boxSizing: "border-box" };
-const currencyStyle: CSSProperties = { color: "var(--muted)", fontSize: 14, fontWeight: 700 };
 const actionsStyle: CSSProperties = { marginTop: "auto", display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.2fr)", gap: 8 };
 const secondaryButtonStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", font: "inherit", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7 };
 const primaryButtonStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", font: "inherit", fontWeight: 750 };

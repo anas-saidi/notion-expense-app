@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, Save } from "lucide-react";
 import { ArrowLeftIcon, XIcon } from "./ui/icons";
 import { MonthPicker } from "./DatePicker";
-import { Money } from "./Money";
+import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
@@ -247,7 +247,7 @@ export function AllocationFlow({
             <div style={heroPoolWrapStyle}>
               <span style={heroPoolLabelStyle}>{poolLabel}</span>
               <span style={heroPoolNumberStyle}>
-                <Money value={availablePool} animated />
+                <Money value={availablePool} currency animated />
               </span>
               <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
                 {isBalanced ? (
@@ -265,7 +265,7 @@ export function AllocationFlow({
                       : "color-mix(in srgb, var(--success) 72%, var(--text2))",
                     animation: "chipIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both",
                   }}>
-                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} showCurrency={false} />
+                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
                   </span>
                 )}
               </div>
@@ -276,7 +276,7 @@ export function AllocationFlow({
               <div style={valueColumnStyle}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={quietAvailableValueStyle}>
-                    <Money value={availablePool} />
+                    <Money value={availablePool} currency />
                   </span>
                   {isUsingFallbackData && !poolOverride && <span style={estimateBadgeStyle}>Est.</span>}
                 </div>
@@ -315,7 +315,7 @@ export function AllocationFlow({
         {activeItem && (
           <div className="planning-editor" style={editorStyle}>
             <div key={activeItem.categoryId} className="planning-category-enter planning-amount-canvas" style={amountCanvasStyle}>
-              <span style={amountCurrencyBigStyle}>MAD</span>
+              <Currency style={amountCurrencyBigStyle} />
               <label style={amountEditorStyle}>
                 <span style={srOnlyStyle}>Planned amount for {activeItem.name}</span>
                 {draftValue === null && (
@@ -349,8 +349,8 @@ export function AllocationFlow({
                 />
               </label>
               <div style={metaRowStyle}>
-                <span>{metaLabel} <Money value={activeItem.lastMonthSpent ?? 0} showCurrency={false} /></span>
-                <span>Spent <Money value={activeItem.spent ?? getSpentFloor(activeItem)} showCurrency={false} /></span>
+                <span>{metaLabel} <Money value={activeItem.lastMonthSpent ?? 0} /></span>
+                <span>Spent <Money value={activeItem.spent ?? getSpentFloor(activeItem)} /></span>
               </div>
             </div>
           </div>
@@ -365,7 +365,7 @@ export function AllocationFlow({
             <div role="status" style={confirmationStyle}>
               <span>
                 <strong style={confirmationTitleStyle}>Apply this rebalance?</strong>
-                <span style={confirmationCopyStyle}>{isBalanced ? "Every available dirham stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} MAD will remain unassigned.`}</span>
+                <span style={confirmationCopyStyle}>{isBalanced ? "Every available dirham stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} will remain unassigned.`}</span>
               </span>
               <button type="button" onClick={() => setConfirming(false)} style={confirmationBackStyle}>Back</button>
             </div>
@@ -478,7 +478,7 @@ const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActi
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
 const editorStyle: CSSProperties = { display: "grid" };
 const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gridTemplateRows: "minmax(68px, auto) auto", gap: 8, minHeight: 132, padding: "14px 10px 12px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
-const amountCurrencyBigStyle: CSSProperties = { position: "absolute", left: 18, top: 18, color: "color-mix(in srgb, var(--muted) 24%, transparent)", fontFamily: "var(--font-body)", fontSize: 22, lineHeight: 1, fontWeight: 600, opacity: 0.6, zIndex: 1 };
+const amountCurrencyBigStyle: CSSProperties = { position: "absolute", left: 18, top: 18, zIndex: 1 };
 const amountEditorStyle: CSSProperties = { position: "relative", display: "flex", justifyContent: "center", alignItems: "center", minWidth: 0, minHeight: 68 };
 const amountCounterStyle: CSSProperties = { position: "absolute", inset: 0, justifyContent: "center", pointerEvents: "none", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: -2, zIndex: 3 };
 const hiddenAmountInputStyle: CSSProperties = { color: "transparent", caretColor: "transparent" };

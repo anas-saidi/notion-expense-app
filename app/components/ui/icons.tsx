@@ -7,6 +7,7 @@
  */
 
 import {
+  Pencil,
   Search,
   Calendar,
   CalendarRange,
@@ -80,6 +81,7 @@ export const XIcon            = (p: LucideProps) => <X             size={S} {...
 export const WrenchIcon       = (p: LucideProps) => <Wrench        size={S} {...p} />;
 export const SlidersIcon      = (p: LucideProps) => <SlidersHorizontal size={S} {...p} />;
 export const ScaleIcon        = (p: LucideProps) => <Scale             size={S} {...p} />;
+export const EditIcon         = (p: LucideProps) => <Pencil            size={S} {...p} />;
 export const ShuffleIcon      = (p: LucideProps) => <Shuffle           size={S} {...p} />;
 export const MenuIcon         = (p: LucideProps) => <Menu          size={S} {...p} />;
 export const LandmarkIcon     = (p: LucideProps) => <Landmark      size={S} {...p} />;

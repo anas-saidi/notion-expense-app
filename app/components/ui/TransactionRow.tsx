@@ -92,26 +92,19 @@ const titleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis"
 const subtitleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.2, color: "var(--muted)" };
 const valueStackStyle: CSSProperties = { display: "grid", justifyItems: "end", gap: 6, flexShrink: 0, whiteSpace: "nowrap" };
 
+/** The signed amount is coloured text, not a pill: the colour alone says expense, income or transfer. */
 const amountStyle = (tone: TransactionTone): CSSProperties => ({
-  minHeight: 26,
-  padding: "3px 7px",
-  borderRadius: 8,
   display: "inline-flex",
   alignItems: "center",
   gap: 0,
-  background: tone === "income"
-    ? "color-mix(in srgb, var(--action-income) 13%, var(--surface))"
-    : tone === "transfer"
-      ? "color-mix(in srgb, var(--action-transfer) 12%, var(--surface))"
-      : "color-mix(in srgb, var(--spend-over) 11%, var(--surface))",
   color: tone === "income"
     ? "var(--success)"
     : tone === "transfer"
       ? "color-mix(in srgb, var(--action-transfer) 68%, var(--text))"
       : "var(--spend-over-deep)",
-  fontSize: 14,
+  fontSize: 15,
   lineHeight: 1,
-  fontWeight: 700,
+  fontWeight: 650,
   fontVariantNumeric: "tabular-nums",
 });
 

@@ -8,7 +8,7 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Banner } from "./ui/Banner";
 import { TransactionRow } from "./ui/TransactionRow";
-import { Money } from "./Money";
+import { Money, Currency } from "./Money";
 import type { Account, Category, Transaction } from "./app-types";
 import { fmt, fmtDate, monthBounds } from "./app-utils";
 import {
@@ -429,11 +429,11 @@ export function AccountDetailsSheet({
             </button>
           </div>
           <p style={{ ...heroValueStyle, color: isNegative ? "var(--danger)" : "var(--text)" }}>
-            <Money value={liveBalance} absolute={isNegative} animated animateOnMount />
+            <Money value={liveBalance} absolute={isNegative} currency animated animateOnMount />
           </p>
           {account.readyToAssign != null && (
             <p style={heroSubStyle}>
-              {fmt(account.readyToAssign)} MAD ready to assign
+              {fmt(account.readyToAssign)} ready to assign
             </p>
           )}
         </div>
@@ -501,7 +501,7 @@ export function AccountDetailsSheet({
                         color: "var(--text2)",
                         boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                       }}
-                      formatter={(value) => [`${fmt(Number(value))} MAD`, "Balance"]}
+                      formatter={(value) => [fmt(Number(value)), "Balance"]}
                       labelFormatter={day => `Day ${day}`}
                       cursor={{ stroke: "var(--border2)", strokeWidth: 1 }}
                     />
@@ -520,7 +520,7 @@ export function AccountDetailsSheet({
                 {/* Net change footer */}
                 <div style={chartFooterStyle}>
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                    {fmt(Math.abs(lastPoint?.balance ?? 0))} MAD
+                    {fmt(Math.abs(lastPoint?.balance ?? 0))}
                   </span>
                   {chartData.netChange !== 0 && (
                     <span style={{
@@ -609,7 +609,7 @@ export function AccountDetailsSheet({
                     style={reconcileInputStyle}
                     autoFocus
                   />
-                  <span style={reconcileCurrencyStyle}>MAD</span>
+                  <Currency style={reconcileCurrencyStyle} />
                 </div>
               </label>
             </div>
@@ -618,7 +618,7 @@ export function AccountDetailsSheet({
               <div style={differenceBandStyle(difference)}>
                 <span style={differenceLabelStyle}>Difference</span>
                 <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {difference > 0 ? "+" : ""}{fmt(Math.round(difference * 100) / 100)} MAD
+                  {difference > 0 ? "+" : ""}{fmt(Math.round(difference * 100) / 100)}
                 </strong>
               </div>
             )}
@@ -664,7 +664,7 @@ export function AccountDetailsSheet({
                       placeholder="Amount"
                       style={reconcileInputStyle}
                     />
-                    <span style={reconcileCurrencyStyle}>MAD</span>
+                    <Currency style={reconcileCurrencyStyle} />
                   </div>
 
                   <input
@@ -765,7 +765,7 @@ export function AccountDetailsSheet({
                reconcileStatus === "success" ? "Reconciled" :
                reconcileStatus === "error" ? "Try again" :
                isFullyReconciled ? "Mark as reconciled" :
-               difference !== null ? `Reconcile remaining ${difference > 0 ? "+" : ""}${fmt(Math.round(difference * 100) / 100)} MAD` :
+               difference !== null ? `Reconcile remaining ${difference > 0 ? "+" : ""}${fmt(Math.round(difference * 100) / 100)}` :
                "Save reconciliation"}
             </button>
           </div>
@@ -1180,12 +1180,7 @@ const reconcileInputStyle: CSSProperties = {
   padding: 0,
 };
 
-const reconcileCurrencyStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  color: "var(--muted)",
-  flexShrink: 0,
-};
+const reconcileCurrencyStyle: CSSProperties = { flexShrink: 0 };
 
 const differenceBandStyle = (diff: number): CSSProperties => ({
   minHeight: 40,

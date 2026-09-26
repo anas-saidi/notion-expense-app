@@ -241,7 +241,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           </div>
           {isExpression(props.amount) && (
             <p style={{ ...exprPreviewStyle, color: isIncome ? "var(--action-income)" : "var(--danger)" }}>
-              = {fmt(evalExpr(props.amount))} MAD
+              = {fmt(evalExpr(props.amount))}
             </p>
           )}
           {visibleBalance !== null && props.amount.trim() !== "" && (
@@ -452,7 +452,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                       {isPartial && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>partial</div>}
                                     </div>
                                     <span style={{ fontSize: 12, color: isPartial ? "var(--warning)" : "var(--success)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
-                                      {fmt(moveAmount)} MAD
+                                      {fmt(moveAmount)}
                                     </span>
                                   </button>
                                 );
@@ -473,7 +473,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 >
                   {props.categoryUnfunded
                     ? <>No budget in <strong>{props.selectedCat.name}</strong></>
-                    : <>Short <strong>{fmt(deficit)} MAD</strong> in <strong>{props.selectedCat.name}</strong></>
+                    : <>Short <strong>{fmt(deficit)}</strong> in <strong>{props.selectedCat.name}</strong></>
                   }
                 </Banner>
               )}

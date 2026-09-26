@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Currency } from "./Money";
+import { Mascot } from "./mascot/Mascot";
+import type { Mood } from "./mascot/poses";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { categoryMatchesScope, comparisonPeriods, getCategoryScope, isExpenseTransaction, resolveTransactionScopes, transactionMatchesScope, fmt, fmtDate } from "./app-utils";
+import { categoryMatchesScope, comparisonPeriods, getCategoryScope, isExpenseTransaction, resolveTransactionScopes, transactionMatchesScope, fmt } from "./app-utils";
 import { ArrowDownIcon, ArrowUpIcon, BanknoteIcon, CalendarIcon, CalendarRangeIcon, ChartPieIcon, FlameIcon, TransferIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
 import { ScreenChip } from "./ui/ScreenChip";
@@ -259,7 +262,7 @@ export function InsightsScreen({
       {assignedByCategory === null || transactionsLoading ? (
         <div className="skeleton" style={{ height: 84, borderRadius: 12 }} />
       ) : (
-        <NarrativeSummary burnRate={burnRate} totalPlanned={totalPlanned} totalSpent={totalSpent} />
+        <NarrativeSummary scope={budgetScope} burnRate={burnRate} totalPlanned={totalPlanned} totalSpent={totalSpent} />
       )}
 
       {/* ── Transaction history — full width ── */}
@@ -301,7 +304,7 @@ export function InsightsScreen({
               <section key={label}>
                 <div style={groupHeaderStyle}>
                   <span style={groupLabelStyle}>{label}</span>
-                  <span style={groupSubtotalStyle}>{expenseTotal > 0 ? `${fmt(expenseTotal)} MAD` : ""}{expenseTotal > 0 && incomeTotal > 0 ? " · " : ""}{incomeTotal > 0 ? `${fmt(incomeTotal)} MAD income` : ""}</span>
+                  <span style={groupSubtotalStyle}>{expenseTotal > 0 ? fmt(expenseTotal) : ""}{expenseTotal > 0 && incomeTotal > 0 ? " · " : ""}{incomeTotal > 0 ? `${fmt(incomeTotal)} income` : ""}</span>
                 </div>
                 <div className="tx-group-list" style={transactionGroupStyle}>
                   {items.map(txn => {
@@ -319,7 +322,6 @@ export function InsightsScreen({
                           amount={txn.amount}
                           tone={isIncome ? "income" : isTransfer ? "transfer" : "expense"}
                           prefix={prefix}
-                          date={txn.date ? fmtDate(txn.date) : undefined}
                           icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} size={22} />}
                           onClick={() => onClickTransaction(txn)}
                         />
@@ -344,7 +346,8 @@ export function InsightsScreen({
   );
 }
 
-function NarrativeSummary({ burnRate, totalPlanned, totalSpent }: {
+function NarrativeSummary({ scope, burnRate, totalPlanned, totalSpent }: {
+  scope: BudgetScope;
   burnRate: { spentPct: number; expectedPct: number; isAhead: boolean; isOver: boolean; gapPct: number; daysLeft: number; vsLastMonth: number | null };
   totalPlanned: number;
   totalSpent: number;
@@ -352,18 +355,31 @@ function NarrativeSummary({ burnRate, totalPlanned, totalSpent }: {
   if (totalPlanned <= 0) {
     return (
       <section aria-label="Monthly insight summary" style={narrativeSummaryStyle}>
-        <span style={summaryLabelStyle}><ChartPieIcon size={16} />Summary</span>
+        <span style={summaryHeaderStyle}>
+          <Mascot target={{ scope, gap: 0, mood: "curious", fill: 0, outline: "partner" }} size={SUMMARY_MASCOT_SIZE} style={summaryMascotStyle} />
+        </span>
         <span>No monthly plan is recorded for this period yet.</span>
       </section>
     );
   }
 
   const comparison = burnRate.vsLastMonth;
+  // The mode's mascot keeps an eye on the month from the corner: its pool is
+  // what's left of the plan, its face how the pace is going (over plan: sad;
+  // spending ahead of the calendar: worried; on or behind pace: happy).
+  const mood: Mood = burnRate.isOver ? "sad" : burnRate.isAhead ? "worried" : "happy";
   return (
     <section aria-label="Monthly insight summary" style={narrativeSummaryStyle}>
-      <span style={summaryLabelStyle}><ChartPieIcon size={16} />Summary</span>
+      {/* The mascot is the card's heading: it says whose month this is and how it's going. */}
+      <span style={summaryHeaderStyle}>
+        <Mascot
+          target={{ scope, gap: 0, mood, fill: Math.max(0, 1 - totalSpent / totalPlanned), outline: "partner" }}
+          size={SUMMARY_MASCOT_SIZE} warnWhenLow
+          style={summaryMascotStyle}
+        />
+      </span>
       <span>
-        This month’s plan is <InlineMetric icon={<ChartPieIcon size={12} />} label={`${fmt(totalPlanned)} MAD`} tone="neutral" />. You’ve spent <InlineMetric icon={<FlameIcon size={12} />} label={`${fmt(totalSpent)} MAD · ${Math.round(burnRate.spentPct)}%`} tone={burnRate.isOver ? "danger" : "accent"} />.
+        This month’s plan is <InlineMetric icon={<ChartPieIcon size={12} />} label={fmt(totalPlanned)} tone="neutral" />. You’ve spent <InlineMetric icon={<FlameIcon size={12} />} label={`${fmt(totalSpent)} · ${Math.round(burnRate.spentPct)}%`} tone="danger" />.
         {comparison !== null && (
           <> Spending is <InlineMetric icon={comparison <= 0 ? <ArrowDownIcon size={12} /> : <ArrowUpIcon size={12} />} label={`${Math.abs(comparison)}% ${comparison <= 0 ? "lower" : "higher"}`} tone={comparison <= 0 ? "positive" : "warning"} /> than the prior period.</>
         )}
@@ -473,7 +489,8 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent,
       {/* Spend number + vs last month */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" as const }}>
         <span style={bigNumStyle(isOver)}><AnimatedCounter value={totalSpent} animateOnMount /></span>
-        <span style={bigNumUnitStyle}>MAD spent</span>
+        <Currency />
+        <span style={bigNumUnitStyle}>spent</span>
         {vsLastMonth !== null && lastMonthTotalSpent > 0 && (
           <span style={{
             fontSize: 12, fontWeight: 600, letterSpacing: 0.2,
@@ -500,7 +517,7 @@ function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent,
             {Math.round(spentPct)}% spent
           </span>
           <span style={{ ...burnLegendItemStyle, marginLeft: "auto" }}>
-            {fmt(totalPlanned)} MAD planned
+            {fmt(totalPlanned)} planned
           </span>
         </div>
       )}
@@ -591,7 +608,6 @@ function DonutView({ items, total }: {
           <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 700, color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
             {fmt(total)}
           </span>
-          <span style={{ fontSize: 12, color: "var(--muted)", marginTop: 3, letterSpacing: 0.3 }}>MAD</span>
         </div>
       </div>
       <div
@@ -698,7 +714,7 @@ function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
               boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
             }}
             formatter={(value, name) => [
-              `${fmt(Number(value))} MAD`,
+              fmt(Number(value)),
               name === "spent" ? "Spent" : "Budget pace",
             ]}
             labelFormatter={(day) => `Day ${day}`}
@@ -722,9 +738,9 @@ function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
       <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 12, height: 2, background: "var(--danger)", borderRadius: 999, display: "inline-block" }} />
-          <span style={{ fontSize: 12, color: "var(--muted)" }}>Spent · {fmt(totalSpent)} MAD</span>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>Spent · {fmt(totalSpent)}</span>
         </div>
-        {totalPlanned > 0 && <span style={{ fontSize: 12, color: "var(--muted)" }}>{fmt(totalSpent)} of {fmt(totalPlanned)} MAD planned</span>}
+        {totalPlanned > 0 && <span style={{ fontSize: 12, color: "var(--muted)" }}>{fmt(totalSpent)} of {fmt(totalPlanned)} planned</span>}
       </div>
     </div>
   );
@@ -772,20 +788,13 @@ const narrativeSummaryStyle: CSSProperties = {
   boxShadow: "none",
 };
 
-const summaryLabelStyle: CSSProperties = {
-  width: "fit-content",
-  minHeight: 28,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "3px 9px",
-  borderRadius: 8,
-  background: "var(--summary-accent-dim)",
-  color: "var(--summary-accent-ink)",
-  fontSize: 14,
-  lineHeight: 1,
-  fontWeight: 700,
-};
+const SUMMARY_MASCOT_SIZE = 87;
+
+/** Where the label was: the mascot heads the card, top-left. */
+const summaryHeaderStyle: CSSProperties = { display: "flex", alignItems: "center" };
+
+/** Trims the mascot box's empty margin so the jar lines up with the text and adds little height. */
+const summaryMascotStyle: CSSProperties = { margin: "-18px 0 -20px -14px" };
 
 const inlineMetricStyle = (tone: "neutral" | "accent" | "positive" | "warning" | "danger"): CSSProperties => {
   const color = tone === "danger" ? "var(--danger)"

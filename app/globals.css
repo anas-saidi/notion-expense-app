@@ -36,6 +36,9 @@
   --surface2: #f1f1f1;
   --border: rgba(14, 15, 12, 0.12);
   --border2: rgba(14, 15, 12, 0.18);
+  --mascot-edge: rgba(14, 15, 12, 0.12);
+  --mascot-shadow: rgba(14, 15, 12, 0.1);
+  --mascot-sticker: #ffffff;
   --accent-foreground: #245c36;
   --budget-used: var(--text2);
   --accent: #9fe870;
@@ -139,6 +142,9 @@ html[data-mode="husband"] {
   --surface2: #f1f1f1;
   --border: rgba(14, 15, 12, 0.12);
   --border2: rgba(14, 15, 12, 0.18);
+  --mascot-edge: rgba(14, 15, 12, 0.12);
+  --mascot-shadow: rgba(14, 15, 12, 0.1);
+  --mascot-sticker: #ffffff;
   --text: #0e0f0c;
   --text2: #454745;
   --muted: #6e6e6d;
@@ -153,6 +159,9 @@ html[data-theme="dark"] {
   --surface2: #1e201e;
   --border: rgba(255, 255, 255, 0.08);
   --border2: rgba(255, 255, 255, 0.12);
+  --mascot-edge: rgba(255, 255, 255, 0.2);
+  --mascot-shadow: rgba(0, 0, 0, 0.5);
+  --mascot-sticker: transparent;
   --ink-strong: #f0f1ef;
   --text: #e8e9e6;
   --text2: #a8a9a6;
@@ -2136,6 +2145,9 @@ html[data-theme="dark"] .bottom-sheet-panel {
 
 /* Shared single-choice and calendar controls. */
 .choice-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px !important; border: 1px solid var(--border) !important; border-radius: var(--radius-control) !important; background: var(--surface) !important; color: var(--text) !important; font-size: 15px !important; cursor: pointer; }
+/* Text fields share the choice-trigger geometry so mixed forms read as one control set. */
+.field-input { width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 15px; box-sizing: border-box; }
+.field-input::placeholder { color: var(--muted); }
 .date-picker-anchor { position: relative; display: block; min-width: 0; }
 .date-picker-trigger { justify-content: flex-start; white-space: nowrap; }
 .date-picker-trigger.composer-picker-chip { width: auto; min-height: 44px; padding: 0 12px !important; border-color: color-mix(in srgb, var(--border) 44%, transparent) !important; border-radius: 999px !important; font-size: 13px !important; font-weight: 600; }

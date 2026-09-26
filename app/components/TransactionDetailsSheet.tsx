@@ -31,7 +31,7 @@ export function TransactionDetailsSheet({ transaction, accounts, categories, onC
         <header>
           <p className="section-label" style={{ marginBottom: 8 }}>{type}</p>
           <h2 style={{ fontSize: 24, lineHeight: 1.15 }}>{transaction.name || type}</h2>
-          <strong style={{ display: "block", marginTop: 12, fontSize: 32, fontVariantNumeric: "tabular-nums" }}><Money value={transaction.amount} animated animateOnMount /></strong>
+          <strong style={{ display: "block", marginTop: 12, fontSize: 32, fontVariantNumeric: "tabular-nums" }}><Money value={transaction.amount} currency animated animateOnMount /></strong>
         </header>
         <dl style={{ display: "grid", gap: 12, margin: 0 }}>
           <Detail label="Date" value={fmtDate(transaction.date)} />

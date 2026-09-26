@@ -114,7 +114,22 @@ export function HomeScreen({
       .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
   }, [pendingItems]);
 
-  const recentTxns = useMemo(() => (transactions ?? []).slice(0, 5), [transactions]);
+  const recentTxns = useMemo(() => (transactions ?? [])
+    .filter(t => !(t.type === "Transfer" && !t.fromAccountId && !t.toAccountId))
+    .slice(0, 5), [transactions]);
+  // 5: one heading per day instead of repeating the date on every row
+  const recentDays = useMemo(() => {
+    const groups: { label: string; txns: Transaction[] }[] = [];
+    const todayStr = today();
+    const yesterdayStr = shiftDate(todayStr, -1);
+    for (const txn of recentTxns) {
+      const label = !txn.date ? "Undated" : txn.date === todayStr ? "Today" : txn.date === yesterdayStr ? "Yesterday" : fmtDate(txn.date);
+      const last = groups[groups.length - 1];
+      if (last?.label === label) last.txns.push(txn);
+      else groups.push({ label, txns: [txn] });
+    }
+    return groups;
+  }, [recentTxns]);
 
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
   const showJointUnassignedPrompt = isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
@@ -191,6 +206,7 @@ export function HomeScreen({
           balanceByScope={balanceByScope}
           contribStatus={contribStatus}
           partnerAvatars={partnerAvatars}
+          categories={categories}
           onOpenJointAllocate={isCurrentMonth ? onOpenJointAllocate : undefined}
         />
       </div>
@@ -203,7 +219,7 @@ export function HomeScreen({
           title={`Plan ${planningNextMonthLabel}`}
           action={(
             <span style={assignRightStyle}>
-              <span style={assignAmountStyle}>{fmt(readyToAssign)} MAD</span>
+              <span style={assignAmountStyle}>{fmt(readyToAssign)}</span>
               <button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>Plan →</button>
             </span>
           )}
@@ -218,7 +234,7 @@ export function HomeScreen({
           tone="accent"
           style={{ marginBottom: 16 }}
           title="Unassigned money"
-          action={<span style={assignRightStyle}><span style={assignAmountStyle}>{fmt(jointUnassigned ?? 0)} MAD</span><button type="button" onClick={onOpenJointAllocate} style={bannerActionButtonStyle}>Allocate →</button></span>}
+          action={<span style={assignRightStyle}><span style={assignAmountStyle}>{fmt(jointUnassigned ?? 0)}</span><button type="button" onClick={onOpenJointAllocate} style={bannerActionButtonStyle}>Allocate →</button></span>}
         >
         </Banner>
       )}
@@ -248,7 +264,7 @@ export function HomeScreen({
                 <div key={bill.id} style={billChipStyle(isImminent)}>
                   <span style={billNameStyle}>{bill.name}</span>
                   {bill.amount != null && (
-                    <span style={billAmountStyle}>{fmt(bill.amount)} MAD</span>
+                    <span style={billAmountStyle}>{fmt(bill.amount)}</span>
                   )}
                   <span style={billDateStyle}>
                     {bill.date ? fmtDate(bill.date) : "No date"}
@@ -273,8 +289,11 @@ export function HomeScreen({
                 </button>
               )}
             </div>
+            {recentDays.map((day) => (
+            <div key={day.label} role="group" aria-label={day.label} style={recentDayStyle}>
+            <span style={recentDayLabelStyle}>{day.label}</span>
             <div className="home-txn-list" style={recentListStyle}>
-              {recentTxns.map((txn) => {
+              {day.txns.map((txn) => {
                 const cat      = categories.find(c => c.id === txn.category);
                 const fromCat  = categories.find(c => c.id === txn.fromCategoryId);
                 const toCat    = categories.find(c => c.id === txn.toCategoryId);
@@ -291,13 +310,14 @@ export function HomeScreen({
                     amount={txn.amount}
                     tone={amountTone}
                     prefix={amountPrefix}
-                    date={txn.date ? fmtDate(txn.date) : undefined}
                     icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} size={22} />}
                     onClick={onClickTransaction ? () => onClickTransaction(txn) : undefined}
                   />
                 );
               })}
             </div>
+            </div>
+            ))}
           </section>
         )}
 
@@ -513,6 +533,10 @@ const billDateStyle: CSSProperties = {
 };
 
 /* Recent transactions */
+
+const recentDayStyle: CSSProperties = { display: "grid", gap: 4, marginBottom: 12 };
+
+const recentDayLabelStyle: CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--muted)" };
 
 const recentListStyle: CSSProperties = {
   display: "grid",

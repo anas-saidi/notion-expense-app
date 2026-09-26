@@ -13,6 +13,7 @@
     "fuse.js": "^7.1.0",
     "jose": "^6.2.4",
     "lucide-react": "^1.11.0",
+    "matter-js": "^0.20.0",
     "motion": "^12.38.0",
     "next": "14.2.3",
     "react": "^18",
@@ -23,6 +24,7 @@
     "web-haptics": "^0.0.6"
   },
   "devDependencies": {
+    "@types/matter-js": "^0.20.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

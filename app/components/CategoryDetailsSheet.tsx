@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, FreezeIcon, XIcon, TransferIcon, CalendarRangeIcon, ScaleIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
+import { FundIcon, FreezeIcon, XIcon, TransferIcon, CalendarRangeIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
 import type { Account, Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -162,7 +162,7 @@ export function CategoryDetailsSheet({
         <section style={statsWrapStyle}>
           <div style={availableStyle}>
             <span style={statLabelStyle}>Available</span>
-            <span style={availableValueStyle}><Money value={available} /></span>
+            <span style={availableValueStyle}><Money value={available} currency /></span>
           </div>
           <div style={supportingStatsStyle}>
             <div style={supportingStatStyle}>
@@ -210,10 +210,10 @@ export function CategoryDetailsSheet({
             <ActionBtn icon={<MoreIcon size={18} />} label="More" ariaLabel="More category actions" bg="transparent" ink="var(--muted)" border="1px solid transparent" onClick={() => setShowMoreActions(true)} />
             <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} width="min(280px, calc(100vw - 32px))">
               <div className="picker-options">
-                {onEdit && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onEdit(); }}>Edit category</button>}
-                <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ScaleIcon size={17} />Adjust available</span></button>
-                {onFreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setConfirmingFreeze(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><FreezeIcon size={17} />Freeze category</span></button>}
-                {onUnfreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onUnfreeze(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ReviveIcon size={17} />Unfreeze category</span></button>}
+                {onEdit && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onEdit(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><EditIcon size={17} />Edit</span></button>}
+                <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ScaleIcon size={17} />Adjust</span></button>
+                {onFreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setConfirmingFreeze(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><FreezeIcon size={17} />Freeze</span></button>}
+                {onUnfreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onUnfreeze(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ReviveIcon size={17} />Unfreeze</span></button>}
               </div>
             </PickerPopover>
           </div>

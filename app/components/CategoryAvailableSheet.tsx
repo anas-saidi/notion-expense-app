@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category } from "./app-types";
 import type { EditableFundTransaction } from "./FundTransactionSheet";
-import { Money } from "./Money";
+import { Money, Currency } from "./Money";
 import { Banner } from "./ui/Banner";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ScaleIcon, XIcon } from "./ui/icons";
@@ -78,7 +78,7 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
           <span style={labelStyle}>Target available</span>
           <div style={heroStyle}>
             <input className="display-amount-input" autoFocus inputMode="decimal" aria-label="Target available" value={target} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setTarget(event.target.value.replace(/[^0-9.]/g, ""))} style={{ ...heroInputStyle, width: `${Math.max(1, target.length)}ch` }} />
-            <span aria-hidden="true" style={currencyStyle}>MAD</span>
+            <span aria-hidden="true"><Currency /></span>
           </div>
         </div>
         <SteppedAmountSlider min={minimum} max={maximum} value={Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : currentAvailable} onChange={(value) => setTarget(String(value))} label={`Adjust available for ${category.name}`} />
@@ -86,8 +86,8 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
         {delta !== 0 && valid && (
           <p role="status" style={adjustmentSummaryStyle}>
             {delta > 0
-              ? <><strong>{Math.abs(delta).toLocaleString("en-US")} MAD</strong> will be added to this category.</>
-              : <><strong>{Math.abs(delta).toLocaleString("en-US")} MAD</strong> will return to {source?.label ?? "the default account"}.</>}
+              ? <><strong>{Math.abs(delta).toLocaleString("en-US")}</strong> will be added to this category.</>
+              : <><strong>{Math.abs(delta).toLocaleString("en-US")}</strong> will return to {source?.label ?? "the default account"}.</>}
           </p>
         )}
         {delta !== 0 && !valid && <Banner tone="danger" compact>Adjustment exceeds the available balance.</Banner>}
@@ -105,7 +105,6 @@ const titleStyle: CSSProperties = { margin: 0, fontSize: 22, lineHeight: 1.2 };
 const labelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" };
 const heroStyle: CSSProperties = { position: "relative", minHeight: 112, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 };
 const heroInputStyle: CSSProperties = { minWidth: "1ch", maxWidth: "calc(100% - 52px)", height: 88, padding: 0, border: 0, outline: 0, background: "transparent", color: "var(--text)", caretColor: "var(--text)", textAlign: "right", fontFamily: "inherit", fontSize: "clamp(48px, 15vw, 72px)", lineHeight: 1, fontWeight: 500, letterSpacing: "-.03em", fontVariantNumeric: "tabular-nums", boxSizing: "content-box" };
-const currencyStyle: CSSProperties = { color: "var(--muted)", fontSize: 16, lineHeight: 1, fontWeight: 500, letterSpacing: 0 };
 const sourceStyle: CSSProperties = { padding: 16, borderRadius: "var(--radius-card)", background: "var(--surface2)", display: "grid", gridTemplateColumns: "1fr auto", gap: "8px 16px", color: "var(--muted)", fontSize: 13 };
 const adjustmentSummaryStyle: CSSProperties = { margin: "-4px 0 0", color: "var(--muted)", fontSize: 13, lineHeight: 1.45, textAlign: "center" };
 const saveStyle: CSSProperties = { marginTop: "auto", minHeight: 52, border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", font: "inherit", fontWeight: 750 };

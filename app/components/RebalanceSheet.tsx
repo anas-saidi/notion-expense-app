@@ -241,7 +241,7 @@ export function RebalanceSheet({
   const unallocatedHint = unallocatedForGroup > 0 ? (
     <div style={unallocatedHintStyle}>
       <span style={unallocatedHintDotStyle} />
-      <span style={unallocatedHintTextStyle}>+{fmt(Math.round(unallocatedForGroup))} MAD unallocated — available to use here</span>
+      <span style={unallocatedHintTextStyle}>+{fmt(Math.round(unallocatedForGroup))} unallocated — available to use here</span>
     </div>
   ) : null;
 
@@ -258,7 +258,7 @@ export function RebalanceSheet({
                   {row.fromIcon && <CategoryIcon icon={row.fromIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
                   <span style={flowNameStyle}>{row.fromLabel}</span>
                 </div>
-                <span style={flowArrowStyle}>→ {row.amount} MAD</span>
+                <span style={flowArrowStyle}>→ {row.amount}</span>
                 <div style={flowToStyle}>
                   <span style={flowNameStyle}>{row.toLabel}</span>
                   {row.toIcon && <CategoryIcon icon={row.toIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}

@@ -4,7 +4,7 @@ import { DatePicker } from "./DatePicker";
 import { useEffect, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
 import { BottomSheet } from "./ui/BottomSheet";
-import { Money } from "./Money";
+import { Money, Currency } from "./Money";
 import { BanknoteIcon, CheckIcon, XIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
 import { today } from "./app-utils";
@@ -108,7 +108,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
                 placeholder="0"
                 style={amountInputStyle}
               />
-              <span style={currencyStyle}>MAD</span>
+              <Currency />
             </div>
           </label>
 
@@ -254,11 +254,6 @@ const amountInputStyle: CSSProperties = {
   fontWeight: 800,
 };
 
-const currencyStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  color: "var(--muted)",
-};
 
 const submitStyle: CSSProperties = {
   width: "100%",

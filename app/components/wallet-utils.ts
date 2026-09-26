@@ -44,12 +44,14 @@ export function cashBackingGap(available: number | null, cash: number | null): n
   return available === null || cash === null ? null : Math.max(0, available - cash);
 }
 
+/** Savings-type categories sit outside the monthly spending picture. */
+export function isSavingsCategory(category: Category): boolean {
+  const types = category.type.map(value => value.toLowerCase());
+  if (types.some(value => value.includes("team") || value.includes("household"))) return false;
+  return types.some(value => ["saving", "sinking", "goal", "fund"].some(kind => value.includes(kind)));
+}
+
 export function getCategoryAvailableByScope(categories: Category[], accounts: Account[] = []): Record<BudgetScope, number> {
-  const isSavingsCategory = (category: Category) => {
-    const types = category.type.map(value => value.toLowerCase());
-    if (types.some(value => value.includes("team") || value.includes("household"))) return false;
-    return types.some(value => ["saving", "sinking", "goal", "fund"].some(kind => value.includes(kind)));
-  };
     const sum = (scope: BudgetScope) =>
       categories
         .filter(c => categoryMatchesScope(c, scope, accounts) && !isSavingsCategory(c))

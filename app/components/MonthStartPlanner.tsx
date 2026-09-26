@@ -483,7 +483,7 @@ export function MonthStartPlanner({
                 </div>
                 <span style={{ ...leftHeroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
                   {left < 0 ? "−" : ""}
-                  <Money value={Math.abs(Math.round(left))} animated animateOnMount />
+                  <Money value={Math.abs(Math.round(left))} currency animated animateOnMount />
                 </span>
                 {jointSplit}
               </div>
@@ -825,10 +825,9 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
                       <span style={{ color: delta > 0 ? "var(--accent-foreground)" : "var(--danger)", fontWeight: 700 }}>
                         {fmt(Math.round(projected))}
                       </span>
-                      <span style={{ fontSize: 12, opacity: 0.55 }}>MAD</span>
                     </>
                   ) : (
-                    <>{fmt(Math.round(cat.available))} <span style={{ fontSize: 12, opacity: 0.6 }}>MAD</span></>
+                    <>{fmt(Math.round(cat.available))}</>
                   )}
                 </span>
               );
@@ -878,7 +877,6 @@ function CategoryRow({ cat, amount, initialAllocation, showSplit, scopePool, lef
           <span><ManIcon size={13} aria-hidden="true" /> {fmt(Math.round(amount * JOINT_SPLIT.anas))}</span>
           <span style={{ opacity: 0.3 }}>·</span>
           <span><WomanIcon size={13} aria-hidden="true" /> {fmt(Math.round(amount * JOINT_SPLIT.salma))}</span>
-          <span style={{ fontSize: 12, opacity: 0.55 }}>MAD</span>
         </div>
       )}
     </div>

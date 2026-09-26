@@ -47,7 +47,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
       <section aria-label="Account totals" style={heroStyle}>
         <span style={heroLabelStyle}>Total balance</span>
         <strong style={heroAmountStyle}>
-          <Money value={totals.balance} animated animateOnMount />
+          <Money value={totals.balance} currency animated animateOnMount />
         </strong>
         <span style={readyMetricStyle(totals.ready < 0)}>
           <span>Ready to assign</span>

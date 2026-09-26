@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category, BudgetScope } from "./app-types";
 import { scopeFromAccountLabel } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
-import { Money } from "./Money";
+import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
@@ -171,18 +171,18 @@ export function CategoryManageSheet({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Groceries, fuel, gym..."
-                style={inputStyle}
+                className="field-input"
               />
             </label>
 
             <div style={twoColStyle}>
               <label style={fieldStyle}>
                 <span style={labelStyle}>Icon</span>
-                <input value={icon} onChange={(event) => setIcon(lastGrapheme(event.target.value))} placeholder="🧾" aria-label="Icon (one emoji)" style={inputStyle} />
+                <input value={icon} onChange={(event) => setIcon(lastGrapheme(event.target.value))} placeholder="🧾" aria-label="Icon (one emoji)" className="field-input" />
               </label>
               <label style={fieldStyle}>
                 <span style={labelStyle}>Type</span>
-                <ChoicePicker aria-label="Category type" value={categoryType} onChange={(event) => setCategoryType(event.target.value)} style={inputStyle}>
+                <ChoicePicker aria-label="Category type" value={categoryType} onChange={(event) => setCategoryType(event.target.value)}>
                   {[...new Set([...(availableTypes ?? []), ...(category?.type ?? [])])].map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -197,7 +197,7 @@ export function CategoryManageSheet({
         <section style={sectionStyle}>
           <label style={fieldStyle}>
             <span style={labelStyle}>{isMetadata ? "Default account" : "Funding account"}</span>
-            <ChoicePicker aria-label={isMetadata ? "Default account" : "Funding account"} value={accountId} onChange={(event) => setAccountId(event.target.value)} style={inputStyle}>
+            <ChoicePicker aria-label={isMetadata ? "Default account" : "Funding account"} value={accountId} onChange={(event) => setAccountId(event.target.value)}>
               <option value="" disabled>Choose account</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.icon} {account.label}</option>
@@ -214,7 +214,7 @@ export function CategoryManageSheet({
                 placeholder={isCreate ? "Optional" : "0"}
                 style={amountInputStyle}
               />
-              <span style={currencyStyle}>MAD</span>
+              <Currency />
             </div>
           </label>}
 
@@ -300,20 +300,6 @@ const labelStyle: CSSProperties = {
   color: "var(--text2)",
 };
 
-const inputStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 48,
-  borderRadius: 14,
-  border: "1px solid transparent",
-  boxShadow: "inset 0 0 0 1.5px var(--border2)",
-  background: "color-mix(in srgb, var(--surface2) 34%, var(--surface))",
-  color: "var(--text2)",
-  padding: "0 13px",
-  fontSize: 15,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
 const twoColStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 0.72fr) minmax(0, 1fr)",
@@ -322,7 +308,7 @@ const twoColStyle: CSSProperties = {
 
 const amountWrapStyle: CSSProperties = {
   minHeight: 56,
-  borderRadius: 16,
+  borderRadius: "var(--radius-control)",
   border: "1px solid var(--border)",
   background: "var(--surface)",
   display: "flex",
@@ -343,11 +329,6 @@ const amountInputStyle: CSSProperties = {
   fontWeight: 800,
 };
 
-const currencyStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  color: "var(--muted)",
-};
 
 const accountHintStyle: CSSProperties = {
   minHeight: 42,
