@@ -1394,6 +1394,8 @@ html.has-open-sheet .app-content {
 }
 
 .app-header-actions {
+  grid-column: 3;
+  justify-self: end;
   display: flex;
   flex: 0 0 auto;
   gap: 4px;
@@ -1425,15 +1427,15 @@ html.has-open-sheet .app-content {
 }
 
 /*
-  Mode picker: one soft track holding Joint and both partners as mascots.
-  The selected option opens to show its name on a tint of that scope's colour;
-  the others stay compact 44px jars.
+  Mode picker: one soft track holding Joint and both partners as mascots, always
+  the same width. Selection is shown by scale and presence, not colour.
 */
 .global-scope-picker {
+  grid-column: 2;
   display: inline-flex;
   align-items: center;
   flex: 0 1 auto;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
   padding: 2px;
   border: 1px solid color-mix(in srgb, var(--border) 44%, transparent);
@@ -1442,11 +1444,10 @@ html.has-open-sheet .app-content {
 }
 
 .global-scope-option {
-  --scope-tint: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   min-width: 44px;
   min-height: 44px;
   padding: 0 7px;
@@ -1465,41 +1466,28 @@ html.has-open-sheet .app-content {
     padding 0.2s cubic-bezier(0.22, 1, 0.36, 1),
     color 0.16s ease;
 }
-.global-scope-option[data-scope="anas"] { --scope-tint: var(--partner-husband); }
-.global-scope-option[data-scope="salma"] { --scope-tint: var(--partner-wife); }
 
+/* Mascots only: shape and colour name the scope; the label stays for screen readers via aria-label. */
 .global-scope-label {
   display: none;
 }
 
-.global-scope-option[aria-selected="true"] {
-  padding: 0 14px 0 8px;
-  background: color-mix(in srgb, var(--scope-tint) 20%, var(--surface));
-  color: var(--text);
+/*
+  No pill: the selected jar is full size and fully present; the others shrink
+  and fade back. The mascot carries the colour, so nothing else needs any.
+*/
+.global-scope-option > * {
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
 }
-.global-scope-option[aria-selected="true"] .global-scope-label {
-  display: inline;
-  animation: scopeLabelIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-@keyframes scopeLabelIn { from { opacity: 0; transform: translateX(-3px); } }
-
-/* Resting jars step back a little so the selected one leads. */
 .global-scope-option:not([aria-selected="true"]) > * {
-  opacity: 0.78;
-  transition: opacity 0.16s ease;
+  opacity: 0.5;
+  transform: scale(0.78);
 }
 
 @media (hover: hover) {
-  .global-scope-option:not([aria-selected="true"]):hover {
-    background: var(--surface2);
-  }
   .global-scope-option:not([aria-selected="true"]):hover > * {
-    opacity: 1;
+    opacity: 0.8;
   }
-}
-
-html[data-theme="dark"] .global-scope-option[aria-selected="true"] {
-  background: color-mix(in srgb, var(--scope-tint) 22%, var(--surface2));
 }
 
 .global-scope-option:active {
@@ -1516,6 +1504,7 @@ html[data-theme="dark"] .global-scope-option[aria-selected="true"] {
     gap: 8px !important;
   }
 }
+
 
 @media (prefers-reduced-transparency: reduce) {
   .global-scope-option {

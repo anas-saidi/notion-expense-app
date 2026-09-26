@@ -12,7 +12,7 @@ import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned } from "./app-utils";
-import { getCategoryAvailableByScope } from "./wallet-utils";
+import { getCategoryAvailableByScope, scopeMonthlySummary } from "./wallet-utils";
 import { MascotHero } from "./mascot/MascotHero";
 import { budgetJarItems } from "./mascot/budgetJar";
 
@@ -186,6 +186,11 @@ export function CategoriesScreen({
     }
     return planned > 0 ? (spent / planned) * 100 : null;
   }, [categories, accounts, budgetScope, plannedByCategory, spentByCategory]);
+  // The pool jar's level uses the exact figures Home uses, so it reads the same on both screens.
+  const poolLevel = useMemo(() => {
+    const scoped = scopeMonthlySummary(monthlySummary, categories, accounts, budgetScope);
+    return scoped.totalAssigned > 0 ? 1 - scoped.totalSpent / scoped.totalAssigned : 1;
+  }, [monthlySummary, categories, accounts, budgetScope]);
   const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
 
   return (
@@ -217,9 +222,13 @@ export function CategoriesScreen({
         : <>
             <section aria-label={`${fmt(Math.round(availableInCategories))} MAD currently available in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* How the month's budget splits across categories: one emoji each, sized by share. */}
-              {jarItems.length > 0 && (
+              {/* Trial (husband only): the same liquid jar as Home, with the categories'
+                  emojis dropped into it, so the mascot varies by screen instead of changing design. */}
+              {jarItems.length > 0 && (budgetScope === "anas" ? (
+                <MascotHero variant="pool" scope={budgetScope} level={poolLevel} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
+              ) : (
                 <MascotHero variant="split" scope={budgetScope} items={jarItems} spentPct={jarSpentPct} unassigned={leftToAllocate} style={{ marginBottom: 4 }} />
-              )}
+              ))}
               <span style={budgetHealthLabelStyle}>Available</span>
               <span style={budgetHealthAmountStyle}>
                 <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />

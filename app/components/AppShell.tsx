@@ -222,10 +222,11 @@ const menuButtonStyle = {
   boxShadow: "none",
 };
 
+// Three columns so the mode picker sits at the true centre; actions hug the right edge.
 const headerStyle = {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
   alignItems: "center",
-  justifyContent: "space-between",
   gap: 8,
   marginBottom: 0,
 };

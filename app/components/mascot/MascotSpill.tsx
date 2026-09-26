@@ -155,7 +155,8 @@ const detailsStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "baseline",
   gap: 4,
-  paddingTop: 2,
+  // A little air under the jar so the line doesn't read as stuck to it.
+  paddingTop: 8,
   whiteSpace: "nowrap",
   fontSize: 14,
   fontWeight: 600,
