@@ -7,6 +7,10 @@ export type Category = {
   defaultAccount: string | null;
   available: number | null;
   planned: number | null;
+  /** Notion "Overall Goal": the savings target, if one is set. */
+  goal?: number | null;
+  /** Notion "Goal Date" (YYYY-MM-DD): when the goal should be reached. */
+  goalDate?: string | null;
   lastMonthSpent: number | null;
   isTeamFund: boolean;
   snoozed?: boolean;

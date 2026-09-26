@@ -4,6 +4,7 @@ import { ChoicePicker } from "./ChoicePicker";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category, BudgetScope } from "./app-types";
 import { scopeFromAccountLabel } from "./app-utils";
+import { isSavingsCategory } from "./wallet-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -80,12 +81,14 @@ export function CategoryManageSheet({
     (isMetadata ? name.trim().length > 0 && (!isEdit || Boolean(category?.id)) : Boolean(category?.id)) &&
     (isEdit || ((isCreate && !amount) || (Number.isFinite(parsedAmount) && parsedAmount > 0)));
 
-  const title = isEdit ? "Edit category" : isCreate ? "New category" : `Fund ${category?.name ?? "category"}`;
+  // Funding a savings category reads as adding to savings.
+  const addingToSavings = !isEdit && !isCreate && !!category && isSavingsCategory(category);
+  const title = isEdit ? "Edit category" : isCreate ? "New category" : addingToSavings ? `Add to ${category?.name}` : `Fund ${category?.name ?? "category"}`;
   const actionLabel = useMemo(() => {
     if (status === "saving") return isEdit ? "Saving..." : isCreate ? "Creating..." : "Funding...";
     if (status === "success") return isEdit ? "Saved" : isCreate ? "Created" : "Funded";
     if (status === "error") return "Try again";
-    return isEdit ? "Save changes" : isCreate ? "Create category" : "Fund category";
+    return isEdit ? "Save changes" : isCreate ? "Create category" : addingToSavings ? "Add to savings" : "Fund category";
   }, [isCreate, isEdit, status]);
 
   const submit = async () => {

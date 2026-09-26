@@ -12,6 +12,7 @@ import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
 import { AccountTransferSheet } from "./components/AccountTransferSheet";
 import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
 import { CategoryManageSheet } from "./components/CategoryManageSheet";
+import { SavingsWithdrawSheet } from "./components/SavingsWithdrawSheet";
 import { ManageScreen } from "./components/ManageScreen";
 import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
 import { RebalanceSheet } from "./components/RebalanceSheet";
@@ -20,7 +21,7 @@ import { JointAllocateSheet } from "./components/JointAllocateSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
 import { TransactionDetailsSheet } from "./components/TransactionDetailsSheet";
-import { getCategoryAvailableByScope, scopeMonthlySummary } from "./components/wallet-utils";
+import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
 import { calculateContributionStatus } from "./components/contribution-utils";
 import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
@@ -82,12 +83,6 @@ const isHouseholdCategory = (category: Category) => {
   });
 };
 
-const isSavingsCategory = (category: Category) => {
-  const types = category.type.map((value) => value.toLowerCase());
-  if (types.some((value) => value.includes("team") || value.includes("household"))) return false;
-  return types.some((value) => value.includes("saving") || value.includes("sinking") || value.includes("goal") || value.includes("fund"));
-};
-
 function SectionHeader({
   title,
   subtitle,
@@ -113,6 +108,7 @@ function SectionHeader({
 export default function App() {
   const [mounted, setMounted] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [withdrawCategory, setWithdrawCategory] = useState<Category | null>(null);
   const [mode, setMode] = useState<"wife" | "husband">("husband");
   const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -1489,9 +1485,19 @@ export default function App() {
         onOpenFund={() => {
           if (detailsCategory) openFundCategory(detailsCategory);
         }}
+        onTakeOut={detailsCategory && isSavingsCategory(detailsCategory) ? () => setWithdrawCategory(detailsCategory) : undefined}
         onFreeze={detailsCategory && !detailsCategory.snoozed ? () => freezeCategory(detailsCategory) : undefined}
         onUnfreeze={detailsCategory?.snoozed ? () => { void reviveCategory(detailsCategory, false); setShowCategoryDetails(false); } : undefined}
         onTransactionsChanged={refreshBudgetData}
+      />
+
+      <SavingsWithdrawSheet
+        savings={withdrawCategory}
+        destinations={withdrawCategory
+          ? categories.filter((c) => !isSavingsCategory(c) && !c.archived && getCategoryScope(c, accounts) === getCategoryScope(withdrawCategory, accounts))
+          : []}
+        onClose={() => setWithdrawCategory(null)}
+        onSuccess={(message) => { setShowCategoryDetails(false); void refreshBudgetData(message); }}
       />
 
       <CategoryManageSheet

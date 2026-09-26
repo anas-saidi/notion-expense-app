@@ -55,6 +55,8 @@ type CategoryDetailsSheetProps = {
   onClose: () => void;
   onOpenAdd: () => void;
   onOpenFund: () => void;
+  /** Savings category: actions become "Add" and "Take out" instead of expense and fund. */
+  onTakeOut?: () => void;
   onEdit?: () => void;
   onFreeze?: () => void;
   onUnfreeze?: () => void;
@@ -69,6 +71,7 @@ export function CategoryDetailsSheet({
   onClose,
   onOpenAdd,
   onOpenFund,
+  onTakeOut,
   onEdit,
   onFreeze,
   onUnfreeze,
@@ -191,6 +194,27 @@ export function CategoryDetailsSheet({
 
         {/* ── Actions ── */}
         <div style={actionsRowStyle}>
+          {onTakeOut ? <>
+            {/* Savings is set aside, not spent from: money only goes in, or deliberately comes out. */}
+            <ActionBtn
+              icon={<FundIcon size={18} strokeWidth={2} />}
+              label="Add"
+              ariaLabel="Add to savings"
+              bg="var(--text)"
+              ink="var(--bg)"
+              border="1px solid transparent"
+              onClick={onOpenFund}
+            />
+            <ActionBtn
+              icon={<TransferIcon size={18} strokeWidth={2} />}
+              label="Take out"
+              ariaLabel="Take money out of savings"
+              bg="var(--surface)"
+              ink="var(--text2)"
+              border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
+              onClick={onTakeOut}
+            />
+          </> : <>
           <ActionBtn
             icon={<ReceiptIcon size={17} strokeWidth={2} />}
             label="Expense"
@@ -209,6 +233,7 @@ export function CategoryDetailsSheet({
             border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
             onClick={onOpenFund}
           />
+          </>}
           <div ref={moreActionsRef} style={{ position: "relative", minWidth: 0 }}>
             <ActionBtn icon={<MoreIcon size={18} />} label="More" ariaLabel="More category actions" bg="transparent" ink="var(--muted)" border="1px solid transparent" onClick={() => setShowMoreActions(true)} />
             <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} width="min(280px, calc(100vw - 32px))">

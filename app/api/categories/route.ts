@@ -87,6 +87,8 @@ const mapCategoryPage = (page: any) => {
     defaultAccount: props.Default?.relation?.[0]?.id ?? null,
     available: readNumericProp(props, "Available"),
     planned: props.Planned?.number ?? null,
+    goal: props["Overall Goal"]?.number ?? null,
+    goalDate: props["Goal Date"]?.date?.start ?? null,
     lastMonthSpent: readNumericProp(props, "Last month spent"),
     isTeamFund,
     snoozed: props.Snooze?.checkbox ?? false,

@@ -429,6 +429,11 @@ function CategoryCard({
   const availableAmount = Math.max(0, available ?? 0);
   const leftPct = Math.min(100, (availableAmount / Math.max(spent + availableAmount, 1)) * 100);
 
+  const goal = savings ? Math.max(0, cat.goal ?? 0) : 0;
+  const goalPct = goal > 0 ? Math.min(100, (availableAmount / goal) * 100) : 0;
+  const goalReached = goal > 0 && availableAmount >= goal;
+  const goalWhen = goalLabel(cat.goalDate);
+
   // Animate between values on updates; show instantly on mount
   const displayAmount = useCountUp(amountNum, 580);
   const amountStr = available === null ? "—" : fmt(Math.round(displayAmount));
@@ -450,13 +455,23 @@ function CategoryCard({
             </span>
           </span>
           {/* Savings isn't spent down, so a spend bar says nothing: just what moved in or out this month. */}
-          {savings ? (
+          {savings ? <>
+            {/* With a goal (Notion "Overall Goal"), the bar is progress towards it. */}
+            {goal > 0 && (
+              <span style={budgetBarStyle} aria-hidden="true">
+                <span style={{ ...budgetBarSegmentStyle, width: `${goalPct}%`, background: "var(--accent)" }} />
+              </span>
+            )}
             <span style={budgetMetaStyle}>
-              {Math.round(planned) > 0 && <span style={savingsInStyle}>+{fmt(Math.round(planned))} this month</span>}
-              {Math.round(spent) > 0 && <span>{fmt(Math.round(spent))} used</span>}
-              {Math.round(planned) <= 0 && Math.round(spent) <= 0 && <span>Nothing moved this month</span>}
+              {goal > 0 && <span>{goalReached ? "Goal reached" : `${Math.floor(goalPct)}% of ${fmt(Math.round(goal))}`}{goalWhen && !goalReached ? ` · ${goalWhen}` : ""}</span>}
+              <span>
+                {Math.round(planned) > 0 && <span style={savingsInStyle}>+{fmt(Math.round(planned))} this month</span>}
+                {Math.round(planned) > 0 && Math.round(spent) > 0 && " · "}
+                {Math.round(spent) > 0 && <span>{fmt(Math.round(spent))} used</span>}
+                {Math.round(planned) <= 0 && Math.round(spent) <= 0 && <span>Nothing moved this month</span>}
+              </span>
             </span>
-          ) : <>
+          </> : <>
           <span style={budgetBarStyle} aria-hidden="true">
             {health === "over" ? (
               <span style={{ ...budgetBarSegmentStyle, width: "100%", background: "var(--danger)" }} />
@@ -473,6 +488,14 @@ function CategoryCard({
       </button>
     </div>
   );
+}
+
+/** "by Dec 2026" for a future goal date, "due Dec 2025" once it has passed. */
+function goalLabel(date: string | null | undefined): string | null {
+  if (!date || !/^\d{4}-\d{2}/.test(date)) return null;
+  const [year, month] = date.split("-").map(Number);
+  const label = new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(new Date(year, month - 1, 1));
+  return date.slice(0, 7) < new Date().toISOString().slice(0, 7) ? `due ${label}` : `by ${label}`;
 }
 
 /* ─── Count-up animation hook ──────────────────────────────────── */
