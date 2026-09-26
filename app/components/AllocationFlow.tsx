@@ -12,7 +12,9 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
 import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
-import type { Account, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
+import type { Account, BudgetScope, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
+import { MascotHero } from "./mascot/MascotHero";
+import { allocationJarItems } from "./mascot/budgetJar";
 import { fmt, getLeftToAssignByScope } from "./app-utils";
 
 export type BudgetGroupKey = "household" | "wife" | "husband" | "savings" | string;
@@ -50,6 +52,11 @@ type AllocationFlowProps = {
   heroPool?: boolean;
   metaLabel?: string;
   rebalanceMode?: boolean;
+  /**
+   * Show the scope's budget jar filling as money is assigned: one emoji per
+   * category, sized by its share of the pool (unassigned money is empty space).
+   */
+  jarScope?: BudgetScope;
 };
 
 export function AllocationFlow({
@@ -77,6 +84,7 @@ export function AllocationFlow({
   heroPool = false,
   metaLabel = "Last month",
   rebalanceMode = false,
+  jarScope,
 }: AllocationFlowProps) {
   // Spent-floor per category, snapshotted on first activation.
   // Must NOT be recomputed from activeItem.amount after edits — that shifts the
@@ -137,6 +145,10 @@ export function AllocationFlow({
   const snapshot: MonthlyPlanningSnapshot = { availablePool, assignedHousehold: assignedBudget, assignedSavings, leftToAssign };
 
   const totalCategories = allBudgetItems.length + savingsItems.length;
+  const jarItems = useMemo(
+    () => (jarScope ? allocationJarItems([...allBudgetItems, ...savingsItems], availablePool) : []),
+    [jarScope, allBudgetItems, savingsItems, availablePool],
+  );
   const isBalanced = availablePool > 0 && leftToAssign === 0;
   const isOver = availablePool > 0 && leftToAssign < 0;
   const canSave =
@@ -243,6 +255,19 @@ export function AllocationFlow({
           <div style={chipsContentWrapStyle}>{chipsContent}</div>
         )}
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
+          {/* The jar fills as money is assigned: full when balanced, worried when over. */}
+          {jarScope && jarItems.length > 0 && (
+            <MascotHero
+              variant="split"
+              scope={jarScope}
+              items={jarItems}
+              spentPct={null}
+              size={FLOW_JAR_SIZE}
+              remember={false}
+              mood={isOver ? "worried" : isBalanced ? "excited" : leftToAssign > 0.5 ? "curious" : "idle"}
+              style={{ marginBottom: heroPool ? -8 : 4 }}
+            />
+          )}
           {heroPool ? (
             <div style={heroPoolWrapStyle}>
               <span style={heroPoolLabelStyle}>{poolLabel}</span>
@@ -457,6 +482,8 @@ const monthPickerButtonStyle: CSSProperties = { minHeight: 44, padding: "0 4px",
 const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
 const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
+/** The flows are sheets with a keypad and editor below, so the jar is a little smaller than a screen hero. */
+const FLOW_JAR_SIZE = 140;
 const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };

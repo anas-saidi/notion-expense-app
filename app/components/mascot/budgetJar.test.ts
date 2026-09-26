@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Category } from "../app-types";
-import { budgetJarItems, topSpentJarItems } from "./budgetJar";
+import { allocationJarItems, budgetJarItems, topSpentJarItems } from "./budgetJar";
 
 const cat = (id: string, icon: string | null, extra: Partial<Category> = {}): Category => ({
   id, name: id, icon, type: ["Obligations"], owner: "Anas", defaultAccount: null, available: 0, planned: null, lastMonthSpent: null, isTeamFund: false, ...extra,
@@ -57,5 +57,27 @@ describe("topSpentJarItems", () => {
   it("stays empty without a plan or spending, and skips unknown categories", () => {
     expect(topSpentJarItems([{ categoryId: "rent", total: 10 }], cats, 0)).toEqual([]);
     expect(topSpentJarItems([{ categoryId: "ghost", total: 500 }], cats, 1000)).toEqual([]);
+  });
+});
+
+describe("allocationJarItems", () => {
+  const row = (categoryId: string, icon: string | null, amount: number) => ({ categoryId, icon, amount });
+
+  it("shows only assigned categories, sized by their share of the pool", () => {
+    const items = allocationJarItems([row("rent", "🏠", 3000), row("food", "🍽️", 1000), row("gym", "🏋️", 0)], 6000);
+    expect(items.map(i => i.glyph)).toEqual(["🏠", "🍽️"]);
+    expect(items[0].radius).toBeGreaterThan(items[1].radius);
+  });
+
+  it("grows the destination and shrinks the source when money moves, keeping ids", () => {
+    const before = allocationJarItems([row("rent", "🏠", 3000), row("food", "🍽️", 1000)], 6000);
+    const after = allocationJarItems([row("rent", "🏠", 2000), row("food", "🍽️", 2000)], 6000);
+    expect(after.map(i => i.id).sort()).toEqual(before.map(i => i.id).sort());
+    expect(after.find(i => i.id === "food")!.radius).toBeGreaterThan(before.find(i => i.id === "food")!.radius);
+    expect(after.find(i => i.id === "rent")!.radius).toBeLessThan(before.find(i => i.id === "rent")!.radius);
+  });
+
+  it("is empty without a pool", () => {
+    expect(allocationJarItems([row("rent", "🏠", 100)], 0)).toEqual([]);
   });
 });

@@ -63,6 +63,7 @@ export function JointAllocateSheet({
 
   return (
     <AllocationFlow
+      jarScope={"joint"}
       open={open}
       selectedMonth={selectedMonth}
       onCancel={onClose}

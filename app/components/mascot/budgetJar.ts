@@ -65,3 +65,30 @@ export function topSpentJarItems(
       return { id: `spent:${id}`, glyph: c.icon?.trim() || "🧾", radius, name: c.name };
     });
 }
+
+/**
+ * The jar while planning or rebalancing: one emoji per category with money
+ * assigned, sized by its share of the pool being planned. Unassigned money is
+ * empty space, so a fully assigned pool is a full jar; moving money between
+ * two categories shrinks one emoji and grows the other in place.
+ */
+/**
+ * While planning, a big category must still visibly shrink or grow as money
+ * moves, so its emoji can get much larger before capping (the jar's radius is 1).
+ */
+const ALLOCATION_MAX_RADIUS = 0.62;
+
+export function allocationJarItems(
+  items: Array<{ categoryId: string; icon: string | null; amount: number }>,
+  pool: number,
+): JarItem[] {
+  if (!(pool > 0)) return [];
+  return items
+    .filter(i => i.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+    .map(i => ({
+      id: i.categoryId,
+      glyph: i.icon?.trim() || "🧾",
+      radius: Math.min(ALLOCATION_MAX_RADIUS, Math.max(MIN_RADIUS, Math.sqrt(Math.min(1, i.amount / pool)) * AREA_FACTOR)),
+    }));
+}

@@ -117,6 +117,7 @@ export function MonthlyPlanningFlow({
 
   return (
     <AllocationFlow
+      jarScope={budgetScope}
       open={open}
       selectedMonth={selectedMonth}
       onSelectedMonthChange={onSelectedMonthChange}

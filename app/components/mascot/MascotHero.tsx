@@ -4,6 +4,7 @@ import type { BudgetScope } from "../app-types";
 import { Mascot } from "./Mascot";
 import type { JarItem } from "./coinSimMatter";
 import type { MascotTarget } from "./engine";
+import type { Mood } from "./poses";
 import { deriveTarget, useBalanceReaction } from "./mood";
 import { useReducedMotion } from "motion/react";
 import { useRememberedJar } from "./memory";
@@ -25,6 +26,13 @@ type Common = {
   lookYaw?: number;
   /** Box size in px; defaults to MASCOT_HERO_SIZE. */
   size?: number;
+  /** Set the face directly (e.g. while planning); otherwise it follows spending. */
+  mood?: Mood;
+  /**
+   * Remember what the jar last showed on this device, so the next visit only
+   * animates changes. On by default; off for flows that open on fresh data.
+   */
+  remember?: boolean;
   style?: CSSProperties;
 };
 
@@ -52,17 +60,18 @@ export function MascotHero(props: MascotHeroProps) {
  * time, the emoji jar fills once as a welcome. Reduce Motion always starts settled.
  */
 function HeroJar(props: MascotHeroProps) {
-  const { scope, spentPct, unassigned = 0, lookYaw, size = MASCOT_HERO_SIZE, style } = props;
+  const { scope, spentPct, unassigned = 0, lookYaw, size = MASCOT_HERO_SIZE, mood, remember = true, style } = props;
   const pool = props.variant === "pool";
   const animate = !useReducedMotion();
   const level = pool ? Math.round(Math.max(0, Math.min(1, props.level)) * 1000) / 1000 : 0;
-  const shownLevel = useRememberedJar(pool ? `pool:${scope}` : null, "level", level, animate);
-  const shownItems = useRememberedJar(pool ? null : `split-v2:${scope}`, "items", pool ? EMPTY : props.items, animate);
+  const shownLevel = useRememberedJar(pool && remember ? `pool:${scope}` : null, "level", level, animate);
+  const shownItems = useRememberedJar(!pool && remember ? `split-v2:${scope}` : null, "items", pool ? EMPTY : props.items, animate);
   // A pool always carries a (usually empty) pile, so showing what's in it never rebuilds the jar.
   const poolItems = pool ? props.items ?? EMPTY : EMPTY;
   // Balance changes only matter for the pool; a stable null keeps the hook quiet otherwise.
   const reaction = useBalanceReaction(pool ? props.balance ?? null : null, scope, pool ? props.available ?? 0 : 0);
-  const base = { ...deriveTarget({ scope, fundingGap: 0, spentPct, unassigned, loading: false }), lookYaw };
+  const derived = deriveTarget({ scope, fundingGap: 0, spentPct, unassigned, loading: false });
+  const base = { ...derived, mood: mood ?? derived.mood, lookYaw };
   const target: MascotTarget = pool
     ? { ...base, outline: "partner", fill: shownLevel, items: poolItems }
     : { ...base, outline: "partner", items: shownItems };

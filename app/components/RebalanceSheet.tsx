@@ -286,6 +286,7 @@ export function RebalanceSheet({
 
   return (
     <AllocationFlow
+      jarScope={budgetScope}
       open={open}
       mode="sheet"
       selectedMonth={homeMonth}
