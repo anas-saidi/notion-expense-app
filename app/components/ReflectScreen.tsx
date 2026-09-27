@@ -2,17 +2,20 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
-import { buildSpendingBreakdown, reflectMonthCount, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
-import { fmtDate, today } from "./app-utils";
+import { buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
+import { fmt, fmtDate, today } from "./app-utils";
 import { Money } from "./Money";
 import { MonthPicker } from "./DatePicker";
 import { ReflectActivity } from "./ReflectActivity";
+import { ReflectFlowChart } from "./ReflectFlowChart";
+import { MascotHero } from "./mascot/MascotHero";
+import { spendingJarItems } from "./mascot/budgetJar";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
 import { ScreenChip } from "./ui/ScreenChip";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { TransactionRow } from "./ui/TransactionRow";
-import { CalendarRangeIcon, ChevronDownIcon, ChevronRightIcon, SlidersIcon, XIcon } from "./ui/icons";
+import { CalendarRangeIcon, ChevronDownIcon, SlidersIcon, XIcon } from "./ui/icons";
 
 type Props = {
   transactions: Transaction[];
@@ -31,6 +34,8 @@ type Props = {
 };
 const monthName = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleDateString("en", { month: "short", year: "numeric" });
 const periodName = ({ start, end }: ReflectPeriod) => !start ? "All time" : start === end ? monthName(start) : `${monthName(start)} – ${monthName(end)}`;
+/** Bigger than the other heroes: here the jar is the chart, not a companion to a number. */
+const REFLECT_JAR_SIZE = 250;
 const tone = (index: number) => `color-mix(in srgb, var(--select-ink) ${Math.max(20, 92 - index * 12)}%, var(--surface2))`;
 
 export function ReflectScreen(props: Props) {
@@ -59,15 +64,22 @@ export function ReflectScreen(props: Props) {
   const accountOptions = [...accountIds].map(id => ({ id, name: props.accounts.find(account => account.id === id)?.label ?? (id === UNKNOWN_ACCOUNT ? "No account" : "Archived account") }));
   const filterCount = excludedCategories.length + excludedAccounts.length;
   const months = reflectMonthCount(props.period, props.transactions);
-  const slices = breakdown.spending.length > 6
-    ? [...breakdown.spending.slice(0, 5), { ...breakdown.spending[5], id: "other", name: "Other categories", share: breakdown.spending.slice(5).reduce((sum, row) => sum + row.share, 0) }]
-    : breakdown.spending;
-  let offset = 0;
+  const jarItems = useMemo(() => spendingJarItems(breakdown.spending), [breakdown.spending]);
+  const [showFlow, setShowFlow] = useState(false);
+  const flow = useMemo(
+    () => buildMoneyFlow(breakdown.spending, props.transactions, props.categories, props.accounts, props.budgetScope, props.period, excludedAccounts),
+    [breakdown.spending, props.transactions, props.categories, props.accounts, props.budgetScope, props.period, excludedAccounts],
+  );
   const toggle = (id: string, values: string[], set: (values: string[]) => void) => set(values.includes(id) ? values.filter(value => value !== id) : [...values, id]);
   const choosePeriod = (period: ReflectPeriod) => { props.onPeriodChange(period); setShowPeriod(false); };
   const label = periodName(props.period);
   const hasData = breakdown.transactionCount > 0;
-  const currentIncluded = !props.period.end || props.period.end === currentMonth;
+  // One short line: the biggest category, and the monthly average over longer periods.
+  const top = breakdown.spending[0];
+  const summary = [
+    top && `Mostly ${top.name} · ${Math.round(top.share * 100)}%`,
+    months > 1 && `${fmt(Math.round(breakdown.total / months))} / month`,
+  ].filter(Boolean).join(" · ");
 
   const categoryRow = (row: ReflectCategory, index: number, inflow = false) => <li key={row.id}>
     <button type="button" onClick={() => setSelectedId(row.id)} aria-label={`${row.name}, ${inflow ? "net inflow" : "spent"} ${Math.abs(row.net)} MAD${!inflow && row.share > 0 ? `, ${(row.share * 100).toFixed(1)} percent` : ""}, view transactions`} style={categoryButtonStyle}>
@@ -82,7 +94,6 @@ export function ReflectScreen(props: Props) {
           <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{row.net > 0 ? `${(row.share * 100).toFixed(1)}%` : `${row.transactions.length} transactions`}</span>
         </span>
       </span>
-      <ChevronRightIcon size={16} style={{ flexShrink: 0, color: "var(--muted)" }} />
     </button>
   </li>;
 
@@ -105,23 +116,22 @@ export function ReflectScreen(props: Props) {
         {!hasData ? <section style={{ padding: "40px 0", textAlign: "center" }}><h2 style={{ fontSize: 20, fontWeight: 500 }}>{filterCount ? "Nothing matches these filters" : "No spending to reflect on yet"}</h2><p style={mutedStyle}>{filterCount ? "Include more categories or accounts to see the breakdown." : "Try another period, or add your first expense."}</p>{filterCount > 0 && <button style={quietButtonStyle} onClick={() => { setExcludedAccounts([]); setExcludedCategories([]); }}>Reset filters</button>}</section>
           : <>
             <section aria-label="Spending breakdown" style={{ display: "grid", justifyItems: "center", gap: 12 }}>
-              <div style={{ position: "relative", width: 224, height: 224 }}>
-                <svg viewBox="0 0 224 224" aria-hidden="true" style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}>
-                  <circle cx="112" cy="112" r="96" fill="none" stroke="var(--surface2)" strokeWidth="18" />
-                  {slices.map((slice, index) => { const start = offset; offset += slice.share * 100; return <circle key={slice.id} cx="112" cy="112" r="96" fill="none" pathLength="100" stroke={tone(index)} strokeWidth="18" strokeDasharray={`${Math.max(0, slice.share * 100 - (slices.length > 1 ? 0.6 : 0))} 100`} strokeDashoffset={-start} />; })}
-                </svg>
-                <div style={{ position: "absolute", inset: 28, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}><span style={mutedStyle}>Spent</span><span style={{ fontSize: breakdown.total >= 1000000 ? 24 : 32, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--text)" }}><Money value={breakdown.total} currency /></span><span style={mutedStyle}>{breakdown.spending.length} {breakdown.spending.length === 1 ? "category" : "categories"}</span></div>
-              </div>
-              {months > 1 && <p style={{ ...mutedStyle, margin: 0 }}><Money value={breakdown.total / months} /> / month across {months} months{currentIncluded ? " · includes this month so far" : ""}</p>}
-              {breakdown.spending[0] && <p style={{ margin: "4px 0 0", fontSize: 15, lineHeight: 1.5, textAlign: "center", maxWidth: 340, color: "var(--text2)" }}><strong style={{ fontWeight: 600 }}>{breakdown.spending[0].name}</strong> made up {(breakdown.spending[0].share * 100).toFixed(0)}% of your spending{filterCount ? " in this selection" : ""}.</p>}
+              {/* The period's spending as the scope's jar, one emoji per category sized by its share.
+                  Tapping it swaps in spending against money in over the same period, and back. */}
+              <button type="button" onClick={() => setShowFlow(open => !open)} aria-pressed={showFlow} aria-label={showFlow ? "Show spending by category" : "Show spending against money in"} style={jarButtonStyle}>
+                {showFlow
+                  ? <ReflectFlowChart points={flow} height={REFLECT_JAR_SIZE - 44} />
+                  : <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={REFLECT_JAR_SIZE} style={{ margin: "-28px auto -16px" }} />}
+              </button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}><span style={mutedStyle}>Spent</span><span style={{ fontSize: breakdown.total >= 1000000 ? 28 : 36, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--danger)" }}>{breakdown.total > 0 ? "−" : ""}<Money value={breakdown.total} currency /></span></div>
+              {summary && <p style={summaryStyle}>{summary}</p>}
             </section>
             <section aria-label="Spending by category">
-              <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Where it went</h2><span style={mutedStyle}>Amount · share</span></div>
+              <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Where it went</h2></div>
               <ul style={listStyle}>{breakdown.spending.map((row, index) => categoryRow(row, index))}</ul>
             </section>
             {breakdown.inflows.length > 0 && <section aria-label="Positive category inflows"><h2 style={sectionTitleStyle}>More came back than went out</h2><p style={mutedStyle}>Net inflows in these categories are separate from the spending chart.</p><ul style={listStyle}>{breakdown.inflows.map((row, index) => categoryRow(row, index, true))}</ul></section>}
             {breakdown.settled.length > 0 && <section aria-label="Fully offset categories"><h2 style={sectionTitleStyle}>Balanced out</h2><p style={mutedStyle}>Category inflows covered the spending.</p><ul style={listStyle}>{breakdown.settled.map((row, index) => categoryRow(row, index))}</ul></section>}
-            <details style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }}><summary style={{ cursor: "pointer", minHeight: 44 }}>What counts as spending?</summary><p>Expenses minus inflows linked to the same category, in your selected wallet, accounts and dates. Transfers and income without a category are excluded. Categories with net inflows appear separately. Percentages describe the spending shown above.</p></details>
           </>}
       </>}
 
@@ -129,7 +139,7 @@ export function ReflectScreen(props: Props) {
       <SheetHeader title="Time period" onClose={() => setShowPeriod(false)} />
       <div style={sheetScrollStyle}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {([["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const).map(([key, name]) => { const period = reflectPreset(key); const selected = props.period.start === period.start && props.period.end === period.end; return <button type="button" key={key} aria-pressed={selected} onClick={() => choosePeriod(period)} style={{ ...quietButtonStyle, justifyContent: "center", background: selected ? "var(--select-wash)" : "var(--surface2)", color: selected ? "var(--select-ink)" : "var(--text2)" }}>{name}</button>; })}
+          {([["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const).map(([key, name]) => { const period = reflectPreset(key); const selected = props.period.start === period.start && props.period.end === period.end; return <button type="button" key={key} aria-pressed={selected} onClick={() => choosePeriod(period)} style={{ ...quietButtonStyle, justifyContent: "center", background: selected ? SELECTED_FLAT : "var(--surface2)", color: selected ? "var(--select-ink)" : "var(--text2)" }}>{name}</button>; })}
         </div>
         <h3 style={{ ...sectionTitleStyle, margin: "24px 0 12px" }}>Choose your own range</h3>
         <div style={{ display: "grid", gap: 16 }}><label style={mutedStyle}>From<MonthPicker value={customPeriod.start} max={currentMonth} aria-label="Start month" onChange={event => setCustomPeriod({ ...customPeriod, start: event.target.value })} /></label><label style={mutedStyle}>Through<MonthPicker value={customPeriod.end} max={currentMonth} aria-label="End month" onChange={event => setCustomPeriod({ ...customPeriod, end: event.target.value })} /></label></div>
@@ -155,6 +165,10 @@ export function ReflectScreen(props: Props) {
 
 function SheetHeader({ title, onClose }: { title: string; onClose: () => void }) { return <header style={{ display: "flex", flexShrink: 0, alignItems: "center", justifyContent: "space-between", gap: 16 }}><h2 style={{ fontSize: 20, fontWeight: 600, margin: 0, overflowWrap: "anywhere" }}>{title}</h2><button type="button" aria-label="Close" onClick={onClose} style={{ ...quietButtonStyle, padding: 0, width: 44, flexShrink: 0 }}><XIcon size={20} /></button></header>; }
 function FilterGroup({ title, items, excluded, onToggle, onAll, onNone }: { title: string; items: { id: string; name: string }[]; excluded: string[]; onToggle: (id: string) => void; onAll: () => void; onNone: () => void }) { return <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}><legend style={sectionTitleStyle}>{title}</legend><div style={{ display: "flex", gap: 8, marginBottom: 4 }}><button onClick={onAll} style={quietButtonStyle}>All</button><button onClick={onNone} style={quietButtonStyle}>None</button></div>{items.map(item => <label key={item.id} style={{ minHeight: 48, display: "flex", gap: 12, alignItems: "center", fontSize: 15, color: "var(--text2)", cursor: "pointer" }}><input type="checkbox" checked={!excluded.includes(item.id)} onChange={() => onToggle(item.id)} style={{ width: 20, height: 20, accentColor: "var(--select-ink)", flexShrink: 0 }} /><span style={{ overflowWrap: "anywhere" }}>{item.name}</span></label>)}{!items.length && <p style={mutedStyle}>No {title.toLowerCase()} in this period.</p>}</fieldset>; }
+/** A flat selected fill: Joint's --select-wash is a gradient. */
+const SELECTED_FLAT = "color-mix(in srgb, var(--select-ink) 12%, var(--surface))";
+const summaryStyle: CSSProperties = { margin: 0, maxWidth: "100%", fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const jarButtonStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: REFLECT_JAR_SIZE - 44, border: 0, padding: 0, background: "transparent", font: "inherit", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
 const mutedStyle: CSSProperties = { fontSize: 13, color: "var(--muted)", lineHeight: 1.5 };
 const sectionTitleStyle: CSSProperties = { fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text2)" };
 const sectionHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 8 };

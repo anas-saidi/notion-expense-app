@@ -92,3 +92,26 @@ export function allocationJarItems(
       radius: Math.min(ALLOCATION_MAX_RADIUS, Math.max(MIN_RADIUS, Math.sqrt(Math.min(1, i.amount / pool)) * AREA_FACTOR)),
     }));
 }
+
+/** Reflect's jar holds only the biggest categories; the list below it names every one. */
+const SPENDING_MAX_ITEMS = 12;
+
+/**
+ * Reflect's "where it went": the period's spending as one full jar, one emoji
+ * per category sized by its share of the total, so the biggest spend is the
+ * biggest emoji. Ids are the categories', so switching periods resizes emojis
+ * in place, and only categories new to the period drop in.
+ */
+export function spendingJarItems(
+  rows: Array<{ id: string; icon: string | null; share: number }>,
+): JarItem[] {
+  return rows
+    .filter(r => r.share > 0)
+    .sort((a, b) => b.share - a.share)
+    .slice(0, SPENDING_MAX_ITEMS)
+    .map(r => ({
+      id: r.id,
+      glyph: r.icon?.trim() || "🧾",
+      radius: Math.min(ALLOCATION_MAX_RADIUS, Math.max(MIN_RADIUS, Math.sqrt(Math.min(1, r.share)) * AREA_FACTOR)),
+    }));
+}

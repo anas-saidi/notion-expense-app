@@ -1,5 +1,5 @@
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
-import { isExpenseTransaction, transactionMatchesScope } from "./app-utils";
+import { isExpenseTransaction, scopeFromAccountLabel, transactionMatchesScope } from "./app-utils";
 
 export type ReflectPeriod = { start: string; end: string };
 export type ReflectCategory = { id: string; name: string; icon: string | null; spent: number; inflow: number; net: number; share: number; transactions: Transaction[] };
@@ -53,4 +53,85 @@ export function reflectMonthCount(period: ReflectPeriod, transactions: Transacti
   const [sy, sm] = start.split("-").map(Number);
   const [ey, em] = end.split("-").map(Number);
   return Math.max(1, (ey - sy) * 12 + em - sm + 1);
+}
+
+export type FlowPoint = { key: string; label: string; spent: number; moneyIn: number };
+
+const accountScopeOf = (id: string | null | undefined, accounts: Account[]) => {
+  const account = id ? accounts.find(entry => entry.id === id) : undefined;
+  return account ? scopeFromAccountLabel(account.label) : null;
+};
+
+/**
+ * Money that came into the wallet: Income into its accounts (category-linked
+ * inflows are refunds, already netted in spending). Joint is funded by the
+ * partners, so for Joint it's their transfers into the joint account plus joint
+ * expenses they paid from their own accounts, the same "direct spend" the
+ * contribution status counts.
+ */
+export function isMoneyIn(transaction: Transaction, categories: Category[], accounts: Account[], scope: BudgetScope) {
+  if (transaction.type === "Income") return !transaction.category && transactionMatchesScope(transaction, categories, scope, accounts);
+  if (scope !== "joint") return false;
+  const isPartner = (id: string | null | undefined) => { const owner = accountScopeOf(id, accounts); return owner !== null && owner !== "joint"; };
+  if (isExpenseTransaction(transaction)) {
+    return transaction.amount > 0 && isPartner(transaction.accountId) && transactionMatchesScope(transaction, categories, "joint", accounts);
+  }
+  if (transaction.type !== "Transfer" || transaction.fromCategoryId || transaction.toCategoryId) return false;
+  return accountScopeOf(transaction.toAccountId, accounts) === "joint" && isPartner(transaction.fromAccountId);
+}
+
+/**
+ * Cumulative spending against cumulative money in, across the period: by day for
+ * a single month (stopping at today in the current month), by month otherwise.
+ * Spending comes from the breakdown's own transactions, so it ends on its total.
+ */
+export function buildMoneyFlow(
+  spending: ReflectCategory[],
+  transactions: Transaction[],
+  categories: Category[],
+  accounts: Account[],
+  scope: BudgetScope,
+  period: ReflectPeriod,
+  excludedAccounts: string[] = [],
+  now = new Date(),
+): FlowPoint[] {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  const firstDate = transactions.map(t => t.date).filter(d => /^\d{4}-\d{2}/.test(d)).sort()[0];
+  const start = period.start || firstDate?.slice(0, 7) || thisMonth;
+  const end = period.end || thisMonth;
+  const daily = start === end;
+
+  const keys: string[] = [];
+  if (daily) {
+    const [y, m] = start.split("-").map(Number);
+    const last = start === thisMonth ? now.getDate() : new Date(y, m, 0).getDate();
+    for (let d = 1; d <= last; d++) keys.push(`${start}-${pad(d)}`);
+  } else {
+    for (let [y, m] = start.split("-").map(Number); `${y}-${pad(m)}` <= end; m === 12 ? (y++, m = 1) : m++) keys.push(`${y}-${pad(m)}`);
+  }
+  const bucketOf = (date: string) => daily ? date.slice(0, 10) : date.slice(0, 7);
+  const spentBy = new Map<string, number>();
+  const inBy = new Map<string, number>();
+  const add = (map: Map<string, number>, date: string, value: number) => map.set(bucketOf(date), (map.get(bucketOf(date)) ?? 0) + cents(value));
+
+  for (const row of spending) {
+    for (const t of row.transactions) add(spentBy, t.date, t.type === "Income" || t.amount < 0 ? -Math.abs(t.amount) : t.amount);
+  }
+  for (const t of transactions) {
+    if (!Number.isFinite(t.amount) || !isMoneyIn(t, categories, accounts, scope)) continue;
+    if (excludedAccounts.includes(t.toAccountId || t.accountId || UNKNOWN_ACCOUNT)) continue;
+    add(inBy, t.date, Math.abs(t.amount));
+  }
+
+  let spent = 0;
+  let moneyIn = 0;
+  return keys.map(key => {
+    spent += spentBy.get(key) ?? 0;
+    moneyIn += inBy.get(key) ?? 0;
+    const label = daily
+      ? String(Number(key.slice(8)))
+      : new Date(`${key}-01T12:00:00`).toLocaleDateString("en", { month: "short" });
+    return { key, label, spent: spent / 100, moneyIn: moneyIn / 100 };
+  });
 }

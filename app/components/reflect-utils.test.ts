@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { buildSpendingBreakdown, reflectMonthCount, reflectPreset, UNCATEGORIZED, UNKNOWN_ACCOUNT } from "./reflect-utils";
+import { buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, UNCATEGORIZED, UNKNOWN_ACCOUNT } from "./reflect-utils";
 const accounts: Account[] = [{ id: "joint", label: "Joined Account", icon: "", type: null, balance: 0, readyToAssign: 0 }, { id: "anas", label: "Anas", icon: "", type: null, balance: 0, readyToAssign: 0 }];
 const category = (id: string): Category => ({ id, name: id, icon: null, type: ["Household"], owner: null, defaultAccount: "joint", available: null, planned: null, lastMonthSpent: null, isTeamFund: true });
 const categories = [category("food"), category("rent"), category("travel")];
@@ -66,5 +66,37 @@ describe("Reflect periods", () => {
   });
   it("uses the first recorded month through now for all-time averages", () => {
     expect(reflectMonthCount({ start: "", end: "" }, [transaction("old", 10, { date: "2025-11-02" })], now)).toBe(3);
+  });
+});
+
+describe("Reflect money flow", () => {
+  const flow = (transactions: Transaction[], period = { start: "2026-09", end: "2026-09" }, now = new Date(2026, 8, 12)) =>
+    buildMoneyFlow(breakdown(transactions).spending, transactions, categories, accounts, "joint", period, [], now);
+
+  it("accumulates spending and money in by day, stopping at today in the current month", () => {
+    const points = flow([
+      transaction("lunch", 25, { date: "2026-09-02" }),
+      transaction("dinner", 75, { date: "2026-09-10" }),
+      transaction("refund", 10, { type: "Income", date: "2026-09-11" }),
+      transaction("contribution", 1000, { type: "Transfer", category: null, accountId: null, fromAccountId: "anas", toAccountId: "joint", date: "2026-09-01" }),
+      transaction("bonus", 200, { type: "Income", category: null, date: "2026-09-05" }),
+    ]);
+    expect(points).toHaveLength(12);
+    expect(points[0]).toMatchObject({ label: "1", spent: 0, moneyIn: 1000 });
+    expect(points[11]).toMatchObject({ spent: 90, moneyIn: 1200 });
+  });
+
+  it("buckets by month across a longer period and ignores transfers within Joint", () => {
+    const points = flow([
+      transaction("july", 50, { date: "2026-07-03" }),
+      transaction("sept", 30, { date: "2026-09-03" }),
+      transaction("internal", 500, { type: "Transfer", category: null, accountId: null, fromAccountId: "joint", toAccountId: "joint", date: "2026-08-01" }),
+    ], { start: "2026-07", end: "2026-09" });
+    expect(points.map(p => [p.key, p.spent, p.moneyIn])).toEqual([["2026-07", 50, 0], ["2026-08", 50, 0], ["2026-09", 80, 0]]);
+  });
+
+  it("counts joint expenses a partner paid from their own account as money in to Joint", () => {
+    const points = flow([transaction("groceries", 120, { accountId: "anas", date: "2026-09-04" }), transaction("rent", 300, { category: "rent", date: "2026-09-05" })]);
+    expect(points[points.length - 1]).toMatchObject({ spent: 420, moneyIn: 120 });
   });
 });

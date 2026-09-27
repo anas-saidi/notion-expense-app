@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Category } from "../app-types";
-import { allocationJarItems, budgetJarItems, topSpentJarItems } from "./budgetJar";
+import { allocationJarItems, budgetJarItems, spendingJarItems, topSpentJarItems } from "./budgetJar";
 
 const cat = (id: string, icon: string | null, extra: Partial<Category> = {}): Category => ({
   id, name: id, icon, type: ["Obligations"], owner: "Anas", defaultAccount: null, available: 0, planned: null, lastMonthSpent: null, isTeamFund: false, ...extra,
@@ -79,5 +79,22 @@ describe("allocationJarItems", () => {
 
   it("is empty without a pool", () => {
     expect(allocationJarItems([row("rent", "🏠", 100)], 0)).toEqual([]);
+  });
+});
+
+describe("spending jar", () => {
+  it("sizes each category by its share of spending, biggest first, and caps how many it holds", () => {
+    const rows = [
+      { id: "food", icon: "🍽️", share: 0.2 },
+      { id: "rent", icon: "🏠", share: 0.5 },
+      { id: "none", icon: "💤", share: 0 },
+      ...Array.from({ length: 14 }, (_, i) => ({ id: `small${i}`, icon: null, share: 0.3 / 14 })),
+    ];
+    const items = spendingJarItems(rows);
+    expect(items[0].glyph).toBe("🏠");
+    expect(items[0].radius).toBeGreaterThan(items[1].radius);
+    expect(items.some(i => i.id === "none")).toBe(false);
+    expect(items).toHaveLength(12);
+    expect(items[items.length - 1]).toMatchObject({ glyph: "🧾", radius: 0.13 });
   });
 });

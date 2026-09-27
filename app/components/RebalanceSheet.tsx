@@ -340,19 +340,21 @@ export function RebalanceSheet({
               }
             }),
           ),
-          // Top-ups pull from the unallocated pool rather than another category,
-          // so they're funded directly (bump this month's Planned) instead of transferred.
+          // Top-ups pull from the unallocated pool rather than another category.
+          // "add" records just the delta as its own fund: a category can hold several
+          // fund records (Monthly, Additional, Reverse), so overwriting one of them
+          // with the category's net planned total double-counts or cancels out.
           ...liveTopUps.map((tu) => {
             const cat = catById.get(tu.id);
-            const nextPlanned = Math.max(0, (plannedByCategory.get(tu.id) ?? cat?.planned ?? 0) + tu.amount);
             return fetch("/api/monthly-planning/funds", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 month: homeMonth,
                 categoryId: tu.id,
-                planned: nextPlanned,
+                planned: tu.amount,
                 accountId: cat?.defaultAccount ?? null,
+                mode: "add",
               }),
             }).then(async (r) => {
               if (!r.ok) {
@@ -361,20 +363,19 @@ export function RebalanceSheet({
               }
             });
           }),
-          // A reduction with no destination releases money back to the
-          // unallocated pool by lowering this month's planned funding.
+          // A reduction with no destination goes back to the unallocated pool as a
+          // reverse fund record for just that amount (same reason as top-ups above).
           ...liveReleases.map((release) => {
             const cat = catById.get(release.id);
-            const nextPlanned = Math.max(0, (plannedByCategory.get(release.id) ?? cat?.planned ?? 0) - release.amount);
             return fetch("/api/monthly-planning/funds", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 month: homeMonth,
                 categoryId: release.id,
-                planned: nextPlanned,
+                planned: release.amount,
                 accountId: cat?.defaultAccount ?? null,
-                mode: "set",
+                mode: "release",
               }),
             }).then(async (r) => {
               if (!r.ok) {
