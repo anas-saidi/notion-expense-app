@@ -38,7 +38,11 @@ type Common = {
 
 export type MascotHeroProps =
   /** Pool: the liquid level is a share (0–1), e.g. what's left of the month's plan. */
-  | (Common & { variant: "pool"; level: number; balance?: number | null; available?: number; items?: JarItem[] })
+  | (Common & {
+      variant: "pool"; level: number; balance?: number | null; available?: number; items?: JarItem[];
+      /** How the plan is doing against the month (category-status `pace`); none for allocation pools. */
+      warn?: "low" | "over" | null;
+    })
   /** Split: one category emoji per category, sized by share of the budget. */
   | (Common & { variant: "split"; items: JarItem[] });
 
@@ -75,7 +79,7 @@ function HeroJar(props: MascotHeroProps) {
   const target: MascotTarget = pool
     ? { ...base, outline: "partner", fill: shownLevel, items: poolItems }
     : { ...base, outline: "partner", items: shownItems };
-  return <Mascot target={target} warnWhenLow={pool} reaction={pool ? reaction : null} size={size} style={{ margin: "0 auto", ...style }} />;
+  return <Mascot target={target} warn={pool ? props.warn ?? null : null} reaction={pool ? reaction : null} size={size} style={{ margin: "0 auto", ...style }} />;
 }
 
 const EMPTY: JarItem[] = [];

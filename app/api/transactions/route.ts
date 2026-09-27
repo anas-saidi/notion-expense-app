@@ -64,9 +64,9 @@ export async function GET(req: NextRequest) {
   } : undefined;
 
   try {
-    // When a date range is provided, paginate through all results.
+    // Date-range and explicit all-time reports must include every page.
     // When no date filter (open-ended), respect the explicit page_size cap.
-    const paginate = !!dateFilter;
+    const paginate = !!dateFilter || searchParams.get("all") === "true";
     const allResults: any[] = [];
     let cursor: string | undefined;
 

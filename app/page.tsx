@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
-import { InsightsScreen } from "./components/InsightsScreen";
+import { ReflectScreen } from "./components/ReflectScreen";
 import { CategoriesScreen } from "./components/CategoriesScreen";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
@@ -143,6 +143,10 @@ export default function App() {
   const [microToast, setMicroToast] = useState<string | null>(null);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
+  const [historyStartMonth, setHistoryStartMonth] = useState(formatMonthInput(today()));
+  const [reflectView, setReflectView] = useState<"spending" | "activity">("spending");
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const historyRequest = useRef(0);
   const [historyMonth, setHistoryMonth] = useState(formatMonthInput(today()));
   const [historyTransactions, setHistoryTransactions] = useState<Transaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -238,19 +242,29 @@ export default function App() {
     if (latestCat) setLastUsedCatId(latestCat);
   };
 
-  const fetchHistoryTransactions = useCallback(async (month: string) => {
+  const fetchHistoryTransactions = useCallback(async (startMonth: string, endMonth = startMonth) => {
+    const request = ++historyRequest.current;
     setHistoryLoading(true);
-    const { start, end } = monthBounds(`${month}-01`);
-    const data = await fetch(`/api/transactions?start=${start}&end=${end}&page_size=100`).then(r => r.json());
-    setHistoryTransactions(data.transactions ?? []);
-    setHistoryLoading(false);
+    setHistoryError(null);
+    setHistoryTransactions([]);
+    try {
+      const query = startMonth
+        ? `start=${monthBounds(`${startMonth}-01`).start}&end=${monthBounds(`${endMonth}-01`).end}`
+        : "all=true";
+      const data = await fetchApiJson<{ transactions?: Transaction[] }>(`/api/transactions?${query}`);
+      if (request === historyRequest.current) setHistoryTransactions(data.transactions ?? []);
+    } catch (error) {
+      if (request === historyRequest.current) setHistoryError(error instanceof Error ? error.message : "Could not load Reflect");
+      throw error;
+    } finally {
+      if (request === historyRequest.current) setHistoryLoading(false);
+    }
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (tab !== "history") return;
-    fetchHistoryTransactions(historyMonth);
-  }, [tab, historyMonth, fetchHistoryTransactions]);
+    void fetchHistoryTransactions(historyStartMonth, historyMonth).catch(() => {});
+  }, [tab, historyStartMonth, historyMonth, fetchHistoryTransactions]);
 
   const fetchMonthlySummary = async (month?: string) => {
     const request = ++monthRequest.current;
@@ -511,14 +525,14 @@ export default function App() {
   const refreshAffectedData = useCallback(async () => {
     setRefreshState("updating");
     const results = await Promise.allSettled([
-      fetchTransactions(), fetchHistoryTransactions(historyMonth), fetchCategoryCatalog(), fetchAccounts(), fetchMonthlySummary(homeMonth),
+      fetchTransactions(), fetchHistoryTransactions(historyStartMonth, historyMonth), fetchCategoryCatalog(), fetchAccounts(), fetchMonthlySummary(homeMonth),
     ]);
     if (results.some(result => result.status === "rejected")) {
       setRefreshState("stale");
       throw new Error("Some balances or activity could not be refreshed");
     }
     setRefreshState("idle");
-  }, [historyMonth, homeMonth, fetchHistoryTransactions]);
+  }, [historyStartMonth, historyMonth, homeMonth, fetchHistoryTransactions]);
 
   const deleteTransaction = async (id: string) => {
     const transaction = historyTransactions.find(item => item.id === id) ?? transactions.find(item => item.id === id);
@@ -910,7 +924,7 @@ export default function App() {
   return (
     <AppShell
       tab={tab}
-      onTabChange={(t) => { setTab(t); setShowManageScreen(false); }}
+      onTabChange={(t) => { if (t === "history") setReflectView("spending"); setTab(t); setShowManageScreen(false); }}
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setTransactionType("Expense");
@@ -921,7 +935,7 @@ export default function App() {
       onBudgetScopeChange={setBudgetScope}
       personalScope={mode === "wife" ? "salma" : "anas"}
       onBudgetSearch={() => window.dispatchEvent(new Event("open-budget-search"))}
-      onInsightsSearch={() => window.dispatchEvent(new Event("open-insights-search"))}
+      onReflectSearch={() => window.dispatchEvent(new Event("open-reflect-search"))}
       onBudgetRebalance={() => setShowRebalance(true)}
       theme={theme}
       onSelectTheme={selectTheme}
@@ -976,7 +990,7 @@ export default function App() {
           plannedScopes={plannedScopes}
           transactions={scopedTransactions}
           pendingItems={scopedPendingItems}
-          onOpenHistory={() => setTab("history")}
+          onOpenHistory={() => { setReflectView("activity"); setTab("history"); }}
           onClickTransaction={editTransaction}
           jointUnassigned={jointUnassigned}
           onOpenAssign={() => setShowRebalance(true)}
@@ -1031,13 +1045,17 @@ export default function App() {
       )}
 
       {tab === "history" && (
-        <InsightsScreen
+        <ReflectScreen
           transactions={historyTransactions}
-          categories={categories}
+          categories={[...categories, ...frozenCategories]}
           accounts={accounts}
           budgetScope={budgetScope}
-          insightsMonth={historyMonth}
-          onInsightsMonthChange={setHistoryMonth}
+          period={{ start: historyStartMonth, end: historyMonth }}
+          onPeriodChange={period => { setHistoryStartMonth(period.start); setHistoryMonth(period.end); }}
+          view={reflectView}
+          onViewChange={setReflectView}
+          error={historyError}
+          onRetry={() => { void fetchHistoryTransactions(historyStartMonth, historyMonth).catch(() => {}); }}
           transactionsLoading={historyLoading}
           onClickTransaction={editTransaction}
           onDeleteTransaction={deleteTransaction}

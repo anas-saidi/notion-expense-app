@@ -217,6 +217,10 @@ Use one anchored popover surface for single-choice controls, including Appearanc
 - **Contribution funding:** include current category carry-over and rebalance results through availability. Credit net partner transfers and personal joint-category expenses. Apply configured shares to credited contributions plus the cash shortfall, cap individual dues between zero and the shortfall, and assign any rounding remainder to the second partner. This is a funding request, not a reimbursement ledger; above-share contributions do not create refund requests.
 
 - **Money words:** money not yet in a category is **Unassigned**, everywhere (never "ready to assign", "not assigned", "unallocated" or "available to plan"). What's in a category is **available**. People are **Anas** and **Salma**, never Husband/Wife.
+- **Budget list:** categories sit in the plan sheet's collapsible sections (`SectionToggle`: Savings → Obligations → Long term → Wants → Other, then Frozen, closed). Each section is one flat surface of jar rows (`CategoryJarRow`): the category's jar, name, one quiet line only when it matters ("Overspent", "Spending fast", "X spent"; empty jars say why by colour instead of a label), and Available as the only number. Rows needing attention come first. Savings rows fill up towards their goal ("40% of 15.000 · by Jun", "Goal reached").
+- **Jar metaphor (one, everywhere):** a jar holds the money that's in it. Budget jars and the Home pool drain as you spend, which is the plan working, not a warning; savings jars fill as you save. The level says how much is there; the colour says how you're doing against the month (`pace` in `category-status.ts`).
+- **Category jar:** `CategoryJar`, a static, eyeless, physics-free SVG in the wallet's outline (the shape says whose). The emoji floats on the liquid: near the top when full, settling as money is spent, resting on the bottom when empty. It's drawn above the liquid so it's never hidden, and its height doubles as the level. Still at rest; it never blinks or wobbles.
+- **Status palette:** one family wherever a budget's health shows (jar liquid, the number, the status line, the Home pool): good = on or ahead of pace (sage); low = "Spending fast", under a fifth left *and* at least 10 points behind the calendar (honey liquid, deep amber `--status-low` text; never the bright `--warning` yellow for text); over = below zero (strong coral wash, red minus number, "Overspent"). Empty jars carry no label; their wash says why: soft coral = spent it all, soft honey = never funded. Tokens: `--status-{good,low,over}` and `--status-{good,low,over}-liquid`.
 - **Budget banners:** at most one, the most urgent: Short by → Unassigned → Due to Joint. Next month's plan is a quiet pill beside the month picker, not a banner. Unassigned money is assigned in Rebalance from both Home and Budget; a category's Fund adds money, and Rebalance takes it back out.
 - **Concise copy:** labels name the value or action directly. Avoid explanatory subtitles that repeat the heading or button. Insights keeps its narrative summary. Home’s monthly rail uses one line: period and percentage spent; full Planned and Spent values remain available through the hero controls. Keep account/cash/category distinctions, money-movement context, and destructive-action consequences explicit.
 
@@ -226,3 +230,22 @@ Use one anchored popover surface for single-choice controls, including Appearanc
 
 - **Sheet separation:** phone sheets use the subtle upward `--elevation-sheet` shadow so their top edge reads above the white canvas.
 - **Warning banner actions:** compact composer alerts retain the shared semantic banner container and use `bannerActionStyle` for their primary corrective action, matching Budget warnings with a neutral filled button and a 44-point minimum target.
+
+## Calendar (concept, replacing Reflect — paused)
+
+An exploration to replace the Reflect tab with a Calendar. Prototyped at `/calendar-lab` (dev-only, mock data); nothing is wired into the app yet.
+
+**What Reflect should answer** (from our planning discussion, 2026-09-27):
+- **Trend across the year** and **this month's surprise** are the two questions Anas and Salma bring to it. They review together at month end.
+- **Savings goals** exist (category `goal` / `goalDate`) and belong in the month view.
+- **Over budget = spent beyond the original Monthly plan**, even when money moved in mid-month covered it. The original plan is the Fund with `Assignment Type = "Monthly"`; mid-month moves are `"Additional"` (source marked `Reverse`). Note: re-saving the month plan after the month starts overwrites the Monthly fund, so a snapshot may be needed.
+- **Stay neutral:** no per-person comparison or "who spent more"; the wallet scope (Joint / Anas / Salma) stays the only split.
+- **Irregular costs** (Eid, travel, car) live in `Long term` categories. They're expected lumps, never a "surprise".
+
+**The concept:** a year of months in a 3-column grid (year arrows above, year total below the year). Each month shows its **three biggest categories as emojis piling up** on an invisible floor. No bubble, container or pebble shapes; just the emojis. Tapping a month opens its details (still to design: plan vs actual, the surprise, goals).
+- **Sizing:** an emoji's *area* follows its spend. The pile's overall size follows the month's total against the year's biggest month, with a floor so quiet months still read (`fill = 0.16 + 0.4 × total / max`).
+- **Piling:** `pileMonth` (`app/components/calendar/month-pile.ts`) drops emojis largest first. Each one settles at the lowest spot it can reach (floor or on top of others, colliding as circles); ties go to the middle. A pile too tall for its box is shrunk as a whole, so proportions hold. Deterministic, static: no physics or motion at rest.
+- **Fixed bills left out by default:** otherwise Rent tops every month and every pile looks the same. One-off months then stand out without reading numbers (🐑 in May, ✈️ in August).
+- **States:** the current month's label uses `--select-ink` and its amount says "so far"; future months show only their name and aren't tappable.
+
+**Open questions:** scale against the biggest month or a typical month (a single large month makes the rest look small); collapse future months into one short row; the month detail view; emoji shapes differ across platforms (tuned for Apple emoji).

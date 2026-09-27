@@ -5,6 +5,7 @@ import { Currency, Money } from "./Money";
 import { fmt } from "./app-utils";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { MascotHero, MASCOT_HERO_SIZE } from "./mascot/MascotHero";
+import { monthProgress, pace } from "./category-status";
 import { Mascot } from "./mascot/Mascot";
 import { MascotSpill } from "./mascot/MascotSpill";
 import { topSpentJarItems } from "./mascot/budgetJar";
@@ -54,6 +55,10 @@ export function WalletCardSwitcher({ value, monthlySummary, categoryAvailableByS
   const overspent = Math.round(overspentProp);
   const spentPct  = hasPlan ? (spent / planned) * 100 : null;
   const isJoint   = value === "joint";
+  // Draining on pace is the plan working; only spending faster than the month (or
+  // past the plan) tints the pool, with the same rule as the category jars.
+  const poolPace  = hasPlan && currentSummary?.start ? pace(1 - spent / planned, monthProgress(currentSummary.start.slice(0, 7))) : "good";
+  const poolWarn  = poolPace === "good" ? null : poolPace;
 
   // The joint pool keeps an eye on whoever owes the most (Anas stands on the
   // left, Salma on the right); with nothing due it just watches its waterline.
@@ -85,7 +90,7 @@ export function WalletCardSwitcher({ value, monthlySummary, categoryAvailableByS
         {overspent > 0 && <span style={{ color: "var(--danger)" }}> · <Money value={overspent} /> overspent</span>}
       </>}
     >
-      <MascotHero variant="pool" size={HOME_POOL_SIZE} items={poolOpen ? topSpent : undefined} scope={value} level={1 - spent / (planned ?? 1)} spentPct={spentPct} balance={balance} available={available ?? 0} lookYaw={poolLook} />
+      <MascotHero variant="pool" size={HOME_POOL_SIZE} items={poolOpen ? topSpent : undefined} scope={value} level={1 - spent / (planned ?? 1)} warn={poolWarn} spentPct={spentPct} balance={balance} available={available ?? 0} lookYaw={poolLook} />
     </MascotSpill>
   );
 

@@ -11,8 +11,9 @@ import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { CheckIcon, ChevronDownIcon, ManIcon, WomanIcon, XIcon } from "./ui/icons";
+import { CheckIcon, ManIcon, WomanIcon, XIcon } from "./ui/icons";
 import { SlideToConfirm } from "./SlideToConfirm";
+import { SectionToggle } from "./ui/SectionToggle";
 import { pickerChipStyle } from "./TransactionPickers";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
@@ -440,29 +441,6 @@ export function MonthPlanSheet({
   );
 }
 
-/* ─── Section header ──────────────────────────────────────────────── */
-
-function SectionToggle({ id, label, count, total, open, onToggle }: {
-  id: string;
-  label: string;
-  count: number;
-  total?: number;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button type="button" onClick={onToggle} aria-expanded={open} style={sectionToggleStyle}>
-      <h2 id={id} style={sectionTitleStyle}>
-        {label} <span style={sectionCountStyle}>{count}</span>
-      </h2>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        {total !== undefined && Math.round(total) !== 0 && <span style={sectionTotalStyle}>{fmt(Math.round(total))}</span>}
-        <ChevronDownIcon size={16} aria-hidden="true" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s ease", color: "var(--muted)" }} />
-      </span>
-    </button>
-  );
-}
-
 /* ─── Row ─────────────────────────────────────────────────────────── */
 
 function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, planLabel, planningMonth, disabled, onChange }: {
@@ -737,32 +715,6 @@ const splitStyle: CSSProperties = {
 };
 
 const sectionStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, minWidth: 0 };
-
-const sectionToggleStyle: CSSProperties = {
-  minHeight: 44,
-  border: "none",
-  background: "transparent",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "0 4px",
-  cursor: "pointer",
-  width: "100%",
-  fontFamily: "var(--font-body)",
-};
-
-const sectionCountStyle: CSSProperties = { fontWeight: 600, color: "var(--muted)", marginLeft: 2 };
-
-const sectionTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-  color: "var(--text2)",
-};
-
-const sectionTotalStyle: CSSProperties = { fontSize: 13, fontWeight: 600, color: "var(--muted)", fontVariantNumeric: "tabular-nums" };
 
 const listStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 };
 

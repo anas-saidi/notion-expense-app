@@ -438,7 +438,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                       <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
                                       {isPartial && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>partial</div>}
                                     </div>
-                                    <span style={{ fontSize: 12, color: isPartial ? "var(--warning)" : "var(--success)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
+                                    <span style={{ fontSize: 12, color: isPartial ? "var(--status-low)" : "var(--status-good)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
                                       {fmt(moveAmount)}
                                     </span>
                                   </button>

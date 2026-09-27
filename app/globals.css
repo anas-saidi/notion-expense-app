@@ -64,6 +64,18 @@
   --danger: #d03238;
   /* Green means money in or money kept (income, saved, positive available) and nothing else. */
   --success: #2f7a55;
+  /*
+   * Status palette: how a budget is doing, one family everywhere it shows.
+   * *-liquid fills category jars (soft, matte, same lightness); the plain token is
+   * for text and icons (readable on the surface). Good ≥ a fifth left, low below
+   * that, over below zero.
+   */
+  --status-good: var(--success);
+  --status-good-liquid: #a9d8bb;
+  --status-low: #a86a00;
+  --status-low-liquid: #f1d48a;
+  --status-over: var(--danger);
+  --status-over-liquid: #f1b0aa;
   --radius-control: 12px;
   --radius-card: 16px;
   --radius-sheet: 24px;
@@ -195,6 +207,10 @@ html[data-theme="dark"] {
   --danger: #f87171;
   --success: #7cc9a0;
   --warning: #fbbf24;
+  --status-good-liquid: #3f7d5c;
+  --status-low: #f2c14e;
+  --status-low-liquid: #8a6d2c;
+  --status-over-liquid: #8c4541;
   --warning-dim: rgba(251, 191, 36, 0.12);
   --info: #60a5fa;
   --info-dim: rgba(96, 165, 250, 0.10);

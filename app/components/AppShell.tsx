@@ -15,7 +15,7 @@ export function AppShell({
   onBudgetScopeChange,
   personalScope,
   onBudgetSearch,
-  onInsightsSearch,
+  onReflectSearch,
   onBudgetRebalance,
   theme = "light",
   onSelectTheme,
@@ -31,7 +31,7 @@ export function AppShell({
   onBudgetScopeChange: (scope: BudgetScope) => void;
   personalScope: Exclude<BudgetScope, "joint">;
   onBudgetSearch?: () => void;
-  onInsightsSearch?: () => void;
+  onReflectSearch?: () => void;
   onBudgetRebalance?: () => void;
   theme?: "system" | "light" | "dark";
   onSelectTheme?: (theme: "system" | "light" | "dark") => void;
@@ -91,7 +91,7 @@ export function AppShell({
               </>
             ) : tab === "history" ? (
               <>
-                <button className="app-top-action" type="button" onClick={onInsightsSearch} aria-label="Search activity" style={menuButtonStyle}>
+                <button className="app-top-action" type="button" onClick={onReflectSearch} aria-label="Search activity" style={menuButtonStyle}>
                   <SearchIcon size={18} />
                 </button>
                 {onSelectTheme && (

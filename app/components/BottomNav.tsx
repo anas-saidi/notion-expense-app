@@ -1,5 +1,5 @@
 import type { AppTab } from "./app-types";
-import { HomeIcon, SlidersIcon, TrendingUpIcon } from "./ui/icons";
+import { HomeIcon, SlidersIcon, ChartPieIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
 type BottomNavProps = {
@@ -12,7 +12,7 @@ export function BottomNav({ tab, onTabChange }: BottomNavProps) {
   const items: { key: AppTab; label: string }[] = [
     { key: "home", label: "Home" },
     { key: "budget", label: "Budget" },
-    { key: "history", label: "Insights" },
+    { key: "history", label: "Reflect" },
   ];
 
   return (
@@ -37,7 +37,7 @@ export function BottomNav({ tab, onTabChange }: BottomNavProps) {
             >
               {item.key === "home" && <HomeIcon size={20} strokeWidth={tab === "home" ? 2.5 : 2} />}
               {item.key === "budget" && <SlidersIcon size={20} strokeWidth={tab === "budget" ? 2.5 : 2} />}
-              {item.key === "history" && <TrendingUpIcon size={20} strokeWidth={tab === "history" ? 2.5 : 2} />}
+              {item.key === "history" && <ChartPieIcon size={20} strokeWidth={tab === "history" ? 2.5 : 2} />}
 
               <span className="nav-label">{item.label}</span>
             </button>

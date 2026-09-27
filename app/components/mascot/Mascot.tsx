@@ -24,10 +24,11 @@ type MascotProps = {
   /** Pool liquid colour. */
   liquidTone?: LiquidTone;
   /**
-   * For a pool of money (a plan): as it runs low its colour turns to soft red.
-   * Off for jars where empty isn't a warning (e.g. a partner's contribution).
+   * For a pool of money (a plan): how it's doing against the month, from
+   * category-status `pace`. "low" (spending faster than the month) tints it honey,
+   * "over" (overspent) coral. Omit for jars where the level isn't a warning.
    */
-  warnWhenLow?: boolean;
+  warn?: "low" | "over" | null;
   /** How a coin is drawn: round beads (default), flat matte metal, or the 🪙 emoji. */
   coinStyle?: CoinStyle;
   style?: CSSProperties;
@@ -61,7 +62,7 @@ const MIN_COIN_SIZE = 64;
  * a jar that fills as money comes in), so it is hidden from assistive tech: the
  * same facts are always stated in text nearby.
  */
-export function Mascot({ target: requested, reaction, size = 96, calm, physics, shake, tilt = 0, glass = "off", coinStyle = "beads", liquidTone = "partner", warnWhenLow = false, style }: MascotProps) {
+export function Mascot({ target: requested, reaction, size = 96, calm, physics, shake, tilt = 0, glass = "off", coinStyle = "beads", liquidTone = "partner", warn = null, style }: MascotProps) {
   const target = useMemo<MascotTarget>(() => {
     if (!requested.coins || size >= MIN_COIN_SIZE) return requested;
     const level = (requested.coins.anas ?? 0) + (requested.coins.salma ?? 0);
@@ -138,10 +139,11 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   const submerged = requested.fill !== undefined && requested.fill >= EYES_SUBMERGED;
   const eyeFill = isJar && !submerged ? "var(--text)" : EYE_INK;
   const jointPool = frame.colors[0] !== frame.colors[1];
-  // A low pool turns soft red over its last fifth (from about 80% of the plan spent),
-  // lightened like the partner colours; fully red when empty.
-  const dry = warnWhenLow && frame.level !== undefined ? Math.max(0, Math.min(1, (LOW_FROM - frame.level) / LOW_FROM)) : 0;
-  const tone = (hex: string, soften: number) => mixHex(mixHex(hex, "#ffffff", soften), mixHex(DANGER_HEX, "#ffffff", SOFTEN), dry);
+  // A pool follows the status palette the category jars use: honey while spending
+  // faster than the month, coral once overspent. Draining on pace is not a warning.
+  const dry = warn === "over" ? 1 : warn === "low" ? 0.8 : 0;
+  const warnHex = warn === "over" ? STATUS_OVER_HEX : STATUS_LOW_HEX;
+  const tone = (hex: string, soften: number) => mixHex(mixHex(hex, "#ffffff", soften), warnHex, dry);
   // A jar of category emojis has no waterline to show its shape, and pale emojis
   // (plates, receipts) vanish on the page: it gets a faint wash and sticker outlines.
   const hasItems = Boolean(frame.coins?.some(c => c.glyph));
@@ -302,9 +304,9 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
 const SOFTEN = 0.35;
 /** How much of the scope's colour tints a pool's empty glass: just enough to give it a body. */
 const POOL_WASH = 0.07;
-/** A warning pool starts turning red below this level, and the red it turns (the --danger hue). */
-const LOW_FROM = 0.2;
-const DANGER_HEX = "#d03238";
+/** The status palette's liquids (--status-low-liquid / --status-over-liquid in globals.css). */
+const STATUS_LOW_HEX = "#f1d48a";
+const STATUS_OVER_HEX = "#f1b0aa";
 /** Above this level the liquid covers the eyes. */
 const EYES_SUBMERGED = 0.55;
 const SOFTEN_JOINT = 0.55;

@@ -2,6 +2,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { fmt } from "../app-utils";
 import { Mascot } from "./Mascot";
+import { CategoryJarLab } from "./CategoryJarLab";
 import { deriveTarget, reactionForBalanceChange, type ReactionToken } from "./mood";
 import type { MascotScope, Mood, Outline, SalmaShape } from "./poses";
 
@@ -149,6 +150,8 @@ export function MascotLab() {
         <h1 style={{ margin: 0, fontSize: 24 }}>Mascot lab</h1>
         <button type="button" onClick={toggleTheme} style={chipStyle(false)}>{dark ? "Light" : "Dark"}</button>
       </header>
+      {/* Category jars vs budget bars: first, so it opens right on a phone. */}
+      <CategoryJarLab />
 
       <section aria-label="Preview" style={stageStyle}>
         <Mascot target={target} reaction={reaction} size={180} calm={calm} {...jar} />
