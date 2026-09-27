@@ -1517,7 +1517,10 @@ html.has-open-sheet .app-content {
   position: absolute;
   --app-nav-base-transform: translateX(-50%);
   left: 50%;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  /* Sit in the home-indicator area like iOS's own floating tab bar: a full
+     16px + safe area (~34px) left a ~50px gap. Clears the indicator by ~6px;
+     phones without one keep 12px. */
+  bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px));
   transform: var(--app-nav-base-transform);
   z-index: 60;
   display: flex;
