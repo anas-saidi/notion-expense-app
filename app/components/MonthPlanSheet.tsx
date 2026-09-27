@@ -11,7 +11,8 @@ import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { ChevronDownIcon, ManIcon, WomanIcon, XIcon } from "./ui/icons";
+import { CheckIcon, ChevronDownIcon, ManIcon, WomanIcon, XIcon } from "./ui/icons";
+import { SlideToConfirm } from "./SlideToConfirm";
 import { pickerChipStyle } from "./TransactionPickers";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
@@ -325,7 +326,7 @@ export function MonthPlanSheet({
         >
           <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} />
           <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
-            <span style={stickyLabelStyle}>Not assigned</span>
+            <span style={stickyLabelStyle}>Unassigned</span>
             <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
               {left < 0 ? "−" : ""}
               <Money value={Math.abs(Math.round(left))} currency animated />
@@ -339,18 +340,18 @@ export function MonthPlanSheet({
         </div>
         <div ref={scrollRef} style={scrollStyle}>
           {/* Hero: the jar fills with the categories you plan; the number is what's still unassigned. */}
-          <section aria-label="Not assigned" style={heroStyle}>
+          <section aria-label="Unassigned" style={heroStyle}>
             <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} />
-            <span style={heroLabelStyle}>Not assigned</span>
+            <span style={heroLabelStyle}>Unassigned</span>
             <span ref={heroAmountRef} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
               {left < 0 ? "−" : ""}
               <Money value={Math.abs(Math.round(left))} currency animated />
             </span>
-            <span style={heroSubStyle}>
-              {plannedTotal > 0
-                ? <>{fmt(Math.round(plannedTotal))} planned for {planLabel}{savedTotal !== plannedTotal ? " · not saved" : ""}</>
-                : <>{fmt(Math.round(notAssigned))} available to plan</>}
-            </span>
+            {plannedTotal > 0 && (
+              <span style={heroSubStyle}>
+                {fmt(Math.round(plannedTotal))} planned for {planLabel}{savedTotal !== plannedTotal ? " · not saved" : ""}
+              </span>
+            )}
             {scope === "joint" && plannedTotal > 0 && (
               <span style={splitStyle}>
                 <span><ManIcon size={13} aria-hidden="true" /> {fmt(Math.round(plannedTotal * split.anas))}</span>
@@ -386,7 +387,7 @@ export function MonthPlanSheet({
           })}
 
           {budgetGroups.length === 0 && (
-            <div style={emptyStyle}>No active {BUDGET_SCOPE_LABELS[scope].toLowerCase()} categories.</div>
+            <div style={emptyStyle}>No active {BUDGET_SCOPE_LABELS[scope]} categories.</div>
           )}
 
           {frozenInScope.length > 0 && (
@@ -418,20 +419,20 @@ export function MonthPlanSheet({
 
         <footer style={footerStyle}>
           {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
-          <div style={footerRowStyle} className="planner-footer-row">
-            {hasCurrentPlan && (
-              <button type="button" onClick={copyCurrentPlan} disabled={loading} style={secondaryButtonStyle}>
-                Copy plan
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={saving || loading || !changed.length}
-              style={{ ...primaryButtonStyle, opacity: saving || loading || !changed.length ? 0.55 : 1 }}
-            >
-              {saving ? "Saving…" : changed.length ? `Save ${planLabel} plan` : "Saved"}
+          {hasCurrentPlan && (
+            <button type="button" onClick={copyCurrentPlan} disabled={loading || saving} style={copyLinkStyle}>
+              Copy last month's plan
             </button>
+          )}
+          <div style={footerRowStyle} className="planner-footer-row">
+            {/* A month's plan is a big commitment: slide to save, so a stray tap never does. */}
+            {changed.length || saving ? (
+              <SlideToConfirm label={`Slide to save ${planLabel} plan`} busy={saving} busyLabel="Saving…" disabled={loading} onConfirm={() => void save()} />
+            ) : (
+              <span role="status" style={savedStatusStyle}>
+                <CheckIcon size={16} aria-hidden="true" /> {savedTotal > 0 ? `${planLabel} plan saved` : "Nothing planned yet"}
+              </span>
+            )}
           </div>
         </footer>
       </div>
@@ -481,7 +482,6 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
   // Tapping in opens the row: the details and quick amounts that help pick a number.
   const open = text !== null;
   const available = cat.available ?? 0;
-  const overspent = currentPlanned > 0 && currentSpent > currentPlanned;
 
   const commit = () => {
     if (text === null) return;
@@ -512,7 +512,7 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
     ? `Last month: ${fmt(Math.round(currentSpent))}${currentPlanned > 0 ? ` of ${fmt(Math.round(currentPlanned))}` : " spent"}`
     : null;
 
-  // Always: what needs attention (available, overspending). Open: what helps pick the amount.
+  // Always: what needs attention (available, or overspent when below zero). Open: what helps pick the amount.
   const details: ReactNode[] = [];
   if (Math.round(available) !== 0) {
     details.push(
@@ -521,8 +521,9 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
       </span>,
     );
   }
-  if (lastMonthLine && (overspent || open) && !goalLine) {
-    details.push(<span key="last" style={{ color: overspent ? "var(--danger)" : undefined }}>{lastMonthLine}</span>);
+  // History, not a warning: "over" is only ever Available below zero.
+  if (lastMonthLine && open && !goalLine) {
+    details.push(<span key="last">{lastMonthLine}</span>);
   }
   if (goalLine && open) details.push(<span key="goal">{goalLine}</span>);
 
@@ -877,30 +878,28 @@ const footerStyle: CSSProperties = {
   borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)",
 };
 
-const footerRowStyle: CSSProperties = { display: "flex", gap: 10 };
+const footerRowStyle: CSSProperties = { display: "flex", gap: 10, minHeight: 60, alignItems: "center" };
 
-const secondaryButtonStyle: CSSProperties = {
-  flex: 1,
-  height: 52,
-  borderRadius: 14,
-  border: "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
+const copyLinkStyle: CSSProperties = {
+  minHeight: 44,
+  border: "none",
   background: "transparent",
   color: "var(--text2)",
   fontSize: 14,
   fontWeight: 600,
   cursor: "pointer",
+  justifySelf: "center",
 };
 
-const primaryButtonStyle: CSSProperties = {
-  flex: 1.4,
-  height: 52,
-  borderRadius: 14,
-  border: "none",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontSize: 15,
-  fontWeight: 800,
-  cursor: "pointer",
+const savedStatusStyle: CSSProperties = {
+  flex: 1,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  fontSize: 14,
+  fontWeight: 600,
+  color: "var(--muted)",
 };
 
 export default MonthPlanSheet;

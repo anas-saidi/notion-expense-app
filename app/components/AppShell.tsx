@@ -8,7 +8,6 @@ import { useAppHaptics } from "./ui/useAppHaptics";
 
 export function AppShell({
   tab,
-  pendingCount = 0,
   onTabChange,
   onOpenAdd,
   onOpenManage,
@@ -22,12 +21,9 @@ export function AppShell({
   onSelectTheme,
   toast,
   showAddButton = true,
-  immersive = false,
-  hideHeader = false,
   children,
 }: {
   tab: AppTab;
-  pendingCount?: number;
   onTabChange: (tab: AppTab) => void;
   onOpenAdd: () => void;
   onOpenManage?: () => void;
@@ -41,23 +37,11 @@ export function AppShell({
   onSelectTheme?: (theme: "system" | "light" | "dark") => void;
   toast?: string | null;
   showAddButton?: boolean;
-  immersive?: boolean;
-  hideHeader?: boolean;
   children?: ReactNode;
 }) {
   const { haptic } = useAppHaptics();
-  // On desktop (≥ 1100px) the sidebar is always visible — immersive mode only
-  // applies on mobile where the bottom nav needs to be hidden.
-  const [isDesktop, setIsDesktop] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth >= 1100);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
   useEffect(() => {
     const root = document.documentElement;
     const useKeyboardModality = (event: KeyboardEvent) => {
@@ -84,84 +68,78 @@ export function AppShell({
     });
     return () => cancelAnimationFrame(frame);
   }, [tab]);
-  // effectiveImmersive drives layout/nav; the original immersive drives header visibility.
-  const effectiveImmersive = immersive && !isDesktop;
 
   return (
     <div className="app-shell-root" style={{ height: "100dvh", position: "relative" }}>
       <div
         ref={contentRef}
-        id={!effectiveImmersive ? "app-root-shell" : undefined}
-        className={effectiveImmersive ? undefined : "app-content"}
-        style={effectiveImmersive ? { height: "100%" } : { height: "100%", overflowY: "auto", overflowAnchor: "none", position: "relative" }}
+        id="app-root-shell"
+        className="app-content"
+        style={{ height: "100%", overflowY: "auto", overflowAnchor: "none", position: "relative" }}
       >
-        {!immersive && !hideHeader && (
-          <header className="app-header" style={headerStyle}>
-            <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
-            <div className="app-header-actions">
-              {tab === "budget" ? (
-                <>
-                  <button className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
-                    <SearchIcon size={18} />
-                  </button>
-                  <button className="app-top-action" type="button" onClick={onBudgetRebalance} aria-label="Rebalance budget" style={menuButtonStyle}>
-                    <ShuffleIcon size={18} />
-                  </button>
-                </>
-              ) : tab === "history" ? (
-                <>
-                  <button className="app-top-action" type="button" onClick={onInsightsSearch} aria-label="Search activity" style={menuButtonStyle}>
-                    <SearchIcon size={18} />
-                  </button>
-                  {onSelectTheme && (
-                    <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
-                      <SettingsIcon size={18} />
-                    </button>
-                  )}
-                </>
-              ) : onSelectTheme && (
-                <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
-                  <SettingsIcon size={18} />
+        <header className="app-header" style={headerStyle}>
+          <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
+          <div className="app-header-actions">
+            {tab === "budget" ? (
+              <>
+                <button className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
+                  <SearchIcon size={18} />
                 </button>
-              )}
-            </div>
-          </header>
-        )}
+                <button className="app-top-action" type="button" onClick={onBudgetRebalance} aria-label="Rebalance budget" style={menuButtonStyle}>
+                  <ShuffleIcon size={18} />
+                </button>
+              </>
+            ) : tab === "history" ? (
+              <>
+                <button className="app-top-action" type="button" onClick={onInsightsSearch} aria-label="Search activity" style={menuButtonStyle}>
+                  <SearchIcon size={18} />
+                </button>
+                {onSelectTheme && (
+                  <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
+                    <SettingsIcon size={18} />
+                  </button>
+                )}
+              </>
+            ) : onSelectTheme && (
+              <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
+                <SettingsIcon size={18} />
+              </button>
+            )}
+          </div>
+        </header>
         {children}
       </div>
 
-      {!effectiveImmersive && (
-        <div className="app-nav-wrap">
-          <BottomNav tab={tab} pendingCount={pendingCount} onTabChange={onTabChange} />
+      <div className="app-nav-wrap">
+        <BottomNav tab={tab} onTabChange={onTabChange} />
 
-          {showAddButton && (
-            <button
-              onClick={() => {
-                haptic("light");
-                onOpenAdd();
-              }}
-              className="fab-add app-nav-add"
-              aria-label="Add transaction"
-              style={{
-                width: 58,
-                height: 58,
-                borderRadius: "50%",
-                border: "1px solid var(--text)",
-                background: "var(--text)",
-                color: "var(--bg)",
-                boxShadow: "var(--elevation-float)",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <PlusIcon size={22} strokeWidth={2.5} />
-            </button>
-          )}
-        </div>
-      )}
+        {showAddButton && (
+          <button
+            onClick={() => {
+              haptic("light");
+              onOpenAdd();
+            }}
+            className="fab-add app-nav-add"
+            aria-label="Add transaction"
+            style={{
+              width: 58,
+              height: 58,
+              borderRadius: "50%",
+              border: "1px solid var(--text)",
+              background: "var(--text)",
+              color: "var(--bg)",
+              boxShadow: "var(--elevation-float)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <PlusIcon size={22} strokeWidth={2.5} />
+          </button>
+        )}
+      </div>
 
       {onSelectTheme && (
         <SettingsSheet
@@ -184,7 +162,7 @@ export function AppShell({
           style={{
             position: "fixed",
             left: "50%",
-            bottom: effectiveImmersive ? "calc(20px + env(safe-area-inset-bottom, 0px))" : "calc(64px + env(safe-area-inset-bottom, 0px))",
+            bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
             transform: "translateX(-50%)",
             zIndex: 80,
             background: "var(--surface2)",

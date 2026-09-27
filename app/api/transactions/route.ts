@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { assertExpenseFitsBudget } from "@/lib/notion-transactions";
 
 const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
 const NOTION_VERSION = "2022-06-28";
@@ -122,6 +123,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: `${existingType} transactions are read-only in the expense editor` }, { status: 409 });
     }
 
+    // Only the increase has to fit when the expense stays in its category.
+    const storedCategory = stored.page.properties?.Category?.relation?.[0]?.id ?? null;
+    const storedAmount = stored.page.properties?.Amount?.number ?? 0;
+    const sameCategory = storedCategory?.replace(/-/g, "") === String(categoryId).replace(/-/g, "");
+    try {
+      await assertExpenseFitsBudget(token, { categoryId, amount: parsedAmount, originalAmount: sameCategory ? storedAmount : 0 });
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message, full: error.full }, { status: error.status ?? 500 });
+    }
+
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: notionHeaders(token),
@@ -182,6 +193,15 @@ export async function PUT(req: NextRequest) {
   try {
     const stored = await fetchTransactionPage(token, id);
     if (stored.error) return stored.error;
+    // Restoring an expense spends its money again, so it must still fit.
+    const restoredCategory = stored.page.properties?.Category?.relation?.[0]?.id;
+    if (stored.page.properties?.Type?.select?.name === "Expense" && restoredCategory) {
+      try {
+        await assertExpenseFitsBudget(token, { categoryId: restoredCategory, amount: stored.page.properties?.Amount?.number ?? 0 });
+      } catch (error: any) {
+        return NextResponse.json({ error: error.message, full: error.full }, { status: error.status ?? 500 });
+      }
+    }
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: notionHeaders(token),

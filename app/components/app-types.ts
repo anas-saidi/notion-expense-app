@@ -75,28 +75,11 @@ export type MonthlySummary = {
   spentByCategory: MonthlyCategoryTotal[];
 };
 
-export type PlanningStep = "close" | "income" | "budget" | "savings" | "review";
-
 export type MonthlyPlanningSnapshot = {
   availablePool: number;
   assignedHousehold: number;
   assignedSavings: number;
   leftToAssign: number;
-};
-
-export type PlanningIncomeItem = {
-  id: string;
-  name: string;
-  accountId: string | null;
-  amount: number;
-  date: string;
-};
-
-export type PlanningIncomeStepState = {
-  items: PlanningIncomeItem[];
-  confirmedTotal: number;
-  ready: boolean;
-  source: "live" | "mock";
 };
 
 export type PlanningAllocationItem = {
@@ -110,51 +93,4 @@ export type PlanningAllocationItem = {
   defaultAccount: string | null;
 };
 
-export type CloseMonthStatus = "complete" | "attention" | "pending";
-
-export type MonthCloseChecklistItem = {
-  id: string;
-  label: string;
-  description: string;
-  status: CloseMonthStatus;
-};
-
-export type MonthCloseMissingTransaction = {
-  id: string;
-  name: string;
-  amount: number | null;
-  date: string | null;
-  addedBy: string | null;
-  categoryId: string | null;
-};
-
-export type MonthCloseAccountSnapshot = {
-  accountId: string;
-  label: string;
-  icon: string;
-  type: string | null;
-  currentBalance: number | null;
-  lastReconciledBalance: number | null;
-  lastReconciledAt: string | null;
-  discrepancy: number | null;
-  status: CloseMonthStatus;
-};
-
-export type MonthCloseSummary = {
-  month: string;
-  start: string;
-  end: string;
-  checklist: MonthCloseChecklistItem[];
-  missingTransactions: MonthCloseMissingTransaction[];
-  accounts: MonthCloseAccountSnapshot[];
-  unresolvedCount: number;
-  source: "live" | "mock";
-};
-
-export type CloseMonthStepState = {
-  reviewed: boolean;
-  unresolvedCount: number;
-  needsAttention: boolean;
-};
-
-export type AppTab = "home" | "plan" | "budget" | "history";
+export type AppTab = "home" | "budget" | "history";

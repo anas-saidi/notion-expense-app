@@ -114,8 +114,6 @@ export const fmt = (n: number) => n.toLocaleString("fr-MA", {
   maximumFractionDigits: 2,
 });
 
-export const fmtMoney = (n: number) => `${fmt(n)} ${MONEY_CURRENCY}`;
-
 export const fmtDate = (d: string) => {
   if (!d) return "";
   const dt = new Date(`${d}T00:00:00`);
@@ -132,8 +130,8 @@ export const monthBounds = (dateStr: string) => {
 
 export const BUDGET_SCOPE_LABELS: Record<BudgetScope, string> = {
   joint: "Joint",
-  anas: "Husband",
-  salma: "Wife",
+  anas: "Anas",
+  salma: "Salma",
 };
 
 export const isSavingsAccount = (account: Account) => {

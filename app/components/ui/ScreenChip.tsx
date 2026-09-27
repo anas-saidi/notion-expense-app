@@ -62,9 +62,9 @@ const badgeStyle = (selected: boolean, tone: "neutral" | "metric"): CSSPropertie
   alignItems: "center",
   justifyContent: "center",
   background: tone === "metric" && !selected
-    ? "color-mix(in srgb, var(--accent) 22%, var(--surface))"
+    ? "var(--select-wash)"
     : selected ? "color-mix(in srgb, var(--bg) 18%, transparent)" : "var(--surface2)",
-  color: tone === "metric" && !selected ? "var(--accent-ink)" : "inherit",
+  color: tone === "metric" && !selected ? "var(--select-ink)" : "inherit",
   fontSize: 11,
   fontWeight: 650,
   fontVariantNumeric: "tabular-nums",

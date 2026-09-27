@@ -231,12 +231,12 @@ export function RebalanceSheet({
     for (const tu of liveTopUps) {
       const to = catById.get(tu.id);
       if (!to) continue;
-      rows.push({ key: `u-${tu.id}`, fromLabel: "Unallocated", fromIcon: null, toLabel: to.name, toIcon: to.icon, amount: tu.amount });
+      rows.push({ key: `u-${tu.id}`, fromLabel: "Unassigned", fromIcon: null, toLabel: to.name, toIcon: to.icon, amount: tu.amount });
     }
     for (const release of liveReleases) {
       const from = catById.get(release.id);
       if (!from) continue;
-      rows.push({ key: `r-${release.id}`, fromLabel: from.name, fromIcon: from.icon, toLabel: "Unallocated", toIcon: null, amount: release.amount });
+      rows.push({ key: `r-${release.id}`, fromLabel: from.name, fromIcon: from.icon, toLabel: "Unassigned", toIcon: null, amount: release.amount });
     }
     return rows;
   }, [liveTransfers, liveTopUps, liveReleases, catById]);
@@ -244,7 +244,7 @@ export function RebalanceSheet({
   const unallocatedHint = unallocatedForGroup > 0 ? (
     <div style={unallocatedHintStyle}>
       <span style={unallocatedHintDotStyle} />
-      <span style={unallocatedHintTextStyle}>+{fmt(Math.round(unallocatedForGroup))} unallocated — available to use here</span>
+      <span style={unallocatedHintTextStyle}>{fmt(Math.round(unallocatedForGroup))} unassigned</span>
     </div>
   ) : null;
 
@@ -301,7 +301,6 @@ export function RebalanceSheet({
       jarScope={budgetScope}
       jarLevel={jarLevel}
       open={open}
-      mode="sheet"
       selectedMonth={homeMonth}
       onCancel={onClose}
       onComplete={onSuccess}

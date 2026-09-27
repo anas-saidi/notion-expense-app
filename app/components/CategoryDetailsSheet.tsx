@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, FreezeIcon, XIcon, TransferIcon, CalendarRangeIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
+import { FundIcon, FreezeIcon, XIcon, TransferIcon, CalendarRangeIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
 import type { Account, Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { TransactionRow } from "./ui/TransactionRow";
 import { MonthPicker } from "./DatePicker";
 import { FundTransactionSheet, type EditableFundTransaction } from "./FundTransactionSheet";
-import { CategoryAvailableSheet } from "./CategoryAvailableSheet";
 import { PickerPopover } from "./PickerPopover";
 import { currentMonth, isPastMonth } from "./app-utils";
 
@@ -83,7 +82,6 @@ export function CategoryDetailsSheet({
   const [activeMonth, setActiveMonth] = useState<string>(month);
   const [refreshKey, setRefreshKey] = useState(0);
   const [editingFund, setEditingFund] = useState<EditableFundTransaction | null>(null);
-  const [adjustingAvailable, setAdjustingAvailable] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [confirmingFreeze, setConfirmingFreeze] = useState(false);
   const moreActionsRef = useRef<HTMLDivElement>(null);
@@ -238,7 +236,6 @@ export function CategoryDetailsSheet({
             <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} width="min(280px, calc(100vw - 32px))">
               <div className="picker-options">
                 {onEdit && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onEdit(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><EditIcon size={17} />Edit</span></button>}
-                <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ScaleIcon size={17} />Adjust</span></button>
                 {onFreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setConfirmingFreeze(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><FreezeIcon size={17} />Freeze</span></button>}
                 {onUnfreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onUnfreeze(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ReviveIcon size={17} />Unfreeze</span></button>}
               </div>
@@ -311,16 +308,6 @@ export function CategoryDetailsSheet({
           setRefreshKey((value) => value + 1);
           await onTransactionsChanged?.();
         }}
-      />
-      <CategoryAvailableSheet
-        open={adjustingAvailable}
-        category={category}
-        currentAvailable={available}
-        month={activeMonth}
-        accounts={accounts}
-        funds={(data?.timeline ?? []).filter((item) => item.kind === "funded").map((item) => ({ ...item, categoryAvailable: available }))}
-        onClose={() => setAdjustingAvailable(false)}
-        onChanged={async () => { setRefreshKey((value) => value + 1); await onTransactionsChanged?.(); }}
       />
       <BottomSheet open={confirmingFreeze} onClose={() => setConfirmingFreeze(false)} label="Confirm freeze category" detent="content" layered maxWidth="440px" zIndex={150} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
         <div style={confirmWrapStyle}>
@@ -519,7 +506,7 @@ const progressFillStyle: CSSProperties = {
   width: "100%",
   height: "100%",
   borderRadius: 999,
-  background: "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))",
+  background: "var(--select-color)",
   transformOrigin: "left center",
   transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
 };

@@ -39,11 +39,6 @@ export function scopeMonthlySummary(monthlySummary: MonthlySummary, categories: 
     };
 }
 
-// Availability is a current ledger snapshot, never reconstructed from monthly activity.
-export function cashBackingGap(available: number | null, cash: number | null): number | null {
-  return available === null || cash === null ? null : Math.max(0, available - cash);
-}
-
 /** Savings-type categories sit outside the monthly spending picture. */
 export function isSavingsCategory(category: Category): boolean {
   const types = category.type.map(value => value.toLowerCase());

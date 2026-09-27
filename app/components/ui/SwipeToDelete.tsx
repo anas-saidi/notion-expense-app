@@ -83,7 +83,7 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
   const revealPx = Math.max(0, -offset);
   const progress = Math.min(1, revealPx / threshold);
   const isPast   = progress >= 1;
-  const actionColor = variant === "restore" ? "var(--accent)" : "var(--danger)";
+  const actionColor = variant === "restore" ? "var(--success)" : "var(--danger)";
 
   return (
     <div ref={outerRef}>

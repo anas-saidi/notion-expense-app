@@ -13,16 +13,14 @@ export type ContribStatus = ContributionStatus;
 
 type WalletCardSwitcherProps = {
   value: BudgetScope;
-  onChange: (scope: BudgetScope) => void;
-  monthlySummary?: MonthlySummary;
-  walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
+  monthlySummary: MonthlySummary;
   categoryAvailableByScope?: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
   contribStatus?: ContribStatus | null;
-  partnerAvatars?: Partial<Record<"anas" | "salma", string>>;
   /** For the pool's top spending categories, shown inside it when tapped. */
   categories?: Category[];
-  onOpenJointAllocate?: () => void;
+  /** Money spent beyond what categories had (Available below zero), this month only. */
+  overspent?: number;
 };
 
 const HOME_POOL_SIZE = MASCOT_HERO_SIZE;
@@ -42,8 +40,8 @@ const CUDDLE_PULL_EXTRA = { anas: 8, salma: 10 } as const;
 /** How far each partner leans in (degrees): a tipped squircle reads as falling, so Anas leans less. */
 const CUDDLE_LEAN = { anas: 4, salma: 8 } as const;
 
-export function WalletCardSwitcher({ value, monthlySummary, walletSummaries, categoryAvailableByScope, balanceByScope, contribStatus, categories = [] }: WalletCardSwitcherProps) {
-  const currentSummary = monthlySummary ?? walletSummaries?.[value];
+export function WalletCardSwitcher({ value, monthlySummary, categoryAvailableByScope, balanceByScope, contribStatus, categories = [], overspent: overspentProp = 0 }: WalletCardSwitcherProps) {
+  const currentSummary = monthlySummary;
   // Hero number: real account balance by scope (from Notion accounts database)
   const balance   = balanceByScope != null ? balanceByScope[value] : null;
   const available = categoryAvailableByScope != null ? categoryAvailableByScope[value] : null;
@@ -51,7 +49,9 @@ export function WalletCardSwitcher({ value, monthlySummary, walletSummaries, cat
   const isOver    = balance !== null && balance < 0;
   const hasPlan   = planned !== null && planned > 0;
   const spent     = currentSummary?.totalSpent ?? 0;
-  const overspent = hasPlan ? Math.round(spent - planned) : 0;
+  // "Over" means categories went below zero, not spending past this month's plan
+  // (carry-over from earlier months can cover that).
+  const overspent = Math.round(overspentProp);
   const spentPct  = hasPlan ? (spent / planned) * 100 : null;
   const isJoint   = value === "joint";
 
@@ -72,7 +72,7 @@ export function WalletCardSwitcher({ value, monthlySummary, walletSummaries, cat
 
   // The pool is the hero: its level is what's left of this month's plan. The exact
   // numbers aren't needed at first glance, so they spill out when the jar is tapped.
-  const spentSummary = `${Math.round(spentPct ?? 0)}% spent` + (overspent > 0 ? `, ${fmt(overspent)} MAD over plan` : "");
+  const spentSummary = `${Math.round(spentPct ?? 0)}% spent` + (overspent > 0 ? `, ${fmt(overspent)} MAD overspent` : "");
   const pool = hasPlan && (
     <MascotSpill
       size={HOME_POOL_SIZE}
@@ -82,7 +82,7 @@ export function WalletCardSwitcher({ value, monthlySummary, walletSummaries, cat
       onOpenChange={setPoolOpen}
       details={<>
         {Math.round(spentPct ?? 0)}% spent
-        {overspent > 0 && <span style={{ color: "var(--danger)" }}> · <Money value={overspent} /> over</span>}
+        {overspent > 0 && <span style={{ color: "var(--danger)" }}> · <Money value={overspent} /> overspent</span>}
       </>}
     >
       <MascotHero variant="pool" size={HOME_POOL_SIZE} items={poolOpen ? topSpent : undefined} scope={value} level={1 - spent / (planned ?? 1)} spentPct={spentPct} balance={balance} available={available ?? 0} lookYaw={poolLook} />

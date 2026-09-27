@@ -14,8 +14,6 @@ import {
   Check,
   Plus,
   Home,
-  Clock,
-  List,
   ChevronRight,
   ChevronLeft,
   ChevronDown,
@@ -28,30 +26,18 @@ import {
   RotateCcw,
   Snowflake,
   X,
-  Maximize2,
-  Minimize2,
-  Wrench,
   SlidersHorizontal,
   Scale,
   Shuffle,
-  Menu,
-  Landmark,
-  User,
-  UserRound,
   TrendingUp,
-  Moon,
-  Sun,
   TriangleAlert,
   Flame,
-  Heart,
-  UsersRound,
   ChartPie,
   Settings,
   Delete,
   MoreHorizontal,
   ReceiptText,
   WalletCards,
-  Sparkles,
   type LucideProps,
 } from "lucide-react";
 
@@ -65,8 +51,6 @@ export const CalendarRangeIcon = (p: LucideProps) => <CalendarRange size={S} {..
 export const CheckIcon        = (p: LucideProps) => <Check         size={S} {...p} />;
 export const PlusIcon         = (p: LucideProps) => <Plus          size={S} {...p} />;
 export const HomeIcon         = (p: LucideProps) => <Home          size={S} {...p} />;
-export const ClockIcon        = (p: LucideProps) => <Clock         size={S} {...p} />;
-export const ListIcon         = (p: LucideProps) => <List          size={S} {...p} />;
 export const ChevronRightIcon = (p: LucideProps) => <ChevronRight  size={S} {...p} />;
 export const ChevronLeftIcon  = (p: LucideProps) => <ChevronLeft   size={S} {...p} />;
 export const ChevronDownIcon  = (p: LucideProps) => <ChevronDown   size={S} {...p} />;
@@ -79,28 +63,26 @@ export const FundIcon         = (p: LucideProps) => <HandCoins      size={S} {..
 export const ReviveIcon       = (p: LucideProps) => <RotateCcw      size={S} {...p} />;
 export const FreezeIcon       = (p: LucideProps) => <Snowflake      size={S} {...p} />;
 export const XIcon            = (p: LucideProps) => <X             size={S} {...p} />;
-export const WrenchIcon       = (p: LucideProps) => <Wrench        size={S} {...p} />;
 export const SlidersIcon      = (p: LucideProps) => <SlidersHorizontal size={S} {...p} />;
 export const ScaleIcon        = (p: LucideProps) => <Scale             size={S} {...p} />;
 export const EditIcon         = (p: LucideProps) => <Pencil            size={S} {...p} />;
 export const ShuffleIcon      = (p: LucideProps) => <Shuffle           size={S} {...p} />;
-export const MenuIcon         = (p: LucideProps) => <Menu          size={S} {...p} />;
-export const LandmarkIcon     = (p: LucideProps) => <Landmark      size={S} {...p} />;
-export const UserIcon         = (p: LucideProps) => <User          size={S} {...p} />;
-export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
 export const DeleteIcon       = (p: LucideProps) => <Delete        size={S} {...p} />;
-/** Type it: write transactions in plain words. */
-export const SparklesIcon     = (p: LucideProps) => <Sparkles      size={S} {...p} />;
+/**
+ * Type it: write transactions in plain words. A filled four-point star rather
+ * than Lucide's outline sparkles; it takes the text colour like the other icons.
+ */
+export const SparklesIcon = ({ size = S, color = "currentColor", strokeWidth: _strokeWidth, absoluteStrokeWidth: _absolute, ...rest }: LucideProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={color} {...rest}>
+    <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
+  </svg>
+);
 export const MoreIcon         = (p: LucideProps) => <MoreHorizontal size={S} {...p} />;
 export const ReceiptIcon      = (p: LucideProps) => <ReceiptText    size={S} {...p} />;
 export const WalletIcon       = (p: LucideProps) => <WalletCards    size={S} {...p} />;
 export const TrendingUpIcon      = (p: LucideProps) => <TrendingUp    size={S} {...p} />;
 export const AlertTriangleIcon   = (p: LucideProps) => <TriangleAlert size={S} {...p} />;
-export const MoonIcon            = (p: LucideProps) => <Moon          size={S} {...p} />;
-export const SunIcon             = (p: LucideProps) => <Sun           size={S} {...p} />;
 export const FlameIcon           = (p: LucideProps) => <Flame         size={S} {...p} />;
-export const HeartIcon           = (p: LucideProps) => <Heart         size={S} {...p} />;
-export const UsersRoundIcon      = (p: LucideProps) => <UsersRound    size={S} {...p} />;
 export const ChartPieIcon        = (p: LucideProps) => <ChartPie      size={S} {...p} />;
 export const SettingsIcon        = (p: LucideProps) => <Settings      size={S} {...p} />;
 
@@ -121,14 +103,4 @@ export function WomanIcon({ size = S, ...props }: LucideProps) {
       <path d="M9.2 10h5.6c.8 0 1.5.5 1.8 1.2L19 18h-3.2v4h-2.5v-4h-2.6v4H8.2v-4H5l2.4-6.8c.3-.7 1-1.2 1.8-1.2Z" />
     </svg>
   );
-}
-
-/** Switches between Maximize2 (enter) and Minimize2 (exit). */
-export function FullScreenIcon({
-  expanded = false,
-  ...props
-}: LucideProps & { expanded?: boolean }) {
-  return expanded
-    ? <Minimize2 size={S} {...props} />
-    : <Maximize2 size={S} {...props} />;
 }

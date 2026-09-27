@@ -420,9 +420,9 @@ export function AccountDetailsSheet({
               style={{
                 ...chartToggleBtnStyle,
                 background: showChart
-                  ? "color-mix(in srgb, var(--accent) 12%, var(--surface))"
+                  ? "var(--select-wash)"
                   : "transparent",
-                color: showChart ? "var(--accent-ink)" : "var(--muted)",
+                color: showChart ? "var(--select-ink)" : "var(--muted)",
               }}
             >
               <TrendingUpIcon size={13} strokeWidth={2} />
@@ -433,7 +433,7 @@ export function AccountDetailsSheet({
           </p>
           {assignableOf(account) != null && (
             <p style={heroSubStyle}>
-              {fmt(assignableOf(account) ?? 0)} ready to assign
+              {fmt(assignableOf(account) ?? 0)} unassigned
             </p>
           )}
         </div>
@@ -473,8 +473,8 @@ export function AccountDetailsSheet({
                   <ComposedChart data={chartData.points} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="acctBalGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="var(--accent)" stopOpacity={0.20} />
-                        <stop offset="95%" stopColor="var(--accent)" stopOpacity={0.02} />
+                        <stop offset="5%"  stopColor="var(--select-color)" stopOpacity={0.20} />
+                        <stop offset="95%" stopColor="var(--select-color)" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 4" stroke="var(--border)" vertical={false} strokeOpacity={0.55} />
@@ -508,11 +508,11 @@ export function AccountDetailsSheet({
                     <Area
                       type="monotone"
                       dataKey="balance"
-                      stroke="var(--accent)"
+                      stroke="var(--select-color)"
                       strokeWidth={2}
                       fill="url(#acctBalGrad)"
                       dot={false}
-                      activeDot={{ r: 4, fill: "var(--accent)", strokeWidth: 0 }}
+                      activeDot={{ r: 4, fill: "var(--select-color)", strokeWidth: 0 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -1188,12 +1188,12 @@ const differenceBandStyle = (diff: number): CSSProperties => ({
   background: diff === 0
     ? "color-mix(in srgb, var(--success) 10%, var(--surface))"
     : diff > 0
-    ? "color-mix(in srgb, var(--accent) 9%, var(--surface))"
+    ? "var(--surface2)"
     : "color-mix(in srgb, var(--danger) 8%, var(--surface))",
   color: diff === 0
     ? "var(--success)"
     : diff > 0
-    ? "var(--accent-ink)"
+    ? "var(--text2)"
     : "var(--danger)",
   display: "flex",
   alignItems: "center",
@@ -1396,7 +1396,7 @@ const seeAllBtnStyle: CSSProperties = {
   background: "transparent",
   fontSize: 12,
   fontWeight: 600,
-  color: "var(--accent-ink)",
+  color: "var(--text2)",
   cursor: "pointer",
   padding: "2px 0",
 };
@@ -1448,7 +1448,7 @@ const barTrackStyle: CSSProperties = {
 const barFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: 999,
-  background: "var(--accent)",
+  background: "var(--select-color)",
   transition: "width 0.3s ease",
 };
 

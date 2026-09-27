@@ -6,7 +6,7 @@ import { MonthPicker } from "./DatePicker";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { AlertTriangleIcon, CalendarIcon, CheckIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
+import { AlertTriangleIcon, CalendarIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
@@ -33,13 +33,9 @@ type Props = {
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
   budgetScope: BudgetScope;
-  selectedCategoryId: string;
-  onSelectCategory: (cat: Category) => void;
   onOpenCategoryDetails: (cat: Category) => void;
   onOpenRebalance: () => void;
-  onFreezeCategory: (cat: Category) => void;
   onReviveCategory: (cat: Category) => void;
-  onFundCategory: (cat: Category) => void;
   onMoveContribution: () => void;
   onOpenNewCategory?: (defaultType: string) => void;
   monthError?: boolean;
@@ -52,7 +48,6 @@ type Props = {
   onOpenPlan?: () => void;
 };
 
-type ScopeChip = BudgetScope;
 type Health = "over" | "low" | "funded" | "unfunded";
 
 const HEALTH_SORT: Record<Health, number> = { over: 0, low: 1, funded: 2, unfunded: 3 };
@@ -91,9 +86,7 @@ export function CategoriesScreen({
   budgetScope,
   onOpenCategoryDetails,
   onOpenRebalance,
-  onFreezeCategory,
   onReviveCategory,
-  onFundCategory,
   onMoveContribution,
   onOpenNewCategory,
   monthError = false,
@@ -244,7 +237,7 @@ export function CategoriesScreen({
           : onOpenNewCategory
             ? <button type="button" className="budget-empty-action" style={emptyActionStyle} onClick={() => onOpenNewCategory("Other")}>
                 <PlusIcon size={15} />
-                Add the first {BUDGET_SCOPE_LABELS[budgetScope].toLowerCase()} category
+                Add the first {BUDGET_SCOPE_LABELS[budgetScope]} category
               </button>
             : null
         : <>
@@ -265,23 +258,9 @@ export function CategoriesScreen({
               </span>
             </section>
 
-            {/* Money not yet in a category is something to act on, so it's an action banner
-                (nothing left to assign is the goal, so then there's no banner). Rebalance
-                moves unassigned money into categories, or takes it back when the accounts fall short. */}
-            {Math.round(leftToAllocate) > 0 && (
-              <Banner
-                tone="accent"
-                icon={<FundIcon size={18} strokeWidth={2.2} />}
-                title={`${fmt(Math.round(leftToAllocate))} unassigned`}
-                action={(
-                  <button type="button" onClick={onOpenRebalance} style={contributionActionStyle}>
-                    Assign
-                  </button>
-                )}
-              >
-              </Banner>
-            )}
-            {shortBy > 0 && (
+            {/* One banner at a time, the most urgent first: accounts falling short, then money
+                not yet in a category, then what's still due to Joint. Nothing to act on, no banner. */}
+            {shortBy > 0 ? (
               <Banner
                 tone="danger"
                 icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
@@ -291,14 +270,19 @@ export function CategoriesScreen({
                     Rebalance
                   </button>
                 )}
-              >
-                {budgetScope === "joint"
-                  ? "The Joint account plus what's still due doesn't cover what's funded."
-                  : "Your account doesn't cover what's funded plus what's due to Joint."}
-              </Banner>
-            )}
-
-            {budgetScope !== "joint" && contributionRemaining > 0 && (
+              />
+            ) : Math.round(leftToAllocate) > 0 ? (
+              <Banner
+                tone="accent"
+                icon={<FundIcon size={18} strokeWidth={2.2} />}
+                title={`${fmt(Math.round(leftToAllocate))} unassigned`}
+                action={(
+                  <button type="button" onClick={onOpenRebalance} style={contributionActionStyle}>
+                    Assign
+                  </button>
+                )}
+              />
+            ) : budgetScope !== "joint" && contributionRemaining > 0 ? (
               <Banner
                 tone="accent"
                 icon={<TransferIcon size={18} strokeWidth={2.2} />}
@@ -308,24 +292,8 @@ export function CategoriesScreen({
                     Contribute
                   </button>
                 )}
-              >
-              </Banner>
-            )}
-
-            {/* Next month's plan is always one tap away while looking at this month. */}
-            {planMonth && onOpenPlan && !isPastMonth(homeMonth) && (
-              <Banner
-                tone="neutral"
-                icon={<CalendarIcon size={18} strokeWidth={2.2} />}
-                title={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}
-                action={(
-                  <button type="button" onClick={onOpenPlan} style={bannerActionStyle}>
-                    Plan
-                  </button>
-                )}
-              >
-              </Banner>
-            )}
+              />
+            ) : null}
 
             <div role="tablist" aria-label="Budget category groups" style={groupPillsStyle}>
               {activeGroups.map(group => {
@@ -367,6 +335,13 @@ export function CategoriesScreen({
                   triggerClassName="composer-picker-chip"
                   showChevron={false}
                 />
+                {/* Next month's plan sits with the month it follows. */}
+                {planMonth && onOpenPlan && !isPastMonth(homeMonth) && (
+                  <button type="button" className="composer-picker-chip" onClick={onOpenPlan} style={planChipStyle}>
+                    <CalendarIcon size={16} aria-hidden="true" />
+                    Plan {new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}
+                  </button>
+                )}
               </div>
             )}
             {!showFrozenAll && monthError && !loading && (
@@ -495,7 +470,7 @@ function CategoryCard({
             {/* With a goal (Notion "Overall Goal"), the bar is progress towards it. */}
             {goal > 0 && (
               <span style={budgetBarStyle} aria-hidden="true">
-                <span style={{ ...budgetBarSegmentStyle, width: `${goalPct}%`, background: "var(--accent)" }} />
+                <span style={{ ...budgetBarSegmentStyle, width: `${goalPct}%`, background: "var(--select-color)" }} />
               </span>
             )}
             <span style={budgetMetaStyle}>
@@ -512,7 +487,7 @@ function CategoryCard({
             {health === "over" ? (
               <span style={{ ...budgetBarSegmentStyle, width: "100%", background: "var(--danger)" }} />
             ) : (
-              <span style={{ ...budgetBarSegmentStyle, width: `${leftPct}%`, background: health === "low" ? "var(--warning)" : "var(--accent)" }} />
+              <span style={{ ...budgetBarSegmentStyle, width: `${leftPct}%`, background: health === "low" ? "var(--warning)" : "var(--select-color)" }} />
             )}
           </span>
           <span style={budgetMetaStyle}>
@@ -560,104 +535,6 @@ function useCountUp(target: number, duration = 750, from = target): number {
   return display;
 }
 
-/* ─── Budget Distribution Chart ───────────────────────────────── */
-
-function BudgetDistributionChart({
-  categories,
-  monthlySummary,
-  homeMonth,
-  scope,
-  onSelectCategory,
-}: {
-  categories: Category[];
-  monthlySummary: MonthlySummary;
-  homeMonth: string;
-  scope: ScopeChip;
-  onSelectCategory: (cat: Category) => void;
-}) {
-  const chartData = useMemo(() => {
-    const scopedCategories = categories.filter(cat => getCategoryScope(cat) === scope);
-    const items = scopedCategories
-      .map(cat => {
-        const available = Math.max(0, cat.available ?? 0);
-        return { cat, available };
-      })
-      .filter(({ available }) => available > 0)
-      .sort((a, b) => b.available - a.available);
-
-    const total = items.reduce((s, { available }) => s + available, 0);
-    return { items, total, hasCategories: scopedCategories.length > 0 };
-  }, [categories, scope]);
-  const countedTotal = useCountUp(chartData.total);
-  const largest = chartData.items[0]?.available ?? 1;
-
-  // ── All spent empty state ──────────────────────────────────────
-  if (chartData.total === 0 || chartData.items.length === 0) {
-    return (
-      <div style={{ ...chartWrapStyle, animation: "modeIn 180ms cubic-bezier(0.22,1,0.36,1) both" }}>
-        <div style={emptyChartStyle}>
-          {chartData.hasCategories ? <CheckIcon size={24} /> : <PlusIcon size={22} />}
-          <strong>{chartData.hasCategories ? "Nothing left" : "No categories yet"}</strong>
-          <span>{chartData.hasCategories ? "Nothing available." : "Add a category to start."}</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <section aria-labelledby="budget-available-heading" style={{ ...chartWrapStyle, animation: "modeIn 180ms var(--ease-standard) both" }}>
-      <div style={chartSummaryStyle}>
-        <div>
-          <span id="budget-available-heading" style={chartEyebrowStyle}>Available by category</span>
-          <strong style={chartTotalStyle}>{fmt(countedTotal)}</strong>
-        </div>
-        <span style={chartSummaryCopyStyle}>{chartData.items.length} funded categor{chartData.items.length === 1 ? "y" : "ies"}</span>
-      </div>
-      <div style={rankedListStyle}>
-        {chartData.items.map(({ cat, available }, index) => (
-          <button key={cat.id} type="button" onClick={() => onSelectCategory(cat)} style={rankedRowStyle}>
-            <span style={rankStyle}>{String(index + 1).padStart(2, "0")}</span>
-            <CategoryIcon icon={cat.icon} size={22} decorative />
-            <span style={rankedCopyStyle}>
-              <span style={rankedNameStyle}>{cat.name}</span>
-              <span style={barTrackStyle} aria-hidden="true">
-                <span style={{ ...barFillStyle, width: `${Math.max(5, (available / largest) * 100)}%` }} />
-              </span>
-            </span>
-            <strong style={rankedAmountStyle}>{fmt(Math.round(available))}</strong>
-            <ChevronRightIcon size={14} aria-hidden="true" />
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const chartWrapStyle: CSSProperties = {
-  borderRadius: "var(--radius-card)",
-  background: "var(--surface)",
-  padding: "16px 16px 18px",
-  boxShadow: "var(--elevation-card)",
-  display: "grid",
-  gap: 16,
-};
-
-const emptyChartStyle: CSSProperties = { minHeight: 160, display: "grid", placeItems: "center", alignContent: "center", gap: 8, color: "var(--muted)", textAlign: "center", fontSize: 13 };
-const chartSummaryStyle: CSSProperties = { display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16 };
-const chartEyebrowStyle: CSSProperties = { display: "block", fontSize: 12, fontWeight: 700, color: "var(--muted)", letterSpacing: 0.5, textTransform: "uppercase" };
-const chartTotalStyle: CSSProperties = { display: "block", marginTop: 6, fontSize: 30, lineHeight: 1, color: "var(--text)", fontVariantNumeric: "tabular-nums" };
-const chartSummaryCopyStyle: CSSProperties = { fontSize: 12, color: "var(--muted)", paddingBottom: 2 };
-const rankedListStyle: CSSProperties = { display: "grid", gap: 4 };
-const rankedRowStyle: CSSProperties = { width: "100%", minHeight: 56, display: "grid", gridTemplateColumns: "24px 26px minmax(0, 1fr) auto 16px", alignItems: "center", gap: 10, border: 0, borderRadius: "var(--radius-control)", background: "transparent", color: "var(--text2)", textAlign: "left", cursor: "pointer", padding: "8px 4px" };
-const rankStyle: CSSProperties = { fontSize: 12, fontWeight: 700, color: "var(--muted)", fontVariantNumeric: "tabular-nums" };
-const rankedCopyStyle: CSSProperties = { minWidth: 0, display: "grid", gap: 7 };
-const rankedNameStyle: CSSProperties = { fontSize: 14, fontWeight: 650, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" };
-const barTrackStyle: CSSProperties = { height: 5, borderRadius: 999, background: "var(--surface2)", overflow: "hidden" };
-const barFillStyle: CSSProperties = { display: "block", height: "100%", borderRadius: 999, background: "var(--accent)" };
-const rankedAmountStyle: CSSProperties = { display: "inline-flex", alignItems: "baseline", gap: 4, fontSize: 14, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
-
-/* ─── Scope chip button ────────────────────────────────────────── */
-
 /* ─── Styles ──────────────────────────────────────────────────── */
 
 const wrapStyle: CSSProperties = {
@@ -665,96 +542,6 @@ const wrapStyle: CSSProperties = {
   gap: 16,
   paddingBottom: 80,
   animation: "fadeUp 0.2s ease both",
-  minWidth: 0,
-};
-
-const headerStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  justifyContent: "space-between",
-  gap: 14,
-  paddingTop: 8,
-};
-
-const eyebrowStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-};
-
-const titleStyle: CSSProperties = {
-  margin: "4px 0 0",
-  fontFamily: "var(--font-display)",
-  fontSize: 34,
-  lineHeight: 0.95,
-  color: "var(--text)",
-};
-
-const rebalanceBtnStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 8px",
-  borderRadius: 10,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 5,
-  flexShrink: 0,
-  opacity: 0.65,
-};
-
-const backBtnStyle: CSSProperties = {
-  minWidth: 44,
-  minHeight: 44,
-  width: 36,
-  height: 36,
-  borderRadius: 10,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 16,
-  flexShrink: 0,
-};
-
-const pillRailStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-};
-
-const searchWrapStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 9,
-  minHeight: 44,
-  padding: "0 12px",
-  borderRadius: 12,
-  background: "color-mix(in srgb, var(--surface) 86%, var(--surface2))",
-  border: "1px solid color-mix(in srgb, var(--border2) 55%, transparent)",
-};
-
-const searchInputStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  background: "transparent",
-  padding: 0,
-  border: "none",
-  fontSize: 14,
-  color: "var(--text2)",
-  outline: "none",
-};
-
-const groupsStyle: CSSProperties = {
-  display: "grid",
-  gap: 20,
   minWidth: 0,
 };
 
@@ -794,6 +581,21 @@ const budgetHealthAmountStyle: CSSProperties = {
 };
 
 
+const planChipStyle: CSSProperties = {
+  minHeight: 44,
+  padding: "0 14px",
+  borderRadius: 999,
+  border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
+  background: "var(--surface)",
+  color: "var(--text2)",
+  fontSize: 13,
+  fontWeight: 600,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  cursor: "pointer",
+};
+
 const contributionActionStyle: CSSProperties = {
   minHeight: 44,
   padding: "0 12px",
@@ -815,16 +617,6 @@ const groupPillsStyle: CSSProperties = {
   scrollbarWidth: "none",
 };
 
-const sectionLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: 0.7,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  marginBottom: 8,
-  paddingLeft: 2,
-};
-
 const railStyle: CSSProperties = {
   display: "grid",
   gap: 12,
@@ -833,45 +625,6 @@ const railStyle: CSSProperties = {
 };
 
 /* ─── Frozen preview ────────────────────────────────────────────── */
-
-const frozenPreviewWrapStyle: CSSProperties = {
-  display: "grid",
-  gap: 8,
-  minWidth: 0,
-};
-
-const frozenPreviewHeaderStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingLeft: 2,
-};
-
-const frozenPreviewLabelStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 5,
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: 0.7,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  opacity: 0.65,
-};
-
-const seeAllBtnStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 3,
-  padding: "4px 0",
-  border: "none",
-  background: "transparent",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "var(--text2)",
-  cursor: "pointer",
-  opacity: 0.65,
-};
 
 /* ─── Ghost add card ────────────────────────────────────────────── */
 
@@ -1084,19 +837,6 @@ const srOnlyStyle: CSSProperties = {
   clip: "rect(0, 0, 0, 0)",
   whiteSpace: "nowrap",
   border: 0,
-};
-
-const cardActionStyle: CSSProperties = {
-  margin: "0 10px 10px",
-  padding: "5px 0",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "transparent",
-  fontSize: 12,
-  fontWeight: 500,
-  color: "var(--text2)",
-  cursor: "pointer",
-  alignSelf: "stretch",
 };
 
 const emptyStyle: CSSProperties = {

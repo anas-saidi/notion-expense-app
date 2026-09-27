@@ -2,10 +2,8 @@
 import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { ChevronDown, Save } from "lucide-react";
-import { ArrowLeftIcon, XIcon } from "./ui/icons";
-import { MonthPicker } from "./DatePicker";
+import { Save } from "lucide-react";
+import { XIcon } from "./ui/icons";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -28,24 +26,19 @@ export type AllocationGroup = {
 
 type AllocationFlowProps = {
   open: boolean;
-  mode?: "sheet" | "screen";
   selectedMonth: string;
-  onSelectedMonthChange?: (nextMonth: string) => void;
   onCancel: () => void;
   onComplete?: () => void;
   accounts?: Account[];
   groups: AllocationGroup[];
-  isUsingFallbackData?: boolean;
   onSave?: (payload: { month: string; budgetItems: PlanningAllocationItem[]; savingsItems: PlanningAllocationItem[]; snapshot: MonthlyPlanningSnapshot }) => Promise<void>;
   // extension props (used by RebalanceSheet and other wrappers)
   poolOverride?: number;
   poolLabel?: string;
   saveButtonLabel?: string;
-  requireBalanced?: boolean;
   readOnly?: boolean;
   readOnlyBanner?: ReactNode;
   headerControls?: ReactNode;
-  chipsContent?: ReactNode;
   flowPreview?: ReactNode;
   title?: string;
   balancedLabel?: string;
@@ -68,25 +61,20 @@ type AllocationFlowProps = {
 export function AllocationFlow({
   open,
   selectedMonth,
-  onSelectedMonthChange,
   onCancel,
   onComplete,
   accounts = [],
   groups,
-  isUsingFallbackData = false,
   onSave,
   poolOverride,
   poolLabel = "Available",
   saveButtonLabel = "Save",
-  requireBalanced = false,
   readOnly = false,
   readOnlyBanner,
   headerControls,
-  chipsContent,
   flowPreview,
   title = "Set Monthly Budget",
   balancedLabel = "Fully assigned",
-  mode = "sheet",
   heroPool = false,
   metaLabel = "Last month",
   rebalanceMode = false,
@@ -102,12 +90,7 @@ export function AllocationFlow({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
   const [saveError, setSaveError] = useState("");
   const [confirming, setConfirming] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
-
   // Reset active item only when the set of group keys changes (not on every amount update)
   const groupKeysSignal = useMemo(() => groups.map((g) => g.key).join(","), [groups]);
   useEffect(() => {
@@ -120,7 +103,6 @@ export function AllocationFlow({
   // so they're re-computed fresh if the sheet re-opens with new data.
   useEffect(() => {
     if (!open) {
-      setHasInteracted(false);
       setDraftValue(null);
       setConfirming(false);
       spentFloorRef.current = {};
@@ -162,10 +144,7 @@ export function AllocationFlow({
     totalCategories > 0 &&
     saveState !== "saving" &&
     typeof onSave === "function" &&
-    !readOnly &&
-    (!requireBalanced || (isBalanced && hasInteracted));
-
-  const activeShare = activeItem ? activeItem.amount / Math.max(1, availablePool) : 0;
+    !readOnly;
 
   // Stable spent floor — snapshot on first access, never recompute from the
   // mutable activeItem.amount. Without this, dragging the slider increases
@@ -186,7 +165,6 @@ export function AllocationFlow({
   const rangeMax = activeItem ? Math.max(rangeMin, activeItem.amount + Math.max(0, leftToAssign)) : 0;
   const updateActiveAmount = (nextAmount: number) => {
     if (!activeItem) return;
-    setHasInteracted(true);
     setConfirming(false);
     const minAmount = getSpentFloor(activeItem);
     const maxAmount = Math.max(minAmount, activeItem.amount + Math.max(0, leftToAssign));
@@ -198,12 +176,6 @@ export function AllocationFlow({
     const nextGroup = groups.find((group) => group.key === groupKey);
     setActiveGroup(groupKey);
     setActiveCategoryId(nextGroup?.items[0]?.categoryId ?? "");
-  };
-
-  const stepCategory = (direction: -1 | 1) => {
-    if (!active.items.length) return;
-    const nextIndex = (activeIndex + direction + active.items.length) % active.items.length;
-    setActiveCategoryId(active.items[nextIndex]?.categoryId ?? "");
   };
 
   const savePlan = async () => {
@@ -223,44 +195,16 @@ export function AllocationFlow({
 
   const innerContent = (
     <>
-      {mode === "screen" ? (
-        <header style={screenHeaderStyle}>
-          <button onClick={onCancel} aria-label="Go back" style={backButtonStyle}>
-            <ArrowLeftIcon size={18} />
-          </button>
-          <div>
-            <h2 style={sheetTitleStyle}>{title}</h2>
-            {onSelectedMonthChange ? (
-              <MonthPicker value={selectedMonth} aria-label="Change planning month" onChange={(event) => onSelectedMonthChange(event.target.value)} style={monthPickerButtonStyle} />
-            ) : (
-              <span style={monthLabelFallbackStyle}>{monthLabel}</span>
-            )}
-          </div>
-          {!chipsContent && (
-            <div style={{ display: "flex", alignItems: "center" }}>
-              {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
-            </div>
-          )}
-        </header>
-      ) : (
         <header style={sheetHeaderStyle}>
           <h2 style={sheetTitleStyle}>{title}</h2>
           <button onClick={onCancel} aria-label="Close" style={closeButtonStyle}>
             <XIcon size={14} />
           </button>
-          {onSelectedMonthChange ? (
-            <MonthPicker value={selectedMonth} aria-label="Change planning month" onChange={(event) => onSelectedMonthChange(event.target.value)} style={monthPickerButtonStyle} />
-          ) : (
-            <span style={monthLabelFallbackStyle}>{monthLabel}</span>
-          )}
+          <span style={monthLabelFallbackStyle}>{monthLabel}</span>
           {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
         </header>
-      )}
 
-      <div style={mode === "screen" ? { ...sheetScrollStyle, ...(heroPool ? { paddingTop: 8 } : {}) } : sheetScrollStyle}>
-        {chipsContent && (
-          <div style={chipsContentWrapStyle}>{chipsContent}</div>
-        )}
+      <div style={sheetScrollStyle}>
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
           {/* The jar fills as money is assigned: full when balanced, worried when over. */}
           {jarScope && jarItems.length > 0 && (() => {
@@ -309,7 +253,6 @@ export function AllocationFlow({
                   <span style={quietAvailableValueStyle}>
                     <Money value={availablePool} currency />
                   </span>
-                  {isUsingFallbackData && !poolOverride && <span style={estimateBadgeStyle}>Est.</span>}
                 </div>
                 {isBalanced ? (
                   <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
@@ -414,45 +357,12 @@ export function AllocationFlow({
     </>
   );
 
-  if (mode === "screen") {
-    if (!open || !mounted) return null;
-    return createPortal(
-      <div style={screenWrapStyle}>
-        <div style={screenInnerStyle}>
-          {innerContent}
-        </div>
-      </div>,
-      document.body
-    );
-  }
-
   return (
     <BottomSheet open={open} onClose={onCancel} showHandle label={title} detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
       {innerContent}
     </BottomSheet>
   );
 }
-
-const screenWrapStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 80,
-  background: "color-mix(in srgb, var(--bg) 96%, var(--surface))",
-  display: "flex",
-  flexDirection: "column",
-  overflow: "hidden",
-  paddingTop: "env(safe-area-inset-top, 0px)",
-};
-const screenInnerStyle: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  display: "flex",
-  flexDirection: "column",
-  overflowY: "auto",
-  overflowX: "hidden",
-  background: "color-mix(in srgb, var(--bg) 96%, var(--surface))",
-  borderRadius: "24px 24px 0 0",
-};
 
 
 
@@ -463,32 +373,11 @@ function GroupPicker({ groups, activeGroup, onSelect }: { groups: AllocationGrou
   </ChoicePicker>;
 }
 
-const gpColor = (key: BudgetGroupKey): string => {
-  if (key === "wife") return "var(--partner-wife-strong)";
-  if (key === "husband") return "var(--partner-husband-strong)";
-  return "var(--text)";
-};
-
-// --- styles (kept local to component) ---
-const gpWrapStyle: CSSProperties = { position: "relative", display: "inline-flex", alignItems: "center", flexShrink: 0, overflow: "visible" };
-const gpTriggerStyle: CSSProperties = { minHeight: 44, padding: "0 4px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, justifySelf: "end" };
-const gpLabelStyle: CSSProperties = { fontSize: 13, fontWeight: 600 };
-const gpChevronStyle: CSSProperties = { pointerEvents: "none", color: "var(--muted)", transition: "transform 0.16s ease" };
-const gpMenuStyle: CSSProperties = { width: 192, padding: 6, borderRadius: 16, border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)", background: "var(--surface)", boxShadow: "0 18px 36px color-mix(in srgb, var(--ink-strong) 14%, transparent), inset 0 1px 0 color-mix(in srgb, white 55%, transparent)", zIndex: 90, display: "grid", gap: 3 };
-const gpOptionStyle: CSSProperties = { minHeight: 44, width: "100%", border: "none", borderRadius: 12, background: "transparent", color: "var(--text2)", cursor: "pointer", display: "grid", gridTemplateColumns: "8px 1fr auto", alignItems: "center", gap: 9, padding: "0 10px", textAlign: "left" };
-const gpOptionActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--surface2) 70%, var(--surface))" };
-const gpDotStyle: CSSProperties = { width: 7, height: 7, borderRadius: 999 };
-const gpOptionTextStyle: CSSProperties = { fontSize: 13, fontWeight: 700 };
-const gpCountStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 12, color: "var(--muted)" };
-
 const sheetPanelStyle: CSSProperties = { background: "var(--surface)", borderRadius: "24px 24px 0 0", boxShadow: "var(--elevation-float)" };
 const sheetContentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
 const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "16px 20px 14px", flexShrink: 0 };
-const screenHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "44px 1fr auto", alignItems: "center", gap: 8, padding: "14px 16px 12px", flexShrink: 0 };
-const backButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text2)" };
 const sheetScrollStyle: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", padding: "8px 12px 12px", display: "grid", alignContent: "start", gap: 12 };
-const monthPickerButtonStyle: CSSProperties = { minHeight: 44, padding: "0 4px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" };
 const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
 const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
@@ -496,7 +385,6 @@ const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "ce
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };
 const quietAvailableValueStyle: CSSProperties = { color: "var(--text2)", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', letterSpacing: -0.5 };
-const estimateBadgeStyle: CSSProperties = { alignSelf: "center", borderRadius: 999, padding: "5px 9px", background: "color-mix(in srgb, var(--warning-dim) 70%, var(--surface))", color: "color-mix(in srgb, var(--warning) 82%, black)", fontSize: 12, fontWeight: 750 };
 const balancedTextStyle: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
 const deltaChipStyle = (isOver: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "center", gap: 2,
@@ -508,9 +396,9 @@ const deltaChipStyle = (isOver: boolean): CSSProperties => ({
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
 const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 196, minHeight: 44, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)", background: "var(--surface)", color: "var(--text2)", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", boxShadow: "none", transition: "background-color var(--motion-standard) ease, color var(--motion-standard) ease" };
-const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "color-mix(in srgb, var(--accent) 42%, var(--surface))", color: "var(--accent-ink)" };
-const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActive ? "var(--accent-ink)" : "var(--text2)", flexShrink: 0 });
-const categoryAmountStyle = (isActive: boolean, negative: boolean): CSSProperties => ({ flexShrink: 0, fontSize: 12, fontWeight: 650, fontVariantNumeric: "tabular-nums", color: negative ? "var(--danger)" : isActive ? "var(--accent-ink)" : "var(--muted)", opacity: isActive ? 0.72 : 1 });
+const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "var(--select-wash)", boxShadow: "inset 0 0 0 1px var(--select-edge)", color: "var(--select-ink)" };
+const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActive ? "var(--select-ink)" : "var(--text2)", flexShrink: 0 });
+const categoryAmountStyle = (isActive: boolean, negative: boolean): CSSProperties => ({ flexShrink: 0, fontSize: 12, fontWeight: 650, fontVariantNumeric: "tabular-nums", color: negative ? "var(--danger)" : isActive ? "var(--select-ink)" : "var(--muted)", opacity: isActive ? 0.72 : 1 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
 const editorStyle: CSSProperties = { display: "grid" };
 const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gridTemplateRows: "minmax(68px, auto) auto", gap: 8, minHeight: 132, padding: "14px 10px 12px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
@@ -521,30 +409,13 @@ const hiddenAmountInputStyle: CSSProperties = { color: "transparent", caretColor
 const srOnlyStyle: CSSProperties = { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 };
 const amountInputBigStyle = (isOver: boolean): CSSProperties => ({ width: "100%", minWidth: 0, maxWidth: "100vw", border: "none", background: "transparent", color: isOver ? "var(--danger)" : "var(--text2)", textAlign: "center", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: -2, outline: "none", fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', zIndex: 2, padding: 0, margin: 0, backgroundClip: "text", transition: "color 0.35s cubic-bezier(0.22, 1, 0.36, 1)" });
 const metaRowStyle: CSSProperties = { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, color: "var(--text2)", fontSize: 12, fontFamily: "var(--font-body)", opacity: 0.5 };
-const stepControlStyle: CSSProperties = { position: "relative", display: "grid", padding: "2px 0", touchAction: "none" };
-const stepTicksStyle: CSSProperties = { height: 38, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px" };
-const stepTickStyle = (active: boolean, passed: boolean): CSSProperties => ({ width: active ? 4 : 3, height: 34, borderRadius: 999, background: active ? "var(--accent)" : passed ? "color-mix(in srgb, var(--accent) 48%, var(--text2))" : "var(--surface2)", transform: `scaleY(${active ? 1 : 0.65})`, transformOrigin: "center", transition: "transform 150ms var(--ease-standard), background-color 150ms ease" });
-const steppedRangeStyle: CSSProperties = { position: "absolute", inset: "0 0 auto", width: "100%", height: 44, margin: 0, opacity: 0, cursor: "ew-resize", touchAction: "none" };
 const confirmationStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)" };
 const confirmationTitleStyle: CSSProperties = { display: "block", fontSize: 13, lineHeight: 1.2 };
 const confirmationCopyStyle: CSSProperties = { display: "block", marginTop: 3, fontSize: 11, lineHeight: 1.35, color: "var(--muted)" };
 const confirmationBackStyle: CSSProperties = { minWidth: 44, minHeight: 44, padding: "0 10px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface)", color: "var(--text2)", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 const emptyStyle: CSSProperties = { minHeight: 220, display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 13 };
-const dialPanelStyle = (isOver: boolean, isBalanced: boolean): CSSProperties => ({ display: "grid", gap: 14, padding: `20px 18px calc(16px + env(safe-area-inset-bottom, 0px))`, borderRadius: "20px 0 0 0", background: isOver ? "color-mix(in srgb, var(--danger) 14%, var(--surface))" : isBalanced ? "color-mix(in srgb, var(--accent) 58%, var(--surface))" : "color-mix(in srgb, var(--accent) 34%, var(--surface))", color: isOver ? "var(--danger)" : "var(--accent-ink)", boxShadow: "inset 0 1px 0 color-mix(in srgb, white 42%, transparent)", transition: "background var(--motion-slow) var(--ease-standard)" });
-const dialCopyStyle: CSSProperties = { display: "grid", gap: 4 };
-const dialStatusStyle: CSSProperties = { fontSize: 12, fontWeight: 850, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.78 };
-const dialTitleStyle: CSSProperties = { fontSize: 15, lineHeight: 1.2, fontWeight: 850 };
-const dialBodyStyle: CSSProperties = { maxWidth: 260, fontSize: 12, lineHeight: 1.35, opacity: 0.78 };
-const rangeWrapStyle: CSSProperties = { display: "grid", gap: 4 };
 const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "0 0 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `14px 18px calc(12px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)", boxShadow: "none" };
 const saveButtonStyle: CSSProperties = { width: "100%", marginTop: "auto", minHeight: 52, borderRadius: 16, border: "none", background: "var(--accent)", color: "var(--accent-ink)", padding: "0 20px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "none" };
-
-// ── Chips content wrap ────────────────────────────────────────────────────────
-const chipsContentWrapStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "center",
-  paddingBottom: 4,
-};
 
 // ── Hero pool styles ──────────────────────────────────────────────────────────
 const heroPoolWrapStyle: CSSProperties = {

@@ -21,8 +21,8 @@ const WARN_ZONE = 0.25;
  */
 function toneFor(fraction: number): string {
   const heat = Math.min(1, Math.max(0, (WARN_ZONE - fraction) / WARN_ZONE));
-  if (heat <= 0) return "var(--accent)";
-  if (heat < 0.5) return `color-mix(in srgb, var(--warning) ${Math.round(heat * 200)}%, var(--accent))`;
+  if (heat <= 0) return "var(--select-color)";
+  if (heat < 0.5) return `color-mix(in srgb, var(--warning) ${Math.round(heat * 200)}%, var(--select-color))`;
   return `color-mix(in srgb, var(--danger) ${Math.round((heat - 0.5) * 200)}%, var(--warning))`;
 }
 
@@ -41,7 +41,7 @@ export function SteppedAmountSlider({ min, max, value, onChange, label }: { min:
   const active = stops.reduce((best, stop, index) => Math.abs(stop - value) < Math.abs(stops[best] - value) ? index : best, 0);
   const lastStop = stops.length - 1;
   // Only tint while the finger is down, so a category resting at zero doesn't sit there red.
-  const tone = sliding && lastStop > 0 ? toneFor(active / lastStop) : "var(--accent)";
+  const tone = sliding && lastStop > 0 ? toneFor(active / lastStop) : "var(--select-color)";
 
   const select = (index: number) => {
     if (index !== lastIndex.current) {

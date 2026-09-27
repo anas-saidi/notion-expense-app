@@ -1,22 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Currency } from "./Money";
 import { Mascot } from "./mascot/Mascot";
 import type { Mood } from "./mascot/poses";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
-import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { categoryMatchesScope, comparisonPeriods, getCategoryScope, isExpenseTransaction, resolveTransactionScopes, transactionMatchesScope, fmt } from "./app-utils";
+import { comparisonPeriods, getCategoryScope, isExpenseTransaction, resolveTransactionScopes, transactionMatchesScope, fmt } from "./app-utils";
 import { ArrowDownIcon, ArrowUpIcon, BanknoteIcon, CalendarIcon, CalendarRangeIcon, ChartPieIcon, FlameIcon, TransferIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { TransactionRow } from "./ui/TransactionRow";
 import { MonthPicker } from "./DatePicker";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, PieChart, Pie, Cell, Sector } from "recharts";
-import type { PieSectorShapeProps } from "recharts";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -34,15 +30,6 @@ type Props = {
 
 /* ─── Constants ──────────────────────────────────────────────────── */
 
-
-const DONUT_COLORS = [
-  "var(--accent)",
-  "var(--partner-husband)",
-  "var(--partner-wife)",
-  "#a78bfa",
-  "#fb923c",
-  "#34d399",
-];
 
 /* ─── Screen ─────────────────────────────────────────────────────── */
 
@@ -143,14 +130,6 @@ export function InsightsScreen({
       .reduce((s, { total }) => s + total, 0);
   }, [assignedByCategory, accounts, categories, budgetScope]);
 
-  const spentByCatId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of expenses) {
-      if (t.category) map.set(t.category, (map.get(t.category) ?? 0) + t.amount);
-    }
-    return map;
-  }, [expenses]);
-
   /* ── 1. Burn Rate ──────────────────────────────────────────────── */
   const lastMonthTotalSpent = useMemo(() => {
     if (!prevMonthTransactions) return 0;
@@ -178,23 +157,6 @@ export function InsightsScreen({
     return { spentPct, expectedPct, isAhead, isOver, gapPct, daysLeft, vsLastMonth };
   }, [insightsMonth, totalSpent, totalPlanned, lastMonthTotalSpent, currentMonthStr]);
 
-
-  /* ── 2. Spending Breakdown (donut) ────────────────────────────── */
-  const donutData = useMemo(() => {
-    const all = categories
-      .filter(c => categoryMatchesScope(c, budgetScope))
-      .map(c => ({ cat: c, spent: spentByCatId.get(c.id) ?? 0 }))
-      .filter(({ spent }) => spent > 0)
-      .sort((a, b) => b.spent - a.spent);
-
-    const top5 = all.slice(0, 5);
-    const othersSpent = all.slice(5).reduce((s, { spent }) => s + spent, 0);
-    const items = othersSpent > 0
-      ? [...top5, { cat: { id: "others", name: "Others", icon: null } as unknown as Category, spent: othersSpent }]
-      : top5;
-    const total = items.reduce((s, { spent }) => s + spent, 0);
-    return { items, total };
-  }, [categories, budgetScope, spentByCatId]);
 
   /* ── Transaction history (bottom section) ─────────────────────── */
   const txGroups = useMemo(() => {
@@ -396,62 +358,6 @@ function InlineMetric({ icon, label, tone }: { icon: ReactNode; label: string; t
   return <span role="img" aria-label={label} style={inlineMetricStyle(tone)}>{icon}<span aria-hidden="true">{label}</span></span>;
 }
 
-/* ─── Card wrapper ───────────────────────────────────────────────── */
-
-function InsightCard({ icon, title, subtitle, children }: {
-  icon: ReactNode; title: string; subtitle: string; children: ReactNode;
-}) {
-  return (
-    <div className="insights-card" style={cardStyle}>
-      <div style={cardHeaderStyle}>
-        <span className="insight-card-icon">{icon}</span>
-        <div>
-          <div style={cardTitleStyle}>{title}</div>
-          <div style={cardSubtitleStyle}>{subtitle}</div>
-        </div>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/* ─── 1. Burn Rate skeleton ─────────────────────────────────────── */
-
-function BurnRateSkeleton() {
-  return (
-    <div style={{ display: "grid", gap: 10 }}>
-      <div className="skeleton" style={{ width: 140, height: 40, borderRadius: 6 }} />
-      <div className="skeleton" style={{ width: "100%", height: 8, borderRadius: 999 }} />
-      <div style={{ display: "flex", gap: 12 }}>
-        <div className="skeleton" style={{ width: 70, height: 12, borderRadius: 4 }} />
-        <div className="skeleton" style={{ width: 80, height: 12, borderRadius: 4 }} />
-        <div className="skeleton" style={{ width: 100, height: 12, borderRadius: 4, marginLeft: "auto" }} />
-      </div>
-      <div className="skeleton" style={{ width: "85%", height: 12, borderRadius: 4 }} />
-    </div>
-  );
-}
-
-
-/* ─── 2. Spending Breakdown skeleton ────────────────────────────── */
-
-function SpendingBreakdownSkeleton() {
-  return (
-    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-      <div className="skeleton" style={{ width: 140, height: 140, borderRadius: "50%", flexShrink: 0 }} />
-      <div style={{ flex: 1, display: "grid", gap: 9 }}>
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div className="skeleton" style={{ width: 8, height: 8, borderRadius: 2 }} />
-            <div className="skeleton" style={{ flex: 1, height: 11, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 50, height: 11, borderRadius: 4 }} />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ─── Transaction row skeleton ───────────────────────────────────── */
 
 function TxRowSkeleton() {
@@ -465,285 +371,6 @@ function TxRowSkeleton() {
       <div style={{ display: "grid", gap: 5, alignItems: "flex-end" }}>
         <div className="skeleton" style={{ width: 70, height: 13, borderRadius: 4 }} />
         <div className="skeleton" style={{ width: 40, height: 10, borderRadius: 4, marginLeft: "auto" }} />
-      </div>
-    </div>
-  );
-}
-
-/* ─── 1. Burn Rate body ──────────────────────────────────────────── */
-
-function BurnRateBody({ burnRate, totalSpent, totalPlanned, lastMonthTotalSpent, periodRanges }: {
-  burnRate: { spentPct: number; expectedPct: number; isAhead: boolean; isOver: boolean; gapPct: number; daysLeft: number; vsLastMonth: number | null };
-  totalSpent: number;
-  totalPlanned: number;
-  lastMonthTotalSpent: number;
-  periodRanges: ReturnType<typeof comparisonPeriods>;
-}) {
-  const { spentPct, isOver, vsLastMonth } = burnRate;
-
-  const fillColor = isOver ? "var(--danger)" : "color-mix(in srgb, var(--accent) 65%, var(--bar-fill))";
-
-  const copy = totalPlanned === 0
-    ? "No monthly plan is recorded for this period."
-    : `${fmt(totalSpent)} of ${fmt(totalPlanned)} MAD monthly plan spent.`;
-
-  return (
-    <div style={{ display: "grid", gap: 10 }}>
-      {/* Spend number + vs last month */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" as const }}>
-        <span style={bigNumStyle(isOver)}><AnimatedCounter value={totalSpent} animateOnMount /></span>
-        <Currency />
-        <span style={bigNumUnitStyle}>spent</span>
-        {vsLastMonth !== null && lastMonthTotalSpent > 0 && (
-          <span style={{
-            fontSize: 12, fontWeight: 600, letterSpacing: 0.2,
-            color: "var(--muted)",
-            marginLeft: 4,
-          }}>
-            {vsLastMonth > 0 ? "+" : "−"}{Math.abs(vsLastMonth)}% vs prior period
-          </span>
-        )}
-      </div>
-
-      {/* Neutral plan progress */}
-      <div style={{ position: "relative", padding: "4px 0" }}>
-        <div style={burnRailStyle}>
-          <div style={{ ...burnFillStyle, transform: `scaleX(${spentPct / 100})`, background: fillColor }} />
-        </div>
-      </div>
-
-      {/* Legend */}
-      {totalPlanned > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={burnLegendItemStyle}>
-            <span style={{ ...burnDotStyle, background: fillColor }} />
-            {Math.round(spentPct)}% spent
-          </span>
-          <span style={{ ...burnLegendItemStyle, marginLeft: "auto" }}>
-            {fmt(totalPlanned)} planned
-          </span>
-        </div>
-      )}
-
-      <p style={copySentenceStyle}>{copy}</p>
-      <p style={{ ...copySentenceStyle, marginTop: -6 }}>{periodRanges.current.start}–{periodRanges.current.end} vs {periodRanges.previous.start}–{periodRanges.previous.end}</p>
-    </div>
-  );
-}
-
-
-/* ─── 2. Spending Breakdown body ─────────────────────────────────── */
-
-function SpendingBreakdownBody({ data, expenses, insightsMonth, totalPlanned }: {
-  data: { items: Array<{ cat: Category; spent: number }>; total: number };
-  expenses: Transaction[];
-  insightsMonth: string;
-  totalPlanned: number;
-}) {
-  const [view, setView] = useState<"donut" | "curve">("donut");
-  const { items, total } = data;
-
-  if (total === 0 || items.length === 0) {
-    return <p style={emptyBodyStyle}>No expenses this month.</p>;
-  }
-
-  return (
-    <div>
-      <div role="group" aria-label="Chart view" style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-        <button type="button" aria-pressed={view === "donut"} onClick={() => setView("donut")} style={filterButtonStyle(view === "donut")}>Breakdown</button>
-        <button type="button" aria-pressed={view === "curve"} onClick={() => setView("curve")} style={filterButtonStyle(view === "curve")}>Trend</button>
-      </div>
-      {view === "donut"
-        ? <DonutView items={items} total={total} />
-        : <CurveView
-            expenses={expenses}
-            insightsMonth={insightsMonth}
-            totalPlanned={totalPlanned}
-            totalSpent={total}
-          />
-      }
-
-    </div>
-  );
-}
-
-function DonutView({ items, total }: {
-  items: Array<{ cat: Category; spent: number }>;
-  total: number;
-}) {
-  const segments = items.map(({ cat, spent }, i) => ({
-    name: cat.name,
-    value: spent,
-    spent,
-    cat,
-    color: DONUT_COLORS[i % DONUT_COLORS.length],
-  }));
-
-  return (
-    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-      <div style={{ position: "relative", flexShrink: 0, width: 140, height: 140 }}>
-        <PieChart width={140} height={140} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-          <Pie
-            data={segments}
-            cx={70} cy={70}
-            innerRadius={44} outerRadius={60}
-            paddingAngle={items.length > 1 ? 4 : 0}
-            dataKey="value"
-            startAngle={90} endAngle={-270}
-            stroke="none"
-            isAnimationActive={true}
-            animationBegin={0}
-            animationDuration={750}
-            animationEasing="ease-out"
-            shape={(props: PieSectorShapeProps) => {
-              const sweep = Math.abs((props.endAngle ?? 0) - (props.startAngle ?? 0));
-              const maxRadius = sweep * 60 * Math.PI / 180 / 2;
-              const cr = Math.min(7, maxRadius);
-              return <Sector {...props} cornerRadius={cr} outerRadius={60} />;
-            }}
-          >
-            {segments.map((seg, i) => (
-              <Cell key={i} fill={seg.color} />
-            ))}
-          </Pie>
-        </PieChart>
-        <div style={{ ...donutCenterStyle, pointerEvents: "none" }}>
-          <span style={{ fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 700, color: "var(--text2)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-            {fmt(total)}
-          </span>
-        </div>
-      </div>
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{ flex: 1, display: "grid", gap: 9, alignContent: "center" as const }}
-      >
-        {segments.map(({ cat, spent, color }, i) => (
-          <div
-            key={cat.id ?? i}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              minWidth: 0,
-            }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: "var(--text2)", fontWeight: 500, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-              {cat.name}
-            </span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-              {fmt(spent)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CurveView({ expenses, insightsMonth, totalPlanned, totalSpent }: {
-  expenses: Transaction[];
-  insightsMonth: string;
-  totalPlanned: number;
-  totalSpent: number;
-}) {
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const isCurrentMonth  = insightsMonth === currentMonthStr;
-  const [y, m] = insightsMonth.split("-").map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const todayDay    = isCurrentMonth ? new Date().getDate() : daysInMonth;
-
-  // Build cumulative daily totals
-  const dayTotals = new Array(daysInMonth + 1).fill(0);
-  for (const t of expenses) {
-    if (!t.date) continue;
-    const day = parseInt(t.date.split("-")[2], 10);
-    if (day >= 1 && day <= daysInMonth) dayTotals[day] += t.amount;
-  }
-
-  // Recharts data: one entry per day (0 = start of month)
-  let running = 0;
-  const data = Array.from({ length: todayDay + 1 }, (_, d) => {
-    if (d > 0) running += dayTotals[d];
-    return {
-      day: d,
-      spent: running,
-      budget: totalPlanned > 0 ? Math.round((totalPlanned / daysInMonth) * d) : undefined,
-    };
-  });
-
-  const xTicks = [1, Math.round(daysInMonth / 2), daysInMonth].filter(t => t <= todayDay);
-
-  return (
-    <div>
-      <ResponsiveContainer width="100%" height={150}>
-        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="sbAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%"  stopColor="var(--danger)" stopOpacity={0.22} />
-              <stop offset="95%" stopColor="var(--danger)" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-
-          <CartesianGrid
-            strokeDasharray="3 4"
-            stroke="var(--border)"
-            vertical={false}
-            strokeOpacity={0.7}
-          />
-
-          <XAxis
-            dataKey="day"
-            ticks={xTicks}
-            tick={{ fontSize: 12, fill: "var(--muted)" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 12, fill: "var(--muted)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
-            width={38}
-          />
-
-          <Tooltip
-            contentStyle={{
-              background: "var(--surface)",
-              border: "1px solid var(--border2)",
-              borderRadius: 10,
-              fontSize: 12,
-              color: "var(--text2)",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-            }}
-            formatter={(value, name) => [
-              fmt(Number(value)),
-              name === "spent" ? "Spent" : "Budget pace",
-            ]}
-            labelFormatter={(day) => `Day ${day}`}
-            cursor={{ stroke: "var(--border2)", strokeWidth: 1 }}
-          />
-
-          {/* Spending area */}
-          <Area
-            type="monotone"
-            dataKey="spent"
-            stroke="var(--danger)"
-            strokeWidth={2}
-            fill="url(#sbAreaGrad)"
-            dot={false}
-            activeDot={{ r: 4, fill: "var(--danger)", strokeWidth: 0 }}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
-
-      {/* Legend */}
-      <div style={{ display: "flex", gap: 16, marginTop: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <span style={{ width: 12, height: 2, background: "var(--danger)", borderRadius: 999, display: "inline-block" }} />
-          <span style={{ fontSize: 12, color: "var(--muted)" }}>Spent · {fmt(totalSpent)}</span>
-        </div>
-        {totalPlanned > 0 && <span style={{ fontSize: 12, color: "var(--muted)" }}>{fmt(totalSpent)} of {fmt(totalPlanned)} planned</span>}
       </div>
     </div>
   );
@@ -802,11 +429,13 @@ const summaryMascotStyle: CSSProperties = { margin: "-18px 0 -20px -14px" };
 const inlineMetricStyle = (tone: "neutral" | "accent" | "positive" | "warning" | "danger"): CSSProperties => {
   const color = tone === "danger" ? "var(--danger)"
     : tone === "warning" ? "var(--warning)"
-    : tone === "positive" || tone === "accent" ? "var(--accent-foreground)"
+    : tone === "positive" ? "var(--success)"
+    : tone === "accent" ? "var(--select-ink)"
     : "var(--text2)";
   const background = tone === "danger" ? "color-mix(in srgb, var(--danger) 10%, transparent)"
     : tone === "warning" ? "color-mix(in srgb, var(--warning) 12%, transparent)"
-    : tone === "positive" || tone === "accent" ? "color-mix(in srgb, var(--accent) 16%, transparent)"
+    : tone === "positive" ? "color-mix(in srgb, var(--success) 10%, transparent)"
+    : tone === "accent" ? "var(--select-wash)"
     : "var(--surface2)";
   return {
     display: "inline-flex",
@@ -827,90 +456,13 @@ const inlineMetricStyle = (tone: "neutral" | "accent" | "positive" | "warning" |
   };
 };
 
-const filterButtonStyle = (selected: boolean): CSSProperties => ({
-  minHeight: 36,
-  padding: "0 12px",
-  flexShrink: 0,
-  borderRadius: 999,
-  border: selected ? "1px solid transparent" : "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
-  background: selected ? "var(--text)" : "var(--surface)",
-  color: selected ? "var(--bg)" : "var(--text2)",
-  fontSize: 12,
-  fontWeight: 700,
-});
-
 
 /* Card */
-const cardStyle: CSSProperties = {
-  background: "var(--surface)",
-  border: "none",
-  borderRadius: "var(--radius-card)",
-  boxShadow: "var(--elevation-card)",
-  padding: 18,
-  display: "grid",
-  gap: 14,
-};
-
-const cardHeaderStyle: CSSProperties = {
-  display: "flex", alignItems: "flex-start", gap: 10,
-};
-
-const cardTitleStyle: CSSProperties = {
-  fontSize: 14, fontWeight: 700, color: "var(--text2)", lineHeight: 1,
-};
-
-const cardSubtitleStyle: CSSProperties = {
-  fontSize: 12, color: "var(--muted)", marginTop: 3, letterSpacing: 0.1,
-};
 
 /* Burn Rate */
-const bigNumStyle = (isOver: boolean): CSSProperties => ({
-  fontFamily: "var(--font-body)",
-  fontSize: 36, fontWeight: 700, lineHeight: 1,
-  letterSpacing: "-0.03em",
-  color: isOver ? "var(--danger)" : "var(--text2)",
-  fontVariantNumeric: "tabular-nums",
-});
-
-const bigNumUnitStyle: CSSProperties = {
-  fontSize: 13, color: "var(--muted)", fontFamily: "var(--font-body)",
-};
-
-const burnRailStyle: CSSProperties = {
-  height: 6, borderRadius: 999, background: "var(--surface2)", overflow: "hidden",
-};
-
-const burnFillStyle: CSSProperties = {
-  width: "100%", height: "100%", borderRadius: 999,
-  transformOrigin: "left center",
-  transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)",
-};
-
-const burnLegendItemStyle: CSSProperties = {
-  display: "flex", alignItems: "center", gap: 5,
-  fontSize: 12, color: "var(--muted)", fontWeight: 500,
-};
-
-const burnDotStyle: CSSProperties = {
-  width: 8, height: 8, borderRadius: 2, display: "inline-block", flexShrink: 0,
-};
-
-const copySentenceStyle: CSSProperties = {
-  fontSize: 12, color: "var(--muted)", lineHeight: 1.5,
-};
-
-const emptyBodyStyle: CSSProperties = {
-  fontSize: 13, color: "var(--muted)", padding: "4px 0",
-};
 
 
 /* Donut */
-const donutCenterStyle: CSSProperties = {
-  position: "absolute", inset: 0,
-  display: "flex", flexDirection: "column",
-  alignItems: "center", justifyContent: "center",
-  pointerEvents: "none",
-};
 
 /* Transaction list */
 const sectionDividerLabelStyle: CSSProperties = {

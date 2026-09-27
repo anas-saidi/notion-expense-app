@@ -27,9 +27,9 @@ const toneStyles: Record<BannerTone, { background: string; border: string; foreg
     foreground: "color-mix(in srgb, var(--info) 58%, var(--text))",
   },
   accent: {
-    background: "color-mix(in srgb, var(--accent) 10%, var(--surface))",
-    border: "color-mix(in srgb, var(--accent) 30%, transparent)",
-    foreground: "color-mix(in srgb, var(--accent) 48%, var(--text))",
+    background: "var(--select-wash)",
+    border: "var(--select-edge)",
+    foreground: "var(--text)",
   },
   warning: {
     background: "color-mix(in srgb, var(--warning-dim) 48%, var(--surface))",

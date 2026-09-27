@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cashBackingGap, getCategoryAvailableByScope, scopeMonthlySummary } from "./wallet-utils";
+import { getCategoryAvailableByScope, scopeMonthlySummary } from "./wallet-utils";
 import type { Account, Category, MonthlySummary } from "./app-types";
 const category = (id: string, available: number | null, extra = {}): Category => ({ id, name: id, available, icon: null, type: ["Team"], owner: null, defaultAccount: null, planned: null, lastMonthSpent: null, isTeamFund: true, ...extra });
 const accounts: Account[] = [{ id: "joint", label: "Joined Account", icon: "", type: null, balance: 1304, readyToAssign: 0 }, { id: "anas", label: "Hubby Account", icon: "", type: null, balance: 0, readyToAssign: 0 }];
@@ -12,18 +12,9 @@ describe("Home wallet semantics", () => {
     expect(monthly.totalSpent).toBe(11604); // Personal payer still counts in joint categories.
     const available = getCategoryAvailableByScope(categories).joint;
     expect(available).toBe(3804.5);
-    expect(cashBackingGap(available, 1304)).toBe(2500.5);
-    expect(cashBackingGap(available, 1304 + 1656)).toBe(844.5);
   });
   it("preserves negative balances, excludes savings, and separates personal scope", () => {
     expect(getCategoryAvailableByScope([category("over", -50), category("unknown", null), category("savings", 900, { type: ["Savings"] }), category("personal", 200, { isTeamFund: false, type: [], owner: "Anas" })])).toEqual({ joint: -50, anas: 200, salma: 0 });
-  });
-  it("does not invent a gap from missing data or surplus cash", () => {
-    expect(cashBackingGap(null, 1304)).toBeNull();
-    expect(cashBackingGap(3804.5, null)).toBeNull();
-    expect(cashBackingGap(100, 200)).toBe(0);
-    expect(cashBackingGap(-50, 0)).toBe(0);
-    expect(cashBackingGap(100, -50)).toBe(150);
   });
 });
 

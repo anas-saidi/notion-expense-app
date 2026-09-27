@@ -2,8 +2,10 @@
 import { ChoicePicker } from "./ChoicePicker";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ChevronRightIcon, XIcon } from "./ui/icons";
+import { useAppHaptics } from "./ui/useAppHaptics";
 type Theme = "system" | "light" | "dark";
 export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccounts }: { open: boolean; onClose: () => void; theme: Theme; onSelectTheme: (theme: Theme) => void; onOpenAccounts?: () => void }) {
+  const { haptic } = useAppHaptics();
   return <BottomSheet open={open} onClose={onClose} label="Settings" maxWidth="480px" panelStyle={{ background: "var(--bg)", borderRadius: "var(--radius-sheet)" }}>
     <div style={sheetContentStyle}>
       <header style={headerStyle}>
@@ -18,6 +20,15 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
             <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
           </ChoicePicker>
         </label>
+        {/* Haptics check: the switch is the phone's own (it should tick if the phone can
+            do web haptics at all); the button is the app's haptics. */}
+        <div style={settingRowStyle}>
+          <span style={rowLabelStyle}>Haptics</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+            <input type="checkbox" {...{ switch: "" }} aria-label="Phone haptics check" style={switchStyle} />
+            <button type="button" onClick={() => haptic("success")} style={appearanceTriggerStyle}>Test</button>
+          </span>
+        </div>
       </section>
       {onOpenAccounts && <section aria-label="Finances" style={sectionStyle}>
         <h3 style={sectionTitleStyle}>Finances</h3>
@@ -37,4 +48,5 @@ const sectionTitleStyle = { margin: 0, fontSize: 13, color: "var(--muted)", font
 const settingRowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, minHeight: 52 } as const;
 const rowLabelStyle = { fontSize: 16, color: "var(--text)" } as const;
 const appearanceTriggerStyle = { minHeight: 44, padding: "0 12px", background: "var(--surface2)", color: "var(--text2)", border: 0, borderRadius: "var(--radius-control)", fontSize: 14, fontWeight: 600 } as const;
+const switchStyle = { width: 44, height: 28, margin: 0 } as const;
 const navigationRowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", minHeight: 52, padding: 0, border: 0, background: "transparent", color: "var(--text)", fontSize: 16, cursor: "pointer", textAlign: "left" } as const;

@@ -4,7 +4,6 @@ import { useAppHaptics } from "./ui/useAppHaptics";
 
 type BottomNavProps = {
   tab: AppTab;
-  pendingCount?: number;
   onTabChange: (tab: AppTab) => void;
 };
 

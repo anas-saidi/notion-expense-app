@@ -913,4 +913,4 @@ const exprPreviewStyle: CSSProperties = {
 
 const entryModeButtonStyle: CSSProperties = { width: 44, height: 44, flexShrink: 0, display: "grid", placeItems: "center", border: 0, borderRadius: 999, background: "transparent", color: "var(--text2)", cursor: "pointer" };
 /** Type it is on: the same sparkle, tinted like other selected controls. */
-const entryModeActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent-foreground)" };
+const entryModeActiveStyle: CSSProperties = { background: "var(--select-wash)", color: "var(--select-ink)" };

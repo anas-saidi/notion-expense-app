@@ -263,7 +263,7 @@ export function CategoryManageSheet({
           {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Owners match the account.</p>}
           {!isEdit && selectedAssignable !== null && selectedAccount && (
             <div style={accountHintStyle}>
-              <span>Ready to assign from {selectedAccount.label}</span>
+              <span>Unassigned in {selectedAccount.label}</span>
               <strong><Money value={selectedAssignable} /></strong>
             </div>
           )}

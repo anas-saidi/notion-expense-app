@@ -55,13 +55,13 @@ gate and never touches `NOTION_TOKEN` or the data layer.
 - Holds all UI state: active tab, open sheets, form values, selected month
 - Passes data and callbacks down to screen/sheet components — no global state library
 
-**Tabs** (`AppTab = "home" | "plan" | "budget" | "history"`) switch between:
+**Tabs** (`AppTab = "home" | "budget" | "history"`) switch between:
 - `HomeScreen` — overview with budget sliders and spend summary
 - `CategoriesScreen` — category budget list with donut chart
 - `InsightsScreen` — monthly spend breakdown charts
-- `MonthlyPlanningFlow` — guided month-close/open workflow
 
 **Sheets** are full-screen or bottom-sheet overlays controlled by boolean state in `page.tsx`:
+- `MonthPlanSheet` — plan next month (opened from the Budget tab and the month-end Home banner)
 - `AddTransactionSheet` — add/edit expense, with quick-fund flow
 - `CategoryDetailsSheet` — category drill-down (transactions + fund/move actions)
 - `AccountDetailsSheet` — account drill-down (running balance chart per month)

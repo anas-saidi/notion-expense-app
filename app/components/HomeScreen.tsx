@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -6,104 +6,63 @@ import { BanknoteIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
 import { TransactionRow } from "./ui/TransactionRow";
 import { Banner } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
+import { isSavingsCategory } from "./wallet-utils";
 
 type HomeScreenProps = {
   categories: Category[];
-  selectedCategoryId: string;
-  search: string;
-  onSearchChange: (value: string) => void;
-  onSelectCategory: (category: Category) => void;
-  onOpenCategoryDetails: (category: Category) => void;
-  onOpenAdd: () => void;
   onOpenPlan: () => void;
-  onOpenRebalance: () => void;
-  onOpenBudgetTab?: () => void;
-  onFundCategory?: (category: Category) => void;
   onOpenHistory?: () => void;
   onClickTransaction?: (txn: Transaction) => void;
   contribStatus?: ContribStatus | null;
-  partnerAvatars?: Partial<Record<"anas" | "salma", string>>;
   monthlySummary: MonthlySummary;
-  walletSummaries?: Partial<Record<BudgetScope, MonthlySummary>>;
   categoryAvailableByScope: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
   readyToAssignByScope: Record<BudgetScope, number>;
   budgetScope: BudgetScope;
-  onBudgetScopeChange: (scope: BudgetScope) => void;
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
   plannedScopes?: Record<"joint" | "anas" | "salma", boolean>;
   transactions?: Transaction[];
   pendingItems?: PendingItem[];
   jointUnassigned?: number;
-  onOpenJointAllocate?: () => void;
+  /** Assign unassigned money (opens Rebalance, the same place Budget's banner goes). */
+  onOpenAssign?: () => void;
 };
 
 
 export function HomeScreen({
   categories,
-  selectedCategoryId,
-  search,
-  onSearchChange,
-  onSelectCategory,
-  onOpenCategoryDetails,
-  onOpenAdd,
   onOpenPlan,
-  onOpenRebalance,
-  onOpenBudgetTab,
-  onFundCategory,
   onOpenHistory,
   onClickTransaction,
   contribStatus,
-  partnerAvatars,
   monthlySummary,
-  walletSummaries,
   categoryAvailableByScope,
   balanceByScope,
   readyToAssignByScope,
   budgetScope,
-  onBudgetScopeChange,
   homeMonth,
   onHomeMonthChange,
   plannedScopes,
   transactions,
   pendingItems,
   jointUnassigned,
-  onOpenJointAllocate,
+  onOpenAssign,
 }: HomeScreenProps) {
 
   const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
-
-  const spentByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of monthlySummary.spentByCategory ?? []) map.set(e.categoryId, e.total);
-    return map;
-  }, [monthlySummary.spentByCategory]);
-
-  const plannedByCategory = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of monthlySummary.assignedByCategory ?? []) map.set(e.categoryId, e.total);
-    return map;
-  }, [monthlySummary.assignedByCategory]);
 
   const visibleCategories = useMemo(
     () => categories.filter(cat => categoryMatchesScope(cat, budgetScope)),
     [categories, budgetScope]
   );
 
-  const attentionItems = useMemo(() => {
-    return visibleCategories
-      .map(cat => {
-        const planned = plannedByCategory.get(cat.id) ?? 0;
-        const spent = spentByCategory.get(cat.id) ?? 0;
-        const available = isCurrentMonth ? (cat.available ?? planned - spent) : planned - spent;
-        const isOver = planned > 0 && spent > planned;
-        const isLow = !isOver && planned > 0 && (spent / planned) >= 0.82;
-        return { cat, spent, planned, available, isOver, isLow };
-      })
-      .filter(({ isOver, isLow }) => isOver || isLow)
-      .sort((a, b) => Number(b.isOver) - Number(a.isOver));
-  }, [visibleCategories, plannedByCategory, spentByCategory, isCurrentMonth]);
+  const overspentInCategories = useMemo(
+    () => isCurrentMonth
+      ? visibleCategories.filter((cat) => !isSavingsCategory(cat)).reduce((sum, cat) => sum + Math.max(0, -(cat.available ?? 0)), 0)
+      : 0,
+    [visibleCategories, isCurrentMonth],
+  );
 
   const upcomingBills = useMemo(() => {
     if (!pendingItems?.length) return [];
@@ -133,7 +92,6 @@ export function HomeScreen({
 
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
   const showJointUnassignedPrompt = isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
-  const monthLabel = monthShortLabel(homeMonth);
 
   // Month-end planning alert: show 2 days before month end until plan is locked
   const { daysUntilMonthEnd, nextMonthLabel: planningNextMonthLabel } = useMemo(() => {
@@ -161,37 +119,6 @@ export function HomeScreen({
     ? "Last day of the month"
     : `${daysUntilMonthEnd} day${daysUntilMonthEnd === 1 ? "" : "s"} left`;
 
-  const storageKey = `dismissed-attention-${homeMonth}-${budgetScope}`;
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return saved ? new Set<string>(JSON.parse(saved)) : new Set<string>();
-    } catch {
-      return new Set<string>();
-    }
-  });
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      setDismissedIds(saved ? new Set<string>(JSON.parse(saved)) : new Set<string>());
-    } catch {
-      setDismissedIds(new Set<string>());
-    }
-  }, [storageKey]);
-
-  const visibleAttentionItems = useMemo(
-    () => attentionItems.filter(({ cat }) => !dismissedIds.has(cat.id)),
-    [attentionItems, dismissedIds]
-  );
-  const dismissAttention = (id: string) => {
-    setDismissedIds(prev => {
-      const next = new Set([...prev, id]);
-      try { localStorage.setItem(storageKey, JSON.stringify([...next])); } catch {}
-      return next;
-    });
-  };
-
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
 
@@ -199,15 +126,12 @@ export function HomeScreen({
       <div style={walletSwitcherWrapStyle}>
         <WalletCardSwitcher
           value={budgetScope}
-          onChange={onBudgetScopeChange}
           monthlySummary={monthlySummary}
-          walletSummaries={walletSummaries}
           categoryAvailableByScope={categoryAvailableByScope}
           balanceByScope={balanceByScope}
           contribStatus={contribStatus}
-          partnerAvatars={partnerAvatars}
           categories={categories}
-          onOpenJointAllocate={isCurrentMonth ? onOpenJointAllocate : undefined}
+          overspent={overspentInCategories}
         />
       </div>
 
@@ -233,10 +157,9 @@ export function HomeScreen({
         <Banner
           tone="accent"
           style={{ marginBottom: 16 }}
-          title="Unassigned money"
-          action={<span style={assignRightStyle}><span style={assignAmountStyle}>{fmt(jointUnassigned ?? 0)}</span><button type="button" onClick={onOpenJointAllocate} style={bannerActionButtonStyle}>Allocate →</button></span>}
-        >
-        </Banner>
+          title={`${fmt(Math.round(jointUnassigned ?? 0))} unassigned`}
+          action={<button type="button" onClick={onOpenAssign} style={bannerActionButtonStyle}>Assign</button>}
+        />
       )}
 
       {/* Zone 2.5a: Month-end planning alert */}
@@ -326,10 +249,6 @@ export function HomeScreen({
   );
 }
 
-function monthShortLabel(ym: string): string {
-  return new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${ym}-01`));
-}
-
 /* ─── Styles ──────────────────────────────────────────────────── */
 
 const walletSwitcherWrapStyle: CSSProperties = {
@@ -382,85 +301,6 @@ const cardsRailStyle: CSSProperties = {
   overflowX: "auto",
   padding: "2px 4px 8px",
 };
-
-/* Attention — horizontal scroll cards */
-
-const attentionCardStyle: CSSProperties = {
-  flex: "0 0 120px",
-  borderRadius: "var(--radius-card)",
-  background: "var(--surface)",
-  boxShadow: "var(--elevation-card)",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  padding: "8px 10px 10px",
-  gap: 0,
-  position: "relative",
-};
-
-const attentionBodyStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 5,
-  padding: "4px 4px 8px",
-  border: "none",
-  background: "transparent",
-  cursor: "pointer",
-  width: "100%",
-  textAlign: "center",
-};
-
-const attentionNameStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  color: "var(--muted)",
-  lineHeight: 1.2,
-  overflow: "hidden",
-  whiteSpace: "nowrap",
-  textOverflow: "ellipsis",
-  maxWidth: "100%",
-};
-
-const attentionSubStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 15,
-  fontWeight: 500,
-  color: "var(--text2)",
-  lineHeight: 1,
-};
-
-
-const fundBtnStyle: CSSProperties = {
-  width: "100%",
-  padding: "5px 0",
-  borderRadius: 8,
-  border: "1px solid var(--border)",
-  background: "transparent",
-  fontSize: 12,
-  fontWeight: 500,
-  color: "var(--text2)",
-  cursor: "pointer",
-};
-
-const dismissBtnStyle: CSSProperties = {
-  position: "absolute",
-  top: 6,
-  right: 6,
-  width: 18,
-  height: 18,
-  borderRadius: 99,
-  border: "none",
-  background: "var(--surface2)",
-  fontSize: 8,
-  color: "var(--muted)",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  lineHeight: 1,
-};
-
 
 /* Ready to assign row */
 

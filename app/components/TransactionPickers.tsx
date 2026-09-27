@@ -150,8 +150,8 @@ const optionRowStyle = (selected: boolean): CSSProperties => ({
   fontSize: 13,
   textAlign: "left",
   boxSizing: "border-box",
-  background: selected ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent",
-  boxShadow: selected ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none",
+  background: selected ? "var(--select-wash)" : "transparent",
+  boxShadow: selected ? "inset 0 0 0 1px var(--select-edge)" : "none",
 });
 
 export const pickerIconStyle: CSSProperties = {
