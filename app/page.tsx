@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import Fuse from "fuse.js";
+import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
 import { InsightsScreen } from "./components/InsightsScreen";
@@ -16,7 +16,7 @@ import { SavingsWithdrawSheet } from "./components/SavingsWithdrawSheet";
 import { ManageScreen } from "./components/ManageScreen";
 import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
 import { RebalanceSheet } from "./components/RebalanceSheet";
-import { MonthStartPlanner } from "./components/MonthStartPlanner";
+import { MonthPlanSheet } from "./components/MonthPlanSheet";
 import { JointAllocateSheet } from "./components/JointAllocateSheet";
 import { Money } from "./components/Money";
 import { PickerPopover } from "./components/PickerPopover";
@@ -200,7 +200,6 @@ export default function App() {
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const balanceAnimRef = useRef<number | null>(null);
-  const fuseRef = useRef<Fuse<{ description: string; categoryId: string }> | null>(null);
   const dateRef = useRef<HTMLDivElement>(null);
   const catRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -572,14 +571,7 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    fuseRef.current = new Fuse(corpus, {
-      keys: ["description"],
-      threshold: 0.35,
-      minMatchCharLength: 3,
-      includeScore: true,
-    });
-  }, [corpus]);
+  const suggestFromHistory = useMemo(() => createCategorySuggester(corpus), [corpus]);
 
   useEffect(() => {
     if (!loading) return;
@@ -754,10 +746,6 @@ export default function App() {
 
   const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
   const jointUnassigned = useMemo(() => getJointAccountUnassigned(accounts), [accounts]);
-  const savingPool = useMemo(
-    () => accounts.filter(isSavingsAccount).reduce((sum, a) => sum + (a.readyToAssign ?? 0), 0),
-    [accounts],
-  );
 
   // Derive which scopes have been planned for next month (based on existing fund records)
   const plannedScopes = useMemo((): Record<"joint" | "anas" | "salma", boolean> => {
@@ -771,12 +759,12 @@ export default function App() {
     };
   }, [nextMonthFunds, categories, frozenCategories, accounts]);
 
-  // Planning is always for the NEXT month (we close the current month and plan the upcoming one)
+  // Planning is always for next month, counted from today (not the month being viewed).
   const monthStartPlannerMonth = useMemo(() => {
-    const [y, m] = homeMonth.split("-").map(Number);
+    const [y, m] = formatMonthInput(today()).split("-").map(Number);
     const d = new Date(y, m, 1); // month m = next month (JS months 0-indexed)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }, [homeMonth]);
+  }, []);
   // DEBUG PRINTS for spent on team categories
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1033,25 +1021,7 @@ export default function App() {
     : null;
 
   const suggestCategory = (query: string) => {
-    if (!fuseRef.current || query.length < 3) {
-      setSuggestedCatId(null);
-      return;
-    }
-    const results = fuseRef.current.search(query);
-    if (!results.length) {
-      setSuggestedCatId(null);
-      return;
-    }
-    const tally: Record<string, { weight: number; count: number }> = {};
-    for (const result of results) {
-      const catId = result.item.categoryId;
-      const weight = 1 - (result.score ?? 1);
-      if (!tally[catId]) tally[catId] = { weight: 0, count: 0 };
-      tally[catId].weight += weight;
-      tally[catId].count += 1;
-    }
-    const best = Object.entries(tally).filter(([, value]) => value.count >= 2).sort((a, b) => b[1].weight - a[1].weight)[0];
-    setSuggestedCatId(best ? best[0] : null);
+    setSuggestedCatId(suggestFromHistory(query, categories));
   };
 
   const submit = async () => {
@@ -1199,20 +1169,23 @@ export default function App() {
         />
       )}
 
-      <MonthStartPlanner
+      <MonthPlanSheet
         open={showMonthStartPlanner}
         onClose={() => setShowMonthStartPlanner(false)}
-        onComplete={() => {
-          refreshBudgetData();
+        onSaved={() => {
+          refreshBudgetData("Plan saved");
           fetchNextMonthFunds(); // eslint-disable-line react-hooks/exhaustive-deps
         }}
+        onCategoriesChanged={() => {
+          fetchCategories();
+          fetchFrozenCategories();
+        }}
+        planningMonth={monthStartPlannerMonth}
+        scope={budgetScope}
         categories={categories.filter((c) => !c.snoozed && !c.archived)}
         frozenCategories={frozenCategories}
         accounts={accounts}
-        planningMonth={monthStartPlannerMonth}
-        readyToAssignByScope={readyToAssignByScope}
-        savingPool={savingPool}
-        onOpenNewCategory={openNewCategory}
+        notAssigned={budgetScope === "joint" ? Math.max(0, jointUnassigned) : readyToAssignByScope[budgetScope] ?? 0}
       />
 
       {tab === "home" && (
@@ -1332,6 +1305,8 @@ export default function App() {
             setTransferAccount(source);
           }}
           onOpenNewCategory={openNewCategory}
+          planMonth={monthStartPlannerMonth}
+          onOpenPlan={openMonthlyPlan}
           loading={monthLoading || budgetRefreshing || refreshState === "updating"}
         />
       )}
@@ -1353,6 +1328,31 @@ export default function App() {
       <AddTransactionSheet
         open={showAddModal}
         mode={mode}
+        typedDraftKey={`typedDraft:v2:${mode}:${budgetScope}`}
+        typedCategories={categories.filter(c => !isSavingsCategory(c) && categoryMatchesScope(c, budgetScope, accounts))}
+        typedHistory={corpus}
+        onSaveTyped={async (transaction) => {
+          const response = await fetch(transaction.type === "Income" ? "/api/monthly-income" : "/api/expense", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(transaction),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Could not save transaction.");
+          if (transaction.type === "Expense") setCorpus(previous => {
+            const next = [...previous, { description: transaction.name, categoryId: transaction.categoryId }].slice(-100);
+            try { localStorage.setItem("expenseCorpus", JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }}
+        onTypedComplete={(count) => {
+          showToast(`${count} ${count === 1 ? "transaction" : "transactions"} saved`, 2000);
+          void fetchTransactions();
+          void fetchMonthlySummary(homeMonth);
+          void fetchCategories();
+          void fetch("/api/accounts").then(r => r.json()).then(data => setAccounts(data.accounts ?? [])).catch(() => {});
+          setTimeout(() => { void fetchCategories(); void fetchMonthlySummary(homeMonth); }, 1500);
+        }}
         amount={amount}
         name={name}
         date={date}

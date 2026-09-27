@@ -4,13 +4,16 @@ import { useState, useEffect, useRef, type CSSProperties, type RefObject } from 
 import type { Account, Category, Transaction } from "./app-types";
 import { evalExpr, fmt, fmtDate, isExpression, shiftDate, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
+import { TypeItComposer } from "./TypeItComposer";
+import type { TypedTransactionDraft } from "@/lib/typed-transactions";
 import { Money } from "./Money";
 import { TransactionRow } from "./ui/TransactionRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { PickerPopover } from "./PickerPopover";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { DateCalendar, DatePickerTrigger } from "./DatePicker";
-import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, XIcon } from "./ui/icons";
+import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, SparklesIcon, XIcon } from "./ui/icons";
+import { AccountOptionList, CategoryOptionList, pickerIconStyle, pickerChipIconStyle, pickerChipLabelStyle, pickerChipStyle } from "./TransactionPickers";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
 type AddTransactionSheetProps = {
@@ -62,6 +65,11 @@ type AddTransactionSheetProps = {
   onCatSearchChange: (value: string) => void;
   onSubmit: () => void;
   onDelete?: () => Promise<boolean>;
+  typedCategories?: Category[];
+  typedHistory?: { description: string; categoryId: string }[];
+  typedDraftKey?: string;
+  onSaveTyped?: (transaction: TypedTransactionDraft) => Promise<void>;
+  onTypedComplete?: (count: number) => void;
   dateRef: RefObject<HTMLDivElement>;
   catRef: RefObject<HTMLDivElement>;
   accountRef: RefObject<HTMLDivElement>;
@@ -69,6 +77,8 @@ type AddTransactionSheetProps = {
 
 export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const { haptic } = useAppHaptics();
+  const [entryMode, setEntryMode] = useState<"form" | "type">("form");
+  const [typedBusy, setTypedBusy] = useState(false);
   const [fundingSourceId, setFundingSourceId] = useState<string | null>(null);
   const [showFundPicker, setShowFundPicker] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -177,32 +187,55 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   return (
     <BottomSheet
       open={props.open}
-      onClose={props.onClose}
+      onClose={() => { if (!typedBusy) props.onClose(); }}
       label={isEditMode ? "Edit transaction" : "Add transaction"}
       maxWidth="500px"
       mobileFullWidth
       detent="default"
       backdropStrength={0.12}
+      backdropTop={typedBusy ? "0px" : undefined}
       panelStyle={panelStyle}
       contentStyle={{ paddingTop: 0, overflow: "hidden" }}
     >
-      <div ref={sheetContentRef} style={{ ...sheetInnerStyle, overflowY: amountFocused || props.categoryUnfunded || props.categoryOverBudget ? "auto" : "hidden" }}>
+      <div ref={sheetContentRef} style={{ ...sheetInnerStyle, overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget) ? "auto" : "hidden" }}>
 
         {/* ── Header ── */}
         <header style={topBarStyle}>
-          <div style={eyebrowStyle}>{isEditMode ? "Edit expense" : "New transaction"}</div>
-          <button onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
+          {entryMode === "type" && !isEditMode ? <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div ref={props.dateRef}>
+              <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} className="typed-date-trigger" ariaLabel="Choose default date" onClick={props.onToggleDatePicker} style={{ ...pickerChipStyle, border: 0, paddingLeft: 0, fontSize: 20 }} showChevron={false} />
+              <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="left" placement="bottom" width="min(304px, calc(100vw - 32px))" zIndex={140} anchorRef={props.dateRef}>
+                <DateCalendar value={props.date} onChange={props.onSelectDate} />
+              </PickerPopover>
+            </div>
+            <button type="button" disabled={typedBusy} aria-label="Type it" aria-pressed={true} title="Back to form" onClick={() => { setEntryMode("form"); props.onCloseDatePicker(); }} style={{ ...entryModeButtonStyle, ...entryModeActiveStyle }}><SparklesIcon size={20} aria-hidden="true" /></button>
+          </div> : <div style={eyebrowStyle}>{isEditMode ? "Edit expense" : "New transaction"}</div>}
+          <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
         </header>
 
-        {!isEditMode && (
+        {!isEditMode && entryMode === "form" && (
           <div role="tablist" aria-label="Transaction type" style={typeSwitcherStyle}>
-            <button type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" onClick={() => selectTransactionType("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></button>
-            <button type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" onClick={() => selectTransactionType("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></button>
+            <button type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" disabled={typedBusy} onClick={() => selectTransactionType("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></button>
+            <button type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" disabled={typedBusy} onClick={() => selectTransactionType("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></button>
           </div>
         )}
 
+        {!isEditMode && props.onSaveTyped && <TypeItComposer
+          key={props.typedDraftKey ?? props.mode}
+          active={entryMode === "type"}
+          draftKey={props.typedDraftKey ?? `typedDraft:v1:${props.mode}`}
+          categories={props.typedCategories ?? props.allCategories ?? []}
+          accounts={props.filteredAccounts}
+          history={props.typedHistory ?? []}
+          defaultAccountId={props.selectedAccount?.id ?? ""}
+          defaultDate={props.date}
+          onSave={props.onSaveTyped}
+          onComplete={props.onTypedComplete ?? (() => {})}
+          onBusyChange={setTypedBusy}
+        />}
+        {(isEditMode || entryMode === "form") && <div style={{ display: "contents" }}>
         {/* ── Amount hero ── */}
         <section style={{ ...heroWrapStyle, minHeight: showKeypad ? 96 : 120 }}>
           <div className="amount-hero-sizer" data-value={props.amount || "0"} data-empty={props.amount === "" ? "true" : undefined}>
@@ -293,35 +326,16 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 aria-expanded={props.showAccountPicker}
                 aria-controls="account-picker"
                 style={{
-                  ...chipStyle,
+                  ...pickerChipStyle,
                   color: props.showAccountPicker ? "var(--text2)" : "var(--muted)",
                 }}
               >
-                <span style={chipIconStyle}>{props.selectedAccount?.icon ?? "$"}</span>
-                <span style={chipLabelStyle}>{props.selectedAccount?.label ?? ""}</span>
+                <span style={pickerChipIconStyle}>{props.selectedAccount?.icon ?? "$"}</span>
+                <span style={pickerChipLabelStyle}>{props.selectedAccount?.label ?? ""}</span>
               </button>
 
               <PickerPopover open={props.showAccountPicker} title="Account" onClose={props.onCloseAccountPicker} align="left" placement="top" width="min(292px, calc(100vw - 28px))" zIndex={140} anchorRef={props.accountRef}>
-                <div id="account-picker" style={{ maxHeight: 236, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
-                  <div style={{ display: "grid", gap: 2 }}>
-                    {props.filteredAccounts.map((acct) => (
-                      <button className="picker-option" aria-pressed={acct.id === props.selectedAccount?.id} key={acct.id} onClick={() => { if (acct.id !== props.selectedAccount?.id) haptic("selection"); props.onSelectAccount(acct.id); }} style={{ ...pickerRowStyle, background: acct.id === props.selectedAccount?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: acct.id === props.selectedAccount?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
-                        <div style={pickerIconStyle}>
-                          {acct.icon ?? "$"}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: acct.id === props.selectedAccount?.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acct.label}</div>
-                          {acct.type && <div style={pickerMetaStyle}>{acct.type}</div>}
-                        </div>
-                        {acct.balance !== null && (
-                          <span style={{ ...monoSmallStyle, color: acct.balance < 0 ? "var(--danger)" : "var(--muted)", paddingLeft: 8 }}>
-                            <Money value={acct.balance} />
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <AccountOptionList id="account-picker" accounts={props.filteredAccounts} selectedId={props.selectedAccount?.id} onSelect={props.onSelectAccount} />
               </PickerPopover>
             </div>
 
@@ -333,60 +347,30 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 aria-expanded={props.showCatPicker}
                 aria-controls="category-picker"
                 style={{
-                  ...chipStyle,
+                  ...pickerChipStyle,
                   color: props.selectedCat || props.showCatPicker ? "var(--text2)" : "var(--muted)",
                 }}
               >
-                <span style={chipIconStyle}>{props.selectedCat?.icon ?? "#"}</span>
-                <span style={chipLabelStyle}>{props.selectedCat?.name ?? "Category"}</span>
+                <span style={pickerChipIconStyle}>{props.selectedCat?.icon ?? "#"}</span>
+                <span style={pickerChipLabelStyle}>{props.selectedCat?.name ?? "Category"}</span>
               </button>
 
               <PickerPopover open={props.showCatPicker} title="Category" onClose={props.onCloseCatPicker} align="left" placement="top" width="min(300px, calc(100vw - 28px))" zIndex={140} anchorRef={props.catRef}>
-                <div id="category-picker" style={{ width: "100%", boxSizing: "border-box" }}>
-                  <div style={{ maxHeight: 164, overflowY: "auto", overflowX: "hidden", padding: 8, boxSizing: "border-box" }}>
-                    <div style={{ display: "grid", gap: 2 }}>
-                      {props.filteredCats.map((cat) => {
-                        const meta = [cat.type[0] ?? null, cat.id === props.lastUsedCatId ? "Last used" : null].filter(Boolean).join(" / ");
-                        return (
-                          <button className="picker-option" aria-pressed={cat.id === props.selectedCat?.id} key={cat.id} onClick={() => { if (cat.id !== props.selectedCat?.id) haptic("selection"); props.onSelectCategory(cat); }} style={{ ...pickerRowStyle, background: cat.id === props.selectedCat?.id ? "color-mix(in srgb, var(--accent) 11%, var(--surface))" : "transparent", boxShadow: cat.id === props.selectedCat?.id ? "inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent)" : "none" }}>
-                            <div style={pickerIconStyle}>
-                              {cat.icon ?? "#"}
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: cat.id === props.selectedCat?.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
-                              {meta && <div style={pickerMetaStyle}>{meta}</div>}
-                            </div>
-                            {cat.available !== null && (
-                              <span style={{ ...monoSmallStyle, color: cat.available > 0 ? "var(--success)" : "var(--danger)", paddingLeft: 8 }}>
-                                {cat.available > 0 ? "+" : ""}<Money value={cat.available} />
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                      {props.filteredCats.length === 0 && (
-                        <p style={{ padding: 18, color: "var(--muted)", fontSize: 14, textAlign: "center" }}>No categories found</p>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ padding: "10px 10px 11px", borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)", background: "color-mix(in srgb, var(--surface2) 10%, var(--surface))" }}>
-                    <div style={{ minHeight: 44, borderRadius: 12, border: "1px solid transparent", background: "color-mix(in srgb, var(--surface2) 42%, var(--surface))", display: "flex", alignItems: "center", gap: 8, padding: "0 12px" }}>
-                      <span aria-hidden="true" style={{ fontSize: 12, color: "var(--muted)" }}>/</span>
-                      <input type="text" aria-label="Search categories" value={props.catSearch} onChange={(e) => props.onCatSearchChange(e.target.value)} placeholder="Search categories" autoFocus style={{ width: "100%", background: "transparent", border: "none", padding: 0, color: "var(--text2)", outline: "none", fontSize: 15 }} />
-                    </div>
-                  </div>
-                </div>
+                <CategoryOptionList id="category-picker" categories={props.filteredCats} selectedId={props.selectedCat?.id} lastUsedId={props.lastUsedCatId} onSelect={props.onSelectCategory} search={props.catSearch} onSearchChange={props.onCatSearchChange} />
               </PickerPopover>
             </div>}
             </div>
 
-            {/* Date picker */}
+            {/* Date picker and writing mode */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <div style={datePickerSlotStyle} ref={props.dateRef}>
-              <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} ariaLabel="Choose date" onClick={props.onToggleDatePicker} style={chipStyle} className="composer-picker-chip" showChevron={false} />
+              <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} ariaLabel="Choose date" onClick={props.onToggleDatePicker} style={pickerChipStyle} className="composer-picker-chip" showChevron={false} />
 
               <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="right" placement="top" width="min(304px, calc(100vw - 32px))" zIndex={140} anchorRef={props.dateRef}>
                 <div id="date-picker"><DateCalendar value={props.date} onChange={props.onSelectDate} /></div>
               </PickerPopover>
+            </div>
+            {!isEditMode && props.onSaveTyped && <button type="button" aria-label="Type it" aria-pressed={false} title="Type it" disabled={props.status === "saving"} onClick={() => { setEntryMode("type"); setShowKeypad(false); props.onCloseDatePicker(); props.onCloseCatPicker(); props.onCloseAccountPicker(); }} style={entryModeButtonStyle}><SparklesIcon size={20} aria-hidden="true" /></button>}
             </div>
           </div>
 
@@ -607,6 +591,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           </div>
 
         </section>
+        </div>}
       </div>
 
       {confirmingDelete && props.onDelete && (
@@ -884,86 +869,6 @@ const pickerContextGroupStyle: CSSProperties = { display: "flex", alignItems: "c
 const pickerSlotStyle: CSSProperties = { position: "relative", minWidth: 0 };
 const datePickerSlotStyle: CSSProperties = { position: "relative", minWidth: 0, marginLeft: "auto" };
 
-const chipStyle: CSSProperties = {
-  minHeight: 44,
-  minWidth: 0,
-  maxWidth: "100%",
-  padding: "0 12px",
-  borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
-  background: "var(--surface)",
-  color: "var(--text2)",
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 7,
-  boxSizing: "border-box",
-};
-
-const chipIconStyle: CSSProperties = {
-  width: 18,
-  height: 18,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 13,
-  flexShrink: 0,
-};
-
-const chipLabelStyle: CSSProperties = {
-  minWidth: 0,
-  maxWidth: 128,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const pickerRowStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 54,
-  padding: "12px 14px",
-  background: "transparent",
-  border: "none",
-  borderRadius: 16,
-  color: "var(--text2)",
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  cursor: "pointer",
-  fontSize: 13,
-  textAlign: "left",
-  boxSizing: "border-box",
-};
-
-const pickerIconStyle: CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: 12,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-  fontSize: 15,
-};
-
-const pickerMetaStyle: CSSProperties = {
-  marginTop: 3,
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  color: "var(--muted)",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const monoSmallStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  flexShrink: 0,
-};
-
 const fundTriggerStyle = (loading: boolean): CSSProperties => ({
   minHeight: 44,
   padding: "0 4px",
@@ -1005,3 +910,7 @@ const exprPreviewStyle: CSSProperties = {
   letterSpacing: 0.2,
   animation: "fadeUp 0.15s ease both",
 };
+
+const entryModeButtonStyle: CSSProperties = { width: 44, height: 44, flexShrink: 0, display: "grid", placeItems: "center", border: 0, borderRadius: 999, background: "transparent", color: "var(--text2)", cursor: "pointer" };
+/** Type it is on: the same sparkle, tinted like other selected controls. */
+const entryModeActiveStyle: CSSProperties = { background: "color-mix(in srgb, var(--accent) 16%, transparent)", color: "var(--accent-foreground)" };

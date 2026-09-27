@@ -70,7 +70,7 @@ const buildFundProperties = (allocation: AllocationItem, date: string) => {
   return properties;
 };
 
-async function upsertFund(token: string, allocation: AllocationItem, date: string, end: string) {
+async function upsertFund(token: string, allocation: AllocationItem, date: string, end: string, allowClear = false) {
   const queryRes = await fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
     method: "POST",
     headers: notionHeaders(token),
@@ -95,7 +95,18 @@ async function upsertFund(token: string, allocation: AllocationItem, date: strin
   const properties = buildFundProperties(allocation, date);
 
   if (existing) {
-    // Never overwrite an existing fund with 0 — skip instead
+    // A plan set to 0 archives the fund only when the caller asks (the month plan
+    // sheet); other callers never overwrite an existing fund with 0.
+    if (allocation.amount <= 0 && allowClear) {
+      const archiveRes = await fetch(`https://api.notion.com/v1/pages/${existing.id}`, {
+        method: "PATCH",
+        headers: notionHeaders(token),
+        body: JSON.stringify({ archived: true }),
+      });
+      const archiveData = await archiveRes.json();
+      if (!archiveRes.ok) throw new Error(archiveData.message || "Failed to clear fund");
+      return { id: existing.id, categoryId: allocation.categoryId, planned: 0, mode: "cleared" };
+    }
     if (allocation.amount <= 0) {
       return { id: existing.id, categoryId: allocation.categoryId, planned: existing.properties.Planned?.number ?? 0, mode: "skipped" };
     }
@@ -169,7 +180,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const savedFunds = await Promise.all(
-      allocations.map((allocation) => upsertFund(token, allocation, bounds.start, bounds.end)),
+      allocations.map((allocation) => upsertFund(token, allocation, bounds.start, bounds.end, body.allowClear === true)),
     );
 
     return NextResponse.json({

@@ -6,7 +6,7 @@ import { MonthPicker } from "./DatePicker";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { AlertTriangleIcon, CheckIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
+import { AlertTriangleIcon, CalendarIcon, CheckIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
@@ -47,6 +47,9 @@ type Props = {
   loading?: boolean;
   /** Partners' contributions to Joint: shown as their jars beside the Joint pool, as on Home. */
   contribStatus?: ContributionStatus | null;
+  /** "YYYY-MM" of the month that can be planned (next month). */
+  planMonth?: string;
+  onOpenPlan?: () => void;
 };
 
 type ScopeChip = BudgetScope;
@@ -97,6 +100,8 @@ export function CategoriesScreen({
   onRetryMonth,
   loading = false,
   contribStatus = null,
+  planMonth,
+  onOpenPlan,
 }: Props) {
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -307,6 +312,21 @@ export function CategoriesScreen({
               </Banner>
             )}
 
+            {/* Next month's plan is always one tap away while looking at this month. */}
+            {planMonth && onOpenPlan && !isPastMonth(homeMonth) && (
+              <Banner
+                tone="neutral"
+                icon={<CalendarIcon size={18} strokeWidth={2.2} />}
+                title={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}
+                action={(
+                  <button type="button" onClick={onOpenPlan} style={bannerActionStyle}>
+                    Plan
+                  </button>
+                )}
+              >
+              </Banner>
+            )}
+
             <div role="tablist" aria-label="Budget category groups" style={groupPillsStyle}>
               {activeGroups.map(group => {
                 const selected = !showFrozenAll && group.label === visibleSection;
@@ -347,9 +367,6 @@ export function CategoriesScreen({
                   triggerClassName="composer-picker-chip"
                   showChevron={false}
                 />
-                <span role="status" style={{ fontSize: 13, color: "var(--text2)" }}>
-                  {loading ? "Loading planned & spent…" : "Planned & spent"}
-                </span>
               </div>
             )}
             {!showFrozenAll && monthError && !loading && (

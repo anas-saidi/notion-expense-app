@@ -2201,3 +2201,8 @@ html[data-theme="dark"] .bottom-sheet-panel {
 .transaction-type--expense[aria-selected="true"] svg { color: var(--danger); }
 .transaction-type--income[aria-selected="true"] svg { color: var(--success); }
 .transaction-type:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 46%, transparent); outline-offset: 2px; }
+
+/* Type it is a writing canvas; retain larger writing text above iOS's zoom threshold. */
+textarea.typed-entry-line { font-size: 22px !important; }
+textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
+.date-picker-trigger.typed-date-trigger { border: 0 !important; background: transparent !important; padding: 0 !important; font-size: 20px !important; }

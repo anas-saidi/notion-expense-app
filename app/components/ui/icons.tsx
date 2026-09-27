@@ -51,6 +51,7 @@ import {
   MoreHorizontal,
   ReceiptText,
   WalletCards,
+  Sparkles,
   type LucideProps,
 } from "lucide-react";
 
@@ -88,6 +89,8 @@ export const LandmarkIcon     = (p: LucideProps) => <Landmark      size={S} {...
 export const UserIcon         = (p: LucideProps) => <User          size={S} {...p} />;
 export const UserRoundIcon    = (p: LucideProps) => <UserRound     size={S} {...p} />;
 export const DeleteIcon       = (p: LucideProps) => <Delete        size={S} {...p} />;
+/** Type it: write transactions in plain words. */
+export const SparklesIcon     = (p: LucideProps) => <Sparkles      size={S} {...p} />;
 export const MoreIcon         = (p: LucideProps) => <MoreHorizontal size={S} {...p} />;
 export const ReceiptIcon      = (p: LucideProps) => <ReceiptText    size={S} {...p} />;
 export const WalletIcon       = (p: LucideProps) => <WalletCards    size={S} {...p} />;
