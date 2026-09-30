@@ -12,7 +12,7 @@ import { MascotHero } from "./mascot/MascotHero";
 import { allocationJarItems } from "./mascot/budgetJar";
 import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
-import { ProgressiveBlur } from "./ui/ProgressiveBlur";
+import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, XIcon } from "./ui/icons";
@@ -127,6 +127,7 @@ export function MonthPlanSheet({
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const [heroTarget, setHeroTarget] = useState<HTMLSpanElement | null>(null);
   const [heroHidden, setHeroHidden] = useState(false);
+  const { below: rowsBelow } = useScrollEdges(scrollRoot);
 
   useEffect(() => {
     if (!open) return;
@@ -380,7 +381,7 @@ export function MonthPlanSheet({
           <ProgressiveBlur
             position="top"
             height={STICKY_BAR_H + 44}
-            solidHeight={STICKY_BAR_H - 12}
+            fade={56}
             maxBlur={12}
             tint={SHEET_BG}
             visible={heroHidden}
@@ -488,6 +489,8 @@ export function MonthPlanSheet({
             </section>
           )}
         </div>
+          {/* Rows melt into the footer rather than stopping at a hairline. */}
+          <ProgressiveBlur position="bottom" height={28} maxBlur={4} tint={SHEET_BG} visible={rowsBelow} reduceMotion={!!reduceMotion} />
         </div>
 
         <footer style={footerStyle}>
@@ -900,7 +903,6 @@ const footerStyle: CSSProperties = {
   flexShrink: 0,
   display: "grid",
   gap: 10,
-  borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)",
 };
 
 const footerRowStyle: CSSProperties = { display: "flex", gap: 10, minHeight: 60, alignItems: "center" };

@@ -5,6 +5,7 @@ import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon } from "./ui/icons";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import { SettingsSheet } from "./SettingsSheet";
 import { useAppHaptics } from "./ui/useAppHaptics";
+import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 
 export function AppShell({
   tab,
@@ -41,7 +42,22 @@ export function AppShell({
 }) {
   const { haptic } = useAppHaptics();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+  const { below: contentBelow } = useScrollEdges(contentEl);
+  // Mobile scrolls .app-content; desktop (≥1100px) scrolls the page — watch both.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const measure = () => setScrolled((contentRef.current?.scrollTop ?? 0) > 1 || window.scrollY > 1);
+    const content = contentRef.current;
+    content?.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("scroll", measure, { passive: true });
+    measure();
+    return () => {
+      content?.removeEventListener("scroll", measure);
+      window.removeEventListener("scroll", measure);
+    };
+  }, []);
   useEffect(() => {
     const root = document.documentElement;
     const useKeyboardModality = (event: KeyboardEvent) => {
@@ -72,12 +88,14 @@ export function AppShell({
   return (
     <div className="app-shell-root" style={{ height: "100dvh", position: "relative" }}>
       <div
-        ref={contentRef}
+        ref={(node) => { contentRef.current = node; setContentEl(node); }}
         id="app-root-shell"
         className="app-content"
         style={{ height: "100%", overflowY: "auto", overflowAnchor: "none", position: "relative" }}
       >
         <header className="app-header" style={headerStyle}>
+          {/* Content scrolling up melts into the header instead of cutting off at its edge. */}
+          <ProgressiveBlur position="top" height={32} maxBlur={6} tint="var(--bg)" visible={scrolled} style={{ top: "100%", zIndex: -1 }} />
           <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
           <div className="app-header-actions">
             {tab === "budget" ? (
@@ -109,6 +127,18 @@ export function AppShell({
         </header>
         {children}
       </div>
+
+      {/* Content fades out behind the floating nav instead of running into the screen edge. */}
+      <ProgressiveBlur
+        className="app-nav-blur"
+        position="bottom"
+        height="calc(96px + env(safe-area-inset-bottom, 0px))"
+        fade={72}
+        maxBlur={10}
+        tint="color-mix(in srgb, var(--bg) 88%, transparent)"
+        visible={contentBelow}
+        style={{ zIndex: 55 }}
+      />
 
       <div className="app-nav-wrap">
         <BottomNav tab={tab} onTabChange={onTabChange} />

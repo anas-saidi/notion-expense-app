@@ -1053,6 +1053,11 @@ html.has-open-sheet .app-content {
   }
 }
 
+/* The nav becomes a sidebar on desktop; nothing floats over the page bottom. */
+@media (min-width: 1100px) {
+  .app-nav-blur { display: none; }
+}
+
 .app-nav-wrap {
   /* Anchor to the full-height shell; its content scrolls independently. */
   position: absolute;

@@ -7,6 +7,7 @@ import { XIcon } from "./ui/icons";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
+import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
 import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
@@ -204,7 +205,7 @@ export function AllocationFlow({
           {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
         </header>
 
-      <div style={sheetScrollStyle}>
+      <BlurScrollArea style={sheetScrollStyle}>
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
           {/* The jar fills as money is assigned: full when balanced, worried when over. */}
           {jarScope && jarItems.length > 0 && (() => {
@@ -333,7 +334,7 @@ export function AllocationFlow({
             </div>
           </div>
         )}
-      </div>
+      </BlurScrollArea>
 
       {activeItem && (
         <div aria-label="Budget control" style={slimBarPanelStyle}>
@@ -414,7 +415,7 @@ const confirmationTitleStyle: CSSProperties = { display: "block", fontSize: 13, 
 const confirmationCopyStyle: CSSProperties = { display: "block", marginTop: 3, fontSize: 11, lineHeight: 1.35, color: "var(--muted)" };
 const confirmationBackStyle: CSSProperties = { minWidth: 44, minHeight: 44, padding: "0 10px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface)", color: "var(--text2)", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 const emptyStyle: CSSProperties = { minHeight: 220, display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 13 };
-const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "0 0 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `14px 18px calc(12px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", borderTop: "1px solid color-mix(in srgb, var(--border) 18%, transparent)", boxShadow: "none" };
+const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "0 0 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `14px 18px calc(12px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", boxShadow: "none" };
 const saveButtonStyle: CSSProperties = { width: "100%", marginTop: "auto", minHeight: 52, borderRadius: 16, border: "none", background: "var(--accent)", color: "var(--accent-ink)", padding: "0 20px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "none" };
 
 // ── Hero pool styles ──────────────────────────────────────────────────────────

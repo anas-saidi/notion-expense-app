@@ -6,6 +6,7 @@ import type { Account, Category, BudgetScope } from "./app-types";
 import { assignableOf, fmt, scopeFromAccountLabel, today } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { BottomSheet } from "./ui/BottomSheet";
+import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
@@ -204,7 +205,7 @@ export function CategoryManageSheet({
           </button>
         </header>
 
-        <div style={{ display: "grid", gap: 16, alignContent: "start", overflowY: "auto", minHeight: 0 }}>
+        <BlurScrollArea style={{ display: "grid", gap: 16, alignContent: "start", overflowY: "auto" }}>
         {isMetadata && (
           <section style={sectionStyle}>
             <label style={fieldStyle}>
@@ -288,7 +289,7 @@ export function CategoryManageSheet({
 
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
-        </div>
+        </BlurScrollArea>
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
           {status === "success" && <CheckIcon size={16} />}
           {status === "idle" && (isEdit ? <CheckIcon size={16} /> : isCreate ? <PlusIcon size={16} strokeWidth={2.3} /> : <FundIcon size={16} strokeWidth={2.3} />)}

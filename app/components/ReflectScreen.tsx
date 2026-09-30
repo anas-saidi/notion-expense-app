@@ -11,6 +11,7 @@ import { ReflectFlowChart } from "./ReflectFlowChart";
 import { MascotHero } from "./mascot/MascotHero";
 import { spendingJarItems } from "./mascot/budgetJar";
 import { BottomSheet } from "./ui/BottomSheet";
+import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
 import { ScreenChip } from "./ui/ScreenChip";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -137,28 +138,28 @@ export function ReflectScreen(props: Props) {
 
     <BottomSheet open={showPeriod} onClose={() => setShowPeriod(false)} label="Time period" maxWidth="440px" contentStyle={sheetContentStyle}>
       <SheetHeader title="Time period" onClose={() => setShowPeriod(false)} />
-      <div style={sheetScrollStyle}>
+      <BlurScrollArea style={sheetScrollStyle}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {([["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const).map(([key, name]) => { const period = reflectPreset(key); const selected = props.period.start === period.start && props.period.end === period.end; return <button type="button" key={key} aria-pressed={selected} onClick={() => choosePeriod(period)} style={{ ...quietButtonStyle, justifyContent: "center", background: selected ? SELECTED_FLAT : "var(--surface2)", color: selected ? "var(--select-ink)" : "var(--text2)" }}>{name}</button>; })}
         </div>
         <h3 style={{ ...sectionTitleStyle, margin: "24px 0 12px" }}>Choose your own range</h3>
         <div style={{ display: "grid", gap: 16 }}><label style={mutedStyle}>From<MonthPicker value={customPeriod.start} max={currentMonth} aria-label="Start month" onChange={event => setCustomPeriod({ ...customPeriod, start: event.target.value })} /></label><label style={mutedStyle}>Through<MonthPicker value={customPeriod.end} max={currentMonth} aria-label="End month" onChange={event => setCustomPeriod({ ...customPeriod, end: event.target.value })} /></label></div>
         {customPeriod.start > customPeriod.end && <p role="alert" style={{ ...mutedStyle, color: "var(--danger)" }}>The end month must follow the start month.</p>}
-      </div>
+      </BlurScrollArea>
       <button disabled={!customPeriod.start || !customPeriod.end || customPeriod.start > customPeriod.end || customPeriod.end > currentMonth} onClick={() => choosePeriod(customPeriod)} style={primaryButtonStyle}>Apply range</button>
     </BottomSheet>
 
     <BottomSheet open={showFilters} onClose={() => setShowFilters(false)} label="Filter spending" maxWidth="480px" contentStyle={sheetContentStyle}>
       <SheetHeader title="Filter spending" onClose={() => setShowFilters(false)} />
-      <div style={sheetScrollStyle}>
+      <BlurScrollArea style={sheetScrollStyle}>
         <FilterGroup title="Categories" items={categoryOptions} excluded={excludedCategories} onToggle={id => toggle(id, excludedCategories, setExcludedCategories)} onAll={() => setExcludedCategories([])} onNone={() => setExcludedCategories(categoryOptions.map(row => row.id))} />
         <FilterGroup title="Accounts" items={accountOptions} excluded={excludedAccounts} onToggle={id => toggle(id, excludedAccounts, setExcludedAccounts)} onAll={() => setExcludedAccounts([])} onNone={() => setExcludedAccounts(accountOptions.map(row => row.id))} />
-      </div>
+      </BlurScrollArea>
       <button onClick={() => setShowFilters(false)} style={primaryButtonStyle}>Show breakdown</button>
     </BottomSheet>
 
     <BottomSheet open={Boolean(selected)} onClose={() => setSelectedId(null)} label={selected ? `${selected.name} spending` : "Category spending"} maxWidth="500px" contentStyle={sheetContentStyle}>
-      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><div style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow" : "Net spending"} · {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><Money value={selected.spent} /> out · <Money value={selected.inflow} /> in</p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = transaction.type === "Income" || transaction.amount < 0; return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === (transaction.accountId || transaction.toAccountId))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></div></>}
+      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow" : "Net spending"} · {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><Money value={selected.spent} /> out · <Money value={selected.inflow} /> in</p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = transaction.type === "Income" || transaction.amount < 0; return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === (transaction.accountId || transaction.toAccountId))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
     </BottomSheet>
   </div>;
 }
