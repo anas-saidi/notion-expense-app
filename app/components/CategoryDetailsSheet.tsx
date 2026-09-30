@@ -164,7 +164,7 @@ export function CategoryDetailsSheet({
         {/* ── Budget summary ── */}
         <section style={statsWrapStyle}>
           <div style={availableStyle}>
-            <span style={statLabelStyle}>Funded</span>
+            <span style={statLabelStyle}>Allocated</span>
             <span style={availableValueStyle}><Money value={available} currency /></span>
           </div>
           <div style={supportingStatsStyle}>

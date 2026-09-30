@@ -1,25 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useReducedMotion } from "motion/react";
 import type { Account, BudgetScope, Category } from "./app-types";
-import { BUDGET_SCOPE_LABELS, categoryMatchesScope, fmt, monthBounds, parseAmount } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, categoryMatchesScope, getCategoryScope, fmt, monthBounds, parseAmount } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
+import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "./month-plan-capacity";
+import { JointFamily } from "./WalletCardSwitcher";
 import { Money } from "./Money";
 import { MascotHero } from "./mascot/MascotHero";
 import { allocationJarItems } from "./mascot/budgetJar";
 import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
+import { ProgressiveBlur } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { CheckIcon, ManIcon, WomanIcon, XIcon } from "./ui/icons";
+import { CheckIcon, XIcon } from "./ui/icons";
+import { SwipeToDelete } from "./ui/SwipeToDelete";
+import { freezeMonthPlanCategory } from "./month-plan-actions";
 import { SlideToConfirm } from "./SlideToConfirm";
 import { SectionToggle } from "./ui/SectionToggle";
 import { pickerChipStyle } from "./TransactionPickers";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
-
-/** Contribution split for Joint when the accounts don't carry one. */
-const DEFAULT_SPLIT = { anas: 0.65, salma: 0.35 } as const;
 
 /** Budget groups from most to least essential, so scrolling down goes from must-pay to optional. */
 const BUDGET_GROUPS: Array<{ key: string; label: string; matches: (type: string) => boolean }> = [
@@ -74,8 +77,8 @@ type MonthPlanSheetProps = {
   categories: Category[];
   frozenCategories: Category[];
   accounts: Account[];
-  /** Unassigned money for the scope, from the accounts' Ready To Assign formula. */
-  notAssigned: number;
+  /** Unassigned capacity after current commitments, before next month's plan. */
+  planningCapacity: PlanAmounts;
 };
 
 /* ─── Main component ──────────────────────────────────────────────── */
@@ -90,8 +93,9 @@ export function MonthPlanSheet({
   categories,
   frozenCategories,
   accounts,
-  notAssigned,
+  planningCapacity,
 }: MonthPlanSheetProps) {
+  const reduceMotion = useReducedMotion();
   const currentMonth = shiftMonth(planningMonth, -1);
   const planLabel = monthName(planningMonth);
 
@@ -103,6 +107,9 @@ export function MonthPlanSheet({
   const [loadError, setLoadError] = useState("");
   // Draft amounts by normalised category id; missing = the saved amount.
   const [draft, setDraft] = useState<Record<string, number>>({});
+  const [locallyFrozen, setLocallyFrozen] = useState<Category[]>([]);
+  const [freezing, setFreezing] = useState<string | null>(null);
+  const freezeLock = useRef(false);
   const [revived, setRevived] = useState<Category[]>([]);
   const [unfreezing, setUnfreezing] = useState<string | null>(null);
   // Sections are open by default; Frozen starts closed.
@@ -117,19 +124,21 @@ export function MonthPlanSheet({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   // Once the hero number scrolls away, a compact bar keeps the jar and number in view.
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const heroAmountRef = useRef<HTMLSpanElement>(null);
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+  const [heroTarget, setHeroTarget] = useState<HTMLSpanElement | null>(null);
   const [heroHidden, setHeroHidden] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    const root = scrollRef.current;
-    const target = heroAmountRef.current;
+    const root = scrollRoot;
+    const target = heroTarget;
     if (!root || !target) return;
-    const observer = new IntersectionObserver(([entry]) => setHeroHidden(!entry.isIntersecting), { root, threshold: 0 });
+    const observer = new IntersectionObserver(([entry]) => {
+      setHeroHidden(!entry.isIntersecting && entry.boundingClientRect.bottom <= (entry.rootBounds?.top ?? root.getBoundingClientRect().top));
+    }, { root, threshold: 0, rootMargin: `-${STICKY_BAR_H}px 0px 0px 0px` });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [open]);
+  }, [open, scrollRoot, heroTarget]);
 
   const loadPlan = async () => {
     setLoading(true);
@@ -143,6 +152,7 @@ export function MonthPlanSheet({
       const funds = await fundsRes.json();
       const summary = await summaryRes.json();
       if (!fundsRes.ok) throw new Error(funds.error || "Couldn't load the saved plan");
+      if (!summaryRes.ok) throw new Error(summary.error || "Couldn't load current commitments");
       setSaved(sumByCategory(funds.funds ?? []));
       setCurrentPlanned(sumByCategory(summary.summary?.assignedByCategory ?? []));
       setCurrentSpent(sumByCategory(summary.summary?.spentByCategory ?? []));
@@ -157,6 +167,8 @@ export function MonthPlanSheet({
     if (!open) return;
     setDraft({});
     setRevived([]);
+    setLocallyFrozen([]);
+    setHeroHidden(false);
     setCollapsed(new Set(["frozen"]));
     setSaveError("");
     void loadPlan();
@@ -167,8 +179,8 @@ export function MonthPlanSheet({
   // Active categories, plus any unfrozen here that the app hasn't refetched yet.
   const activeCategories = useMemo(() => {
     const ids = new Set(categories.map((c) => c.id));
-    return [...categories, ...revived.filter((c) => !ids.has(c.id))].filter((c) => !c.archived);
-  }, [categories, revived]);
+    return [...categories, ...revived.filter((c) => !ids.has(c.id))].filter((c) => !c.archived && !locallyFrozen.some((f) => normId(f.id) === normId(c.id)));
+  }, [categories, revived, locallyFrozen]);
   const scopeCategories = useMemo(
     () => activeCategories.filter((c) => categoryMatchesScope(c, scope, accounts)),
     [activeCategories, scope, accounts],
@@ -189,23 +201,39 @@ export function MonthPlanSheet({
 
   const frozenInScope = useMemo(() => {
     const revivedIds = new Set(revived.map((c) => c.id));
-    return frozenCategories.filter((c) => !c.archived && !revivedIds.has(c.id) && categoryMatchesScope(c, scope, accounts));
-  }, [frozenCategories, revived, scope, accounts]);
+    return [...new Map([...frozenCategories, ...locallyFrozen].map((c) => [normId(c.id), c])).values()].filter((c) => !c.archived && !revivedIds.has(c.id) && categoryMatchesScope(c, scope, accounts));
+  }, [frozenCategories, locallyFrozen, revived, scope, accounts]);
 
   // The formula doesn't see next month's funds yet, so the saved plan comes off here.
   const plannedTotal = scopeCategories.reduce((sum, c) => sum + amountFor(c), 0);
   const savedTotal = scopeCategories.reduce((sum, c) => sum + (saved.get(normId(c.id)) ?? 0), 0);
-  const left = notAssigned - plannedTotal;
   // Edits survive switching modes, and one save covers every wallet.
   const changed = activeCategories.filter((c) => amountFor(c) !== (saved.get(normId(c.id)) ?? 0));
   const hasCurrentPlan = scopeCategories.some((c) => (currentPlanned.get(normId(c.id)) ?? 0) > 0);
 
-  const split = useMemo(() => {
-    const find = (needle: string) => accounts.find((a) => !a.label.toLowerCase().includes("saving") && a.label.toLowerCase().includes(needle));
-    const anas = find("hubb")?.contributionPercent;
-    const salma = find("wife")?.contributionPercent;
-    return anas != null && salma != null && Math.abs(anas + salma - 1) < 0.001 ? { anas, salma } : DEFAULT_SPLIT;
-  }, [accounts]);
+  const split = useMemo(() => getPlanningSplit(accounts), [accounts]);
+
+  // Include saved frozen categories as commitments; drafts in every wallet
+  // participate immediately, before any of them are saved.
+  const totals: PlanAmounts = { joint: 0, anas: 0, salma: 0 };
+  const catalog = new Map([...frozenCategories, ...activeCategories].map((c) => [normId(c.id), c]));
+  for (const cat of catalog.values()) {
+    const owner = getCategoryScope(cat, accounts);
+    if (owner) totals[owner] += amountFor(cat);
+  }
+  const capacity = calculateMonthPlanCapacity(planningCapacity, totals, split);
+  const notAssigned = capacity.pool[scope];
+  const left = capacity.left[scope];
+  const shortfalls = (["anas", "salma"] as const)
+    .filter((partner) => capacity.left[partner] < -0.005)
+    .map((partner) => `${BUDGET_SCOPE_LABELS[partner]} is short by ${fmt(Math.ceil(-capacity.left[partner]))}`);
+  const capacityError = shortfalls.length ? `${shortfalls.join(" · ")}. Reduce personal or Joint allocations before saving.` : "";
+
+  const capacityLabel = left < 0 ? "Over capacity" : "Unassigned";
+  const personalRemaining = {
+    anas: Math.max(0, planningCapacity.anas - totals.anas),
+    salma: Math.max(0, planningCapacity.salma - totals.salma),
+  };
 
   const jarItems = useMemo(
     () => allocationJarItems(
@@ -239,6 +267,7 @@ export function MonthPlanSheet({
         body: JSON.stringify({ id: cat.id, snoozed: false }),
       });
       if (!res.ok) throw new Error("Couldn't unfreeze");
+      setLocallyFrozen((prev) => prev.filter((c) => c.id !== cat.id));
       setRevived((prev) => [...prev, { ...cat, snoozed: false }]);
       onCategoriesChanged();
     } catch {
@@ -248,8 +277,38 @@ export function MonthPlanSheet({
     }
   };
 
+  const freeze = async (cat: Category): Promise<boolean> => {
+    if (freezeLock.current || loading || saving || loadError) return false;
+    freezeLock.current = true;
+    setFreezing(cat.id);
+    setSaveError("");
+    try {
+      await freezeMonthPlanCategory({
+        month: planningMonth,
+        categoryId: cat.id,
+        hasSavedAllocation: (saved.get(normId(cat.id)) ?? 0) > 0,
+        onAllocationCleared: () => {
+          setSaved((prev) => new Map(prev).set(normId(cat.id), 0));
+          setAmount(cat, 0);
+          onSaved();
+        },
+      });
+      setAmount(cat, 0);
+      setRevived((prev) => prev.filter((c) => c.id !== cat.id));
+      setLocallyFrozen((prev) => [...prev, { ...cat, snoozed: true }]);
+      onCategoriesChanged();
+      return true;
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : `Couldn't freeze ${cat.name}`);
+      return false;
+    } finally {
+      freezeLock.current = false;
+      setFreezing(null);
+    }
+  };
+
   const save = async () => {
-    if (!changed.length) return;
+    if (!changed.length || loading || saving || freezing || loadError || capacityError) return;
     setSaving(true);
     setSaveError("");
     try {
@@ -279,8 +338,8 @@ export function MonthPlanSheet({
   };
 
   const renderRow = (cat: Category, index: number, savings: boolean) => (
+    <SwipeToDelete key={cat.id} variant="freeze" deleteLabel={`Freeze ${cat.name} and clear its ${planLabel} allocation`} disabled={loading || saving || !!freezing || !!loadError} onDelete={() => freeze(cat)}>
     <PlanRow
-      key={cat.id}
       cat={cat}
       index={index}
       savings={savings}
@@ -289,9 +348,10 @@ export function MonthPlanSheet({
       currentSpent={currentSpent.get(normId(cat.id)) ?? 0}
       planLabel={monthName(planningMonth, "short")}
       planningMonth={planningMonth}
-      disabled={loading}
+      disabled={loading || saving || !!freezing}
       onChange={(value) => setAmount(cat, value)}
     />
+    </SwipeToDelete>
   );
 
   return (
@@ -316,50 +376,62 @@ export function MonthPlanSheet({
         </header>
 
         <div style={scrollAreaStyle}>
-        <div
-          aria-hidden={!heroHidden}
-          style={{
-            ...stickyBarStyle,
-            opacity: heroHidden ? 1 : 0,
-            transform: heroHidden ? "none" : "translateY(-8px)",
-            pointerEvents: heroHidden ? "auto" : "none",
-          }}
-        >
-          <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} />
-          <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
-            <span style={stickyLabelStyle}>Unassigned</span>
-            <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
-              {left < 0 ? "−" : ""}
-              <Money value={Math.abs(Math.round(left))} currency animated />
-            </span>
+          {/* The compact bar floats over the list on a blur that thins out below it — no hard bottom edge. */}
+          <ProgressiveBlur
+            position="top"
+            height={STICKY_BAR_H + 44}
+            solidHeight={STICKY_BAR_H - 12}
+            maxBlur={12}
+            tint={SHEET_BG}
+            visible={heroHidden}
+            reduceMotion={!!reduceMotion}
+          />
+          <div
+            aria-hidden={!heroHidden}
+            style={{
+              ...stickyBarStyle,
+              opacity: heroHidden ? 1 : 0,
+              transform: heroHidden ? "translateY(0)" : "translateY(-4px)",
+              transition: reduceMotion ? "none" : "opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+              pointerEvents: heroHidden ? "auto" : "none",
+            }}
+          >
+            <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} />
+            <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+              <span style={stickyLabelStyle}>{capacityLabel}</span>
+              <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
+                {left < 0 ? "−" : ""}
+                <Money value={Math.abs(Math.round(left))} currency animated />
+              </span>
+            </div>
+            {plannedTotal > 0 && (
+              <span style={stickyPlannedStyle}>
+                {fmt(Math.round(plannedTotal))} planned
+              </span>
+            )}
           </div>
-          {plannedTotal > 0 && (
-            <span style={stickyPlannedStyle}>
-              {fmt(Math.round(plannedTotal))} planned
-            </span>
-          )}
-        </div>
-        <div ref={scrollRef} style={scrollStyle}>
+        <div ref={setScrollRoot} style={scrollStyle}>
           {/* Hero: the jar fills with the categories you plan; the number is what's still unassigned. */}
-          <section aria-label="Unassigned" style={heroStyle}>
-            <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} />
-            <span style={heroLabelStyle}>Unassigned</span>
-            <span ref={heroAmountRef} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
+          <section aria-label={capacityLabel} style={heroStyle}>
+            {scope === "joint" ? (
+              <JointFamily planningCapacity={personalRemaining}>
+                <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} />
+              </JointFamily>
+            ) : (
+              <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} />
+            )}
+            <span style={heroLabelStyle}>{capacityLabel}</span>
+            <span ref={setHeroTarget} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
               {left < 0 ? "−" : ""}
               <Money value={Math.abs(Math.round(left))} currency animated />
             </span>
             {plannedTotal > 0 && (
               <span style={heroSubStyle}>
-                {fmt(Math.round(plannedTotal))} planned for {planLabel}{savedTotal !== plannedTotal ? " · not saved" : ""}
+                {fmt(Math.round(plannedTotal))} planned{savedTotal !== plannedTotal ? " · not saved" : ""}
               </span>
             )}
-            {scope === "joint" && plannedTotal > 0 && (
-              <span style={splitStyle}>
-                <span><ManIcon size={13} aria-hidden="true" /> {fmt(Math.round(plannedTotal * split.anas))}</span>
-                <span style={{ opacity: 0.35 }}>·</span>
-                <span><WomanIcon size={13} aria-hidden="true" /> {fmt(Math.round(plannedTotal * split.salma))}</span>
-                <span style={{ opacity: 0.7 }}>due to Joint</span>
-              </span>
+            {scope !== "joint" && (
+              <span style={heroSubStyle}>{fmt(Math.round(capacity.due[scope]))} reserved for Joint</span>
             )}
           </section>
 
@@ -406,7 +478,7 @@ export function MonthPlanSheet({
                     <div key={cat.id} style={frozenRowStyle}>
                       <CategoryIcon icon={cat.icon} size={20} style={{ opacity: 0.5, flexShrink: 0 }} />
                       <span style={frozenNameStyle}>{cat.name}</span>
-                      <button type="button" onClick={() => void unfreeze(cat)} disabled={unfreezing === cat.id} style={unfreezeButtonStyle}>
+                      <button type="button" onClick={() => void unfreeze(cat)} disabled={!!unfreezing || !!freezing || saving} style={unfreezeButtonStyle}>
                         {unfreezing === cat.id ? "…" : "Unfreeze"}
                       </button>
                     </div>
@@ -419,19 +491,19 @@ export function MonthPlanSheet({
         </div>
 
         <footer style={footerStyle}>
-          {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
+          {(saveError || capacityError) && <Banner role="alert" tone="danger" compact>{saveError || capacityError}</Banner>}
           {hasCurrentPlan && (
-            <button type="button" onClick={copyCurrentPlan} disabled={loading || saving} style={copyLinkStyle}>
+            <button type="button" onClick={copyCurrentPlan} disabled={loading || saving || !!freezing} style={copyLinkStyle}>
               Copy last month's plan
             </button>
           )}
           <div style={footerRowStyle} className="planner-footer-row">
             {/* A month's plan is a big commitment: slide to save, so a stray tap never does. */}
             {changed.length || saving ? (
-              <SlideToConfirm label={`Slide to save ${planLabel} plan`} busy={saving} busyLabel="Saving…" disabled={loading} onConfirm={() => void save()} />
+              <SlideToConfirm label="Slide to save plan" busy={saving} busyLabel="Saving…" disabled={loading || !!freezing || !!loadError || !!capacityError} onConfirm={() => void save()} />
             ) : (
               <span role="status" style={savedStatusStyle}>
-                <CheckIcon size={16} aria-hidden="true" /> {savedTotal > 0 ? `${planLabel} plan saved` : "Nothing planned yet"}
+                <CheckIcon size={16} aria-hidden="true" /> {savedTotal > 0 ? "Plan saved" : "Nothing planned yet"}
               </span>
             )}
           </div>
@@ -456,9 +528,10 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
   onChange: (value: number) => void;
 }) {
   const [text, setText] = useState<string | null>(null);
+  const [rowFocused, setRowFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   // Tapping in opens the row: the details and quick amounts that help pick a number.
-  const open = text !== null;
+  const open = text !== null || rowFocused;
   const available = cat.available ?? 0;
 
   const commit = () => {
@@ -513,6 +586,8 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
 
   return (
     <div
+      onFocusCapture={() => setRowFocused(true)}
+      onBlurCapture={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setRowFocused(false); }}
       style={{ ...rowStyle, ...(open ? rowOpenStyle : null), animation: `fadeUp 0.2s ${Math.min(index * 0.02, 0.15)}s ease both` }}
       onClick={(e) => { if (e.target === e.currentTarget || !(e.target as HTMLElement).closest("button, input")) inputRef.current?.focus(); }}
     >
@@ -575,7 +650,9 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
 
 /* ─── Styles ──────────────────────────────────────────────────────── */
 
-const SHEET_BG = "color-mix(in srgb, var(--bg) 96%, var(--surface))";
+// What the panel actually paints: `.bottom-sheet-panel` forces --surface (!important) in both
+// themes, so anything that has to blend with the header must use the same token.
+const SHEET_BG = "var(--surface)";
 
 const panelStyle: CSSProperties = {
   background: SHEET_BG,
@@ -627,20 +704,21 @@ const closeButtonStyle: CSSProperties = {
 
 const scrollAreaStyle: CSSProperties = { flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" };
 
+const STICKY_BAR_H = 68;
+
+// Floats over the top of the list; its backdrop is the ProgressiveBlur beneath it.
 const stickyBarStyle: CSSProperties = {
   position: "absolute",
   top: 0,
   left: 0,
   right: 0,
-  zIndex: 2,
+  height: STICKY_BAR_H,
+  boxSizing: "border-box",
+  padding: "4px 20px 12px",
   display: "flex",
   alignItems: "center",
-  gap: 10,
-  padding: "4px 20px 8px 14px",
-  // Same surface as the sheet; only the shadow lifts it above the scrolling list.
-  background: SHEET_BG,
-  boxShadow: "var(--elevation-card)",
-  transition: "opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
+  gap: 12,
+  zIndex: 2,
 };
 
 const stickyLabelStyle: CSSProperties = {
@@ -668,6 +746,9 @@ const stickyPlannedStyle: CSSProperties = {
 };
 
 const scrollStyle: CSSProperties = {
+  // Contain swipe-row z-indices below the sibling progressive-blur layer.
+  position: "relative",
+  zIndex: 0,
   flex: 1,
   minHeight: 0,
   overflowY: "auto",
@@ -705,14 +786,6 @@ const heroAmountStyle: CSSProperties = {
 
 const heroSubStyle: CSSProperties = { fontSize: 13, color: "var(--text2)", fontVariantNumeric: "tabular-nums" };
 
-const splitStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  fontSize: 12,
-  color: "var(--muted)",
-  fontVariantNumeric: "tabular-nums",
-};
 
 const sectionStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8, minWidth: 0 };
 

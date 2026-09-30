@@ -104,7 +104,7 @@ function Redesign({ scope }: { scope: BudgetScope }) {
     <div style={{ display: "grid", gap: 18 }}>
       <div style={{ display: "grid", justifyItems: "center", gap: 4, paddingTop: 4 }}>
         <Mascot target={{ scope, gap: 0, mood: "idle", fill: 0.62, outline: "partner" }} size={120} calm />
-        <span style={labelStyle}>Left to spend</span>
+        <span style={labelStyle}>Allocated</span>
         <span style={{ fontSize: 40, fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{fmt(left)}</span>
       </div>
       {groups.map((group) => {

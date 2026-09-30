@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { monthBounds } from "@/app/components/app-utils";
+import { monthBounds } from "../../../components/app-utils";
+import { notionFetchJson } from "../../../../lib/notion-api";
 
-const NOTION_VERSION = "2022-06-28";
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
 
 type AllocationItem = {
@@ -9,12 +9,6 @@ type AllocationItem = {
   amount: number;
   defaultAccount?: string | null;
 };
-
-const notionHeaders = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-  "Notion-Version": NOTION_VERSION,
-  "Content-Type": "application/json",
-});
 
 const ensureMonthBounds = (month: string) => {
   if (!/^\d{4}-\d{2}$/.test(month)) return null;
@@ -71,11 +65,10 @@ const buildFundProperties = (allocation: AllocationItem, date: string) => {
 };
 
 async function upsertFund(token: string, allocation: AllocationItem, date: string, end: string, allowClear = false) {
-  const queryRes = await fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
+  const { data: queryData } = await notionFetchJson<any>(token, `/databases/${FUNDS_DB}/query`, {
     method: "POST",
-    headers: notionHeaders(token),
     cache: "no-store",
-    body: JSON.stringify({
+    body: {
       filter: {
         and: [
           { property: "Category", relation: { contains: allocation.categoryId } },
@@ -85,11 +78,8 @@ async function upsertFund(token: string, allocation: AllocationItem, date: strin
         ],
       },
       page_size: 1,
-    }),
+    },
   });
-
-  const queryData = await queryRes.json();
-  if (!queryRes.ok) throw new Error(queryData.message || "Failed to query funds");
 
   const existing = queryData.results?.[0];
   const properties = buildFundProperties(allocation, date);
@@ -98,26 +88,20 @@ async function upsertFund(token: string, allocation: AllocationItem, date: strin
     // A plan set to 0 archives the fund only when the caller asks (the month plan
     // sheet); other callers never overwrite an existing fund with 0.
     if (allocation.amount <= 0 && allowClear) {
-      const archiveRes = await fetch(`https://api.notion.com/v1/pages/${existing.id}`, {
+      await notionFetchJson(token, `/pages/${existing.id}`, {
         method: "PATCH",
-        headers: notionHeaders(token),
-        body: JSON.stringify({ archived: true }),
+        body: { archived: true },
       });
-      const archiveData = await archiveRes.json();
-      if (!archiveRes.ok) throw new Error(archiveData.message || "Failed to clear fund");
       return { id: existing.id, categoryId: allocation.categoryId, planned: 0, mode: "cleared" };
     }
     if (allocation.amount <= 0) {
       return { id: existing.id, categoryId: allocation.categoryId, planned: existing.properties.Planned?.number ?? 0, mode: "skipped" };
     }
 
-    const updateRes = await fetch(`https://api.notion.com/v1/pages/${existing.id}`, {
+    const { data: updateData } = await notionFetchJson<any>(token, `/pages/${existing.id}`, {
       method: "PATCH",
-      headers: notionHeaders(token),
-      body: JSON.stringify({ properties }),
+      body: { properties },
     });
-    const updateData = await updateRes.json();
-    if (!updateRes.ok) throw new Error(updateData.message || "Failed to update fund");
     return { id: updateData.id, categoryId: allocation.categoryId, planned: allocation.amount, mode: "updated" };
   }
 
@@ -125,16 +109,13 @@ async function upsertFund(token: string, allocation: AllocationItem, date: strin
     return { id: null, categoryId: allocation.categoryId, planned: allocation.amount, mode: "skipped" };
   }
 
-  const createRes = await fetch("https://api.notion.com/v1/pages", {
+  const { data: createData } = await notionFetchJson<any>(token, "/pages", {
     method: "POST",
-    headers: notionHeaders(token),
-    body: JSON.stringify({
+    body: {
       parent: { database_id: FUNDS_DB },
       properties,
-    }),
+    },
   });
-  const createData = await createRes.json();
-  if (!createRes.ok) throw new Error(createData.message || "Failed to create fund");
   return { id: createData.id, categoryId: allocation.categoryId, planned: allocation.amount, mode: "created" };
 }
 
@@ -164,24 +145,16 @@ export async function POST(req: NextRequest) {
 
   const token = process.env.NOTION_TOKEN;
   if (!token) {
-    return NextResponse.json({
-      success: true,
-      savedAt: new Date().toISOString(),
-      mode: "mock",
-      savedFunds: allocations.map((allocation) => ({
-        id: null,
-        categoryId: allocation.categoryId,
-        planned: allocation.amount,
-        mode: "mock",
-      })),
-      payload: body,
-    });
+    return NextResponse.json({ error: "NOTION_TOKEN not set; the plan was not saved" }, { status: 500 });
   }
 
   try {
-    const savedFunds = await Promise.all(
-      allocations.map((allocation) => upsertFund(token, allocation, bounds.start, bounds.end, body.allowClear === true)),
-    );
+    // Avoid flooding Notion with a query and write for every category at once.
+    // The shared client retries rejected rate-limited writes safely.
+    const savedFunds = [];
+    for (const allocation of allocations) {
+      savedFunds.push(await upsertFund(token, allocation, bounds.start, bounds.end, body.allowClear === true));
+    }
 
     return NextResponse.json({
       success: true,

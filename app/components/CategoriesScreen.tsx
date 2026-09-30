@@ -235,7 +235,7 @@ export function CategoriesScreen({
               </button>
             : null
         : <>
-            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD left to spend in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
+            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD allocated in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
                   emojis stay tucked away until the jar is tapped; then every category that still
                   has money drops in, sized by its share of Available. */}
@@ -245,7 +245,7 @@ export function CategoriesScreen({
                 <div style={{ marginBottom: 4 }}>{budgetJar}</div>
               )}
               {/* Not money to assign: what's still in categories after spending. */}
-              <span style={budgetHealthLabelStyle}>Left to spend</span>
+              <span style={budgetHealthLabelStyle}>Allocated</span>
               <span style={budgetHealthAmountStyle}>
                 <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
                 <Currency />

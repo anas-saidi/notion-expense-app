@@ -1,5 +1,7 @@
 "use client";
 
+import { Money } from "./Money";
+
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, today } from "./app-utils";
@@ -243,8 +245,8 @@ export function RebalanceSheet({
 
   const unallocatedHint = unallocatedForGroup > 0 ? (
     <div style={unallocatedHintStyle}>
-      <span style={unallocatedHintDotStyle} />
-      <span style={unallocatedHintTextStyle}>{fmt(Math.round(unallocatedForGroup))} unassigned</span>
+      <span>Unassigned</span>
+      <span style={unallocatedHintTextStyle}><Money value={Math.round(unallocatedForGroup)} /></span>
     </div>
   ) : null;
 
@@ -292,9 +294,8 @@ export function RebalanceSheet({
     return scoped.totalAssigned > 0 ? 1 - scoped.totalSpent / scoped.totalAssigned : 1;
   }, [monthlySummary, categories, accounts, budgetScope]);
 
-  // "Funded", not "Available": this is money already in categories (plus any unassigned
-  // shown just below), not money free to assign.
-  const poolLabel = monthCtx === "past" ? "Leftover" : monthCtx === "future" ? "Planned" : "Funded";
+  // The pool combines category allocations and unassigned money.
+  const poolLabel = monthCtx === "past" ? "Leftover" : "Allocation pool";
 
   return (
     <AllocationFlow
@@ -394,9 +395,7 @@ export function RebalanceSheet({
 
 const flowWrapStyle: CSSProperties = {
   margin: "0 0 4px",
-  padding: "10px 14px 12px",
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
+  padding: "8px 4px",
   display: "grid",
   gap: 8,
 };
@@ -462,26 +461,16 @@ const flowMoreStyle: CSSProperties = {
 
 const unallocatedHintStyle: CSSProperties = {
   display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "8px 12px",
-  borderRadius: 12,
-  background: "color-mix(in srgb, var(--accent) 12%, var(--surface))",
-  border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
-};
-
-const unallocatedHintDotStyle: CSSProperties = {
-  width: 6,
-  height: 6,
-  borderRadius: "50%",
-  background: "var(--accent)",
-  flexShrink: 0,
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "8px 0",
+  fontSize: 14,
+  color: "var(--text2)",
 };
 
 const unallocatedHintTextStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  fontWeight: 700,
-  color: "var(--text2)",
-  letterSpacing: 0.1,
+  fontWeight: 600,
+  color: "var(--text)",
+  fontVariantNumeric: "tabular-nums",
 };

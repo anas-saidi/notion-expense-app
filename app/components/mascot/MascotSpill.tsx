@@ -14,6 +14,8 @@ type MascotSpillProps = {
   size: number;
   /** Set on one jar per screen: its details show once by themselves, the first time ever. */
   hintKey?: string;
+  /** Open the contextual numbers on entry, e.g. next-month contribution capacity. */
+  initiallyOpen?: boolean;
   /**
    * Where the details come out: from under the jar (default), or out of one of
    * its sides, e.g. the empty side of a jar that has a neighbour on the other.
@@ -36,8 +38,8 @@ const EASE_OUT = [0.22, 1, 0.36, 1] as const;
  * are shown, and always carries them in its accessible name. Under Reduce
  * Motion the details simply fade.
  */
-export function MascotSpill({ children, details, label, size, hintKey, side = "below", onOpenChange, style }: MascotSpillProps) {
-  const [open, setOpen] = useState(false);
+export function MascotSpill({ children, details, label, size, hintKey, initiallyOpen = false, side = "below", onOpenChange, style }: MascotSpillProps) {
+  const [open, setOpen] = useState(initiallyOpen);
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
   useEffect(() => { onOpenChangeRef.current?.(open); }, [open]);

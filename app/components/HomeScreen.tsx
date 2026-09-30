@@ -21,6 +21,7 @@ type HomeScreenProps = {
   budgetScope: BudgetScope;
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
+  planningRemaining?: Record<BudgetScope, number>;
   plannedScopes?: Record<"joint" | "anas" | "salma", boolean>;
   transactions?: Transaction[];
   pendingItems?: PendingItem[];
@@ -44,6 +45,7 @@ export function HomeScreen({
   homeMonth,
   onHomeMonthChange,
   plannedScopes,
+  planningRemaining,
   transactions,
   pendingItems,
   jointUnassigned,
@@ -143,7 +145,7 @@ export function HomeScreen({
           title={`Plan ${planningNextMonthLabel}`}
           action={(
             <span style={assignRightStyle}>
-              <span style={assignAmountStyle}>{fmt(readyToAssign)}</span>
+              <span style={assignAmountStyle}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</span>
               <button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>Plan →</button>
             </span>
           )}

@@ -24,6 +24,7 @@ import {
   Banknote,
   HandCoins,
   RotateCcw,
+  Repeat2,
   Snowflake,
   X,
   SlidersHorizontal,
@@ -61,6 +62,7 @@ export const TransferIcon     = (p: LucideProps) => <ArrowRightLeft size={S} {..
 export const BanknoteIcon     = (p: LucideProps) => <Banknote       size={S} {...p} />;
 export const FundIcon         = (p: LucideProps) => <HandCoins      size={S} {...p} />;
 export const ReviveIcon       = (p: LucideProps) => <RotateCcw      size={S} {...p} />;
+export const RepeatIcon       = (p: LucideProps) => <Repeat2        size={S} {...p} />;
 export const FreezeIcon       = (p: LucideProps) => <Snowflake      size={S} {...p} />;
 export const XIcon            = (p: LucideProps) => <X             size={S} {...p} />;
 export const SlidersIcon      = (p: LucideProps) => <SlidersHorizontal size={S} {...p} />;

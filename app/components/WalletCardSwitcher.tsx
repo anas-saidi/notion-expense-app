@@ -132,12 +132,17 @@ export function WalletCardSwitcher({ value, monthlySummary, categoryAvailableByS
  * against it. Shared by Home and Budget so Joint looks the same on both; the
  * pool must be MASCOT_HERO_SIZE for the cuddle geometry to line up.
  */
-export function JointFamily({ contribStatus, children }: { contribStatus: ContribStatus; children: ReactNode }) {
+type JointFamilyProps = { children: ReactNode } & (
+  | { contribStatus: ContribStatus; planningCapacity?: never }
+  | { planningCapacity: { anas: number; salma: number }; contribStatus?: never }
+);
+
+export function JointFamily({ contribStatus, planningCapacity, children }: JointFamilyProps) {
   return (
     <div style={familyRowStyle}>
-      <PartnerJar scope="anas" name="Anas" actual={contribStatus.anasActual} plan={contribStatus.anasPlan} />
+      <PartnerJar scope="anas" name="Anas" actual={contribStatus?.anasActual ?? 0} plan={contribStatus?.anasPlan ?? 0} capacity={planningCapacity?.anas} />
       {children}
-      <PartnerJar scope="salma" name="Salma" actual={contribStatus.salmaActual} plan={contribStatus.salmaPlan} />
+      <PartnerJar scope="salma" name="Salma" actual={contribStatus?.salmaActual ?? 0} plan={contribStatus?.salmaPlan ?? 0} capacity={planningCapacity?.salma} />
     </div>
   );
 }
@@ -148,11 +153,12 @@ export function JointFamily({ contribStatus, children }: { contribStatus: Contri
  * They look towards the joint pool; the face is happy once settled, sheepish
  * while something is still due. Tapping spills their status.
  */
-function PartnerJar({ scope, name, actual, plan }: {
+function PartnerJar({ scope, name, actual, plan, capacity }: {
   scope: "anas" | "salma";
   name: string;
   actual: number;
   plan: number;
+  capacity?: number;
 }) {
   const due = Math.max(0, plan - actual);
   const overpaid = Math.max(0, actual - plan);
@@ -163,7 +169,9 @@ function PartnerJar({ scope, name, actual, plan }: {
   // Shown without the currency (the app has one); spoken with it.
   const status = note ? `${amount} ${note}` : "Settled";
   const spoken = note ? `${amount} MAD ${note}` : "Settled";
-  const level = plan > 0 ? Math.min(1, actual / plan) : 1;
+  const planning = capacity !== undefined;
+  const planningAmount = fmt(Math.round(capacity ?? 0));
+  const level = planning ? 1 : plan > 0 ? Math.min(1, actual / plan) : 1;
   // Shape and colour say who this is, so there's no visible name; it stays in the
   // accessible label. Cuddled up: level with the pool, touching it, leaning in.
   // Tapped, their details come out of their empty side (Anas's left, Salma's
@@ -172,9 +180,9 @@ function PartnerJar({ scope, name, actual, plan }: {
   const lean = left ? CUDDLE_LEAN.anas : -CUDDLE_LEAN.salma;
   return (
     <div style={{ ...partnerJarStyle, paddingTop: CUDDLE_DROP, [left ? "marginRight" : "marginLeft"]: -(CUDDLE_PULL + CUDDLE_PULL_EXTRA[scope]) }}>
-      <MascotSpill size={PARTNER_JAR_SIZE} label={`${name}: ${spoken}`} details={status} side={left ? "left" : "right"}>
+      <MascotSpill size={PARTNER_JAR_SIZE} label={planning ? `${name}: ${planningAmount} MAD can contribute after personal plan` : `${name}: ${spoken}`} initiallyOpen={planning} details={planning ? <span style={{ display: "grid", gap: 2 }}><span style={{ fontSize: 12 }}>I can give</span><Money value={Math.round(capacity ?? 0)} /></span> : status} side={left ? "left" : "right"}>
         <Mascot
-          target={{ scope, gap: 0, mood: settled ? "happy" : "worried", fill: level, outline: "partner", lookYaw: left ? 14 : -14 }}
+          target={{ scope, gap: 0, mood: planning ? "curious" : settled ? "happy" : "worried", fill: level, outline: "partner", lookYaw: left ? 14 : -14 }}
           size={PARTNER_JAR_SIZE}
           style={{ transform: `rotate(${lean}deg)`, transformOrigin: "50% 85%" }}
           // Keep the water level with the ground while the jar leans.

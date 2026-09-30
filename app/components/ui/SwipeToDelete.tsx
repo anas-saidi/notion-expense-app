@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, type ReactNode } from "react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { RotateCcw, Snowflake, Trash2 } from "lucide-react";
 
 type Props = {
   onDelete: () => boolean | Promise<boolean>;
@@ -9,18 +9,66 @@ type Props = {
   deleteLabel?: string;
   /** Px to drag before the delete commits. Default 80. */
   threshold?: number;
-  variant?: "delete" | "restore";
+  variant?: "delete" | "restore" | "freeze";
+  disabled?: boolean;
   /** Removes row rounding when used inside a continuous activity feed. */
   flat?: boolean;
 };
 
-export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel = "Delete item", variant = "delete", flat = false }: Props) {
+export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel = "Delete item", variant = "delete", flat = false, disabled = false }: Props) {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
 
   const outerRef  = useRef<HTMLDivElement>(null);
   const startX    = useRef(0);
   const startY    = useRef(0);
+  const touchActive = useRef(false);
+  const pointer = useRef<{ id: number; x: number; y: number; offset: number; moved: boolean } | null>(null);
+  const latestOffset = useRef(0);
+  const suppressClick = useRef(false);
+  const FREEZE_REVEAL = 110;
+  const moveFreeze = (value: number) => {
+    latestOffset.current = value;
+    setOffset(value);
+  };
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (variant !== "freeze" || disabled || committed.current || e.button !== 0) return;
+    suppressClick.current = false;
+    if ((e.target as HTMLElement).closest("input, button")) return;
+    pointer.current = { id: e.pointerId, x: e.clientX, y: e.clientY, offset: latestOffset.current, moved: false };
+    direction.current = null;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const active = pointer.current;
+    if (!active || active.id !== e.pointerId || disabled) return;
+    const dx = e.clientX - active.x;
+    const dy = e.clientY - active.y;
+    if (!direction.current && Math.max(Math.abs(dx), Math.abs(dy)) > 7) {
+      direction.current = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+    }
+    if (direction.current !== "h") return;
+    active.moved = true;
+    setDragging(true);
+    moveFreeze(Math.max(-FREEZE_REVEAL, Math.min(0, active.offset + dx)));
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const active = pointer.current;
+    if (!active || active.id !== e.pointerId) return;
+    pointer.current = null;
+    setDragging(false);
+    suppressClick.current = active.moved;
+    // Freeze is revealed, never executed by the swipe itself.
+    moveFreeze(latestOffset.current < -FREEZE_REVEAL / 2 ? -FREEZE_REVEAL : 0);
+    direction.current = null;
+  };
+  const onPointerCancel = () => {
+    const active = pointer.current;
+    pointer.current = null;
+    direction.current = null;
+    setDragging(false);
+    moveFreeze(active?.offset ?? 0);
+  };
   const direction = useRef<"h" | "v" | null>(null);
   const committed = useRef(false);
   const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -28,29 +76,32 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   const commit = () => {
-    if (committed.current) return;
+    if (committed.current || disabled) return;
     committed.current = true;
     setDragging(false);
     setOffset(-window.innerWidth); // slide content off-screen left
 
     timerRef.current = setTimeout(async () => {
-      const succeeded = await onDelete();
-      if (!succeeded) {
-        committed.current = false;
-        setOffset(0);
-      }
+      try {
+        if (await onDelete()) return;
+      } catch { /* A failed action restores the row for retry. */ }
+      committed.current = false;
+      if (variant === "freeze") moveFreeze(0); else setOffset(0);
     }, 220);
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if (committed.current) return;
+    touchActive.current = false;
+    if (committed.current || disabled) return;
+    if (variant === "freeze" && (e.target as HTMLElement).closest("input, button")) return;
+    touchActive.current = true;
     startX.current    = e.touches[0].clientX;
     startY.current    = e.touches[0].clientY;
     direction.current = null;
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    if (committed.current) return;
+    if (!touchActive.current || committed.current || disabled) return;
     const dx = e.touches[0].clientX - startX.current;
     const dy = e.touches[0].clientY - startY.current;
 
@@ -70,7 +121,9 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
   };
 
   const onTouchEnd = () => {
-    if (committed.current) return;
+    if (!touchActive.current) return;
+    touchActive.current = false;
+    if (committed.current || disabled) return;
     direction.current = null;
     if (offset < -threshold) {
       commit();
@@ -83,7 +136,7 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
   const revealPx = Math.max(0, -offset);
   const progress = Math.min(1, revealPx / threshold);
   const isPast   = progress >= 1;
-  const actionColor = variant === "restore" ? "var(--success)" : "var(--danger)";
+  const actionColor = variant === "freeze" ? "color-mix(in srgb, var(--info) 14%, var(--surface))" : variant === "restore" ? "var(--success)" : "var(--danger)";
 
   return (
     <div ref={outerRef}>
@@ -109,21 +162,31 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
           <button
             type="button"
             aria-label={deleteLabel}
+            disabled={disabled}
             className="swipe-delete-action"
-            onFocus={() => setOffset(-72)}
-            onBlur={() => { if (!committed.current) setOffset(0); }}
+            onFocus={() => variant === "freeze" ? moveFreeze(-FREEZE_REVEAL) : setOffset(-72)}
+            onBlur={() => { if (!committed.current) { if (variant === "freeze") moveFreeze(0); else setOffset(0); } }}
             onClick={commit}
-            style={{ opacity: Math.max(progress, 0.01) }}
+            style={{ opacity: Math.max(progress, 0.01), ...(variant === "freeze" ? { color: "var(--text)", width: "auto", minWidth: 80, gap: 8 } : {}) }}
           >
-            {variant === "restore" ? <RotateCcw size={17} aria-hidden="true" /> : <Trash2 size={17} aria-hidden="true" />}
+            {variant === "freeze" ? <><Snowflake size={17} aria-hidden="true" />Freeze</> : variant === "restore" ? <RotateCcw size={17} aria-hidden="true" /> : <Trash2 size={17} aria-hidden="true" />}
           </button>
         </div>
 
         {/* Swipeable surface */}
         <div
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
+          onPointerDown={variant === "freeze" ? onPointerDown : undefined}
+          onPointerMove={variant === "freeze" ? onPointerMove : undefined}
+          onPointerUp={variant === "freeze" ? onPointerUp : undefined}
+          onPointerCancel={variant === "freeze" ? onPointerCancel : undefined}
+          onClickCapture={variant === "freeze" ? (e) => {
+            if (suppressClick.current) { e.preventDefault(); e.stopPropagation(); suppressClick.current = false; }
+            else if (latestOffset.current < 0) { moveFreeze(0); e.preventDefault(); e.stopPropagation(); }
+          } : undefined}
+          onTouchStart={variant === "freeze" ? undefined : onTouchStart}
+          onTouchMove={variant === "freeze" ? undefined : onTouchMove}
+          onTouchEnd={variant === "freeze" ? undefined : onTouchEnd}
+          onTouchCancel={() => { touchActive.current = false; direction.current = null; setDragging(false); if (!committed.current) setOffset(0); }}
           style={{
             touchAction: "pan-y",
             transform: `translateX(${offset}px)`,

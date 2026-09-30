@@ -15,6 +15,7 @@ import { SavingsWithdrawSheet } from "./components/SavingsWithdrawSheet";
 import { ManageScreen } from "./components/ManageScreen";
 import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
 import { RebalanceSheet } from "./components/RebalanceSheet";
+import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "./components/month-plan-capacity";
 import { MonthPlanSheet } from "./components/MonthPlanSheet";
 import { TransactionDetailsSheet } from "./components/TransactionDetailsSheet";
 import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
@@ -104,7 +105,7 @@ export default function App() {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [tab, setTab] = useState<AppTab>("home");
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
-  const [nextMonthFunds, setNextMonthFunds] = useState<{ categoryId: string; planned: number }[]>([]);
+  const [nextMonthFunds, setNextMonthFunds] = useState<{ categoryId: string; planned: number; reverse?: boolean }[]>([]);
   const [homeMonth, setHomeMonth] = useState(formatMonthInput(today()));
   const [showAddModal, setShowAddModal] = useState(false);
   const [transactionType, setTransactionType] = useState<"Expense" | "Income">("Expense");
@@ -800,6 +801,22 @@ export default function App() {
     salma: contribStatus ? Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual) : 0,
   }), [contribStatus]);
 
+  const nextMonthRemaining = useMemo(() => {
+    const totals: PlanAmounts = { joint: 0, anas: 0, salma: 0 };
+    const normalize = (id: string) => id.replace(/-/g, "").toLowerCase();
+    const catalog = new Map([...categories, ...frozenCategories].map((c) => [normalize(c.id), c]));
+    for (const fund of nextMonthFunds) {
+      if (fund.reverse || !fund.categoryId) continue;
+      const cat = catalog.get(normalize(fund.categoryId));
+      const owner = cat && getCategoryScope(cat, accounts);
+      if (owner) totals[owner] += fund.planned;
+    }
+    return calculateMonthPlanCapacity(
+      { joint: jointUnassigned, anas: assignBalanceByScope.anas, salma: assignBalanceByScope.salma },
+      totals, getPlanningSplit(accounts),
+    ).left;
+  }, [nextMonthFunds, categories, frozenCategories, accounts, jointUnassigned, assignBalanceByScope]);
+
   const selectedDateLabel =
     date === today() ? "Today" :
     date === shiftDate(today(), -1) ? "Yesterday" :
@@ -972,7 +989,7 @@ export default function App() {
         categories={categories.filter((c) => !c.snoozed && !c.archived)}
         frozenCategories={frozenCategories}
         accounts={accounts}
-        notAssigned={budgetScope === "joint" ? Math.max(0, jointUnassigned) : readyToAssignByScope[budgetScope] ?? 0}
+        planningCapacity={{ joint: jointUnassigned, anas: assignBalanceByScope.anas, salma: assignBalanceByScope.salma }}
       />
 
       {tab === "home" && (
@@ -988,6 +1005,7 @@ export default function App() {
           homeMonth={homeMonth}
           onHomeMonthChange={setHomeMonth}
           plannedScopes={plannedScopes}
+          planningRemaining={nextMonthRemaining}
           transactions={scopedTransactions}
           pendingItems={scopedPendingItems}
           onOpenHistory={() => { setReflectView("activity"); setTab("history"); }}
