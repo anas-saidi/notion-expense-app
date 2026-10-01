@@ -26,7 +26,6 @@ it("retries a rate-limited Anas allocation and saves the remaining categories", 
     .mockResolvedValueOnce(Response.json({ results: [] }))
     .mockResolvedValueOnce(Response.json({ message: "Rate limited" }, { status: 429 }))
     .mockResolvedValueOnce(Response.json({ id: "car-fund" }))
-    .mockResolvedValueOnce(Response.json({ results: [] }))
     .mockResolvedValueOnce(Response.json({ id: "food-fund" }));
   vi.stubGlobal("fetch", fetchMock);
   const response = await save([
@@ -53,4 +52,26 @@ it("reports a rejected write as an error", async () => {
   const response = await save();
   expect(response.status).toBe(500);
   expect(await response.json()).toEqual({ error: "Invalid relation" });
+});
+
+it("queries the month once, follows pagination, and preserves existing updates and explicit clears", async () => {
+  vi.stubEnv("NOTION_TOKEN", "batch-test");
+  const fund = (id: string, categoryId: string, planned: number) => ({ id, properties: { Category: { relation: [{ id: categoryId }] }, Planned: { number: planned } } });
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce(Response.json({ results: [fund("car", "anas-car", 300)], has_more: true, next_cursor: "page2" }))
+    .mockResolvedValueOnce(Response.json({ results: [fund("food", "anas-food", 200)], has_more: false }))
+    .mockResolvedValueOnce(Response.json({ id: "car" }))
+    .mockResolvedValueOnce(Response.json({ id: "food" }))
+    .mockResolvedValueOnce(Response.json({ id: "new" }));
+  vi.stubGlobal("fetch", fetchMock);
+  const response = await save([
+    { categoryId: "anas-car", amount: 500, defaultAccount: "anas-account" },
+    { categoryId: "anas-food", amount: 0, defaultAccount: "anas-account" },
+    { categoryId: "anas-other", amount: 50, defaultAccount: "anas-account" },
+  ]);
+  expect(response.status).toBe(200);
+  expect((await response.json()).savedFunds.map((f: any) => f.mode)).toEqual(["updated", "cleared", "created"]);
+  expect(fetchMock.mock.calls.filter(([url]) => url.endsWith("/query"))).toHaveLength(2);
+  expect(JSON.parse(fetchMock.mock.calls[1][1].body).start_cursor).toBe("page2");
+  expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ archived: true });
 });

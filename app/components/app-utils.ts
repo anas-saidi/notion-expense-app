@@ -167,7 +167,20 @@ export const getBalanceByScope = (accounts: Account[]): Record<BudgetScope, numb
   };
 };
 
-/** Each partner's ready-to-assign (personal, non-savings accounts) and what they still owe Joint. */
+/** Savings cash already covers its allocations; only a deficit needs personal money. */
+export const getSavingsReservationByScope = (accounts: Account[]): Record<"anas" | "salma", number> => {
+  const reserved = { anas: 0, salma: 0 };
+  for (const account of accounts) {
+    if (!isSavingsAccount(account)) continue;
+    const owner = scopeFromAccountLabel(account.label);
+    if (owner === "anas" || owner === "salma") {
+      reserved[owner] += Math.max(0, -(account.readyToAssign ?? 0));
+    }
+  }
+  return reserved;
+};
+
+/** Each partner's ready-to-assign after unfunded savings and what they still owe Joint. */
 const personalReadyAndDue = (
   accounts: Account[],
   contributionRemaining?: Partial<Record<Exclude<BudgetScope, "joint">, number>>,
@@ -179,9 +192,10 @@ const personalReadyAndDue = (
     accounts.reduce((sum, account) => matches(account, scope) ? sum + (account.readyToAssign ?? 0) : sum, 0);
   const notionDue = (scope: "anas" | "salma") =>
     accounts.reduce((sum, account) => matches(account, scope) ? sum + Math.max(0, account.jointDue ?? 0) : sum, 0);
+  const savings = getSavingsReservationByScope(accounts);
   return {
-    anasReady: ready("anas"),
-    salmaReady: ready("salma"),
+    anasReady: ready("anas") - savings.anas,
+    salmaReady: ready("salma") - savings.salma,
     anasDue: contributionRemaining?.anas ?? notionDue("anas"),
     salmaDue: contributionRemaining?.salma ?? notionDue("salma"),
   };
@@ -204,7 +218,7 @@ export const getLeftToAssignByScope = (
 
 /**
  * Signed version of what's left once categories and dues are covered — negative
- * means the accounts don't cover it ("short by"). Personal: ready − owed to Joint.
+ * means the accounts don't cover it ("short by"). Personal: ready − unfunded savings − owed to Joint.
  * Joint: the joint account's ready plus what the partners still owe it, since
  * Joint may fund ahead of contributions that are on their way.
  */
@@ -221,8 +235,8 @@ export const getAssignBalanceByScope = (
 };
 
 /**
- * Adds `assignable` to each account: a partner's personal account keeps back what
- * they still owe Joint, so funding a category can't spend the Joint contribution.
+ * Adds `assignable` to each account: personal accounts reserve unfunded savings
+ * and what they still owe Joint before funding any more categories.
  * With one personal account per partner (the usual case) it carries the live due;
  * with several, each keeps back its own stored due. Joint and savings are unchanged.
  */
@@ -240,12 +254,28 @@ export const withAssignable = (
     const scope = personalScope(account);
     if (scope) countByScope[scope] += 1;
   }
+  const savings = getSavingsReservationByScope(accounts);
+  const savingsByAccount = new Map<string, number>();
+  for (const scope of ["anas", "salma"] as const) {
+    const personal = accounts.filter(account => personalScope(account) === scope);
+    let remaining = Math.round(savings[scope] * 100);
+    for (const account of personal) {
+      const reserved = Math.min(remaining, Math.max(0, Math.round((account.readyToAssign ?? 0) * 100)));
+      savingsByAccount.set(account.id, reserved / 100);
+      remaining -= reserved;
+    }
+    // Keep an uncovered reservation visible as a signed shortfall.
+    if (remaining > 0 && personal.length) {
+      const first = personal[0].id;
+      savingsByAccount.set(first, (savingsByAccount.get(first) ?? 0) + remaining / 100);
+    }
+  }
   return accounts.map((account) => {
     const scope = personalScope(account);
     if (!scope || account.readyToAssign === null) return { ...account, assignable: account.readyToAssign };
     const storedDue = Math.max(0, account.jointDue ?? 0);
     const due = countByScope[scope] === 1 ? contributionRemaining?.[scope] ?? storedDue : storedDue;
-    return { ...account, assignable: account.readyToAssign - due };
+    return { ...account, assignable: account.readyToAssign - due - (savingsByAccount.get(account.id) ?? 0) };
   });
 };
 
@@ -269,9 +299,11 @@ export const getJointAccountUnassigned = (accounts: Account[]): number => {
 
 export const scopeFromAccountLabel = (label: string): BudgetScope | null => {
   const l = label.toLowerCase();
-  if (l.includes("hubb") || l.includes("husband") || l.includes("anas") || l.includes("saving")) return "anas";
+  if (l.includes("hubb") || l.includes("husband") || l.includes("anas")) return "anas";
   if (l.includes("wife") || l.includes("salma")) return "salma";
   if (l.includes("joined") || l.includes("joint")) return "joint";
+  // The existing unnamed Saving Account belongs to Anas.
+  if (l.includes("saving")) return "anas";
   return null;
 };
 

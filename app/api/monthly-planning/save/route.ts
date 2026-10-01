@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../../components/app-utils";
-import { notionFetchJson } from "../../../../lib/notion-api";
+import { notionFetchJson, queryDatabaseAll } from "../../../../lib/notion-api";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
 
@@ -64,24 +64,7 @@ const buildFundProperties = (allocation: AllocationItem, date: string) => {
   return properties;
 };
 
-async function upsertFund(token: string, allocation: AllocationItem, date: string, end: string, allowClear = false) {
-  const { data: queryData } = await notionFetchJson<any>(token, `/databases/${FUNDS_DB}/query`, {
-    method: "POST",
-    cache: "no-store",
-    body: {
-      filter: {
-        and: [
-          { property: "Category", relation: { contains: allocation.categoryId } },
-          { property: "Date", date: { on_or_after: date } },
-          { property: "Date", date: { on_or_before: end } },
-          { property: "Reverse", checkbox: { equals: false } },
-        ],
-      },
-      page_size: 1,
-    },
-  });
-
-  const existing = queryData.results?.[0];
+async function upsertFund(token: string, allocation: AllocationItem, date: string, existing: any, allowClear = false) {
   const properties = buildFundProperties(allocation, date);
 
   if (existing) {
@@ -149,11 +132,26 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Avoid flooding Notion with a query and write for every category at once.
-    // The shared client retries rejected rate-limited writes safely.
+    // One paginated lookup for the month, rather than a query per category.
+    // Use the first matching record, preserving the previous upsert behavior.
+    const existingFunds = await queryDatabaseAll<any>(token, FUNDS_DB, {
+      filter: { and: [
+        { property: "Date", date: { on_or_after: bounds.start } },
+        { property: "Date", date: { on_or_before: bounds.end } },
+        { property: "Reverse", checkbox: { equals: false } },
+      ] },
+    });
+    const byCategory = new Map<string, any>();
+    const normalizeId = (id: string) => id.replace(/-/g, "").toLowerCase();
+    for (const fund of existingFunds) {
+      for (const category of fund.properties?.Category?.relation ?? []) {
+        const key = normalizeId(category.id);
+        if (!byCategory.has(key)) byCategory.set(key, fund);
+      }
+    }
     const savedFunds = [];
     for (const allocation of allocations) {
-      savedFunds.push(await upsertFund(token, allocation, bounds.start, bounds.end, body.allowClear === true));
+      savedFunds.push(await upsertFund(token, allocation, bounds.start, byCategory.get(normalizeId(allocation.categoryId)), body.allowClear === true));
     }
 
     return NextResponse.json({

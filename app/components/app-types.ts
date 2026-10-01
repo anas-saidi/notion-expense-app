@@ -41,7 +41,7 @@ export type Account = {
   balance: number | null;
   readyToAssign: number | null;
   /**
-   * What can really be assigned from this account: ready to assign minus what its
+   * What can really be assigned from this account: ready to assign minus unfunded savings and what its
    * owner still owes Joint. Derived in the app (see withAssignable), not from Notion.
    */
   assignable?: number | null;

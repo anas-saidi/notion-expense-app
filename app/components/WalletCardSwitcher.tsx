@@ -15,6 +15,8 @@ export type ContribStatus = ContributionStatus;
 type WalletCardSwitcherProps = {
   value: BudgetScope;
   monthlySummary: MonthlySummary;
+  monthlyLoading?: boolean;
+  monthlyError?: boolean;
   categoryAvailableByScope?: Record<BudgetScope, number>;
   balanceByScope?: Record<BudgetScope, number>;
   contribStatus?: ContribStatus | null;
@@ -41,14 +43,14 @@ const CUDDLE_PULL_EXTRA = { anas: 8, salma: 10 } as const;
 /** How far each partner leans in (degrees): a tipped squircle reads as falling, so Anas leans less. */
 const CUDDLE_LEAN = { anas: 4, salma: 8 } as const;
 
-export function WalletCardSwitcher({ value, monthlySummary, categoryAvailableByScope, balanceByScope, contribStatus, categories = [], overspent: overspentProp = 0 }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = false, monthlyError = false, categoryAvailableByScope, balanceByScope, contribStatus, categories = [], overspent: overspentProp = 0 }: WalletCardSwitcherProps) {
   const currentSummary = monthlySummary;
   // Hero number: real account balance by scope (from Notion accounts database)
   const balance   = balanceByScope != null ? balanceByScope[value] : null;
   const available = categoryAvailableByScope != null ? categoryAvailableByScope[value] : null;
   const planned   = currentSummary?.totalAssigned ?? null;
   const isOver    = balance !== null && balance < 0;
-  const hasPlan   = planned !== null && planned > 0;
+  const hasPlan   = !monthlyLoading && !monthlyError && planned !== null && planned > 0;
   const spent     = currentSummary?.totalSpent ?? 0;
   // "Over" means categories went below zero, not spending past this month's plan
   // (carry-over from earlier months can cover that).
@@ -98,7 +100,11 @@ export function WalletCardSwitcher({ value, monthlySummary, categoryAvailableByS
     <div style={switcherStyle}>
       <section className="wallet-overview-card" style={wrapStyle} aria-label="Wallet overview">
         <div style={heroStyle} key={value}>
-          {isJoint && contribStatus ? (
+          {monthlyLoading || monthlyError ? (
+            <span role="status" style={{ ...captionStyle, minHeight: HOME_POOL_SIZE, display: "grid", placeItems: "center" }}>
+              {monthlyError ? "Monthly details unavailable" : "Loading monthly details…"}
+            </span>
+          ) : isJoint && contribStatus ? (
             // Joint: the pooled jar in the middle, each partner's own jar beside it,
             // filled by how much of their share they've put in this month.
             <JointFamily contribStatus={contribStatus}>
@@ -118,7 +124,7 @@ export function WalletCardSwitcher({ value, monthlySummary, categoryAvailableByS
         </div>
       </section>
 
-      {isJoint && !contribStatus && (
+      {!monthlyLoading && !monthlyError && isJoint && !contribStatus && (
         <p style={contribUnavailableStyle} role="note">
           Contributions unavailable: set both partners' split percentages (totalling 100%) and check the joint balance and category balances.
         </p>

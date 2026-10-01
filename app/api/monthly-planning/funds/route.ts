@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { queryDatabaseAll } from "@/lib/notion-api";
 import { monthBounds } from "@/app/components/app-utils";
 
 const NOTION_VERSION = "2022-06-28";
@@ -93,32 +94,12 @@ export async function GET(req: NextRequest) {
   if (!bounds) return NextResponse.json({ error: "month must be YYYY-MM" }, { status: 400 });
 
   try {
-    const results: any[] = [];
-    let cursor: string | undefined;
-
-    do {
-      const res = await fetch(`https://api.notion.com/v1/databases/${FUNDS_DB}/query`, {
-        method: "POST",
-        headers: notionHeaders(token),
-        cache: "no-store",
-        body: JSON.stringify({
-          filter: {
-            and: [
-              { property: "Date", date: { on_or_after: bounds.start } },
-              { property: "Date", date: { on_or_before: bounds.end } },
-            ],
-          },
-          page_size: 100,
-          ...(cursor ? { start_cursor: cursor } : {}),
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) return NextResponse.json({ error: data.message || "Failed to load funds" }, { status: res.status });
-
-      results.push(...(data.results ?? []));
-      cursor = data.has_more ? data.next_cursor : undefined;
-    } while (cursor);
+    const results = await queryDatabaseAll<any>(token, FUNDS_DB, {
+      filter: { and: [
+        { property: "Date", date: { on_or_after: bounds.start } },
+        { property: "Date", date: { on_or_before: bounds.end } },
+      ] },
+    });
 
     const funds = results.map((page: any) => ({
       id: page.id,

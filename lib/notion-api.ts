@@ -11,6 +11,42 @@ type NotionFetchOptions = {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Pace starts per connection within this server process. Serverless instances have
+// independent queues; Retry-After is still authoritative for shared limits.
+const queues = new Map<string, { tail: Promise<void>; nextStart: number; pausedUntil: number }>();
+async function scheduleRequest(token: string) {
+  let queue = queues.get(token);
+  if (!queue) {
+    queue = { tail: Promise.resolve(), nextStart: 0, pausedUntil: 0 };
+    queues.set(token, queue);
+  }
+  const state = queue;
+  const turn = state.tail.then(async () => {
+    let delay: number;
+    while ((delay = Math.max(state.nextStart, state.pausedUntil) - Date.now()) > 0) await wait(delay);
+    state.nextStart = Date.now() + 350;
+  });
+  state.tail = turn.catch(() => {});
+  await turn;
+}
+
+const schemas = new Map<string, { expires: number; promise: Promise<any> }>();
+/** Cache metadata only, never financial balances. Failed reads are not cached. */
+export function readDatabaseSchema(token: string, databaseId: string): Promise<any> {
+  const key = `${token}:${databaseId}`;
+  const cached = schemas.get(key);
+  if (cached && cached.expires > Date.now()) return cached.promise;
+  if (schemas.size >= 100) {
+    for (const [id, entry] of schemas) if (entry.expires <= Date.now()) schemas.delete(id);
+    if (schemas.size >= 100) schemas.delete(schemas.keys().next().value!);
+  }
+  const promise = notionFetchJson<any>(token, `/databases/${databaseId}`).then(result => result.data);
+  const entry = { expires: Date.now() + 5 * 60_000, promise };
+  schemas.set(key, entry);
+  void promise.catch(() => { if (schemas.get(key) === entry) schemas.delete(key); });
+  return promise;
+}
+
 export async function notionFetchJson<T>(
   token: string,
   path: string,
@@ -33,6 +69,7 @@ export async function notionFetchJson<T>(
     let response: Response;
     let data: any;
     try {
+      await scheduleRequest(token);
       response = await fetch(`${NOTION_BASE_URL}${path}`, {
         method,
         headers: {
@@ -68,7 +105,13 @@ export async function notionFetchJson<T>(
 
     const retryable = response.status === 429 || (response.status >= 500 && !isCreate);
     if (retryable && canRetry) {
-      await wait(350 * (attempt + 1));
+      const retryAfter = Number(response.headers.get("Retry-After") ?? data?.additional_data?.retry_after);
+      const delay = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : 350 * 2 ** attempt;
+      const queue = queues.get(token)!;
+      queue.pausedUntil = Math.max(queue.pausedUntil, Date.now() + delay);
+      await wait(delay);
       continue;
     }
     throw error;

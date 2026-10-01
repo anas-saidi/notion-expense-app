@@ -25,7 +25,7 @@ describe("transaction history pagination", () => {
   });
   it("does not present an incomplete total if a later page fails", async () => {
     vi.stubEnv("NOTION_TOKEN", "test-token");
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ results: [page("one")], has_more: true, next_cursor: "next" })).mockResolvedValueOnce(Response.json({ message: "Unavailable" }, { status: 503 })));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ results: [page("one")], has_more: true, next_cursor: "next" })).mockImplementation(() => Promise.resolve(Response.json({ message: "Unavailable" }, { status: 503 }))));
     const response = await GET(new NextRequest("http://localhost/api/transactions?all=true"));
     expect(response.status).toBe(503);
     expect((await response.json()).transactions).toBeUndefined();

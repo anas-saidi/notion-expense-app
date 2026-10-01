@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import type { Account, Category, Transaction } from "./app-types";
 import { evalExpr, fmt, fmtDate, isExpression, shiftDate, today } from "./app-utils";
+import { AutoscaleAmountInput } from "./ui/AutoscaleAmountInput";
 import { BottomSheet } from "./ui/BottomSheet";
 import { TypeItComposer } from "./TypeItComposer";
 import type { TypedTransactionDraft } from "@/lib/typed-transactions";
@@ -238,43 +239,20 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         {(isEditMode || entryMode === "form") && <div style={{ display: "contents" }}>
         {/* ── Amount hero ── */}
         <section style={{ ...heroWrapStyle, minHeight: showKeypad ? 96 : 120 }}>
-          <div className="amount-hero-sizer" data-value={props.amount || "0"} data-empty={props.amount === "" ? "true" : undefined}>
-            <input
-              type="text"
-              value={props.amount}
-              onChange={(e) => props.onAmountChange(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
-              placeholder="0"
-              aria-label="Amount"
-              inputMode="decimal"
-              autoComplete="off"
-              autoFocus
-              // size=1 drops the input's ~20-character intrinsic width, so the sizer's
-              // text mirror sets the width and the drawn caret lands at the end of the digits.
-              size={1}
-              className="amount-hero-input"
-              ref={amountInputRef}
-              onFocus={() => setAmountFocused(true)}
-              onBlur={() => setAmountFocused(false)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                margin: 0,
-                color: "var(--text2)",
-                WebkitAppearance: "none",
-                appearance: "none",
-                fontSize: "clamp(68px, 20vw, 104px)",
-                fontFamily: "var(--font-body)",
-                fontWeight: 500,
-                fontVariantNumeric: "tabular-nums",
-                fontFeatureSettings: '"tnum"',
-                lineHeight: 0.88,
-                letterSpacing: "-0.03em",
-                textAlign: "center",
-              }}
-            />
-          </div>
+          <AutoscaleAmountInput
+            type="text"
+            value={props.amount}
+            onChange={(e) => props.onAmountChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
+            placeholder="0"
+            aria-label="Amount"
+            inputMode="decimal"
+            autoComplete="off"
+            autoFocus
+            ref={amountInputRef}
+            onFocus={() => setAmountFocused(true)}
+            onBlur={() => setAmountFocused(false)}
+          />
           {isExpression(props.amount) && (
             <p style={{ ...exprPreviewStyle, color: isIncome ? "var(--action-income)" : "var(--danger)" }}>
               = {fmt(evalExpr(props.amount))}

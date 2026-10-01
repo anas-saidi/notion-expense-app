@@ -38,3 +38,17 @@ it("keeps existing personal deficits visible", () => {
   expect(result.left.anas).toBe(-100);
   expect(result.pool.joint).toBe(0);
 });
+
+it("unfunded savings reduce affordable Joint allocation exactly once across a savings transfer", async () => {
+  const { getAssignBalanceByScope } = await import("./app-utils");
+  const capacity = (personal: number, savingsReady: number) => getAssignBalanceByScope([
+    { id: "anas", label: "Hubby Account", icon: "", type: "Checking", balance: personal, readyToAssign: personal },
+    { id: "salma", label: "Wife Account", icon: "", type: "Checking", balance: 10000, readyToAssign: 10000 },
+    { id: "saving", label: "Saving Account", icon: "", type: "Savings", balance: 1000 + savingsReady, readyToAssign: savingsReady },
+  ]);
+  const plan = { joint: 0, anas: 0, salma: 0 };
+  const before = calculate(capacity(2000, -600), plan, split);
+  const after = calculate(capacity(1400, 0), plan, split);
+  expect(before.pool.joint).toBe(2153.84);
+  expect(after).toEqual(before);
+});

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { notionFetchJson, queryDatabaseAll } from "@/lib/notion-api";
+import { readDatabaseSchema, queryDatabaseAll } from "@/lib/notion-api";
 
 const ACCOUNTS_DB = process.env.NOTION_ACCOUNTS_DB ?? "1926a2be-8922-8014-bb54-d9f5e9d1234b";
 
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
   try {
-    const { data: database } = await notionFetchJson<any>(token, `/databases/${ACCOUNTS_DB}`);
+    const database = await readDatabaseSchema(token, ACCOUNTS_DB);
     const props = Object.entries(database.properties ?? {}).map(([name, prop]: [string, any]) => ({
       name,
       type: prop.type,

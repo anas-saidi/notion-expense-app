@@ -1,5 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import { queryDatabaseAll } from "@/lib/notion-api";
+import { readDatabaseSchema, queryDatabaseAll } from "@/lib/notion-api";
 export const dynamic = "force-dynamic";
 
 const PENDING_DB = process.env.NOTION_PENDING_DB ?? "d2db101b-faec-467d-8c57-eee6d8780311";
@@ -31,13 +31,7 @@ const pickByTypeAndAliases = (
 };
 
 async function getPendingPropKeys(token: string): Promise<PendingPropKeys> {
-  const metaRes = await fetch(`https://api.notion.com/v1/databases/${PENDING_DB}`, {
-    method: "GET",
-    headers: HDR(token),
-    cache: "no-store",
-  });
-  const meta = await metaRes.json();
-  if (!metaRes.ok) throw new Error(meta?.message || "Failed to read pending database schema");
+  const meta = await readDatabaseSchema(token, PENDING_DB);
 
   const rawProps = Object.entries(meta.properties ?? {}).map(([name, p]: [string, any]) => ({
     id: p.id,

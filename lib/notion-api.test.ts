@@ -65,3 +65,46 @@ it("follows next_cursor until every row is loaded", async () => {
   expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ filter: { x: 1 }, page_size: 100 });
   expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ filter: { x: 1 }, page_size: 100, start_cursor: "c1" });
 });
+
+it("paces concurrent requests and respects Retry-After for the whole connection", async () => {
+  vi.useFakeTimers();
+  const starts: number[] = [];
+  const fetchMock = vi.fn().mockImplementation(() => {
+    starts.push(Date.now());
+    return Promise.resolve(starts.length === 1
+      ? Response.json({ message: "rate limited" }, { status: 429, headers: { "Retry-After": "2" } })
+      : Response.json({ id: "ok" }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  const first = notionFetchJson("queue-test", "/pages/one");
+  const second = notionFetchJson("queue-test", "/pages/two");
+  await vi.runAllTimersAsync();
+  await Promise.all([first, second]);
+  expect(starts).toHaveLength(3);
+  expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(2000);
+  expect(starts[2] - starts[1]).toBeGreaterThanOrEqual(350);
+});
+
+it("shares schema reads, expires metadata, and never caches failures", async () => {
+  vi.useFakeTimers();
+  const { readDatabaseSchema } = await import("./notion-api");
+  const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ properties: { Balance: { type: "number" } } })));
+  vi.stubGlobal("fetch", fetchMock);
+  const first = readDatabaseSchema("schema-test", "accounts");
+  const second = readDatabaseSchema("schema-test", "accounts");
+  await vi.runAllTimersAsync();
+  expect(await first).toEqual(await second);
+  await readDatabaseSchema("schema-test", "accounts");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(300001);
+  const expired = readDatabaseSchema("schema-test", "accounts");
+  await vi.runAllTimersAsync(); await expired;
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  fetchMock.mockResolvedValueOnce(fail(400));
+  const failure = readDatabaseSchema("schema-test", "pending").catch(error => error);
+  await vi.runAllTimersAsync();
+  expect((await failure).status).toBe(400);
+  const retry = readDatabaseSchema("schema-test", "pending");
+  await vi.runAllTimersAsync(); await retry;
+  expect(fetchMock).toHaveBeenCalledTimes(4);
+});

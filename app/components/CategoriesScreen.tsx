@@ -201,7 +201,11 @@ export function CategoriesScreen({
   const jarDetails = jarItems.length > 0
     ? `Money left in ${jarItems.length} categor${jarItems.length === 1 ? "y" : "ies"}`
     : "No category has money left";
-  const budgetJar = (
+  const budgetJar = loading || monthError ? (
+    <span role="status" style={{ minHeight: MASCOT_HERO_SIZE, display: "grid", placeItems: "center", color: "var(--text2)", fontSize: 12 }}>
+      {monthError ? "Monthly details unavailable" : "Loading monthly details…"}
+    </span>
+  ) : (
     <MascotSpill size={MASCOT_HERO_SIZE} label={jarDetails} details={jarDetails} onOpenChange={setJarOpen}>
       <MascotHero variant="pool" scope={budgetScope} level={poolLevel} warn={poolWarn} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={leftToAllocate} />
     </MascotSpill>
@@ -239,7 +243,7 @@ export function CategoriesScreen({
               {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
                   emojis stay tucked away until the jar is tapped; then every category that still
                   has money drops in, sized by its share of Available. */}
-              {budgetScope === "joint" && contribStatus ? (
+              {!loading && !monthError && budgetScope === "joint" && contribStatus ? (
                 <JointFamily contribStatus={contribStatus}>{budgetJar}</JointFamily>
               ) : (
                 <div style={{ marginBottom: 4 }}>{budgetJar}</div>

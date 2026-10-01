@@ -10,6 +10,11 @@ import { isSavingsCategory } from "./wallet-utils";
 
 type HomeScreenProps = {
   categories: Category[];
+  monthlyLoading?: boolean;
+  monthlyError?: boolean;
+  secondaryLoading?: boolean;
+  planningReady?: boolean;
+  planningMonth?: string;
   onOpenPlan: () => void;
   onOpenHistory?: () => void;
   onClickTransaction?: (txn: Transaction) => void;
@@ -33,6 +38,11 @@ type HomeScreenProps = {
 
 export function HomeScreen({
   categories,
+  monthlyLoading = false,
+  monthlyError = false,
+  secondaryLoading = false,
+  planningReady = true,
+  planningMonth,
   onOpenPlan,
   onOpenHistory,
   onClickTransaction,
@@ -52,7 +62,7 @@ export function HomeScreen({
   onOpenAssign,
 }: HomeScreenProps) {
 
-  const isCurrentMonth = homeMonth === new Date().toISOString().slice(0, 7);
+  const isCurrentMonth = homeMonth === today().slice(0, 7);
 
   const visibleCategories = useMemo(
     () => categories.filter(cat => categoryMatchesScope(cat, budgetScope)),
@@ -109,15 +119,19 @@ export function HomeScreen({
     };
   }, [homeMonth, isCurrentMonth]);
 
+  const planningCurrentMonth = planningMonth === today().slice(0, 7);
+  const planningLabel = planningMonth
+    ? new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planningMonth}-01T12:00:00`))
+    : planningNextMonthLabel;
   const allScopesPlanned = plannedScopes
     ? Object.values(plannedScopes).every(Boolean)
     : false;
   const plannedCount = plannedScopes
     ? Object.values(plannedScopes).filter(Boolean).length
     : 0;
-  const showMonthEndAlert = isCurrentMonth && daysUntilMonthEnd <= 2 && !allScopesPlanned;
+  const showMonthEndAlert = !secondaryLoading && !monthlyLoading && !monthlyError && planningReady && isCurrentMonth && (planningCurrentMonth || daysUntilMonthEnd <= 2) && !allScopesPlanned;
   const showPlanningPrompt = showMonthEndAlert && readyToAssign > 0;
-  const planningTiming = daysUntilMonthEnd <= 0
+  const planningTiming = planningCurrentMonth ? "This month is not planned yet" : daysUntilMonthEnd <= 0
     ? "Last day of the month"
     : `${daysUntilMonthEnd} day${daysUntilMonthEnd === 1 ? "" : "s"} left`;
 
@@ -128,6 +142,8 @@ export function HomeScreen({
       <div style={walletSwitcherWrapStyle}>
         <WalletCardSwitcher
           value={budgetScope}
+          monthlyLoading={monthlyLoading}
+          monthlyError={monthlyError}
           monthlySummary={monthlySummary}
           categoryAvailableByScope={categoryAvailableByScope}
           balanceByScope={balanceByScope}
@@ -137,12 +153,14 @@ export function HomeScreen({
         />
       </div>
 
+      {secondaryLoading && <p role="status" style={{ minHeight: 20, margin: "0 0 16px", color: "var(--text2)", fontSize: 12 }}>Loading activity and planning…</p>}
+
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
         <Banner
           tone="accent"
           style={{ marginBottom: 16 }}
-          title={`Plan ${planningNextMonthLabel}`}
+          title={`Plan ${planningLabel}`}
           action={(
             <span style={assignRightStyle}>
               <span style={assignAmountStyle}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</span>
@@ -155,7 +173,7 @@ export function HomeScreen({
       )}
 
       {/* Zone 2a: Joint account has unassigned money */}
-      {showJointUnassignedPrompt && (
+      {showJointUnassignedPrompt && !showMonthEndAlert && (
         <Banner
           tone="accent"
           style={{ marginBottom: 16 }}
@@ -169,7 +187,7 @@ export function HomeScreen({
         <Banner
           tone="accent"
           style={{ marginBottom: 16 }}
-          title={plannedCount > 0 ? `${planningNextMonthLabel} · ${plannedCount}/3 budgets` : `Plan ${planningNextMonthLabel}`}
+          title={plannedCount > 0 ? `${planningLabel} · ${plannedCount}/3 budgets` : `Plan ${planningLabel}`}
           action={<button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>{plannedCount > 0 ? "Resume →" : "Plan →"}</button>}
         >
           {planningTiming}

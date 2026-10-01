@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { comparisonPeriods, evalExpr, expenseBalancePreview, expenseBudgetGate, fmt, getAssignBalanceByScope, getLeftToAssignByScope, withAssignable, isExpenseTransaction, isPastMonth, parseAmount, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
+import { comparisonPeriods, evalExpr, expenseBalancePreview, expenseBudgetGate, fmt, getAssignBalanceByScope, getSavingsReservationByScope, getLeftToAssignByScope, withAssignable, isExpenseTransaction, isPastMonth, parseAmount, resolveTransactionScopes, scopeFromAccountLabel } from "./app-utils";
 
 const accounts: Account[] = [
   { id: "joint", label: "Joined account", icon: "", type: null, balance: 900, readyToAssign: 0 },
@@ -143,5 +143,45 @@ describe("isPastMonth", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+
+describe("savings reservations", () => {
+  const banks = (personal: number, savingReady: number): Account[] => [
+    { id: "anas", label: "Hubby Account", icon: "", type: "Checking", balance: personal, readyToAssign: personal, jointDue: 100 },
+    { id: "save", label: "Saving Account", icon: "", type: "Savings", balance: 1000 + savingReady, readyToAssign: savingReady },
+  ];
+  it("reserves only savings allocations not yet covered by savings cash", () => {
+    const list = banks(2000, -600);
+    expect(getSavingsReservationByScope(list)).toEqual({ anas: 600, salma: 0 });
+    expect(getAssignBalanceByScope(list).anas).toBe(1300);
+    expect(getLeftToAssignByScope(list).anas).toBe(1300);
+    expect(withAssignable(list).find(account => account.id === "anas")?.assignable).toBe(1300);
+  });
+  it("keeps capacity unchanged through partial and full transfers, without a second deduction", () => {
+    const before = getAssignBalanceByScope(banks(2000, -600)).anas;
+    expect(getAssignBalanceByScope(banks(1750, -350)).anas).toBe(before);
+    expect(getAssignBalanceByScope(banks(1400, 0)).anas).toBe(before);
+  });
+  it("does not release extra personal capacity when savings has a surplus", () => {
+    expect(getAssignBalanceByScope(banks(2000, 500)).anas).toBe(1900);
+  });
+  it("preserves a savings shortfall rather than allowing it to disappear", () => {
+    const list = banks(200, -600);
+    expect(getAssignBalanceByScope(list).anas).toBe(-500);
+    expect(getLeftToAssignByScope(list).anas).toBe(0);
+    expect(withAssignable(list).find(account => account.id === "anas")?.assignable).toBe(-500);
+  });
+  it("uses Salma's explicit savings ownership ahead of the generic saving-account fallback", () => {
+    const list: Account[] = [{ id: "wife-save", label: "Wife Saving Account", icon: "", type: "Savings", balance: 0, readyToAssign: -250.75 }];
+    expect(getSavingsReservationByScope(list)).toEqual({ anas: 0, salma: 250.75 });
+    expect(scopeFromAccountLabel("Wife Saving Account")).toBe("salma");
+  });
+  it("reserves a deficit once across multiple personal accounts", () => {
+    const list = [...banks(200, -600), { id: "anas2", label: "Hubby second", icon: "", type: "Checking", balance: 1000, readyToAssign: 1000, jointDue: 0 }];
+    const personal = withAssignable(list).filter(account => account.id !== "save");
+    expect(personal.reduce((total, account) => total + (account.assignable ?? 0), 0)).toBe(500);
+    expect(getAssignBalanceByScope(list).anas).toBe(500);
   });
 });

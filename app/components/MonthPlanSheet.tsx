@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { fetchApiJson, fetchMonthlyData } from "../../lib/app-data";
 import { useReducedMotion } from "motion/react";
 import type { Account, BudgetScope, Category } from "./app-types";
 import { BUDGET_SCOPE_LABELS, categoryMatchesScope, getCategoryScope, fmt, monthBounds, parseAmount } from "./app-utils";
@@ -70,7 +71,7 @@ type MonthPlanSheetProps = {
   onSaved: () => void;
   /** Called after a category is unfrozen so the app can refetch categories. */
   onCategoriesChanged: () => void;
-  /** "YYYY-MM" of the month being planned (always next month for now). */
+  /** "YYYY-MM" of the month being planned (current month when still unfunded, otherwise next month). */
   planningMonth: string;
   /** The app-wide mode: the sheet plans that wallet's categories. */
   scope: BudgetScope;
@@ -144,16 +145,11 @@ export function MonthPlanSheet({
   const loadPlan = async () => {
     setLoading(true);
     setLoadError("");
-    const { start, end } = monthBounds(`${currentMonth}-01`);
     try {
-      const [fundsRes, summaryRes] = await Promise.all([
-        fetch(`/api/monthly-planning/funds?month=${planningMonth}`),
-        fetch(`/api/monthly-summary?start=${start}&end=${end}`),
+      const [funds, summary] = await Promise.all([
+        fetchApiJson<{ funds: any[] }>(`/api/monthly-planning/funds?month=${planningMonth}`),
+        fetchMonthlyData(currentMonth),
       ]);
-      const funds = await fundsRes.json();
-      const summary = await summaryRes.json();
-      if (!fundsRes.ok) throw new Error(funds.error || "Couldn't load the saved plan");
-      if (!summaryRes.ok) throw new Error(summary.error || "Couldn't load current commitments");
       setSaved(sumByCategory(funds.funds ?? []));
       setCurrentPlanned(sumByCategory(summary.summary?.assignedByCategory ?? []));
       setCurrentSpent(sumByCategory(summary.summary?.spentByCategory ?? []));

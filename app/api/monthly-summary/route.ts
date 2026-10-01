@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { monthBounds } from "@/app/components/app-utils";
-import { queryDatabaseAll } from "@/lib/notion-api";
+import { monthBounds } from "../../components/app-utils";
+import { mapTransactionPage } from "../../../lib/transaction-page";
+import { queryDatabaseAll } from "../../../lib/notion-api";
 
-const FUNDS_DB = "1936a2be-8922-8058-990d-c549172f1d45";
+const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be-8922-8058-990d-c549172f1d45";
 const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
 
 const sumByCategory = (pages: any[], valueGetter: (page: any) => number) => {
@@ -55,7 +56,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [funds, transactions] = await Promise.all([
+    const includeTransactions = searchParams.get("includeTransactions") === "true";
+    const [funds, transactionPages] = await Promise.all([
       queryDatabaseAll(token, FUNDS_DB, {
         filter: {
           and: [
@@ -68,15 +70,18 @@ export async function GET(req: NextRequest) {
       queryDatabaseAll(token, TRANSACTIONS_DB, {
         filter: {
           and: [
-            { property: "Type", select: { equals: "Expense" } },
+            ...(!includeTransactions ? [{ property: "Type", select: { equals: "Expense" } }] : []),
             { property: "Date", date: { on_or_after: rangeStart } },
             { property: "Date", date: { on_or_before: rangeEnd } },
-            { property: "Category", relation: { is_not_empty: true } },
+            ...(!includeTransactions ? [{ property: "Category", relation: { is_not_empty: true } }] : []),
           ],
         },
+        sorts: [{ property: "Date", direction: "descending" }],
       }),
     ]);
 
+    const transactions = transactionPages.filter((page: any) =>
+      page.properties?.Type?.select?.name === "Expense" && page.properties?.Category?.relation?.length > 0);
     const totalAssigned = funds.reduce(
       (sum: number, page: any) => sum + signedPlannedAmount(page),
       0,
@@ -90,6 +95,14 @@ export async function GET(req: NextRequest) {
     const spentByCategory = sumByCategory(transactions, (page) => page.properties.Amount?.number ?? 0);
 
     return NextResponse.json({
+      ...(includeTransactions ? {
+        transactions: transactionPages.map(mapTransactionPage),
+        funds: funds.map((page: any) => ({
+          categoryId: page.properties.Category?.relation?.[0]?.id,
+          planned: page.properties.Planned?.number ?? 0,
+          reverse: page.properties.Reverse?.checkbox ?? false,
+        })),
+      } : {}),
       summary: {
         month: month ?? null,
         start: rangeStart,

@@ -10,8 +10,12 @@ export function scopeMonthlySummary(monthlySummary: MonthlySummary, categories: 
 
     const assignmentMatchesScope = (entry: { categoryId: string; accountId?: string | null }) => {
       const label = accountLabel(entry);
-      // Savings accounts are never part of operational planned budget
-      if (label.includes("saving")) return false;
+      // Savings allocations still belong to a wallet. A shared savings account
+      // does not identify its owner, so use the category's ownership instead.
+      if (label.includes("saving")) {
+        const category = categories.find(candidate => candidate.id === entry.categoryId);
+        return !!category && getCategoryScope(category, accounts) === scope;
+      }
       // Primary: use account label (ground truth for who made the assignment)
       if (label.includes("hubb")) return scope === "anas";
       if (label.includes("wife")) return scope === "salma";
@@ -46,10 +50,16 @@ export function isSavingsCategory(category: Category): boolean {
   return types.some(value => ["saving", "sinking", "goal", "fund"].some(kind => value.includes(kind)));
 }
 
-export function getCategoryAvailableByScope(categories: Category[], accounts: Account[] = []): Record<BudgetScope, number> {
+/** All allocations owned by a wallet, including money set aside for savings. */
+export function getCategoryAllocatedByScope(categories: Category[], accounts: Account[] = []): Record<BudgetScope, number> {
     const sum = (scope: BudgetScope) =>
       categories
-        .filter(c => categoryMatchesScope(c, scope, accounts) && !isSavingsCategory(c))
+        .filter(c => categoryMatchesScope(c, scope, accounts))
         .reduce((s, c) => s + (c.available ?? 0), 0);
     return { joint: sum("joint"), anas: sum("anas"), salma: sum("salma") };
+}
+
+/** Operational category balances backed by the spending accounts. */
+export function getCategoryAvailableByScope(categories: Category[], accounts: Account[] = []): Record<BudgetScope, number> {
+  return getCategoryAllocatedByScope(categories.filter(category => !isSavingsCategory(category)), accounts);
 }

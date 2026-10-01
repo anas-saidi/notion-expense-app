@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mapTransactionPage as mapPage } from "../../../lib/transaction-page";
+import { notionFetchJson } from "../../../lib/notion-api";
 import { assertExpenseFitsBudget } from "@/lib/notion-transactions";
 
 const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
@@ -19,19 +21,6 @@ const normalizeId = (value: string | undefined | null) => (value ?? "").replace(
 const belongsToTransactionsDatabase = (page: any) =>
   page?.parent?.type === "database_id" && normalizeId(page.parent.database_id) === normalizeId(TRANSACTIONS_DB);
 
-const mapPage = (page: any) => ({
-  id: page.id,
-  name: page.properties?.Name?.title?.[0]?.plain_text ?? "",
-  amount: page.properties?.Amount?.number ?? 0,
-  date: page.properties?.Date?.date?.start ?? "",
-  category: page.properties?.Category?.relation?.[0]?.id ?? null,
-  accountId: page.properties?.Account?.relation?.[0]?.id ?? null,
-  type: page.properties?.Type?.select?.name ?? null,
-  fromCategoryId: page.properties?.[PROP_BUDGET_OUT]?.relation?.[0]?.id ?? null,
-  toCategoryId: page.properties?.[PROP_BUDGET_IN]?.relation?.[0]?.id ?? null,
-  fromAccountId: page.properties?.[PROP_ACCOUNT_OUT]?.relation?.[0]?.id ?? null,
-  toAccountId: page.properties?.[PROP_ACCOUNT_IN]?.relation?.[0]?.id ?? null,
-});
 
 async function fetchTransactionPage(token: string, id: string) {
   const response = await fetch(`https://api.notion.com/v1/pages/${id}`, {
@@ -71,20 +60,15 @@ export async function GET(req: NextRequest) {
     let cursor: string | undefined;
 
     do {
-      const res = await fetch(`https://api.notion.com/v1/databases/${TRANSACTIONS_DB}/query`, {
+      const { data } = await notionFetchJson<any>(token, `/databases/${TRANSACTIONS_DB}/query`, {
         method: "POST",
-        headers: notionHeaders(token),
-        cache: "no-store",
-        body: JSON.stringify({
+        body: {
           ...(dateFilter ? { filter: dateFilter } : {}),
           sorts: [{ property: "Date", direction: "descending" }],
-          page_size: 100,
+          page_size: paginate ? 100 : pageSize,
           ...(cursor ? { start_cursor: cursor } : {}),
-        }),
+        },
       });
-
-      const data = await res.json();
-      if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
 
       allResults.push(...data.results);
       cursor = (paginate && data.has_more) ? data.next_cursor : undefined;
@@ -93,7 +77,7 @@ export async function GET(req: NextRequest) {
     const results = paginate ? allResults : allResults.slice(0, pageSize);
     return NextResponse.json({ transactions: results.map(mapPage) });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: err.status ?? 500 });
   }
 }
 

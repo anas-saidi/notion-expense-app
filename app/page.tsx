@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
+import { fetchApiJson, fetchMonthlyData, invalidateFinancialReads, loadHomeData, type MonthlyData } from "@/lib/app-data";
+import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
-import { ReflectScreen } from "./components/ReflectScreen";
+const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen));
 import { CategoriesScreen } from "./components/CategoriesScreen";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
@@ -13,12 +16,12 @@ import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
 import { CategoryManageSheet } from "./components/CategoryManageSheet";
 import { SavingsWithdrawSheet } from "./components/SavingsWithdrawSheet";
 import { ManageScreen } from "./components/ManageScreen";
-import { AccountDetailsSheet } from "./components/AccountDetailsSheet";
+const AccountDetailsSheet = dynamic(() => import("./components/AccountDetailsSheet").then(m => m.AccountDetailsSheet));
 import { RebalanceSheet } from "./components/RebalanceSheet";
 import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "./components/month-plan-capacity";
 import { MonthPlanSheet } from "./components/MonthPlanSheet";
 import { TransactionDetailsSheet } from "./components/TransactionDetailsSheet";
-import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
+import { getCategoryAllocatedByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
 import { calculateContributionStatus } from "./components/contribution-utils";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
@@ -59,22 +62,6 @@ const FALLBACK_ACCOUNTS: Account[] = [];
 
 const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15000) });
-    const data = await response.json();
-    if (response.ok) return data as T;
-    if ((response.status === 429 || response.status >= 500) && attempt < retries) {
-      await wait(900 * (attempt + 1));
-      continue;
-    }
-    throw new Error(data.error || `Request failed with status ${response.status}`);
-  }
-  throw new Error("Request failed");
-}
-
 export default function App() {
   const [mounted, setMounted] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -96,9 +83,24 @@ export default function App() {
     spentByCategory: [],
   });
   const [loading, setLoading] = useState(true);
-  const [monthLoading, setMonthLoading] = useState(false);
+  const [monthLoading, setMonthLoading] = useState(true);
+  const [secondaryLoading, setSecondaryLoading] = useState(true);
+  const [planningReady, setPlanningReady] = useState(false);
+  const [currentMonthFunds, setCurrentMonthFunds] = useState<PlanningFund[] | null>(null);
+  const [openedPlanningMonth, setOpenedPlanningMonth] = useState<string | null>(null);
+  const [currentPlanCapacity, setCurrentPlanCapacity] = useState<PlanAmounts | null>(null);
+  const calendarMonth = formatMonthInput(today());
+  const nextCalendarMonth = getNextMonth(calendarMonth);
+  const monthlySnapshot = useRef<{ month: string; data: MonthlyData; expires: number } | null>(null);
+  const budgetRefresh = useRef<{ month: string; promise: Promise<void>; rerun: boolean; started: boolean } | null>(null);
+  // Once opened, keep the sheet mounted for exit animations and its draft state.
+  const [accountDetailsLoaded, setAccountDetailsLoaded] = useState(false);
+
   const [monthError, setMonthError] = useState(false);
   const monthRequest = useRef(0);
+  const catalogRequest = useRef(0);
+  const accountsRequest = useRef(0);
+  const transactionsRequest = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshState, setRefreshState] = useState<"idle" | "updating" | "stale">("idle");
   const [budgetRefreshing, setBudgetRefreshing] = useState(false);
@@ -106,6 +108,15 @@ export default function App() {
   const [tab, setTab] = useState<AppTab>("home");
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
   const [nextMonthFunds, setNextMonthFunds] = useState<{ categoryId: string; planned: number; reverse?: boolean }[]>([]);
+  const monthStartPlannerMonth = useMemo(() => {
+    if (currentMonthFunds === null) return null;
+    const normalize = (id: string) => id.replace(/-/g, "").toLowerCase();
+    const scopedIds = new Set([...categories, ...frozenCategories]
+      .filter(category => getCategoryScope(category, accounts) === budgetScope)
+      .map(category => normalize(category.id)));
+    return getPlanningMonth(calendarMonth, currentMonthFunds.filter(fund => scopedIds.has(normalize(fund.categoryId))));
+  }, [calendarMonth, currentMonthFunds, categories, frozenCategories, accounts, budgetScope]);
+  const planningFunds = useMemo(() => monthStartPlannerMonth === calendarMonth ? currentMonthFunds ?? [] : nextMonthFunds, [monthStartPlannerMonth, calendarMonth, currentMonthFunds, nextMonthFunds]);
   const [homeMonth, setHomeMonth] = useState(formatMonthInput(today()));
   const [showAddModal, setShowAddModal] = useState(false);
   const [transactionType, setTransactionType] = useState<"Expense" | "Income">("Expense");
@@ -121,6 +132,7 @@ export default function App() {
   const [transferAccount, setTransferAccount] = useState<Account | null>(null);
   const [transferPreset, setTransferPreset] = useState<{ toAccountId: string; amount: number; note: string } | null>(null);
   const [detailsAccount, setDetailsAccount] = useState<Account | null>(null);
+  useEffect(() => { if (detailsAccount) setAccountDetailsLoaded(true); }, [detailsAccount]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editingOriginal, setEditingOriginal] = useState<{ amount: number; accountId: string; categoryId: string | null } | null>(null);
   const [detailsTransaction, setDetailsTransaction] = useState<Transaction | null>(null);
@@ -157,6 +169,7 @@ export default function App() {
   const initialCatApplied = useRef(false);
   const initialLoadStarted = useRef(false);
   const initialLoadComplete = useRef(false);
+  const coreReady = useRef(false);
   const rebalanceReturnToAdd = useRef(false);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -236,9 +249,19 @@ export default function App() {
   };
 
   const fetchTransactions = async () => {
+    const request = ++transactionsRequest.current;
     const data = await fetchApiJson<{ transactions?: Transaction[] }>("/api/transactions?page_size=100");
+    if (request !== transactionsRequest.current) return;
     const txns: Transaction[] = data.transactions ?? [];
     setTransactions(txns);
+    let hasCorpus = false;
+    try { hasCorpus = Boolean(localStorage.getItem("expenseCorpus")); } catch {}
+    if (!hasCorpus) {
+      const entries = txns.slice(0, 50).filter(t => t.name && t.category)
+        .map(t => ({ description: t.name, categoryId: t.category! }));
+      setCorpus(entries);
+      try { localStorage.setItem("expenseCorpus", JSON.stringify(entries)); } catch {}
+    }
     const latestCat = txns.find(t => (!t.type || t.type === "Expense") && t.category)?.category;
     if (latestCat) setLastUsedCatId(latestCat);
   };
@@ -252,15 +275,20 @@ export default function App() {
       const query = startMonth
         ? `start=${monthBounds(`${startMonth}-01`).start}&end=${monthBounds(`${endMonth}-01`).end}`
         : "all=true";
-      const data = await fetchApiJson<{ transactions?: Transaction[] }>(`/api/transactions?${query}`);
-      if (request === historyRequest.current) setHistoryTransactions(data.transactions ?? []);
+      const snapshot = monthlySnapshot.current;
+      const txns = startMonth && startMonth === endMonth && startMonth === homeMonth
+        ? (snapshot?.month === startMonth && snapshot.expires > Date.now()
+          ? snapshot.data.transactions
+          : (await fetchMonthlyData(startMonth, endMonth)).transactions)
+        : (await fetchApiJson<{ transactions: Transaction[] }>(`/api/transactions?${query}`)).transactions;
+      if (request === historyRequest.current) setHistoryTransactions(txns ?? []);
     } catch (error) {
       if (request === historyRequest.current) setHistoryError(error instanceof Error ? error.message : "Could not load Reflect");
       throw error;
     } finally {
       if (request === historyRequest.current) setHistoryLoading(false);
     }
-  }, []);
+  }, [homeMonth]);
 
   useEffect(() => {
     if (tab !== "history") return;
@@ -274,12 +302,11 @@ export default function App() {
     try {
       const target = month ?? formatMonthInput(today());
       const { start, end } = monthBounds(`${target}-01`);
-      const [data, transactionData] = await Promise.all([
-        fetchApiJson<{ summary?: MonthlySummary }>(`/api/monthly-summary?start=${start}&end=${end}`),
-        fetchApiJson<{ transactions?: Transaction[] }>(`/api/transactions?start=${start}&end=${end}&page_size=100`),
-      ]);
+      const data = await fetchMonthlyData(target);
       if (request !== monthRequest.current) return;
-      setContributionTransactions(transactionData.transactions ?? []);
+      monthlySnapshot.current = { month: target, data, expires: Date.now() + 15000 };
+      if (target === formatMonthInput(today())) setCurrentMonthFunds(data.funds ?? []);
+      setContributionTransactions(data.transactions ?? []);
       setMonthlySummary({
         start,
         end,
@@ -304,26 +331,19 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) setPendingItems(parsed);
       }
     } catch {}
-    try {
-      const res = await fetch("/api/pending");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (Array.isArray(data.items)) {
-        setPendingItems(data.items);
-        localStorage.setItem("pendingItems", JSON.stringify(data.items));
-      }
-    } catch {}
+    const data = await fetchApiJson<{ items: PendingItem[] }>("/api/pending");
+    if (Array.isArray(data.items)) {
+      setPendingItems(data.items);
+      try { localStorage.setItem("pendingItems", JSON.stringify(data.items)); } catch {}
+    }
   };
 
-  const fetchCategories = async () => {
-    const data = await fetchApiJson<{ categories?: Category[] }>("/api/categories");
-    const loadedCategories = data.categories ?? [];
-    setCategories(loadedCategories);
-    if (loadedCategories.length > 0 && !categoryId) setCategoryId(loadedCategories[0].id);
-  };
+  const fetchCategories = () => fetchCategoryCatalog();
 
   const fetchCategoryCatalog = async () => {
+    const request = ++catalogRequest.current;
     const data = await fetchApiJson<{ categories?: Category[] }>("/api/categories?includeSnoozed=true");
+    if (request !== catalogRequest.current) return;
     const catalog: Category[] = data.categories ?? [];
     const active = catalog.filter((category) => !category.snoozed && !category.archived);
     setCategories(active);
@@ -332,19 +352,11 @@ export default function App() {
   };
 
   const fetchAccounts = async () => {
+    const request = ++accountsRequest.current;
     const data = await fetchApiJson<{ accounts?: Account[] }>("/api/accounts");
-    setAccounts(data.accounts ?? []);
+    if (request === accountsRequest.current) setAccounts(data.accounts ?? []);
   };
 
-  const fetchFrozenCategories = async () => {
-    try {
-      const data = await fetch("/api/categories?includeSnoozed=true").then((r) => r.json());
-      const frozen = (data.categories ?? []).filter((category: Category) => category.snoozed && !category.archived);
-      setFrozenCategories(frozen);
-    } catch {
-      setFrozenCategories([]);
-    }
-  };
 
   useEffect(() => {
     if (initialLoadStarted.current && loadAttempt === 0) return;
@@ -352,21 +364,22 @@ export default function App() {
 
     const loadLiveData = async () => {
       try {
-        setLoading(true);
+        setLoading(!coreReady.current);
         setLoadError(null);
-        // Notion enforces a low request rate. Load the home dependencies in
-        // sequence so a page refresh does not fan out into a burst of 429s.
-        await fetchCategoryCatalog();
-        await fetchAccounts();
-        await fetchTransactions();
-        await fetchPending();
-        await fetchMonthlySummary(homeMonth);
-        await fetchNextMonthFunds();
+        setSecondaryLoading(true);
+        const results = await loadHomeData({
+          essentials: [fetchCategoryCatalog, fetchAccounts],
+          onReady: () => { coreReady.current = true; initialLoadComplete.current = true; setLoading(false); },
+          secondary: [fetchTransactions, fetchPending, () => fetchMonthlySummary(homeMonth), fetchNextMonthFunds],
+        });
+        setRefreshState(results.some(result => result.status === "rejected") ? "stale" : "idle");
       } catch (error) {
         console.error("[app] Failed to load live data:", error);
-        setLoadError(error instanceof Error ? error.message : "Could not load financial data");
+        if (coreReady.current) setRefreshState("stale");
+        else setLoadError(error instanceof Error ? error.message : "Could not load financial data");
       } finally {
-        initialLoadComplete.current = true;
+        initialLoadComplete.current = coreReady.current;
+        setSecondaryLoading(false);
         setLoading(false);
       }
     };
@@ -449,17 +462,6 @@ export default function App() {
       try {
         setCorpus(JSON.parse(raw));
       } catch {}
-    } else {
-      fetch("/api/transactions?page_size=50")
-        .then((r) => r.json())
-        .then((data) => {
-          const entries = (data.transactions ?? [])
-            .filter((t: Transaction) => t.name && t.category)
-            .map((t: Transaction) => ({ description: t.name, categoryId: t.category as string }));
-          setCorpus(entries);
-          localStorage.setItem("expenseCorpus", JSON.stringify(entries));
-        })
-        .catch(() => {});
     }
   }, []);
 
@@ -525,15 +527,18 @@ export default function App() {
 
   const refreshAffectedData = useCallback(async () => {
     setRefreshState("updating");
+    invalidateFinancialReads();
+    monthlySnapshot.current = null;
     const results = await Promise.allSettled([
-      fetchTransactions(), fetchHistoryTransactions(historyStartMonth, historyMonth), fetchCategoryCatalog(), fetchAccounts(), fetchMonthlySummary(homeMonth),
+      refreshBudgetData(), fetchTransactions(),
+      ...(tab === "history" ? [fetchHistoryTransactions(historyStartMonth, historyMonth)] : []),
     ]);
     if (results.some(result => result.status === "rejected")) {
       setRefreshState("stale");
       throw new Error("Some balances or activity could not be refreshed");
     }
     setRefreshState("idle");
-  }, [historyStartMonth, historyMonth, homeMonth, fetchHistoryTransactions]);
+  }, [historyStartMonth, historyMonth, homeMonth, tab, fetchHistoryTransactions]);
 
   const deleteTransaction = async (id: string) => {
     const transaction = historyTransactions.find(item => item.id === id) ?? transactions.find(item => item.id === id);
@@ -582,24 +587,18 @@ export default function App() {
   const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
   const jointUnassigned = useMemo(() => getJointAccountUnassigned(accounts), [accounts]);
 
-  // Derive which scopes have been planned for next month (based on existing fund records)
+  // Derive which scopes have allocations for the month offered by the planner.
   const plannedScopes = useMemo((): Record<"joint" | "anas" | "salma", boolean> => {
-    if (!nextMonthFunds.length) return { joint: false, anas: false, salma: false };
-    const fundedIds = new Set(nextMonthFunds.filter((f) => f.planned > 0).map((f) => f.categoryId));
+    if (!planningFunds.length) return { joint: false, anas: false, salma: false };
+    const fundedIds = new Set(planningFunds.filter((f) => !f.reverse && f.planned > 0).map((f) => f.categoryId));
     const all = [...categories, ...frozenCategories];
     return {
       joint: all.filter((c) => getCategoryScope(c, accounts) === "joint").some((c) => fundedIds.has(c.id)),
       anas:  all.filter((c) => getCategoryScope(c, accounts) === "anas").some((c) => fundedIds.has(c.id)),
       salma: all.filter((c) => getCategoryScope(c, accounts) === "salma").some((c) => fundedIds.has(c.id)),
     };
-  }, [nextMonthFunds, categories, frozenCategories, accounts]);
+  }, [planningFunds, categories, frozenCategories, accounts]);
 
-  // Planning is always for next month, counted from today (not the month being viewed).
-  const monthStartPlannerMonth = useMemo(() => {
-    const [y, m] = formatMonthInput(today()).split("-").map(Number);
-    const d = new Date(y, m, 1); // month m = next month (JS months 0-indexed)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
   const selectCategory = (cat: Category) => {
     setCategoryId(cat.id);
     setLastUsedCatId(cat.id);
@@ -639,34 +638,78 @@ export default function App() {
     setCategoryManageMode("create");
   };
 
-  const refreshBudgetData = async (message?: string) => {
+  const refreshBudgetData = (message?: string): Promise<void> => {
+    if (budgetRefresh.current?.month === homeMonth) {
+      const entry = budgetRefresh.current;
+      // Same-turn callbacks share one refresh. A later save while a read is in
+      // progress gets a trailing fresh pass, rather than accepting old balances.
+      if (entry.started) entry.rerun = true;
+      if (message) void entry.promise.then(() => showToast(message, 1500)).catch(() => {});
+      return entry.promise;
+    }
     setBudgetRefreshing(true);
-    await Promise.allSettled([
-      fetchCategories(),
-      fetchFrozenCategories(),
-      fetchMonthlySummary(homeMonth),
-      fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? [])),
-    ]);
-    setBudgetRefreshing(false);
-    if (message) showToast(message, 1500);
+    monthlySnapshot.current = null;
+    invalidateFinancialReads();
+    const entry = { month: homeMonth, promise: Promise.resolve(), rerun: false, started: false };
+    const promise = (async () => {
+      await Promise.resolve();
+      entry.started = true;
+      do {
+        entry.rerun = false;
+        const results = await Promise.allSettled([fetchCategoryCatalog(), fetchMonthlySummary(homeMonth), fetchAccounts()]);
+        if (results.some(result => result.status === "rejected")) {
+          setRefreshState("stale");
+          throw new Error("Some balances could not be refreshed");
+        }
+        if (entry.rerun) invalidateFinancialReads();
+      } while (entry.rerun);
+    })();
+    entry.promise = promise;
+    budgetRefresh.current = entry;
+    void promise.then(() => {
+      if (budgetRefresh.current?.promise === promise) { budgetRefresh.current = null; setBudgetRefreshing(false); }
+    }, () => {
+      if (budgetRefresh.current?.promise === promise) { budgetRefresh.current = null; setBudgetRefreshing(false); }
+    });
+    // Existing sheet callbacks may fire-and-forget. Surface failures without an
+    // unhandled rejection while still rejecting to callers that await refresh.
+    void promise.catch(error => showToast(error.message));
+    if (message) void promise.then(() => showToast(message, 1500)).catch(() => {});
+    return promise;
   };
 
   const refreshAccountsData = (message?: string) => {
-    fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
-    fetchMonthlySummary(homeMonth);
-    if (message) showToast(message, 1500);
+    void refreshBudgetData(message).catch(() => {});
   };
 
   const fetchNextMonthFunds = async () => {
     try {
-      const data = await fetch(`/api/monthly-planning/funds?month=${monthStartPlannerMonth}`).then((r) => r.json());
+      const data = await fetchApiJson<{ funds?: typeof nextMonthFunds }>(`/api/monthly-planning/funds?month=${nextCalendarMonth}`);
       setNextMonthFunds(data.funds ?? []);
-    } catch {
-      setNextMonthFunds([]);
+      setPlanningReady(true);
+    } catch (error) {
+      setPlanningReady(false);
+      setRefreshState("stale");
+      throw error;
     }
   };
 
   const openMonthlyPlan = () => {
+    if (!monthStartPlannerMonth) return;
+    setOpenedPlanningMonth(monthStartPlannerMonth);
+    // Saving this month's first allocations updates live balances. Keep the
+    // opening pool so those saved allocations are deducted only once in-sheet.
+    if (monthStartPlannerMonth === calendarMonth) {
+      const capacity = { ...assignBalanceByScope };
+      const normalize = (id: string) => id.replace(/-/g, "").toLowerCase();
+      const catalog = new Map([...categories, ...frozenCategories].map(category => [normalize(category.id), category]));
+      for (const fund of currentMonthFunds ?? []) {
+        const category = catalog.get(normalize(fund.categoryId));
+        const owner = category && getCategoryScope(category, accounts);
+        if (owner && !fund.reverse) capacity[owner] += fund.planned;
+      }
+      setCurrentPlanCapacity(capacity);
+    } else setCurrentPlanCapacity(null);
     setShowMonthStartPlanner(true);
   };
 
@@ -733,7 +776,7 @@ export default function App() {
 
   const categoryAvailableByScope = useMemo<Record<BudgetScope, number>>(() => {
     if (isPastMonth(homeMonth)) return { joint: 0, anas: 0, salma: 0 };
-    return getCategoryAvailableByScope(categories, accounts);
+    return getCategoryAllocatedByScope(categories, accounts);
   }, [categories, accounts, homeMonth]);
 
   const scopedTransactions = useMemo(
@@ -802,10 +845,11 @@ export default function App() {
   }), [contribStatus]);
 
   const nextMonthRemaining = useMemo(() => {
+    if (monthStartPlannerMonth === calendarMonth) return assignBalanceByScope;
     const totals: PlanAmounts = { joint: 0, anas: 0, salma: 0 };
     const normalize = (id: string) => id.replace(/-/g, "").toLowerCase();
     const catalog = new Map([...categories, ...frozenCategories].map((c) => [normalize(c.id), c]));
-    for (const fund of nextMonthFunds) {
+    for (const fund of planningFunds) {
       if (fund.reverse || !fund.categoryId) continue;
       const cat = catalog.get(normalize(fund.categoryId));
       const owner = cat && getCategoryScope(cat, accounts);
@@ -815,7 +859,7 @@ export default function App() {
       { joint: jointUnassigned, anas: assignBalanceByScope.anas, salma: assignBalanceByScope.salma },
       totals, getPlanningSplit(accounts),
     ).left;
-  }, [nextMonthFunds, categories, frozenCategories, accounts, jointUnassigned, assignBalanceByScope]);
+  }, [planningFunds, categories, frozenCategories, accounts, jointUnassigned, assignBalanceByScope, monthStartPlannerMonth, calendarMonth]);
 
   const selectedDateLabel =
     date === today() ? "Today" :
@@ -865,15 +909,11 @@ export default function App() {
 
       const expAmt = evalExpr(amount);
       if (!isEditing && displayedBalance !== null) animateBalance(displayedBalance, displayedBalance + (transactionType === "Income" ? expAmt : -expAmt));
-      fetchTransactions();
-      fetchMonthlySummary(homeMonth);
-      fetchCategories();
-      fetch("/api/accounts").then((r) => r.json()).then((d) => setAccounts(d.accounts ?? []));
+      void refreshAffectedData().catch(error => showToast(error.message));
       // Re-fetch categories after a short delay — Notion computed properties (formulas/rollups)
       // may not reflect the new transaction immediately.
       setTimeout(() => {
-        fetchCategories();
-        fetchMonthlySummary(homeMonth);
+        void refreshBudgetData().catch(() => {});
       }, 1500);
 
       if (!isEditing) {
@@ -920,7 +960,7 @@ export default function App() {
     );
   }
 
-  if (loadError && !categories.length && !accounts.length) {
+  if (loadError) {
     return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 20, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 22 }}>Could not load your finances</h1><p style={{ margin: "10px 0 18px", color: "var(--text2)" }}>No balances were replaced. Check the connection and try again.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ minHeight: 48, padding: "0 18px", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>Retry</button></section></main>;
   }
 
@@ -961,7 +1001,7 @@ export default function App() {
     >
       {refreshState !== "idle" && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
-          {refreshState === "updating" ? "Updating" : <>Could not refresh · <button type="button" onClick={() => void refreshAffectedData().catch(error => showToast(error.message))}>Retry</button></>}
+          {refreshState === "updating" ? "Updating" : <>Could not refresh · <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
         </div>
       )}
       {showManageScreen && (
@@ -978,22 +1018,26 @@ export default function App() {
         onClose={() => setShowMonthStartPlanner(false)}
         onSaved={() => {
           refreshBudgetData("Plan saved");
-          fetchNextMonthFunds(); // eslint-disable-line react-hooks/exhaustive-deps
+          void fetchNextMonthFunds().catch(() => {});
         }}
         onCategoriesChanged={() => {
-          fetchCategories();
-          fetchFrozenCategories();
+          void fetchCategoryCatalog().catch(error => showToast(error.message));
         }}
-        planningMonth={monthStartPlannerMonth}
+        planningMonth={openedPlanningMonth ?? monthStartPlannerMonth ?? calendarMonth}
         scope={budgetScope}
         categories={categories.filter((c) => !c.snoozed && !c.archived)}
         frozenCategories={frozenCategories}
         accounts={accounts}
-        planningCapacity={{ joint: jointUnassigned, anas: assignBalanceByScope.anas, salma: assignBalanceByScope.salma }}
+        planningCapacity={currentPlanCapacity ?? { joint: jointUnassigned, anas: assignBalanceByScope.anas, salma: assignBalanceByScope.salma }}
       />
 
       {tab === "home" && (
         <HomeScreen
+          monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
+          monthlyError={monthError}
+          secondaryLoading={secondaryLoading}
+          planningReady={currentMonthFunds !== null && (monthStartPlannerMonth === calendarMonth || planningReady)}
+          planningMonth={monthStartPlannerMonth ?? undefined}
           categories={homeCategories}
           onOpenPlan={openMonthlyPlan}
           contribStatus={contribStatus}
@@ -1056,7 +1100,7 @@ export default function App() {
             setTransferAccount(source);
           }}
           onOpenNewCategory={openNewCategory}
-          planMonth={monthStartPlannerMonth}
+          planMonth={monthStartPlannerMonth ?? undefined}
           onOpenPlan={openMonthlyPlan}
           loading={monthLoading || budgetRefreshing || refreshState === "updating"}
         />
@@ -1102,11 +1146,8 @@ export default function App() {
         }}
         onTypedComplete={(count) => {
           showToast(`${count} ${count === 1 ? "transaction" : "transactions"} saved`, 2000);
-          void fetchTransactions();
-          void fetchMonthlySummary(homeMonth);
-          void fetchCategories();
-          void fetch("/api/accounts").then(r => r.json()).then(data => setAccounts(data.accounts ?? [])).catch(() => {});
-          setTimeout(() => { void fetchCategories(); void fetchMonthlySummary(homeMonth); }, 1500);
+          void refreshAffectedData().catch(error => showToast(error.message));
+          setTimeout(() => { void refreshBudgetData().catch(() => {}); }, 1500);
         }}
         amount={amount}
         name={name}
@@ -1287,7 +1328,7 @@ export default function App() {
         zIndex={95}
       />
 
-      <AccountDetailsSheet
+      {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
         open={detailsAccount !== null}
         account={detailsAccount && (displayAccounts.find((a) => a.id === detailsAccount.id) ?? detailsAccount)}
         transactions={transactions}
@@ -1298,7 +1339,7 @@ export default function App() {
         onIncome={(acct) => { setDetailsAccount(null); setIncomeAccount(acct); }}
         onReconcileSuccess={(msg) => { refreshAccountsData(msg); }}
         onTransactionsChanged={() => { fetchTransactions(); refreshBudgetData(); }}
-      />
+      />}
 
       <AccountIncomeSheet
         open={incomeAccount !== null}

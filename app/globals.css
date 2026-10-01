@@ -457,74 +457,55 @@ input[type="number"] { -moz-appearance: textfield; }
   color: transparent;
 }
 
-/* Amount hero input — prevent iOS Safari from overriding font-size */
-.amount-hero-input {
-  -webkit-text-size-adjust: 100%;
-  font-size: clamp(96px, 26vw, 144px) !important;
-}
-
-.amount-hero-input:focus::placeholder {
-  color: transparent;
-}
-
-/*
-  Auto-sizing wrapper for the hero amount input.
-  The ::after ghost mirrors the input value so the container
-  shrinks to exactly content width — cursor always follows the text.
-*/
+/* Large amount entry shrinks from its measured text width, including expressions. */
 .amount-hero-sizer {
-  display: inline-grid;
-  width: max-content;
-  max-width: 100%;
-}
-.amount-hero-sizer::after {
-  content: attr(data-value);
-  visibility: hidden;
-  pointer-events: none;
-  grid-area: 1 / 1;
-  white-space: pre;
-  font-size: clamp(96px, 26vw, 144px);
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 114px;
   font-family: var(--font-body);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
-  line-height: 0.88;
   letter-spacing: -0.03em;
 }
-.amount-hero-sizer .amount-hero-input {
-  grid-area: 1 / 1;
-  width: 100%;
-  min-width: 0;
-  text-align: left;
-  /* The native caret is as tall as the 100px+ line box; a slim drawn one replaces it. */
-  caret-color: transparent;
-}
-
-/*
-  Slim caret at the end of the digits. The sizer shrink-wraps the value, so its
-  right edge is where the text ends; when empty it sits where the first digit will go.
-*/
-.amount-hero-sizer { position: relative; }
-.amount-hero-sizer:focus-within::before {
-  content: "";
+.amount-hero-measure {
   position: absolute;
-  right: -5px;
-  top: 50%;
-  width: 2px;
-  height: 0.5em;
-  font-size: clamp(96px, 26vw, 144px);
-  transform: translateY(-50%);
-  border-radius: 2px;
-  background: var(--text2);
-  opacity: 0.7;
+  visibility: hidden;
   pointer-events: none;
-  animation: amountCaretBlink 1.1s steps(1, end) infinite;
+  white-space: pre;
+  font-size: clamp(68px, 20vw, 104px);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
-.amount-hero-sizer[data-empty="true"]:focus-within::before { right: auto; left: 50%; }
-@keyframes amountCaretBlink { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .amount-hero-sizer:focus-within::before { animation: none; }
+.amount-hero-input {
+  -webkit-text-size-adjust: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0 8px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text2);
+  caret-color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.03em;
+  /* The mobile form rule enforces 16px to prevent Safari zoom; this field
+     stays above that size and needs its measured value to take precedence. */
+  font-size: var(--amount-font-size, clamp(68px, 20vw, 104px)) !important;
+  line-height: 1.1;
+  text-align: center;
 }
+.amount-hero-input::placeholder { color: var(--text2); opacity: 1; }
+.amount-hero-input::selection { background: var(--select-wash); color: var(--select-ink); }
 
 /* Date picker icon */
 input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
