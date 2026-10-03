@@ -1,5 +1,6 @@
+import { withMirrorReads } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
-import { readDatabaseSchema, queryDatabaseAll } from "@/lib/notion-api";
+import { queryDatabaseAll } from "../../../lib/notion-api";
 
 const ACCOUNTS_DB = process.env.NOTION_ACCOUNTS_DB ?? "1926a2be-8922-8014-bb54-d9f5e9d1234b";
 
@@ -7,7 +8,7 @@ type NotionProperty = { name: string; type: string };
 
 const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-const pickByTypeAndAliases = (props: NotionProperty[], type: string, aliases: string[]): string | undefined => {
+const pickByTypeAndAliases = (props: NotionProperty[], type: string, aliases: string[], allowFallback = true): string | undefined => {
   const sameType = props.filter((prop) => prop.type === type);
   // 1. Exact normalized match
   for (const alias of aliases) {
@@ -21,7 +22,7 @@ const pickByTypeAndAliases = (props: NotionProperty[], type: string, aliases: st
     if (found) return found.name;
   }
   // 3. Fall back to first only when it's the only property of this type (unambiguous)
-  if (sameType.length === 1) return sameType[0].name;
+  if (allowFallback && sameType.length === 1) return sameType[0].name;
   return undefined;
 };
 
@@ -46,14 +47,16 @@ const readNumber = (prop: any): number | null => {
   return prop.number ?? prop.formula?.number ?? prop.rollup?.number ?? null;
 };
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
 
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
   try {
-    const database = await readDatabaseSchema(token, ACCOUNTS_DB);
-    const props = Object.entries(database.properties ?? {}).map(([name, prop]: [string, any]) => ({
+    // Query pages already include property names and types. Reading the schema
+    // first adds an unnecessary network round trip on every cold instance.
+    const results = await queryDatabaseAll(token, ACCOUNTS_DB);
+    const props = Object.entries(results[0]?.properties ?? {}).map(([name, prop]: [string, any]) => ({
       name,
       type: prop.type,
     }));
@@ -62,38 +65,31 @@ export async function GET(req: NextRequest) {
     const typeKey = pickByTypeAndAliases(props, "select", ["Account Type", "Type"]);
     const disabledKey = pickByTypeAndAliases(props, "checkbox", ["Disabled", "Inactive", "Archived"]);
     const balanceKey =
-      pickByTypeAndAliases(props, "formula", ["Current Balance", "Balance", "Ledger Balance"]) ??
-      pickByTypeAndAliases(props, "number", ["Current Balance", "Balance", "Ledger Balance"]) ??
-      pickByTypeAndAliases(props, "rollup", ["Current Balance", "Balance", "Ledger Balance"]);
+      pickByTypeAndAliases(props, "formula", ["Current Balance", "Balance", "Ledger Balance"], false) ??
+      pickByTypeAndAliases(props, "number", ["Current Balance", "Balance", "Ledger Balance"], false) ??
+      pickByTypeAndAliases(props, "rollup", ["Current Balance", "Balance", "Ledger Balance"], false);
     const readyKey =
-      pickByTypeAndAliases(props, "formula", ["Ready to Assign", "Ready To Assign", "Available to Assign"]) ??
-      pickByTypeAndAliases(props, "number", ["Ready to Assign", "Ready To Assign", "Available to Assign"]) ??
-      pickByTypeAndAliases(props, "rollup", ["Ready to Assign", "Ready To Assign", "Available to Assign"]);
+      pickByTypeAndAliases(props, "formula", ["Ready to Assign", "Ready To Assign", "Available to Assign"], false) ??
+      pickByTypeAndAliases(props, "number", ["Ready to Assign", "Ready To Assign", "Available to Assign"], false) ??
+      pickByTypeAndAliases(props, "rollup", ["Ready to Assign", "Ready To Assign", "Available to Assign"], false);
     const jointDueKey =
-      pickByTypeAndAliases(props, "formula", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"]) ??
-      pickByTypeAndAliases(props, "number", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"]) ??
-      pickByTypeAndAliases(props, "rollup", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"]);
+      pickByTypeAndAliases(props, "formula", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"], false) ??
+      pickByTypeAndAliases(props, "number", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"], false) ??
+      pickByTypeAndAliases(props, "rollup", ["Joint Due #", "Joint Due", "Joint due", "Joint owed", "Joint Owed"], false);
     const contributionPercentKey =
-      pickByTypeAndAliases(props, "number", ["Contribution ( percent )", "Contribution %", "Contribution Percent"]) ??
-      pickByTypeAndAliases(props, "formula", ["Contribution ( percent )", "Contribution %", "Contribution Percent"]) ??
-      pickByTypeAndAliases(props, "rollup", ["Contribution ( percent )", "Contribution %", "Contribution Percent"]);
+      pickByTypeAndAliases(props, "number", ["Contribution ( percent )", "Contribution %", "Contribution Percent"], false) ??
+      pickByTypeAndAliases(props, "formula", ["Contribution ( percent )", "Contribution %", "Contribution Percent"], false) ??
+      pickByTypeAndAliases(props, "rollup", ["Contribution ( percent )", "Contribution %", "Contribution Percent"], false);
 
-    const queryBody: Record<string, unknown> = {};
+    const activeResults = results.filter((page: any) =>
+      !disabledKey || !page.properties?.[disabledKey]?.checkbox);
+    if (nameKey) activeResults.sort((a: any, b: any) => {
+      const title = (page: any) => (page.properties?.[nameKey]?.title ?? [])
+        .map((item: any) => item.plain_text ?? item.text?.content ?? "").join("");
+      return title(a).localeCompare(title(b));
+    });
 
-    if (disabledKey) {
-      queryBody.filter = {
-        property: disabledKey,
-        checkbox: { equals: false },
-      };
-    }
-
-    if (nameKey) {
-      queryBody.sorts = [{ property: nameKey, direction: "ascending" }];
-    }
-
-    const results = await queryDatabaseAll(token, ACCOUNTS_DB, queryBody);
-
-    const accounts = results.map((page: any) => {
+    const accounts = activeResults.map((page: any) => {
       const properties = page.properties ?? {};
       const nameProp = nameKey ? properties[nameKey] : null;
       const typeProp = typeKey ? properties[typeKey] : null;
@@ -133,3 +129,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export const GET = withMirrorReads(handleGET);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

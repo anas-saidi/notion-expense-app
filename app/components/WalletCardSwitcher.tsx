@@ -90,7 +90,7 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
       onOpenChange={setPoolOpen}
       details={<>
         {Math.round(spentPct ?? 0)}% spent
-        {overspent > 0 && <span style={{ color: "var(--danger)" }}> · <Money value={overspent} /> overspent</span>}
+        {overspent > 0 && <span style={{ color: "var(--danger)", display: "block" }}><Money value={overspent} /> overspent</span>}
       </>}
     >
       <MascotHero variant="pool" size={HOME_POOL_SIZE} items={poolOpen ? topSpent : undefined} scope={value} level={1 - spent / (planned ?? 1)} warn={poolWarn} spentPct={spentPct} balance={balance} available={available ?? 0} lookYaw={poolLook} />

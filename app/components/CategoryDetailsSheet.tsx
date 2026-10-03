@@ -268,13 +268,13 @@ export function CategoryDetailsSheet({
                   eventKindLabel(item.kind),
                   item.relatedCategoryName,
                   item.subtitle,
-                ].filter(Boolean).join(" · ");
+                ].filter(Boolean);
 
                 return (
                   <TransactionRow
                     key={item.id}
                     title={item.title}
-                    subtitle={meta}
+                    subtitle={<span style={{ display: "grid", gap: 2 }}>{meta.map((value, index) => <span key={index}>{value}</span>)}</span>}
                     amount={item.amount}
                     tone={item.kind === "funded" ? "income" : item.kind === "expense" ? "expense" : "transfer"}
                     prefix={item.direction === "in" ? "+" : "−"}

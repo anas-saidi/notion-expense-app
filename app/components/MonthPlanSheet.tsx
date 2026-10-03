@@ -227,7 +227,7 @@ export function MonthPlanSheet({
   const shortfalls = (["anas", "salma"] as const)
     .filter((partner) => capacity.left[partner] < -0.005)
     .map((partner) => `${BUDGET_SCOPE_LABELS[partner]} is short by ${fmt(Math.ceil(-capacity.left[partner]))}`);
-  const capacityError = shortfalls.length ? `${shortfalls.join(" · ")}. Reduce personal or Joint allocations before saving.` : "";
+  const capacityError = shortfalls.length ? `${shortfalls.join(". ")}. Reduce personal or Joint allocations before saving.` : "";
 
   const capacityLabel = left < 0 ? "Over capacity" : "Unassigned";
   const personalRemaining = {
@@ -432,7 +432,7 @@ export function MonthPlanSheet({
             </span>
             {plannedTotal > 0 && (
               <span style={heroSubStyle}>
-                {fmt(Math.round(plannedTotal))} planned{savedTotal !== plannedTotal ? " · not saved" : ""}
+                {fmt(Math.round(plannedTotal))} planned{savedTotal !== plannedTotal ? " (not saved)" : ""}
               </span>
             )}
             {scope !== "joint" && (

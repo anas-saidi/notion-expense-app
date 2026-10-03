@@ -61,3 +61,72 @@ The shared Notion client paces outgoing starts at 350 ms intervals and honors Re
 [Raw browser results](../artifacts/performance/browser-results.json), [backend results](../artifacts/performance/notion-results.json), [summary](../artifacts/performance/summary.json), and [live parity](../artifacts/performance/live-parity.json) are local verification artifacts, ignored by Git. Screenshots contain fixture data.
 
 The local artifacts also contain `browser-benchmark.cjs`, `start-benchmark-server.cjs`, and `notion-benchmark.ts.fixture`. Run production baseline and modified copies on loopback ports 3211/3212; the server launcher reads environment variables from `APP_ENV_DIR` and uses a local-only session signing key. The browser script uses `PLAYWRIGHT_PACKAGE` when Playwright is supplied by the desktop runtime. Copy the backend fixture into each comparison root as `performance-benchmark.test.ts`, configure Vitest's `@` alias to that root, and set `BENCHMARK_VARIANT=before` or `after`. Live comparisons perform reads only; saving uses mocks.
+
+
+## Hosted Postgres follow-up — 2026-10-03
+
+This comparison uses the working tree immediately before the synchronized-database
+integration, including the earlier performance improvements and Due Bills work.
+It is a different baseline from committed main above. The final version uses
+Neon Free in US East 1, with five schemas and 3,090 imported records. App servers
+run locally in production mode; the database is genuinely hosted on Neon.
+
+Three alternating runs per version use fresh Chromium contexts at 390 × 844,
+without CPU/network throttling and with reduced motion. The database has a valid
+imported generation. Figures are medians; database connections and metadata warm
+across runs. Every measured financial response after the change returned 200 and
+`X-Finance-Data-Source: mirror`.
+
+| Metric | Before | After | Reduction |
+|---|---:|---:|---:|
+| Home balance visible | 3.870 s | 0.840 s | 78.3% |
+| Full startup through network settling | 10.082 s | 1.989 s | 80.3% |
+| Normal data refresh | 6.598 s | 0.869 s | 86.8% |
+| Initial JavaScript response bytes | 268,021 | 235,030 | 12.3% |
+
+Full startup retains the network-idle quiet window used above. Refresh is timed
+from a bill retry through completion of all five financial responses and clearing
+of the updating/error UI. The first bills request is deliberately failed to reach
+this read-only refresh path; no live financial mutations are performed. The
+refresh promises are registered before clicking, avoiding a false fast result
+before React has started its requests. All refresh responses are awaited,
+including the formerly sequential bill read.
+
+Startup samples before: 10.082, 8.717, 11.165 s; after: 3.478, 1.989, 1.982 s.
+Refresh samples before: 6.598, 6.789, 6.518 s; after: 0.713, 0.913, 0.869 s.
+The first startup sample includes initial connection/route setup and was only
+65.5% faster. The 80% target is achieved for median normal startup and refresh,
+not guaranteed for every cold start, database wake-up, outage, or network.
+Explicit **Sync now** still imports Notion; a verified full import took 62.2 s.
+Post-save reads use live Notion until a safe new generation is published, so that
+path is not covered by the normal-refresh speed claim.
+
+The implementation stores schemas and individual pages under an immutable
+generation ID. One SQL statement publishes the generation and its records and
+removes older generations atomically. Display queries filter and paginate in
+Postgres instead of transferring or decompressing an entire snapshot. The pool
+allows five concurrent connections and reuses idle connections for up to one
+minute. Import leases, revision checks, and independent write fences prevent
+pre-write or partial imports from replacing valid data. Task sheets mount on
+first use, and bills refresh concurrently with balances and activity.
+
+Validation: 365 tests passed, the production build, TypeScript, and diff checks
+passed, and mobile/desktop browser checks recorded no page errors or horizontal
+overflow. Reflect, Add Transaction, and Account Details opening/reopening passed,
+as did the inline last-sync timestamp. Live categories, monthly totals and
+transactions, funds, bills, and pending results matched the baseline. Account
+balances matched; one Joint Due field changed because the old numeric fallback
+mistook an unrelated formula for that field. Explicit alias mapping now leaves
+missing financial fields null, covered by an account mapping test.
+
+The local environment is configured and the hosted database import is verified.
+These code changes have not been deployed, and the production environment still
+needs its server-only database connection and scheduler configuration. Public
+signups remain a separate rebuild: [the architecture roadmap](financial-sync.md)
+describes tenant authorization, connection credentials, jobs, and property
+indexes rather than treating today's private household setup as public-ready.
+
+Local ignored evidence: [hosted startup](../artifacts/performance-speed/hosted-browser-results.json),
+[hosted refresh](../artifacts/performance-speed/hosted-refresh-results.json),
+[parity](../artifacts/performance-speed/hosted-parity.json), and
+[UI checks](../artifacts/performance-speed/ui-results.json).

@@ -51,7 +51,7 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   const pct = goal > 0 ? Math.min(1, saved / goal) : 0;
   const when = goalLabel(cat.goalDate);
   const line = goal > 0
-    ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(Math.round(goal))}${when ? ` · ${when}` : ""}`
+    ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(Math.round(goal))}${when ? ` ${when}` : ""}`
     : Math.round(planned) > 0 ? `+${fmt(Math.round(planned))} this month`
     : Math.round(spent) > 0 ? `${fmt(Math.round(spent))} used`
     : null;

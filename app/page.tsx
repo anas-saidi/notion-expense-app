@@ -6,21 +6,23 @@ import { fetchApiJson, fetchMonthlyData, invalidateFinancialReads, loadHomeData,
 import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
+import { BillsSection } from "./components/BillsSection";
+import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
 import { HomeScreen } from "./components/HomeScreen";
 const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen), { loading: () => <SkeletonRegion label="Loading Reflect"><Skeleton style={{ height: 220, marginBottom: 16 }} /><SkeletonRows /></SkeletonRegion> });
 import { CategoriesScreen } from "./components/CategoriesScreen";
-import { AddTransactionSheet } from "./components/AddTransactionSheet";
-import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
-import { AccountTransferSheet } from "./components/AccountTransferSheet";
-import { CategoryDetailsSheet } from "./components/CategoryDetailsSheet";
-import { CategoryManageSheet } from "./components/CategoryManageSheet";
-import { SavingsWithdrawSheet } from "./components/SavingsWithdrawSheet";
-import { ManageScreen } from "./components/ManageScreen";
+const AddTransactionSheet = dynamic(() => import("./components/AddTransactionSheet").then(m => m.AddTransactionSheet));
+const AccountIncomeSheet = dynamic(() => import("./components/AccountIncomeSheet").then(m => m.AccountIncomeSheet));
+const AccountTransferSheet = dynamic(() => import("./components/AccountTransferSheet").then(m => m.AccountTransferSheet));
+const CategoryDetailsSheet = dynamic(() => import("./components/CategoryDetailsSheet").then(m => m.CategoryDetailsSheet));
+const CategoryManageSheet = dynamic(() => import("./components/CategoryManageSheet").then(m => m.CategoryManageSheet));
+const SavingsWithdrawSheet = dynamic(() => import("./components/SavingsWithdrawSheet").then(m => m.SavingsWithdrawSheet));
+const ManageScreen = dynamic(() => import("./components/ManageScreen").then(m => m.ManageScreen));
 const AccountDetailsSheet = dynamic(() => import("./components/AccountDetailsSheet").then(m => m.AccountDetailsSheet));
-import { RebalanceSheet } from "./components/RebalanceSheet";
+const RebalanceSheet = dynamic(() => import("./components/RebalanceSheet").then(m => m.RebalanceSheet));
 import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "./components/month-plan-capacity";
-import { MonthPlanSheet } from "./components/MonthPlanSheet";
-import { TransactionDetailsSheet } from "./components/TransactionDetailsSheet";
+const MonthPlanSheet = dynamic(() => import("./components/MonthPlanSheet").then(m => m.MonthPlanSheet));
+const TransactionDetailsSheet = dynamic(() => import("./components/TransactionDetailsSheet").then(m => m.TransactionDetailsSheet));
 import { getCategoryAllocatedByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
 import { calculateContributionStatus } from "./components/contribution-utils";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
@@ -63,6 +65,10 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [contributionTransactions, setContributionTransactions] = useState<Transaction[]>([]);
+  const [billsData, setBillsData] = useState<BillsData | null>(null);
+  const [billsLoading, setBillsLoading] = useState(true);
+  const [billsError, setBillsError] = useState<string | null>(null);
+  const billsRequest = useRef(0);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary>({
     start: "",
@@ -92,6 +98,21 @@ export default function App() {
   const accountsRequest = useRef(0);
   const transactionsRequest = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [financialSources, setFinancialSources] = useState<Record<string, string>>({});
+  const [syncing, setSyncing] = useState(false);
+  const syncTimestamp = Object.values(financialSources).sort()[0] ?? null;
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const { url, syncedAt } = (event as CustomEvent<{ url: string; syncedAt: string | null }>).detail;
+      setFinancialSources(previous => {
+        const next = { ...previous };
+        if (syncedAt) next[url] = syncedAt; else delete next[url];
+        return next;
+      });
+    };
+    window.addEventListener("finance-data-source", handler);
+    return () => window.removeEventListener("finance-data-source", handler);
+  }, []);
   const [refreshState, setRefreshState] = useState<"idle" | "updating" | "stale">("idle");
   const [budgetRefreshing, setBudgetRefreshing] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -109,6 +130,9 @@ export default function App() {
   const planningFunds = useMemo(() => monthStartPlannerMonth === calendarMonth ? currentMonthFunds ?? [] : nextMonthFunds, [monthStartPlannerMonth, calendarMonth, currentMonthFunds, nextMonthFunds]);
   const [homeMonth, setHomeMonth] = useState(formatMonthInput(today()));
   const [showAddModal, setShowAddModal] = useState(false);
+  const transactionSaveBusy = useRef(false);
+  const [recurringRepeat, setRecurringRepeat] = useState<"None" | "Monthly" | "Yearly">("None");
+  const [recurringBillId, setRecurringBillId] = useState<string | null>(null);
   const [transactionType, setTransactionType] = useState<"Expense" | "Income">("Expense");
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [detailsCategory, setDetailsCategory] = useState<Category | null>(null);
@@ -140,7 +164,7 @@ export default function App() {
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [draftOffer, setDraftOffer] = useState<{ amount: string; name: string; accountId: string; categoryId: string; date: string; scope: BudgetScope; timestamp: number } | null>(null);
+  const [draftOffer, setDraftOffer] = useState<{ amount: string; name: string; accountId: string; categoryId: string; date: string; scope: BudgetScope; timestamp: number; repeat?: "None" | "Monthly" | "Yearly" } | null>(null);
 
   const [microToast, setMicroToast] = useState<string | null>(null);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
@@ -312,6 +336,18 @@ export default function App() {
     }
   };
 
+  const fetchBills = async () => {
+    const request = ++billsRequest.current;
+    setBillsLoading(true);
+    try {
+      const data = await fetchApiJson<BillsData>("/api/bills");
+      if (request === billsRequest.current) { setBillsData(data); setBillsError(null); }
+    } catch (error) {
+      if (request === billsRequest.current) setBillsError(error instanceof Error ? error.message : "Could not load bills");
+      throw error;
+    } finally { if (request === billsRequest.current) setBillsLoading(false); }
+  };
+
   const fetchPending = async () => {
     try {
       const cached = localStorage.getItem("pendingItems");
@@ -359,7 +395,7 @@ export default function App() {
         const results = await loadHomeData({
           essentials: [fetchCategoryCatalog, fetchAccounts],
           onReady: () => { coreReady.current = true; initialLoadComplete.current = true; setLoading(false); },
-          secondary: [fetchTransactions, fetchPending, () => fetchMonthlySummary(homeMonth), fetchNextMonthFunds],
+          secondary: [fetchTransactions, fetchPending, fetchBills, () => fetchMonthlySummary(homeMonth), fetchNextMonthFunds],
         });
         setRefreshState(results.some(result => result.status === "rejected") ? "stale" : "idle");
       } catch (error) {
@@ -392,10 +428,10 @@ export default function App() {
 
   useEffect(() => {
     if (!mounted || !showAddModal || editingTransactionId || draftOffer) return;
-    const payload = { version: 1, timestamp: Date.now(), amount, name, accountId, categoryId, date, scope: budgetScope };
+    const payload = { version: 1, timestamp: Date.now(), amount, name, accountId, categoryId, date, scope: budgetScope, repeat: recurringRepeat };
     if (!amount && !name) return;
     try { localStorage.setItem(`expenseDraft:v1:${mode}`, JSON.stringify(payload)); } catch {}
-  }, [mounted, showAddModal, editingTransactionId, draftOffer, amount, name, accountId, categoryId, date, budgetScope, mode]);
+  }, [mounted, showAddModal, editingTransactionId, draftOffer, amount, name, accountId, categoryId, date, budgetScope, mode, recurringRepeat]);
 
   // Refetch monthly summary whenever the viewed home month changes
   useEffect(() => {
@@ -510,14 +546,17 @@ export default function App() {
 
   const refreshAffectedData = useCallback(async () => {
     setRefreshState("updating");
+    setBillsLoading(true);
     invalidateFinancialReads();
     monthlySnapshot.current = null;
     const results = await Promise.allSettled([
-      refreshBudgetData(), fetchTransactions(),
+      refreshBudgetData(), fetchTransactions(), fetchBills(),
       ...(tab === "history" ? [fetchHistoryTransactions(historyStartMonth, historyMonth)] : []),
     ]);
     if (results.some(result => result.status === "rejected")) {
       setRefreshState("stale");
+      setBillsLoading(false);
+      setBillsError("Balances could not refresh. Refresh before changing bills.");
       throw new Error("Some balances or activity could not be refreshed");
     }
     setRefreshState("idle");
@@ -663,6 +702,31 @@ export default function App() {
 
   const refreshAccountsData = (message?: string) => {
     void refreshBudgetData(message).catch(() => {});
+  };
+
+  const syncFromNotion = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    const started = Date.now();
+    try {
+      const response = await fetch("/api/sync", { method: "POST" });
+      if (!response.ok) throw new Error("Could not start sync. Try again.");
+      const { previousSyncedAt } = await response.json();
+      while (Date.now() - started < 120000) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const statusResponse = await fetch("/api/sync", { cache: "no-store" });
+        if (!statusResponse.ok) throw new Error("Could not check sync. Try again.");
+        const status = await statusResponse.json();
+        if (status.current && status.syncedAt && status.syncedAt !== previousSyncedAt) {
+          invalidateFinancialReads();
+          monthlySnapshot.current = null;
+          setLoadAttempt(value => value + 1);
+          return;
+        }
+      }
+      showToast("Sync is still running. Try again shortly.", 4000);
+    } catch (error) { showToast(error instanceof Error ? error.message : "Could not sync", 4000); }
+    finally { setSyncing(false); }
   };
 
   const fetchNextMonthFunds = async () => {
@@ -862,13 +926,15 @@ export default function App() {
     setSuggestedCatId(suggestFromHistory(query, categories));
   };
 
-  const submit = async () => {
-    if (!amount || !name || !accountId || (transactionType === "Expense" && !categoryId)) return;
+  const submit = async (repeat: "None" | "Monthly" | "Yearly" = "None") => {
+    if (transactionSaveBusy.current || !amount || !name || !accountId || (transactionType === "Expense" && !categoryId)) return;
+    if (recurringBillId && (repeat === "None" || transactionType !== "Expense" || editingTransactionId)) { setErrorMsg("Finish the saved recurring bill from Bills, or retry with its original repeat interval."); setStatus("error"); return; }
+    transactionSaveBusy.current = true;
     setStatus("saving");
     setErrorMsg("");
     const isEditing = Boolean(editingTransactionId);
     try {
-      const payload = { name, amount: evalExpr(amount), accountId, categoryId, date };
+      const payload = { name, amount: evalExpr(amount), accountId, categoryId, date, ...(!isEditing && transactionType === "Expense" ? { repeat, ...(recurringBillId ? { billId: recurringBillId } : {}) } : {}) };
       const endpoint = isEditing ? "/api/transactions" : transactionType === "Income" ? "/api/monthly-income" : "/api/expense";
       const res = await fetch(endpoint, {
         method: isEditing ? "PATCH" : "POST",
@@ -876,8 +942,9 @@ export default function App() {
         body: JSON.stringify(isEditing ? { id: editingTransactionId, ...payload } : payload),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      if (!res.ok) { if (data.billId) { setRecurringBillId(data.billId); void refreshAffectedData().catch(() => {}); } throw new Error(data.error || "Failed"); }
 
+      setRecurringBillId(null);
       setStatus("success");
       showToast(isEditing ? "Transaction updated" : "Saved", 1500);
 
@@ -920,7 +987,7 @@ export default function App() {
       setErrorMsg(e instanceof Error ? e.message : "Failed");
       setStatus("error");
       setTimeout(() => setStatus("idle"), 3000);
-    }
+    } finally { transactionSaveBusy.current = false; }
   };
 
   // Not yet mounted: server and first client render must match — show a neutral shell
@@ -941,6 +1008,13 @@ export default function App() {
     : { unfunded: false, overBudget: false, shortfall: 0 };
   const categoryUnfunded = budgetGate.unfunded;
   const categoryOverBudget = budgetGate.overBudget;
+  const billReservations = billsData && !billsLoading && !billsError
+    ? earmarkedByCategory(deriveOccurrences(billsData.schedules, billsData.payments, billsData.today, billsData.today.slice(0, 7)), monthBounds(`${billsData.today.slice(0, 7)}-01`).end)
+    : null;
+  const reservedForCategory = selectedCat ? billReservations?.[normalizedId(selectedCat.id)] ?? 0 : 0;
+  const originalInCategory = isEditingTransaction && editingOriginal?.categoryId === selectedCat?.id ? editingOriginal!.amount : 0;
+  const billShortfall = transactionType === "Expense" && selectedCat?.available != null && reservedForCategory > 0
+    ? Math.max(0, reservedForCategory - (selectedCat.available + originalInCategory - parsedAmount)) : 0;
   const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && accountId && (transactionType === "Income" || categoryId) && status === "idle" && !categoryUnfunded && !categoryOverBudget);
   const suggestedCategory = suggestedCatId ? categories.find((c) => c.id === suggestedCatId) : undefined;
 
@@ -963,11 +1037,14 @@ export default function App() {
       theme={theme}
       onSelectTheme={selectTheme}
       toast={microToast}
+      syncTimestamp={syncTimestamp}
+      syncing={syncing}
+      onSync={() => { void syncFromNotion(); }}
       showAddButton={!showManageScreen}
     >
       {refreshState !== "idle" && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
-          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <>Could not refresh · <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
+          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>Could not refresh</span> <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
         </div>
       )}
       {showManageScreen && (
@@ -979,7 +1056,7 @@ export default function App() {
         />
       )}
 
-      <MonthPlanSheet
+      <DeferredMount active={showMonthStartPlanner}>      <MonthPlanSheet
         open={showMonthStartPlanner}
         onClose={() => setShowMonthStartPlanner(false)}
         onSaved={() => {
@@ -995,10 +1072,11 @@ export default function App() {
         frozenCategories={frozenCategories}
         accounts={accounts}
         planningCapacity={currentPlanCapacity ?? { joint: jointUnassigned, anas: assignBalanceByScope.anas, salma: assignBalanceByScope.salma }}
-      />
+      /></DeferredMount>
 
       {tab === "home" && (
         <HomeScreen
+          billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={accounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
           monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
           monthlyError={monthError}
           secondaryLoading={secondaryLoading}
@@ -1061,7 +1139,7 @@ export default function App() {
             setTransferPreset({
               toAccountId: destination.id,
               amount: contributionRemainingByScope[budgetScope],
-              note: `Joint contribution · ${homeMonth}`,
+              note: `Joint contribution for ${homeMonth}`,
             });
             setTransferAccount(source);
           }}
@@ -1090,9 +1168,11 @@ export default function App() {
         />
       )}
 
-      <AddTransactionSheet
+      <DeferredMount active={showAddModal}>      <AddTransactionSheet
         open={showAddModal}
         mode={mode}
+        repeat={recurringRepeat}
+        onRepeatChange={setRecurringRepeat}
         typedDraftKey={`typedDraft:v2:${mode}:${budgetScope}`}
         typedCategories={categories.filter(c => !isSavingsCategory(c) && categoryMatchesScope(c, budgetScope, accounts))}
         typedHistory={corpus}
@@ -1139,6 +1219,8 @@ export default function App() {
         categoryUnfunded={categoryUnfunded}
         categoryOverBudget={categoryOverBudget}
         categoryShortfall={budgetGate.shortfall}
+        billShortfall={billShortfall}
+        billsUnavailable={Boolean(billsError)}
         canSubmit={canSubmit}
         allCategories={categories.filter(c => !isSavingsCategory(c))}
         modeVariant={editingTransactionId ? "edit" : "create"}
@@ -1182,6 +1264,8 @@ export default function App() {
           }
         }}
         onClose={() => {
+          if (recurringBillId) showToast("Recurring bill saved. Finish its payment from Bills.", 3000);
+          setRecurringBillId(null);
           if (editingTransactionId) {
             setAmount("");
             setName("");
@@ -1235,16 +1319,16 @@ export default function App() {
         dateRef={dateRef}
         catRef={catRef}
         accountRef={accountRef}
-      />
+      /></DeferredMount>
 
-      <TransactionDetailsSheet
+      <DeferredMount active={detailsTransaction !== null}>      <TransactionDetailsSheet
         transaction={detailsTransaction}
         accounts={accounts}
         categories={categories}
         onClose={() => setDetailsTransaction(null)}
-      />
+      /></DeferredMount>
 
-      <CategoryDetailsSheet
+      <DeferredMount active={showCategoryDetails}>      <CategoryDetailsSheet
         open={showCategoryDetails}
         category={detailsCategory}
         month={(monthlySummary.start || today()).slice(0, 7)}
@@ -1269,18 +1353,18 @@ export default function App() {
         onFreeze={detailsCategory && !detailsCategory.snoozed ? () => freezeCategory(detailsCategory) : undefined}
         onUnfreeze={detailsCategory?.snoozed ? () => { void reviveCategory(detailsCategory, false); setShowCategoryDetails(false); } : undefined}
         onTransactionsChanged={refreshBudgetData}
-      />
+      /></DeferredMount>
 
-      <SavingsWithdrawSheet
+      <DeferredMount active={withdrawCategory !== null}>      <SavingsWithdrawSheet
         savings={withdrawCategory}
         destinations={withdrawCategory
           ? categories.filter((c) => !isSavingsCategory(c) && !c.archived && getCategoryScope(c, accounts) === getCategoryScope(withdrawCategory, accounts))
           : []}
         onClose={() => setWithdrawCategory(null)}
         onSuccess={(message) => { setShowCategoryDetails(false); void refreshBudgetData(message); }}
-      />
+      /></DeferredMount>
 
-      <CategoryManageSheet
+      <DeferredMount active={categoryManageMode !== null}>      <CategoryManageSheet
         open={categoryManageMode !== null}
         mode={categoryManageMode ?? "fund"}
         category={categoryManageCategory}
@@ -1292,7 +1376,7 @@ export default function App() {
         onClose={() => setCategoryManageMode(null)}
         onSuccess={refreshBudgetData}
         zIndex={95}
-      />
+      /></DeferredMount>
 
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
         open={detailsAccount !== null}
@@ -1307,14 +1391,14 @@ export default function App() {
         onTransactionsChanged={() => { fetchTransactions(); refreshBudgetData(); }}
       />}
 
-      <AccountIncomeSheet
+      <DeferredMount active={incomeAccount !== null}>      <AccountIncomeSheet
         open={incomeAccount !== null}
         account={incomeAccount}
         onClose={() => setIncomeAccount(null)}
         onSuccess={refreshAccountsData}
-      />
+      /></DeferredMount>
 
-      <AccountTransferSheet
+      <DeferredMount active={transferAccount !== null}>      <AccountTransferSheet
         open={transferAccount !== null}
         account={transferAccount}
         accounts={accounts}
@@ -1327,9 +1411,9 @@ export default function App() {
           fetchTransactions();
           refreshBudgetData();
         }}
-      />
+      /></DeferredMount>
 
-      <RebalanceSheet
+      <DeferredMount active={showRebalance}>      <RebalanceSheet
         open={showRebalance}
         onClose={() => {
           setShowRebalance(false);
@@ -1349,7 +1433,7 @@ export default function App() {
             setShowAddModal(true);
           }
         }}
-      />
+      /></DeferredMount>
 
       {archivedTransaction && (
         <div role="status" aria-live="polite" style={undoNoticeStyle}>
@@ -1367,7 +1451,7 @@ export default function App() {
             <p style={{ color: "var(--text2)", lineHeight: 1.45 }}>A draft from {new Date(draftOffer.timestamp).toLocaleDateString()} is available. It will not be submitted automatically.</p>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" onClick={() => { try { localStorage.removeItem(`expenseDraft:v1:${mode}`); } catch {} setDraftOffer(null); }} style={draftSecondaryButtonStyle}>Discard</button>
-              <button type="button" onClick={() => { setAmount(draftOffer.amount); setName(draftOffer.name); setAccountId(accounts.some(a => a.id === draftOffer.accountId) ? draftOffer.accountId : ""); setCategoryId(categories.some(c => c.id === draftOffer.categoryId) ? draftOffer.categoryId : ""); setDate(draftOffer.date || today()); setBudgetScope(draftOffer.scope); setDraftOffer(null); setShowAddModal(true); }} style={draftPrimaryButtonStyle}>Restore</button>
+              <button type="button" onClick={() => { setAmount(draftOffer.amount); setName(draftOffer.name); setAccountId(accounts.some(a => a.id === draftOffer.accountId) ? draftOffer.accountId : ""); setCategoryId(categories.some(c => c.id === draftOffer.categoryId) ? draftOffer.categoryId : ""); setDate(draftOffer.date || today()); setRecurringRepeat(draftOffer.repeat === "Monthly" || draftOffer.repeat === "Yearly" ? draftOffer.repeat : "None"); setBudgetScope(draftOffer.scope); setDraftOffer(null); setShowAddModal(true); }} style={draftPrimaryButtonStyle}>Restore</button>
             </div>
           </div>
         </div>
@@ -1394,3 +1478,10 @@ const draftOverlayStyle: CSSProperties = { position: "fixed", inset: 0, zIndex: 
 const draftDialogStyle: CSSProperties = { width: "min(100%, 420px)", padding: 20, borderRadius: "var(--radius-sheet)", background: "var(--surface)", display: "grid", gap: 16 };
 const draftSecondaryButtonStyle: CSSProperties = { flex: 1, minHeight: 48, borderRadius: "var(--radius-control)", border: "1px solid var(--border2)", background: "var(--surface)", color: "var(--text)", fontWeight: 700 };
 const draftPrimaryButtonStyle: CSSProperties = { ...draftSecondaryButtonStyle, border: 0, background: "var(--accent)", color: "var(--accent-ink)" };
+
+/** Load sheet code on first use, then preserve drafts and exit animations. */
+function DeferredMount({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const [opened, setOpened] = useState(active);
+  useEffect(() => { if (active) setOpened(true); }, [active]);
+  return active || opened ? <>{children}</> : null;
+}

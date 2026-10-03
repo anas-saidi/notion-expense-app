@@ -1,3 +1,4 @@
+import { withMirrorReads, withMirrorMutation } from "../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "@/lib/notion-api";
 import { monthBounds } from "@/app/components/app-utils";
@@ -84,7 +85,7 @@ const buildFundPayload = (payload: {
   return properties;
 };
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -291,7 +292,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -334,7 +335,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+async function handleDELETE(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -359,3 +360,14 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Failed to delete funding transaction" }, { status: 500 });
   }
 }
+
+export const GET = withMirrorReads(handleGET);
+
+export const POST = withMirrorMutation(handlePOST);
+
+export const PATCH = withMirrorMutation(handlePATCH);
+
+export const DELETE = withMirrorMutation(handleDELETE);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

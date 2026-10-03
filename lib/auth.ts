@@ -11,6 +11,8 @@ export const PUBLIC_PATHS = [
   "/api/auth/logout",
   // Shortcut routes authenticate with their own bearer tokens.
   "/api/shortcuts",
+  // The scheduler endpoint verifies CRON_SECRET itself; app sync stays private.
+  "/api/sync/refresh",
 ];
 
 export type SessionPayload = {

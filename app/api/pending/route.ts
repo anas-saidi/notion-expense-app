@@ -1,4 +1,5 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
+import { NextRequest, NextResponse } from "next/server";
 import { readDatabaseSchema, queryDatabaseAll } from "@/lib/notion-api";
 export const dynamic = "force-dynamic";
 
@@ -52,12 +53,14 @@ async function getPendingPropKeys(token: string): Promise<PendingPropKeys> {
   };
 }
 
-export async function GET() {
+async function handleGET() {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
   try {
-    const keys = await getPendingPropKeys(token);
-    const results = await queryDatabaseAll(token, PENDING_DB, { sorts: [{ timestamp: "created_time", direction: "ascending" }] });
+    const [keys, results] = await Promise.all([
+      getPendingPropKeys(token),
+      queryDatabaseAll(token, PENDING_DB, { sorts: [{ timestamp: "created_time", direction: "ascending" }] }),
+    ]);
     const items = results.map((page: any) => {
       const rawClaimed = keys.claimedBy ? page.properties[keys.claimedBy]?.select?.name ?? null : null;
       return {
@@ -77,7 +80,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
   const { name, amount, categoryId, addedBy, claimedBy, date } = await req.json();
@@ -106,7 +109,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
   const { id, claimedBy } = await req.json();
@@ -131,7 +134,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+async function handleDELETE(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
   const { id } = await req.json();
@@ -149,3 +152,14 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const GET = withMirrorReads(handleGET);
+
+export const POST = withMirrorMutation(handlePOST);
+
+export const PATCH = withMirrorMutation(handlePATCH);
+
+export const DELETE = withMirrorMutation(handleDELETE);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

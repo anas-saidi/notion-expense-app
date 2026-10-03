@@ -23,7 +23,7 @@ export function TransactionDetailsSheet({ transaction, accounts, categories, onC
       : `${accountName(transaction.fromAccountId)} → ${accountName(transaction.toAccountId)}`
     : type === "Income"
       ? `To ${accountName(transaction.toAccountId ?? transaction.accountId)}`
-      : `${categoryName(transaction.category)} · ${accountName(transaction.accountId)}`;
+      : accountName(transaction.accountId);
 
   return (
     <BottomSheet open onClose={onClose} label={`${type} details`} detent="default" snapPoints={[0, 0.62, 1]} initialSnap={1} maxWidth="500px" panelStyle={{ background: "var(--surface)", overflowY: "auto" }}>
@@ -35,7 +35,7 @@ export function TransactionDetailsSheet({ transaction, accounts, categories, onC
         </header>
         <dl style={{ display: "grid", gap: 12, margin: 0 }}>
           <Detail label="Date" value={fmtDate(transaction.date)} />
-          <Detail label="Flow" value={relationships} />
+          {type === "Expense" ? <><Detail label="Category" value={categoryName(transaction.category)} /><Detail label="Account" value={accountName(transaction.accountId)} /></> : <Detail label="Flow" value={relationships} />}
         </dl>
         <p style={{ margin: 0, padding: 14, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", fontSize: 14, lineHeight: 1.45 }}>
           {type === "Expense" ? "Expense details." : `Editing ${type.toLowerCase()} transactions is not available here. The original type and relationships are protected.`}

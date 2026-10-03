@@ -13,7 +13,12 @@ export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
     for (let attempt = 0; ; attempt += 1) {
       const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30000) });
       const data = await response.json();
-      if (response.ok) return data as T;
+      if (response.ok) {
+        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("finance-data-source", { detail: {
+          url, source: response.headers.get("X-Finance-Data-Source"), syncedAt: response.headers.get("X-Finance-Synced-At"),
+        } }));
+        return data as T;
+      }
       if ((response.status === 429 || response.status >= 500) && attempt < retries) {
         const retryAfter = Number(response.headers.get("Retry-After"));
         await wait(retryAfter > 0 ? retryAfter * 1000 : 900 * (attempt + 1));

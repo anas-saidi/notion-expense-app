@@ -5,7 +5,7 @@ export type TransactionTone = "expense" | "income" | "transfer";
 
 type TransactionRowProps = {
   title: string;
-  subtitle?: string | null;
+  subtitle?: ReactNode;
   amount: number;
   tone: TransactionTone;
   prefix?: string;
@@ -13,6 +13,8 @@ type TransactionRowProps = {
   icon: ReactNode;
   onClick?: () => void;
   className?: string;
+  /** Due amounts retain the shared typography without implying recorded spending. */
+  amountColor?: string;
 };
 
 export function TransactionRow({
@@ -25,6 +27,7 @@ export function TransactionRow({
   icon,
   onClick,
   className = "",
+  amountColor,
 }: TransactionRowProps) {
   const content = (
     <>
@@ -34,7 +37,7 @@ export function TransactionRow({
         {subtitle && <span style={subtitleStyle}>{subtitle}</span>}
       </span>
       <span style={valueStackStyle}>
-        <span style={amountStyle(tone)}>
+        <span style={{ ...amountStyle(tone), ...(amountColor ? { color: amountColor } : {}) }}>
           <span style={{ display: "inline-flex", alignItems: "baseline" }}>
           <span>{prefix}</span>
             <Money value={Math.abs(amount)} />

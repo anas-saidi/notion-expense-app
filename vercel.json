@@ -4,6 +4,10 @@
     {
       "path": "/api/shortcuts/cache/refresh",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/sync/refresh",
+      "schedule": "15 3 * * *"
     }
   ]
 }

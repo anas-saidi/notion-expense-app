@@ -1,3 +1,4 @@
+import { withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 
 const NOTION_VERSION = "2022-06-28";
@@ -5,7 +6,7 @@ const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80b
 const PROP_BUDGET_IN = "\u{1F4B0} budget (in)";
 const PROP_BUDGET_OUT = "\u{1F4B0} budget (out)";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -57,3 +58,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export const POST = withMirrorMutation(handlePOST);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

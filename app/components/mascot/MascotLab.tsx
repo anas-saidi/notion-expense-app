@@ -156,8 +156,8 @@ export function MascotLab() {
       <section aria-label="Preview" style={stageStyle}>
         <Mascot target={target} reaction={reaction} size={180} calm={calm} {...jar} />
         <p style={readoutStyle}>
-          {target.scope} · {target.mood}{target.celebrate ? " · heart" : ""}
-          {target.coins ? ` · coins ${Math.round(((target.coins.anas ?? 0) + (target.coins.salma ?? 0)) * 100)}%` : target.fill !== undefined ? ` · filled ${Math.round(target.fill * 100)}%` : target.scope === "joint" && !target.celebrate ? ` · apart ${Math.round(target.gap * 100)}%` : ""}
+          {target.scope} ({target.mood}{target.celebrate ? ", heart" : ""})
+          {target.coins ? ` Coins ${Math.round(((target.coins.anas ?? 0) + (target.coins.salma ?? 0)) * 100)}%` : target.fill !== undefined ? ` Filled ${Math.round(target.fill * 100)}%` : target.scope === "joint" && !target.celebrate ? ` Apart ${Math.round(target.gap * 100)}%` : ""}
         </p>
       </section>
 
@@ -206,7 +206,7 @@ export function MascotLab() {
           </>
         )}
         {body === "spent" && (
-          <Field label={`Spent · ${fmt(spentTotal)} of ${fmt(plan)} MAD (${Math.round((spentTotal / plan) * 100)}%)`}>
+          <Field label={`Spent ${fmt(spentTotal)} of ${fmt(plan)} MAD (${Math.round((spentTotal / plan) * 100)}%)`}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <button type="button" onClick={() => spend("coffee", 35)} style={chipStyle(false)}>☕ 35</button>
               <button type="button" onClick={() => spend("groceries", 240)} style={chipStyle(false)}>🍽️ 240</button>
@@ -270,7 +270,7 @@ export function MascotLab() {
         <Range label="Unassigned" value={unassigned} min={0} max={3000} step={50} unit="MAD" onChange={setUnassigned} />
         <Range label="Available in categories" value={available} min={0} max={8000} step={50} unit="MAD" onChange={setAvailable} />
 
-        <Field label={`Balance · ${fmt(balance)} MAD`}>
+        <Field label={`Balance ${fmt(balance)} MAD`}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <button type="button" onClick={() => move(500)} style={chipStyle(false)}>+500 income</button>
             <button type="button" onClick={() => move(-40)} style={chipStyle(false)}>−40 expense</button>

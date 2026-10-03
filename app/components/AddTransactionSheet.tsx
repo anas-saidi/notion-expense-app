@@ -7,6 +7,7 @@ import { AutoscaleAmountInput } from "./ui/AutoscaleAmountInput";
 import { BottomSheet } from "./ui/BottomSheet";
 import { TypeItComposer } from "./TypeItComposer";
 import type { TypedTransactionDraft } from "@/lib/typed-transactions";
+import { anchoredDate, isCalendarDate, nextPeriod, type BillRepeat } from "@/lib/bills";
 import { Money } from "./Money";
 import { TransactionRow } from "./ui/TransactionRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -44,6 +45,8 @@ type AddTransactionSheetProps = {
   categoryOverBudget: boolean;
   /** Budget this expense still needs in its category (0 when covered). */
   categoryShortfall: number;
+  billShortfall?: number;
+  billsUnavailable?: boolean;
   canSubmit: boolean;
   allCategories?: Category[];
   modeVariant?: "create" | "edit";
@@ -64,7 +67,9 @@ type AddTransactionSheetProps = {
   onSelectCategory: (category: Category) => void;
   onSelectAccount: (id: string) => void;
   onCatSearchChange: (value: string) => void;
-  onSubmit: () => void;
+  repeat?: BillRepeat;
+  onRepeatChange?: (repeat: BillRepeat) => void;
+  onSubmit: (repeat?: BillRepeat) => void;
   onDelete?: () => Promise<boolean>;
   typedCategories?: Category[];
   typedHistory?: { description: string; categoryId: string }[];
@@ -84,6 +89,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const [showFundPicker, setShowFundPicker] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showRepeat, setShowRepeat] = useState(false);
+  const repeat = props.repeat ?? "None";
+  const setRepeat = (value: BillRepeat) => props.onRepeatChange?.(value);
   const [showKeypad, setShowKeypad] = useState(false);
   const [amountFocused, setAmountFocused] = useState(false);
   const fundPickerRef = useRef<HTMLDivElement>(null);
@@ -103,6 +111,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       setConfirmingDelete(false);
       setDeleting(false);
       setShowKeypad(false);
+      setShowRepeat(false);
       setAmountFocused(false);
     }
   }, [props.open]);
@@ -111,7 +120,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     const previousStatus = previousStatusRef.current;
     previousStatusRef.current = props.status;
     if (!props.open || previousStatus === props.status) return;
-    if (props.status === "success") haptic("success");
+    if (props.status === "success") { haptic("success"); setRepeat("None"); setShowRepeat(false); }
     if (props.status === "error") haptic("error");
   }, [haptic, props.open, props.status]);
 
@@ -128,6 +137,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     return () => document.removeEventListener("mousedown", handler);
   }, [showFundPicker]);
 
+  useEffect(() => { if (props.transactionType !== "Expense") { setRepeat("None"); setShowRepeat(false); } }, [props.transactionType]);
+
   if (!props.open) return null;
 
   const deficit = props.categoryShortfall;
@@ -139,6 +150,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
   const isEditMode = props.modeVariant === "edit";
   const isIncome = props.transactionType === "Income";
+  const submit = () => props.onSubmit(!isEditMode && !isIncome ? repeat : "None");
+  const nextDue = repeat !== "None" && isCalendarDate(props.date) ? anchoredDate(props.date, nextPeriod(props.date.slice(0, 7), repeat === "Yearly" ? 12 : 1)) : "";
   const todayValue = today();
   const yesterdayValue = shiftDate(todayValue, -1);
   const visibleBalance = props.amountAfterBalance ?? props.displayedBalance;
@@ -243,7 +256,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             type="text"
             value={props.amount}
             onChange={(e) => props.onAmountChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
+            onKeyDown={(e) => e.key === "Enter" && props.canSubmit && submit()}
             placeholder="0"
             aria-label="Amount"
             inputMode="decimal"
@@ -274,7 +287,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             aria-label="Transaction description"
             value={props.name}
             onChange={(e) => props.onNameChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && props.canSubmit && props.onSubmit()}
+            onKeyDown={(e) => e.key === "Enter" && props.canSubmit && submit()}
             placeholder={isIncome ? "Where did it come from?" : "What was it for?"}
             style={{
               width: "100%",
@@ -352,6 +365,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>
           </div>
 
+          {!isIncome && !props.categoryUnfunded && !props.categoryOverBudget && (props.billShortfall ?? 0) > 0 && <Banner tone="warning" compact>This expense leaves bills short by <Money value={props.billShortfall!} />. Choose Save anyway to use earmarked money.</Banner>}
+          {!isIncome && props.billsUnavailable && <Banner tone="warning" compact>Bill reservations are unavailable. Your actual category budget is still checked.</Banner>}
           {/* Budget warnings */}
           {!isIncome && (props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
             <div style={{ display: "grid", gap: 10 }}>
@@ -445,6 +460,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>
           )}
 
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
+          {!isEditMode && !isIncome && <button type="button" style={keypadToggleStyle} aria-expanded={showRepeat} aria-controls="transaction-repeat" disabled={props.status === "saving"} onClick={() => { haptic("selection"); setShowRepeat(!showRepeat); }}><span>{repeat === "None" ? "Repeat" : `Repeat ${repeat.toLowerCase()}`}</span><ChevronDownIcon size={15} style={{ transform: showRepeat ? "rotate(180deg)" : "none" }} /></button>}
           <button
             type="button"
             aria-expanded={showKeypad}
@@ -463,6 +480,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             <span>{showKeypad ? "Hide keypad" : "Show keypad"}</span>
             <ChevronDownIcon size={15} style={{ transform: showKeypad ? "rotate(180deg)" : "none", transition: "transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)" }} />
           </button>
+          </div>
+          {showRepeat && !isEditMode && !isIncome && <div id="transaction-repeat" style={{ display: "grid", gap: 8, padding: "0 16px" }}>
+            <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, fontSize: 13, color: "var(--text2)" }}>Repeat<select aria-label="Repeat expense" value={repeat} disabled={props.status === "saving"} onChange={event => { setRepeat(event.target.value as BillRepeat); haptic("selection"); }} style={{ minHeight: 44, padding: "0 12px", borderRadius: "var(--radius-control)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", font: "inherit" }}><option value="None">Off</option><option value="Monthly">Monthly</option><option value="Yearly">Yearly</option></select></label>
+            {nextDue && <p style={{ margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--muted)" }}>Next bill due {fmtDate(nextDue)}. Future bills use this amount and category.</p>}
+          </div>}
 
           {showKeypad && (
             <div id="amount-keypad" aria-label="Amount keypad" style={keypadStyle}>
@@ -522,13 +544,13 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </button>
           )}
           <button
-            onClick={props.onSubmit}
+            onClick={submit}
             disabled={!props.canSubmit}
             aria-label={
               props.status === "saving" ? (isEditMode ? "Updating expense" : isIncome ? "Adding income" : "Adding expense")
               : props.status === "success" ? (isEditMode ? "Expense updated" : isIncome ? "Income added" : "Expense added")
               : props.status === "error" ? `Save failed: ${props.errorMsg}`
-              : isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
+              : !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
             }
             className="pressable cta-save"
             style={{
@@ -563,7 +585,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             ) : props.status === "error" ? (
               <><XIcon size={16} />Error</>
             ) : (
-              isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
+              !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
             )}
           </button>
           </div>

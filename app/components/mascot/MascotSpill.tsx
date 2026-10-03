@@ -6,7 +6,7 @@ import { useAppHaptics } from "../ui/useAppHaptics";
 type MascotSpillProps = {
   /** The jar (a Mascot or MascotHero). */
   children: ReactNode;
-  /** The details the jar holds, e.g. "91% spent · 212 MAD over". */
+  /** The details the jar holds, e.g. "91% spent, 212 MAD over". */
   details: ReactNode;
   /** The same details as plain text, for the button's accessible name. */
   label: string;

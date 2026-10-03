@@ -82,9 +82,9 @@ export function ReflectScreen(props: Props) {
   // One short line: the biggest category, and the monthly average over longer periods.
   const top = breakdown.spending[0];
   const summary = [
-    top && `Mostly ${top.name} · ${Math.round(top.share * 100)}%`,
+    top && `Mostly ${top.name} (${Math.round(top.share * 100)}%)`,
     months > 1 && `${fmt(Math.round(breakdown.total / months))} / month`,
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(". ");
 
   const categoryRow = (row: ReflectCategory, index: number, inflow = false) => <li key={row.id}>
     <button type="button" onClick={() => setSelectedId(row.id)} aria-label={`${row.name}, ${inflow ? "net inflow" : "spent"} ${Math.abs(row.net)} MAD${!inflow && row.share > 0 ? `, ${(row.share * 100).toFixed(1)} percent` : ""}, view transactions`} style={categoryButtonStyle}>
@@ -163,7 +163,7 @@ export function ReflectScreen(props: Props) {
     </BottomSheet>
 
     <BottomSheet open={Boolean(selected)} onClose={() => setSelectedId(null)} label={selected ? `${selected.name} spending` : "Category spending"} maxWidth="500px" contentStyle={sheetContentStyle}>
-      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow" : "Net spending"} · {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><Money value={selected.spent} /> out · <Money value={selected.inflow} /> in</p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = transaction.type === "Income" || transaction.amount < 0; return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === (transaction.accountId || transaction.toAccountId))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
+      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow from" : "Net spending across"} {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = transaction.type === "Income" || transaction.amount < 0; return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === (transaction.accountId || transaction.toAccountId))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
     </BottomSheet>
   </div>;
 }

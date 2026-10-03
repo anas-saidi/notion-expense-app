@@ -114,3 +114,23 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). You'll be redirected to `/login`; the sign-in button redirects you through Notion OAuth and back to `localhost`.
 
 > **Tip:** If you get a "redirect_uri mismatch" error from Notion, double-check that `http://localhost:3000/api/auth/callback` is saved in your Notion integration's redirect URIs list.
+
+## Faster reads with a synchronized database
+
+Use the **Neon Free** plan and copy its pooled Postgres connection string into
+`DATABASE_URL` in `.env.local` and Vercel. Keep it server-only. The mirror tables
+initialize automatically; [the SQL migration](db/migrations/001_finance_mirror.sql)
+is also available for deployments that restrict DDL permissions. Configure a
+separate `CRON_SECRET` and enable Vercel Fluid compute for the bounded background
+sync lifetime. No paid scheduler is required: the configured cron runs daily,
+and active reads refresh snapshots older than one minute in the background.
+
+Seed the mirror using an authenticated `GET /api/sync/refresh` with
+`Authorization: Bearer <CRON_SECRET>`. The app can seed it on demand too; until
+the first successful import, it keeps using Notion. A normal app reload reads
+from Postgres. **Sync now** explicitly imports direct Notion changes and then
+reloads the displayed data. App saves continue to write to Notion and invalidate
+the mirror before writing; refreshes use live Notion until a new import succeeds.
+
+See [the sync architecture and public-app roadmap](docs/financial-sync.md) for
+freshness, recovery, testing, and deployment limits.

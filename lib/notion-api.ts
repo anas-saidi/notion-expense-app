@@ -1,3 +1,4 @@
+import { mirrorResponse } from "./mirror/context";
 const NOTION_BASE_URL = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
 
@@ -7,13 +8,17 @@ type NotionFetchOptions = {
   cache?: RequestCache;
   retries?: number;
   timeoutMs?: number;
+  /** Internal display-report hint: retrieve matching mirror rows atomically. */
+  _mirrorAllRows?: boolean;
 };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Pace starts per connection within this server process. Serverless instances have
 // independent queues; Retry-After is still authoritative for shared limits.
-const queues = new Map<string, { tail: Promise<void>; nextStart: number; pausedUntil: number }>();
+type RequestQueue = { tail: Promise<void>; nextStart: number; pausedUntil: number };
+const notionState = globalThis as typeof globalThis & { financeNotionQueues?: Map<string, RequestQueue> };
+const queues = notionState.financeNotionQueues ??= new Map<string, RequestQueue>();
 async function scheduleRequest(token: string) {
   let queue = queues.get(token);
   if (!queue) {
@@ -32,7 +37,9 @@ async function scheduleRequest(token: string) {
 
 const schemas = new Map<string, { expires: number; promise: Promise<any> }>();
 /** Cache metadata only, never financial balances. Failed reads are not cached. */
-export function readDatabaseSchema(token: string, databaseId: string): Promise<any> {
+export async function readDatabaseSchema(token: string, databaseId: string): Promise<any> {
+  const mirrored = await mirrorResponse(token, `/databases/${databaseId}`, "GET", undefined);
+  if (mirrored !== undefined) return mirrored.data;
   const key = `${token}:${databaseId}`;
   const cached = schemas.get(key);
   if (cached && cached.expires > Date.now()) return cached.promise;
@@ -56,8 +63,11 @@ export async function notionFetchJson<T>(
     cache = "no-store",
     retries = 2,
     timeoutMs = 15000,
+    _mirrorAllRows = false,
   }: NotionFetchOptions = {},
 ): Promise<{ status: number; data: T }> {
+  const mirrored = await mirrorResponse(token, path, method, body, _mirrorAllRows);
+  if (mirrored !== undefined) return mirrored;
   // Creating a page is not idempotent: after a timeout, network error or 5xx
   // Notion may already have written it, so only 429 (rejected before
   // processing) is safe to retry. Reads, queries and PATCHes can be repeated.
@@ -138,6 +148,7 @@ export async function queryDatabaseAll<T = any>(
       `/databases/${databaseId}/query`,
       {
         method: "POST",
+        _mirrorAllRows: true,
         body: { ...body, page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) },
       },
     );

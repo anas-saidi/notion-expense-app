@@ -1,3 +1,4 @@
+import { withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { notionFetchJson } from "@/lib/notion-api";
 
@@ -18,7 +19,7 @@ const pickByTypeAndAliases = (props: NotionProperty[], type: string, aliases: st
   return sameType[0]?.name;
 };
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
   if (!RECONCILIATIONS_DB) {
@@ -85,3 +86,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const POST = withMirrorMutation(handlePOST);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

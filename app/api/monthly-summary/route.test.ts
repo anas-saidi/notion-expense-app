@@ -30,5 +30,5 @@ it("shares fully paginated transactions while excluding transfers, income, and u
   expect(data.transactions.map((t: any) => t.id)).toEqual(["expense", "income", "transfer", "uncategorized", "expense2"]);
   expect(fetcher).toHaveBeenCalledTimes(3);
   const transactionQuery = JSON.parse(fetcher.mock.calls[1][1].body);
-  expect(transactionQuery.filter.and).toHaveLength(2);
+  expect(transactionQuery.filter.and).toContainEqual({ property: "Type", select: { does_not_equal: "Due" } });
 });

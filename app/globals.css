@@ -147,7 +147,7 @@
 html[data-scope="joint"] {
   --select-color: color-mix(in srgb, var(--partner-husband) 50%, var(--partner-wife));
   --select-ink: color-mix(in srgb, var(--partner-husband-strong) 50%, var(--partner-wife-strong));
-  --select-wash: linear-gradient(90deg, color-mix(in srgb, var(--partner-husband) 13%, var(--surface)), color-mix(in srgb, var(--partner-wife) 13%, var(--surface)));
+  --select-wash: color-mix(in srgb, var(--select-color) 13%, var(--surface));
   --select-edge: color-mix(in srgb, var(--select-color) 32%, transparent);
 }
 html[data-scope="anas"] {

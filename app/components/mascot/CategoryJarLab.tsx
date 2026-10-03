@@ -80,7 +80,7 @@ export function CategoryJarLab() {
           : <Card key={s.name} sample={s} scope={scope} variant={variant} />)}
       </div>}
 
-      <span style={labelStyle}>Jar sizes (36 · 44 · 56) and levels</span>
+      <span style={labelStyle}>Jar sizes (36, 44, 56) and levels</span>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         {[36, 44, 56].map((size) => <CategoryJar key={size} scope={scope} level={0.6} icon="🍽️" size={size} />)}
         {[1, 0.5, 0.15, 0.04].map((level) => <CategoryJar key={level} scope={scope} level={level} icon="🍽️" size={44} />)}
@@ -160,7 +160,7 @@ function SavingsRow({ sample, scope }: { sample: Sample; scope: BudgetScope }) {
   const pct = goal > 0 ? Math.min(1, sample.available / goal) : 0;
   const reached = goal > 0 && sample.available >= goal;
   const line = goal > 0
-    ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(goal)}${sample.goalBy ? ` · by ${sample.goalBy}` : ""}`
+    ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(goal)}${sample.goalBy ? ` by ${sample.goalBy}` : ""}`
     : sample.added ? `+${fmt(sample.added)} this month` : null;
   return (
     <button type="button" style={jarRowStyle}>

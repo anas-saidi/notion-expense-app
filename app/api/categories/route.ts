@@ -1,3 +1,4 @@
+import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { accountOwnerScope, categoryOwnerPeople } from "../../../lib/category-owners";
 import { queryDatabaseAll } from "../../../lib/notion-api";
@@ -96,7 +97,7 @@ const mapCategoryPage = (page: any) => {
   };
 };
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
 
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
@@ -126,7 +127,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -174,7 +175,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -254,3 +255,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Failed to create category" }, { status: 500 });
   }
 }
+
+export const GET = withMirrorReads(handleGET);
+
+export const POST = withMirrorMutation(handlePOST);
+
+export const PATCH = withMirrorMutation(handlePATCH);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

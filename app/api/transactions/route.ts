@@ -1,9 +1,10 @@
+import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { mapTransactionPage as mapPage } from "../../../lib/transaction-page";
 import { notionFetchJson } from "../../../lib/notion-api";
 import { assertExpenseFitsBudget } from "@/lib/notion-transactions";
 
-const TRANSACTIONS_DB = "1926a2be-8922-80be-968a-efa6e6dace95";
+const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
 const NOTION_VERSION = "2022-06-28";
 const PROP_BUDGET_IN   = "\u{1F4B0} budget (in)";
 const PROP_BUDGET_OUT  = "\u{1F4B0} budget (out)";
@@ -35,7 +36,7 @@ async function fetchTransactionPage(token: string, id: string) {
   return { page: data };
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
 
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
@@ -62,8 +63,9 @@ export async function GET(req: NextRequest) {
     do {
       const { data } = await notionFetchJson<any>(token, `/databases/${TRANSACTIONS_DB}/query`, {
         method: "POST",
+        _mirrorAllRows: paginate,
         body: {
-          ...(dateFilter ? { filter: dateFilter } : {}),
+          filter: { and: [{ property: "Type", select: { does_not_equal: "Due" } }, ...(dateFilter?.and ?? [])] },
           sorts: [{ property: "Date", direction: "descending" }],
           page_size: paginate ? 100 : pageSize,
           ...(cursor ? { start_cursor: cursor } : {}),
@@ -74,14 +76,15 @@ export async function GET(req: NextRequest) {
       cursor = (paginate && data.has_more) ? data.next_cursor : undefined;
     } while (cursor);
 
-    const results = paginate ? allResults : allResults.slice(0, pageSize);
+    const financialResults = allResults.filter(page => page.properties?.Type?.select?.name !== "Due");
+    const results = paginate ? financialResults : financialResults.slice(0, pageSize);
     return NextResponse.json({ transactions: results.map(mapPage) });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: err.status ?? 500 });
   }
 }
 
-export async function PATCH(req: NextRequest) {
+async function handlePATCH(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -142,7 +145,7 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-export async function DELETE(req: NextRequest) {
+async function handleDELETE(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -166,7 +169,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 /** Restore only a page already verified to belong to the transactions database. */
-export async function PUT(req: NextRequest) {
+async function handlePUT(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
@@ -198,3 +201,14 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Failed to restore transaction" }, { status: 500 });
   }
 }
+
+export const GET = withMirrorReads(handleGET);
+
+export const PATCH = withMirrorMutation(handlePATCH);
+
+export const DELETE = withMirrorMutation(handleDELETE);
+
+export const PUT = withMirrorMutation(handlePUT);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

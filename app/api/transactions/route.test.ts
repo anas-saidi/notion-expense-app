@@ -22,6 +22,7 @@ describe("transaction history pagination", () => {
     const response = await GET(new NextRequest("http://localhost/api/transactions?page_size=1"));
     expect((await response.json()).transactions).toHaveLength(1);
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).filter.and).toContainEqual({ property: "Type", select: { does_not_equal: "Due" } });
   });
   it("does not present an incomplete total if a later page fails", async () => {
     vi.stubEnv("NOTION_TOKEN", "test-token");

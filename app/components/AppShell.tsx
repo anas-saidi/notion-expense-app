@@ -21,6 +21,9 @@ export function AppShell({
   theme = "light",
   onSelectTheme,
   toast,
+  syncTimestamp,
+  syncing,
+  onSync,
   showAddButton = true,
   children,
 }: {
@@ -37,6 +40,9 @@ export function AppShell({
   theme?: "system" | "light" | "dark";
   onSelectTheme?: (theme: "system" | "light" | "dark") => void;
   toast?: string | null;
+  syncTimestamp?: string | null;
+  syncing?: boolean;
+  onSync?: () => void;
   showAddButton?: boolean;
   children?: ReactNode;
 }) {
@@ -175,6 +181,9 @@ export function AppShell({
         <SettingsSheet
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
+          syncTimestamp={syncTimestamp}
+          syncing={syncing}
+          onSync={onSync}
           theme={theme}
           onSelectTheme={onSelectTheme}
           onOpenAccounts={onOpenManage ? () => {

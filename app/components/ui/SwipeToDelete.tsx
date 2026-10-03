@@ -1,10 +1,13 @@
 "use client";
 
 import { useRef, useState, useEffect, type ReactNode } from "react";
+import { useReducedMotion } from "motion/react";
 import { RotateCcw, Snowflake, Trash2 } from "lucide-react";
 
 type Props = {
-  onDelete: () => boolean | Promise<boolean>;
+  onDelete?: () => boolean | Promise<boolean>;
+  /** Reveal contextual actions; swiping never executes them. */
+  actions?: { label: string; icon?: ReactNode; onSelect: () => void }[];
   children: ReactNode;
   deleteLabel?: string;
   /** Px to drag before the delete commits. Default 80. */
@@ -13,9 +16,10 @@ type Props = {
   disabled?: boolean;
   /** Removes row rounding when used inside a continuous activity feed. */
   flat?: boolean;
+  surface?: string;
 };
 
-export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel = "Delete item", variant = "delete", flat = false, disabled = false }: Props) {
+export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel = "Delete item", variant = "delete", flat = false, disabled = false, actions, surface }: Props) {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
 
@@ -83,7 +87,7 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
 
     timerRef.current = setTimeout(async () => {
       try {
-        if (await onDelete()) return;
+        if (await onDelete?.()) return;
       } catch { /* A failed action restores the row for retry. */ }
       committed.current = false;
       if (variant === "freeze") moveFreeze(0); else setOffset(0);
@@ -137,6 +141,8 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
   const progress = Math.min(1, revealPx / threshold);
   const isPast   = progress >= 1;
   const actionColor = variant === "freeze" ? "color-mix(in srgb, var(--info) 14%, var(--surface))" : variant === "restore" ? "var(--success)" : "var(--danger)";
+
+  if (actions?.length) return <SwipeActions actions={actions} disabled={disabled} surface={surface}>{children}</SwipeActions>;
 
   return (
     <div ref={outerRef}>
@@ -201,4 +207,61 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
       </div>
     </div>
   );
+}
+
+/** The same flat swipe surface, with explicit taps for non-destructive shortcuts. */
+function SwipeActions({ actions, disabled, children, surface }: Pick<Props, "actions" | "disabled" | "children" | "surface">) {
+  const [offset, setOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const gesture = useRef<{ id: number; x: number; y: number; offset: number; horizontal: boolean; vertical: boolean } | null>(null);
+  const latest = useRef(0);
+  const suppressClick = useRef(false);
+  const reducedMotion = useReducedMotion();
+  const actionSize = 44;
+  const actionGap = 8;
+  const rowGap = 16;
+  const width = (actions?.length ?? 0) * actionSize + Math.max(0, (actions?.length ?? 0) - 1) * actionGap + rowGap;
+  const move = (value: number) => { latest.current = value; setOffset(value); };
+  useEffect(() => {
+    if (!offset) return;
+    const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) move(0); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [offset]);
+  useEffect(() => { if (disabled) move(0); }, [disabled]);
+  return <div ref={root} style={{ position: "relative", overflow: "hidden" }} onKeyDown={event => { if (event.key === "Escape") move(0); }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) move(0); }}>
+    <div style={{ position: "absolute", inset: "0 0 0 auto", width, display: "flex", alignItems: "center", gap: actionGap, paddingInlineStart: rowGap, boxSizing: "border-box" }}>
+      {actions?.map((action, index) => <button key={action.label} type="button" disabled={disabled} aria-label={action.label} title={action.label} onFocus={() => move(-width)} onClick={() => { move(0); action.onSelect(); }} style={{ width: actionSize, height: actionSize, flexShrink: 0, padding: 0, border: 0, borderRadius: "var(--radius-control)", background: index === 0 ? "var(--accent)" : "var(--surface2)", color: index === 0 ? "var(--accent-ink)" : "var(--text2)", font: "inherit", fontSize: 12, fontWeight: 650, display: "grid", alignContent: "center", justifyItems: "center", gap: 4, cursor: "pointer" }}>{action.icon ?? action.label}</button>)}
+    </div>
+    <div style={{ position: "relative", background: surface ?? "var(--bg)", width: `calc(100% - ${-offset}px)`, touchAction: "pan-y", transition: dragging || reducedMotion ? "none" : "width 0.2s cubic-bezier(0.22, 1, 0.36, 1)" }}
+      onPointerDown={event => {
+        if (disabled || event.button !== 0) return;
+        suppressClick.current = false;
+        gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, offset: latest.current, horizontal: false, vertical: false };
+      }}
+      onPointerMove={event => {
+        const active = gesture.current;
+        if (!active || event.pointerId !== active.id || active.vertical) return;
+        const dx = event.clientX - active.x, dy = event.clientY - active.y;
+        if (!active.horizontal && Math.max(Math.abs(dx), Math.abs(dy)) > 7) {
+          if (Math.abs(dy) >= Math.abs(dx)) { active.vertical = true; return; }
+          active.horizontal = true;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setDragging(true);
+        }
+        if (active.horizontal) { event.preventDefault(); move(Math.max(-width, Math.min(0, active.offset + dx))); }
+      }}
+      onPointerUp={() => {
+        const active = gesture.current; gesture.current = null; setDragging(false);
+        if (active?.horizontal) { suppressClick.current = true; move(latest.current < -width / 3 ? -width : 0); }
+      }}
+      onPointerCancel={() => { gesture.current = null; setDragging(false); move(0); }}
+      onClickCapture={event => {
+        if (suppressClick.current) { event.preventDefault(); event.stopPropagation(); suppressClick.current = false; }
+        else if (latest.current < 0) { event.preventDefault(); event.stopPropagation(); move(0); }
+      }}>
+      {children}
+    </div>
+  </div>;
 }

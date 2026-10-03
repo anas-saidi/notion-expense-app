@@ -1,3 +1,4 @@
+import { withMirrorMutation } from "../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { requireBearerToken } from "@/lib/shortcut-auth";
 import { createNotionExpense } from "@/lib/notion-transactions";
@@ -30,7 +31,7 @@ function optionLookupValue(value: unknown): unknown {
   return value;
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const auth = requireBearerToken(request, "SHORTCUT_API_TOKEN", "Shortcut API");
   if (!auth.ok) return auth.response;
 
@@ -114,3 +115,14 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+const saveWithFence = withMirrorMutation(handlePOST);
+export async function POST(request: NextRequest) {
+  // This route is public to middleware, so authenticate BEFORE touching the mirror.
+  const auth = requireBearerToken(request, "SHORTCUT_API_TOKEN", "Shortcut API");
+  if (!auth.ok) return auth.response;
+  return saveWithFence(request);
+}
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

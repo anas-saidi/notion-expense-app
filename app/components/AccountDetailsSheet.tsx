@@ -811,7 +811,7 @@ export function AccountDetailsSheet({
             <div style={sectionStyle}>
               <div style={sectionHeaderStyle}>
                 <p style={sectionLabelStyle}>
-                  {showAllActivity ? `All · ${fmtMonth(homeMonth)}` : "Recent activity"}
+                  {showAllActivity ? `Activity in ${fmtMonth(homeMonth)}` : "Recent activity"}
                 </p>
                 <button
                   type="button"

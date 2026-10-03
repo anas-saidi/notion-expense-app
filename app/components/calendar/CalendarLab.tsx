@@ -108,7 +108,7 @@ export function CalendarLab() {
     <main style={pageStyle}>
       <header style={{ display: "grid", gap: 4 }}>
         <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}>Calendar</h1>
-        <span style={mutedStyle}>Lab · mock data · not in the app yet</span>
+        <span style={mutedStyle}>Calendar lab (sample data)</span>
       </header>
 
       <section aria-label="Lab options" style={{ display: "grid", gap: 8 }}>
@@ -121,7 +121,7 @@ export function CalendarLab() {
         <button type="button" aria-label="Previous year" onClick={() => setYear((y) => y - 1)} disabled={year <= 2025} style={iconButtonStyle}><ChevronLeftIcon /></button>
         <div style={{ display: "grid", justifyItems: "center", gap: 2 }}>
           <strong style={{ fontSize: 20, fontWeight: 600 }}>{year}</strong>
-          <span style={mutedStyle}>{fmt(yearTotal)} MAD{year === TODAY.year ? " so far" : ""}{options.skipBills ? " · without bills" : ""}</span>
+          <span style={mutedStyle}>{fmt(yearTotal)} MAD{year === TODAY.year ? " so far" : ""}{options.skipBills ? " excluding bills" : ""}</span>
         </div>
         <button type="button" aria-label="Next year" onClick={() => setYear((y) => y + 1)} disabled={year >= TODAY.year} style={iconButtonStyle}><ChevronRightIcon /></button>
       </div>
@@ -179,7 +179,7 @@ export function CalendarLab() {
               {open.rest > 0 && (
                 <li style={rowStyle}>
                   <span aria-hidden="true" style={emojiStyle} />
-                  <span style={{ flex: 1, color: "var(--muted)", fontSize: 15 }}>Everything else · {open.rows.length - open.top.length} categories</span>
+                  <span style={{ flex: 1, color: "var(--muted)", fontSize: 15 }}>{open.rows.length - open.top.length} other categories</span>
                   <span style={{ fontSize: 15, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{fmt(open.rest)}</span>
                 </li>
               )}

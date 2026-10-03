@@ -1,5 +1,5 @@
 import { SkeletonRows } from "./ui/Skeleton";
-import { useMemo, type CSSProperties } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -10,6 +10,7 @@ import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesSco
 import { isSavingsCategory } from "./wallet-utils";
 
 type HomeScreenProps = {
+  billsSection?: ReactNode;
   categories: Category[];
   monthlyLoading?: boolean;
   monthlyError?: boolean;
@@ -38,6 +39,7 @@ type HomeScreenProps = {
 
 
 export function HomeScreen({
+  billsSection,
   categories,
   monthlyLoading = false,
   monthlyError = false,
@@ -168,7 +170,7 @@ export function HomeScreen({
             </span>
           )}
         >
-          {planningTiming} · {BUDGET_SCOPE_LABELS[budgetScope]} budget
+          {planningTiming}
         </Banner>
       )}
 
@@ -187,18 +189,20 @@ export function HomeScreen({
         <Banner
           tone="accent"
           style={{ marginBottom: 16 }}
-          title={plannedCount > 0 ? `${planningLabel} · ${plannedCount}/3 budgets` : `Plan ${planningLabel}`}
+          title={plannedCount > 0 ? `${plannedCount}/3 budgets ready for ${planningLabel}` : `Plan ${planningLabel}`}
           action={<button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>{plannedCount > 0 ? "Resume →" : "Plan →"}</button>}
         >
           {planningTiming}
         </Banner>
       )}
 
+      {billsSection}
+
       {/* Zone 2.5: Upcoming bills strip */}
       {upcomingBills.length > 0 && (
         <section aria-label="Upcoming bills" style={upcomingWrapStyle}>
           <div style={sectionHeaderStyle}>
-            <span className="section-label" style={sectionLabelStyle}>Upcoming · next 7 days</span>
+            <span className="section-label" style={sectionLabelStyle}>Due in the next 7 days</span>
           </div>
           <div className="home-scroll-rail" style={cardsRailStyle}>
             {upcomingBills.map(bill => {

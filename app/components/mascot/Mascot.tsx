@@ -133,11 +133,9 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   const isJar = Boolean(frame.coins || frame.liquid);
   const material = isJar ? glass : "off";
   const layerStyle: CSSProperties = { position: "absolute", inset: 0, overflow: "visible" };
-  // A jar is clear: its empty part shows the page through it, so anything drawn
-  // "in the glass" (eyes, the label behind them, bead outlines) follows the theme.
-  // Eyes under the waterline sit on the pale liquid, so they take the dark ink in any theme.
-  const submerged = requested.fill !== undefined && requested.fill >= EYES_SUBMERGED;
-  const eyeFill = isJar && !submerged ? "var(--text)" : EYE_INK;
+  // Empty glass uses theme ink. The liquid clip below switches only submerged
+  // parts of each eye to dark ink, following the animated waterline and gaze.
+  const eyeFill = isJar ? "var(--text)" : EYE_INK;
   const jointPool = frame.colors[0] !== frame.colors[1];
   // A pool follows the status palette the category jars use: honey while spending
   // faster than the month, coral once overspent. Draining on pace is not a warning.
@@ -232,6 +230,7 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
         </radialGradient>
         {/* Eyes clip against the outline, so a glance towards the edge tucks them in. */}
         <clipPath id={`${ids}-fclip`}><path d={frame.body} /></clipPath>
+        {frame.liquid && <clipPath id={`${ids}-eye-liquid`}><path d={frame.liquid} /></clipPath>}
         {/* The label behind the eyes is the page colour, so the face reads over coins in any theme. */}
         <radialGradient id={`${ids}-label`}>
           <stop offset="0.55" style={{ stopColor: "var(--bg)", stopOpacity: 0.94 }} />
@@ -246,7 +245,7 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
         )}
       </defs>
       <g clipPath={`url(#${ids}-fclip)`}>
-        {isJar && frame.faceWindow && (
+        {isJar && !frame.liquid && frame.faceWindow && (
           <ellipse cx={frame.faceWindow.x} cy={frame.faceWindow.y} rx={frame.faceWindow.rx} ry={frame.faceWindow.ry} fill={`url(#${ids}-label)`} />
         )}
         {material === "fake" && <path d={frame.body} fill={`url(#${ids}-inner)`} />}
@@ -274,6 +273,11 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
       <g clipPath={`url(#${ids}-fclip)`} style={{ fill: eyeFill }}>
         {frame.eyes.map((eye, i) => <path key={i} d={eye.d} transform={eye.transform} />)}
       </g>
+      {frame.liquid && <g clipPath={`url(#${ids}-fclip)`}>
+        <g clipPath={`url(#${ids}-eye-liquid)`} fill={EYE_INK}>
+          {frame.eyes.map((eye, i) => <path key={i} d={eye.d} transform={eye.transform} />)}
+        </g>
+      </g>}
     </svg>
   );
 
@@ -307,8 +311,7 @@ const POOL_WASH = 0.07;
 /** The status palette's liquids (--status-low-liquid / --status-over-liquid in globals.css). */
 const STATUS_LOW_HEX = "#f1d48a";
 const STATUS_OVER_HEX = "#f1b0aa";
-/** Above this level the liquid covers the eyes. */
-const EYES_SUBMERGED = 0.55;
+
 const SOFTEN_JOINT = 0.55;
 
 const COIN_RX = COIN_R * SCALE;

@@ -93,7 +93,7 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
                 <div style={groupHeaderStyle}>
                   <span style={groupLabelStyle}>{label}</span>
                   {/* A day with one transaction already shows its amount on the row. */}
-                  {items.length > 1 && <span style={groupSubtotalStyle}>{expenseTotal > 0 ? fmt(expenseTotal) : ""}{expenseTotal > 0 && incomeTotal > 0 ? " · " : ""}{incomeTotal > 0 ? `${fmt(incomeTotal)} income` : ""}</span>}
+                  {items.length > 1 && <span style={{ ...groupSubtotalStyle, display: "flex", gap: 12, flexWrap: "wrap" }}>{expenseTotal > 0 && <span>{fmt(expenseTotal)} spent</span>}{incomeTotal > 0 && <span>{fmt(incomeTotal)} income</span>}</span>}
                 </div>
                 <div className="tx-group-list" style={transactionGroupStyle}>
                   {items.map(txn => {

@@ -1,3 +1,4 @@
+import { withMirrorReads } from "../../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "@/lib/notion-api";
 
@@ -100,7 +101,7 @@ function buildAccountLookup(results: NotionPage[]) {
   );
 }
 
-export async function GET(
+async function handleGET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -327,3 +328,8 @@ export async function GET(
     return NextResponse.json({ error: err.message ?? "Failed to load category activity" }, { status: 500 });
   }
 }
+
+export const GET = withMirrorReads(handleGET);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;

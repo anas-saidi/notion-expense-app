@@ -1,3 +1,4 @@
+import { withMirrorMutation } from "../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../../components/app-utils";
 import { notionFetchJson, queryDatabaseAll } from "../../../../lib/notion-api";
@@ -102,7 +103,7 @@ async function upsertFund(token: string, allocation: AllocationItem, date: strin
   return { id: createData.id, categoryId: allocation.categoryId, planned: allocation.amount, mode: "created" };
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const body = await req.json().catch(() => null);
 
   if (!body?.month) {
@@ -166,3 +167,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export const POST = withMirrorMutation(handlePOST);
+
+// Background imports need the same bounded lifetime as explicit sync.
+export const maxDuration = 240;
