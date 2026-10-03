@@ -1,3 +1,4 @@
+import { HeroSkeleton } from "./ui/Skeleton";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { BudgetScope, Category, MonthlySummary } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
@@ -100,10 +101,8 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
     <div style={switcherStyle}>
       <section className="wallet-overview-card" style={wrapStyle} aria-label="Wallet overview">
         <div style={heroStyle} key={value}>
-          {monthlyLoading || monthlyError ? (
-            <span role="status" style={{ ...captionStyle, minHeight: HOME_POOL_SIZE, display: "grid", placeItems: "center" }}>
-              {monthlyError ? "Monthly details unavailable" : "Loading monthly details…"}
-            </span>
+          {monthlyLoading ? <HeroSkeleton size={HOME_POOL_SIZE} /> : monthlyError ? (
+            <span role="status" style={{ ...captionStyle, minHeight: HOME_POOL_SIZE, display: "grid", placeItems: "center" }}>Monthly details unavailable</span>
           ) : isJoint && contribStatus ? (
             // Joint: the pooled jar in the middle, each partner's own jar beside it,
             // filled by how much of their share they've put in this month.

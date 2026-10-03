@@ -884,6 +884,55 @@ html.has-open-sheet .app-content {
   outline-offset: -3px;
 }
 
+.mascot-tap:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -3px;
+  border-radius: var(--radius-control);
+}
+
+.appearance-theme-button,
+.appearance-system-button {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.appearance-theme-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.appearance-system-button[aria-pressed="true"] {
+  background: var(--select-wash);
+  color: var(--select-ink);
+}
+
+.appearance-theme-button:hover,
+.appearance-system-button:hover {
+  filter: brightness(0.95);
+}
+
+.appearance-theme-button:active,
+.appearance-system-button:active {
+  transform: scale(0.95);
+}
+
+.appearance-theme-button:focus-visible,
+.appearance-system-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
 .settings-navigation-row:hover {
   color: var(--text2) !important;
 }

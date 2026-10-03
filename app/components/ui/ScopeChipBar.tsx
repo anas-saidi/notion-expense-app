@@ -40,7 +40,7 @@ export function GlobalBudgetScopePicker({
             className="global-scope-option"
             data-scope={scope}
             onClick={() => {
-              if (!active) haptic("selection");
+              haptic("selection");
               onChange(scope);
             }}
           >

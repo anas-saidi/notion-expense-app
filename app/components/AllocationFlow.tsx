@@ -13,6 +13,7 @@ import { Banner } from "./ui/Banner";
 import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
 import type { Account, BudgetScope, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
 import { MascotHero } from "./mascot/MascotHero";
+import { MascotTap } from "./mascot/MascotTap";
 import { allocationJarItems } from "./mascot/budgetJar";
 import { fmt, getLeftToAssignByScope } from "./app-utils";
 
@@ -214,9 +215,9 @@ export function AllocationFlow({
             const jarMood = isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle";
             const jarStyle = { marginBottom: heroPool ? -8 : 4 };
             return jarLevel !== undefined ? (
-              <MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} style={jarStyle} />
+              <MascotTap label="Tap allocation mascot"><MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} style={jarStyle} /></MascotTap>
             ) : (
-              <MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={jarStyle} />
+              <MascotTap label="Tap allocation mascot"><MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={jarStyle} /></MascotTap>
             );
           })()}
           {heroPool ? (

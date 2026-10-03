@@ -1,3 +1,4 @@
+import { SkeletonRows } from "./ui/Skeleton";
 import { useMemo, type CSSProperties } from "react";
 import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
@@ -153,7 +154,6 @@ export function HomeScreen({
         />
       </div>
 
-      {secondaryLoading && <p role="status" style={{ minHeight: 20, margin: "0 0 16px", color: "var(--text2)", fontSize: 12 }}>Loading activity and planning…</p>}
 
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
@@ -222,6 +222,7 @@ export function HomeScreen({
       <div className="home-content" style={contentStyle}>
 
         {/* Zone 6: Recent transactions */}
+        {secondaryLoading && recentTxns.length === 0 && <SkeletonRows label="Loading recent activity" count={4} />}
         {recentTxns.length > 0 && (
           <section aria-label="Recent transactions">
             <div className="home-section-hdr home-recent-header" style={sectionHeaderStyle}>

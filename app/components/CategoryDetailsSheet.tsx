@@ -1,5 +1,7 @@
 "use client";
 
+import { SkeletonRows } from "./ui/Skeleton";
+
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
 import { FundIcon, FreezeIcon, XIcon, TransferIcon, CalendarRangeIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
@@ -253,20 +255,7 @@ export function CategoryDetailsSheet({
             <MonthPicker value={activeMonth} max={currentMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} align="right" triggerIcon={<CalendarRangeIcon size={16} aria-hidden="true" />} triggerClassName="composer-picker-chip" showChevron={false} />
           </div>
 
-          {loading && (
-            <div style={{ display: "grid", gap: 12 }}>
-              {[72, 56, 64].map((w, i) => (
-                <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <div className="skeleton" style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, marginTop: 5 }} />
-                  <div style={{ flex: 1, display: "grid", gap: 6 }}>
-                    <div className="skeleton" style={{ height: 13, width: `${w}%`, borderRadius: 4 }} />
-                    <div className="skeleton" style={{ height: 10, width: "40%", borderRadius: 4 }} />
-                  </div>
-                  <div className="skeleton" style={{ height: 13, width: 48, borderRadius: 4, flexShrink: 0 }} />
-                </div>
-              ))}
-            </div>
-          )}
+          {loading && <SkeletonRows label="Loading category activity" />}
           {error && !loading && <div style={panelMessageStyle}>{error}</div>}
           {!loading && !error && (data?.timeline?.length ?? 0) === 0 && (
             <div style={panelMessageStyle}>No activity for {formatMonth(activeMonth)}.</div>

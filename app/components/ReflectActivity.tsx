@@ -1,4 +1,6 @@
 "use client";
+
+import { SkeletonRows } from "./ui/Skeleton";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -81,9 +83,7 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
         {transactionsLoading && (
           <div style={{ display: "grid", gap: 20 }}>
             <div className="section-label" style={sectionDividerLabelStyle}>History</div>
-            <div style={{ display: "grid", gap: 6 }}>
-              {[1, 2, 3, 4].map(i => <TxRowSkeleton key={i} />)}
-            </div>
+            <SkeletonRows label="Loading transaction history" count={4} />
           </div>
         )}
         {!transactionsLoading && txGroups.length > 0 && (
@@ -133,22 +133,6 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
 
   );
 }
-function TxRowSkeleton() {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
-      <div className="skeleton" style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0 }} />
-      <div style={{ flex: 1, display: "grid", gap: 5 }}>
-        <div className="skeleton" style={{ width: "60%", height: 13, borderRadius: 4 }} />
-        <div className="skeleton" style={{ width: "35%", height: 10, borderRadius: 4 }} />
-      </div>
-      <div style={{ display: "grid", gap: 5, alignItems: "flex-end" }}>
-        <div className="skeleton" style={{ width: 70, height: 13, borderRadius: 4 }} />
-        <div className="skeleton" style={{ width: 40, height: 10, borderRadius: 4, marginLeft: "auto" }} />
-      </div>
-    </div>
-  );
-}
-
 const sectionDividerLabelStyle: CSSProperties = {
   fontSize: 12, fontWeight: 700, letterSpacing: 0.7,
   textTransform: "uppercase", color: "var(--muted)",

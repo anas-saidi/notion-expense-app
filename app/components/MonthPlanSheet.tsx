@@ -1,5 +1,7 @@
 "use client";
 
+import { HeroSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
+
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { fetchApiJson, fetchMonthlyData } from "../../lib/app-data";
 import { useReducedMotion } from "motion/react";
@@ -10,6 +12,7 @@ import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "
 import { JointFamily } from "./WalletCardSwitcher";
 import { Money } from "./Money";
 import { MascotHero } from "./mascot/MascotHero";
+import { MascotTap } from "./mascot/MascotTap";
 import { allocationJarItems } from "./mascot/budgetJar";
 import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -104,7 +107,7 @@ export function MonthPlanSheet({
   const [saved, setSaved] = useState<Map<string, number>>(new Map());
   const [currentPlanned, setCurrentPlanned] = useState<Map<string, number>>(new Map());
   const [currentSpent, setCurrentSpent] = useState<Map<string, number>>(new Map());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   // Draft amounts by normalised category id; missing = the saved amount.
   const [draft, setDraft] = useState<Record<string, number>>({});
@@ -161,7 +164,7 @@ export function MonthPlanSheet({
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setLoading(true); return; }
     setDraft({});
     setRevived([]);
     setLocallyFrozen([]);
@@ -380,20 +383,20 @@ export function MonthPlanSheet({
             fade={56}
             maxBlur={12}
             tint={SHEET_BG}
-            visible={heroHidden}
+            visible={heroHidden && !loading && !loadError}
             reduceMotion={!!reduceMotion}
           />
           <div
-            aria-hidden={!heroHidden}
+            aria-hidden={!heroHidden || loading || !!loadError}
             style={{
               ...stickyBarStyle,
-              opacity: heroHidden ? 1 : 0,
+              opacity: heroHidden && !loading && !loadError ? 1 : 0,
               transform: heroHidden ? "translateY(0)" : "translateY(-4px)",
               transition: reduceMotion ? "none" : "opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
               pointerEvents: heroHidden ? "auto" : "none",
             }}
           >
-            <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} />
+            <MascotTap label="Tap planning mascot" tabIndex={heroHidden ? 0 : -1} style={{ margin: 0 }}><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} /></MascotTap>
             <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
               <span style={stickyLabelStyle}>{capacityLabel}</span>
               <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
@@ -408,14 +411,19 @@ export function MonthPlanSheet({
             )}
           </div>
         <div ref={setScrollRoot} style={scrollStyle}>
+          {loading ? <SkeletonRegion label="Loading monthly plan">
+            <HeroSkeleton label="Loading planning capacity" />
+            <Skeleton style={{ width: 160, height: 44, margin: "16px auto 32px" }} />
+            <SkeletonRows label="Loading planned categories" count={4} iconSize={60} />
+          </SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <>
           {/* Hero: the jar fills with the categories you plan; the number is what's still unassigned. */}
           <section aria-label={capacityLabel} style={heroStyle}>
             {scope === "joint" ? (
               <JointFamily planningCapacity={personalRemaining}>
-                <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} />
+                <MascotTap label="Tap planning mascot"><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
               </JointFamily>
             ) : (
-              <MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} />
+              <MascotTap label="Tap planning mascot"><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
             )}
             <span style={heroLabelStyle}>{capacityLabel}</span>
             <span ref={setHeroTarget} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
@@ -431,10 +439,6 @@ export function MonthPlanSheet({
               <span style={heroSubStyle}>{fmt(Math.round(capacity.due[scope]))} reserved for Joint</span>
             )}
           </section>
-
-          {loadError && (
-            <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} />
-          )}
 
           {[
             ...(savingsCategories.length ? [{ key: "savings", label: "Savings", items: savingsCategories, savings: true }] : []),
@@ -484,21 +488,22 @@ export function MonthPlanSheet({
               )}
             </section>
           )}
+          </>}
         </div>
           {/* Rows melt into the footer rather than stopping at a hairline. */}
           <ProgressiveBlur position="bottom" height={28} maxBlur={4} tint={SHEET_BG} visible={rowsBelow} reduceMotion={!!reduceMotion} />
         </div>
 
         <footer style={footerStyle}>
-          {(saveError || capacityError) && <Banner role="alert" tone="danger" compact>{saveError || capacityError}</Banner>}
-          {hasCurrentPlan && (
+          {!loading && !loadError && (saveError || capacityError) && <Banner role="alert" tone="danger" compact>{saveError || capacityError}</Banner>}
+          {!loading && hasCurrentPlan && (
             <button type="button" onClick={copyCurrentPlan} disabled={loading || saving || !!freezing} style={copyLinkStyle}>
               Copy last month's plan
             </button>
           )}
           <div style={footerRowStyle} className="planner-footer-row">
             {/* A month's plan is a big commitment: slide to save, so a stray tap never does. */}
-            {changed.length || saving ? (
+            {loading ? <SkeletonRegion label="Loading plan status"><Skeleton style={{ width: 140, height: 18 }} /></SkeletonRegion> : loadError ? null : changed.length || saving ? (
               <SlideToConfirm label="Slide to save plan" busy={saving} busyLabel="Saving…" disabled={loading || !!freezing || !!loadError || !!capacityError} onConfirm={() => void save()} />
             ) : (
               <span role="status" style={savedStatusStyle}>

@@ -7,7 +7,7 @@ import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/plannin
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { HomeScreen } from "./components/HomeScreen";
-const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen));
+const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen), { loading: () => <SkeletonRegion label="Loading Reflect"><Skeleton style={{ height: 220, marginBottom: 16 }} /><SkeletonRows /></SkeletonRegion> });
 import { CategoriesScreen } from "./components/CategoriesScreen";
 import { AddTransactionSheet } from "./components/AddTransactionSheet";
 import { AccountIncomeSheet } from "./components/AccountIncomeSheet";
@@ -44,17 +44,7 @@ import {
   today,
   transactionMatchesScope,
 } from "./components/app-utils";
-import { Mascot } from "./components/mascot/Mascot";
-
-const LOADING_MASCOT_SIZE = 112;
-
-const LOADING_LINES = [
-  "Warming up Notion...",
-  "Sorting tiny receipts...",
-  "Polishing your ledger...",
-  "Counting coins quietly...",
-];
-
+import { AppLoadingSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./components/ui/Skeleton";
 
 type SessionUser = { email: string | null; name: string | null; avatarUrl: string | null };
 
@@ -151,7 +141,6 @@ export default function App() {
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [draftOffer, setDraftOffer] = useState<{ amount: string; name: string; accountId: string; categoryId: string; date: string; scope: BudgetScope; timestamp: number } | null>(null);
-  const [loadingLineIdx, setLoadingLineIdx] = useState(0);
 
   const [microToast, setMicroToast] = useState<string | null>(null);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
@@ -466,12 +455,6 @@ export default function App() {
   }, []);
 
   const suggestFromHistory = useMemo(() => createCategorySuggester(corpus), [corpus]);
-
-  useEffect(() => {
-    if (!loading) return;
-    const id = setInterval(() => setLoadingLineIdx((i) => (i + 1) % LOADING_LINES.length), 900);
-    return () => clearInterval(id);
-  }, [loading]);
 
   useEffect(() => {
     const acct = accounts.find((a) => a.id === accountId);
@@ -941,24 +924,7 @@ export default function App() {
   };
 
   // Not yet mounted: server and first client render must match — show a neutral shell
-  if (!mounted || loading) {
-    return (
-      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          {/* The mascot dozes while Notion wakes up; before mount, an empty box of the same size
-              keeps the server and first client render identical. */}
-          {mounted
-            ? <Mascot target={{ scope: budgetScope, gap: 0, mood: "sleepy", fill: 0, outline: "partner" }} size={LOADING_MASCOT_SIZE} />
-            : <div style={{ width: LOADING_MASCOT_SIZE, height: LOADING_MASCOT_SIZE }} />}
-          {mounted && (
-            <p style={{ fontSize: 11, letterSpacing: 0.2, color: "var(--muted)", fontWeight: 600, animation: "fadeUp 0.2s ease both" }}>
-              {LOADING_LINES[loadingLineIdx]}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
+  if (!mounted || loading) return <AppLoadingSkeleton />;
 
   if (loadError) {
     return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 20, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 22 }}>Could not load your finances</h1><p style={{ margin: "10px 0 18px", color: "var(--text2)" }}>No balances were replaced. Check the connection and try again.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ minHeight: 48, padding: "0 18px", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>Retry</button></section></main>;
@@ -1001,7 +967,7 @@ export default function App() {
     >
       {refreshState !== "idle" && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
-          {refreshState === "updating" ? "Updating" : <>Could not refresh · <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
+          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <>Could not refresh · <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
         </div>
       )}
       {showManageScreen && (

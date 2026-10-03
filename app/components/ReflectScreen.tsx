@@ -1,5 +1,7 @@
 "use client";
 
+import { Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
+
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 import { buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
@@ -9,6 +11,7 @@ import { MonthPicker } from "./DatePicker";
 import { ReflectActivity } from "./ReflectActivity";
 import { ReflectFlowChart } from "./ReflectFlowChart";
 import { MascotHero } from "./mascot/MascotHero";
+import { useAppHaptics } from "./ui/useAppHaptics";
 import { spendingJarItems } from "./mascot/budgetJar";
 import { BottomSheet } from "./ui/BottomSheet";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
@@ -40,6 +43,7 @@ const REFLECT_JAR_SIZE = 250;
 const tone = (index: number) => `color-mix(in srgb, var(--select-ink) ${Math.max(20, 92 - index * 12)}%, var(--surface2))`;
 
 export function ReflectScreen(props: Props) {
+  const { haptic } = useAppHaptics();
   const [showPeriod, setShowPeriod] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [customPeriod, setCustomPeriod] = useState(props.period);
@@ -111,7 +115,7 @@ export function ReflectScreen(props: Props) {
       {props.view === "spending" && <button type="button" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, background: filterCount ? "var(--select-wash)" : "transparent", color: filterCount ? "var(--select-ink)" : "var(--text2)" }}><SlidersIcon size={16} /><span>Filter{filterCount ? ` (${filterCount})` : ""}</span></button>}
     </div>
     {props.error ? <Banner tone="danger" role="alert" title="Could not load this period" action={<button onClick={props.onRetry} style={quietButtonStyle}>Try again</button>}>Your records are unchanged. Try refreshing Reflect.</Banner>
-      : props.transactionsLoading ? <div role="status" aria-label="Loading Reflect" style={{ display: "grid", gap: 16 }}><div className="skeleton" style={{ height: 220, borderRadius: 16 }} />{[1, 2, 3].map(item => <div key={item} className="skeleton" style={{ height: 56, borderRadius: 12 }} />)}</div>
+      : props.transactionsLoading ? <SkeletonRegion label="Loading Reflect" style={{ display: "grid", gap: 16 }}><Skeleton style={{ height: 220, borderRadius: 16 }} /><SkeletonRows /></SkeletonRegion>
       : props.view === "activity" ? <ReflectActivity {...props} periodLabel={label} searchOpen={searchOpen} onSearchClose={() => setSearchOpen(false)} />
       : <>
         {!hasData ? <section style={{ padding: "40px 0", textAlign: "center" }}><h2 style={{ fontSize: 20, fontWeight: 500 }}>{filterCount ? "Nothing matches these filters" : "No spending to reflect on yet"}</h2><p style={mutedStyle}>{filterCount ? "Include more categories or accounts to see the breakdown." : "Try another period, or add your first expense."}</p>{filterCount > 0 && <button style={quietButtonStyle} onClick={() => { setExcludedAccounts([]); setExcludedCategories([]); }}>Reset filters</button>}</section>
@@ -119,7 +123,7 @@ export function ReflectScreen(props: Props) {
             <section aria-label="Spending breakdown" style={{ display: "grid", justifyItems: "center", gap: 12 }}>
               {/* The period's spending as the scope's jar, one emoji per category sized by its share.
                   Tapping it swaps in spending against money in over the same period, and back. */}
-              <button type="button" onClick={() => setShowFlow(open => !open)} aria-pressed={showFlow} aria-label={showFlow ? "Show spending by category" : "Show spending against money in"} style={jarButtonStyle}>
+              <button type="button" onClick={() => { haptic("light"); setShowFlow(open => !open); }} aria-pressed={showFlow} aria-label={showFlow ? "Show spending by category" : "Show spending against money in"} style={jarButtonStyle}>
                 {showFlow
                   ? <ReflectFlowChart points={flow} height={REFLECT_JAR_SIZE - 44} />
                   : <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={REFLECT_JAR_SIZE} style={{ margin: "-28px auto -16px" }} />}

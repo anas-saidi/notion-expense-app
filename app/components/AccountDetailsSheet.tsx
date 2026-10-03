@@ -1,4 +1,6 @@
 "use client";
+
+import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
 import { DatePicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
 
@@ -464,9 +466,9 @@ export function AccountDetailsSheet({
             </div>
 
             {chartLoading ? (
-              <div style={chartLoadingStyle}>
-                <span style={spinnerStyle} />
-              </div>
+              <SkeletonRegion label="Loading account chart" style={chartLoadingStyle}>
+                <Skeleton style={{ height: 148, borderRadius: 12 }} />
+              </SkeletonRegion>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={148}>

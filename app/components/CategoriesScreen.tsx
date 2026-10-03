@@ -1,5 +1,7 @@
 "use client";
 
+import { HeroSkeleton, SkeletonRows } from "./ui/Skeleton";
+
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import { Currency } from "./Money";
 import { MonthPicker } from "./DatePicker";
@@ -201,10 +203,8 @@ export function CategoriesScreen({
   const jarDetails = jarItems.length > 0
     ? `Money left in ${jarItems.length} categor${jarItems.length === 1 ? "y" : "ies"}`
     : "No category has money left";
-  const budgetJar = loading || monthError ? (
-    <span role="status" style={{ minHeight: MASCOT_HERO_SIZE, display: "grid", placeItems: "center", color: "var(--text2)", fontSize: 12 }}>
-      {monthError ? "Monthly details unavailable" : "Loading monthly details…"}
-    </span>
+  const budgetJar = loading ? <HeroSkeleton size={MASCOT_HERO_SIZE} /> : monthError ? (
+    <span role="status" style={{ minHeight: MASCOT_HERO_SIZE, display: "grid", placeItems: "center", color: "var(--text2)", fontSize: 12 }}>Monthly details unavailable</span>
   ) : (
     <MascotSpill size={MASCOT_HERO_SIZE} label={jarDetails} details={jarDetails} onOpenChange={setJarOpen}>
       <MascotHero variant="pool" scope={budgetScope} level={poolLevel} warn={poolWarn} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={leftToAllocate} />
@@ -313,21 +313,7 @@ export function CategoriesScreen({
               <Banner tone="danger" title="Couldn't load this month" action={<button type="button" onClick={onRetryMonth} style={bannerActionStyle}>Retry</button>} />
             )}
 
-            {loading && (
-              <section aria-label="Loading budget categories" aria-busy="true" style={listSurfaceStyle}>
-                <span style={srOnlyStyle} role="status">Loading budget categories</span>
-                {Array.from({ length: 4 }, (_, index) => (
-                  <div key={index} style={skeletonRowStyle} aria-hidden="true">
-                    <span className="skeleton" style={{ width: 60, height: 60, borderRadius: 20, flexShrink: 0 }} />
-                    <span style={{ display: "grid", gap: 6, flex: 1 }}>
-                      <span className="skeleton" style={{ width: "46%", height: 14, borderRadius: 5 }} />
-                      <span className="skeleton" style={{ width: "28%", height: 10, borderRadius: 5 }} />
-                    </span>
-                    <span className="skeleton" style={{ width: 56, height: 16, borderRadius: 5 }} />
-                  </div>
-                ))}
-              </section>
-            )}
+            {loading && <div style={listSurfaceStyle}><SkeletonRows label="Loading budget categories" count={4} iconSize={60} /></div>}
 
             {/* Categories as the plan sheet lists them: collapsible sections of jar rows. */}
             {!loading && !monthError && activeGroups.map((group) => {
@@ -434,7 +420,6 @@ const sectionStyle: CSSProperties = { display: "grid", gap: 4, minWidth: 0 };
 /** One shared surface per section; rows inside stay flat. */
 const listSurfaceStyle: CSSProperties = { display: "grid", padding: "4px 0", borderRadius: "var(--radius-card)", background: "var(--surface)", border: "1px solid color-mix(in srgb, var(--border) 60%, transparent)" };
 
-const skeletonRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 76, padding: "8px 14px 8px 14px" };
 
 const addRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, minHeight: 48, padding: "0 16px 0 24px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
 
@@ -501,17 +486,7 @@ const frozenNameStyle: CSSProperties = {
 };
 
 
-const srOnlyStyle: CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: "hidden",
-  clip: "rect(0, 0, 0, 0)",
-  whiteSpace: "nowrap",
-  border: 0,
-};
+
 
 const emptyStyle: CSSProperties = {
   padding: "22px 10px",
