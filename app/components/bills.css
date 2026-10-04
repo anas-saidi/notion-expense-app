@@ -6,16 +6,7 @@
 .bills-sheet { padding: 18px 18px calc(32px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 16px; }
 .bills-muted { color: var(--text2); font-size: 13px; line-height: 20px; margin: 0; }
 .bills-empty { color: var(--text2); font-size: 15px; padding: 24px 0; margin: 0; }
-.bills-filters { display: flex; gap: 8px; }
-.bills-filters button { flex: 1; min-height: 44px; background: transparent; color: var(--text2); border: 0; border-radius: 12px; font-size: 13px; cursor: pointer; }
-.bills-filters button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.bills-category-context { display: grid; gap: 16px; }
-.bills-category-summary { display: grid; gap: 8px; }
-.bills-category-summary strong { font-size: 15px; }
-.bills-category-summary dl { display: grid; gap: 8px; margin: 0; }
-.bills-category-summary dl div { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
-.bills-category-summary dt { color: var(--text2); }
-.bills-category-summary dd { margin: 0; }
+.bills-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 .bills-detail-amount { font-size: 34px; font-weight: 500; line-height: 1; }
 .bills-primary, .bills-secondary { min-height: 48px; padding: 12px 16px; border: 0; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
 .bills-primary { background: var(--accent); color: var(--accent-ink); }

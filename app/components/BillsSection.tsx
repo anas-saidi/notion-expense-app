@@ -5,6 +5,7 @@ import type { Account, BudgetScope, Category } from "./app-types";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData, type BillOccurrence, type BillRepeat } from "@/lib/bills";
 import { categoryMatchesScope, expenseBudgetGate, fmtDate, monthBounds, parseAmount } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
+import { ScreenChip } from "./ui/ScreenChip";
 import { TransactionRow } from "./ui/TransactionRow";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { Money } from "./Money";
@@ -60,6 +61,10 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const selectedCategory = categories.find(c => selected && normalizedId(c.id) === normalizedId(selected.categoryId));
   const expected = parseAmount(amount) ?? 0;
   const gate = expenseBudgetGate({ available: selectedCategory?.available ?? null, amount: expected });
+  const needsFunding = (bill: BillOccurrence) => {
+    const available = categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))?.available;
+    return (bill.state === "Due" || bill.state === "Overdue") && bill.dueDate <= currentCutoff && available != null && available < (reservations[normalizedId(bill.categoryId)] ?? 0);
+  };
   const enabled = !saving && !savedPendingRefresh && !loading && !error;
 
   function move(next: View) { setShowMore(false); setView(next); setSaveError(""); setConfirm(null); setPicker(null); haptic("selection"); }
@@ -106,7 +111,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
     {loading ? <SkeletonRows count={2} /> : error ? <Banner role="alert" tone="danger" compact action={<button type="button" onClick={onRetry}>Retry</button>}>{error}</Banner>
       : <>
         {currentDue.length ? <>
-          {currentDue.slice(0, 3).map(bill => <BillRow key={bill.id} bill={bill} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}
+          {currentDue.slice(0, 3).map(bill => <BillRow key={bill.id} bill={bill} needsFunding={needsFunding(bill)} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}
         </> : <p className="bills-muted">No bills due.</p>}
       </>}
     <BottomSheet open={open} onClose={() => { if (!saving) { setOpen(false); setPicker(null); setShowMore(false); } }} label={view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Pay due" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"} maxWidth="520px" contentStyle={{ paddingTop: 0 }}>
@@ -118,16 +123,9 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
         {saveError && <Banner role="alert" tone="danger" compact>{saveError}{savedPendingRefresh && <button type="button" className="bills-quiet-action" disabled={saving} onClick={retrySaved}>Refresh balances</button>}</Banner>}
         {loading ? <SkeletonRows /> : error ? <Banner role="alert" tone="danger" compact action={<button type="button" onClick={onRetry}>Retry</button>}>{error}</Banner> : <>
         {view === "list" && <>
-          <div className="bills-list-controls"><MonthPicker value={activeMonth} onChange={e => setMonth(e.target.value)} aria-label="Bill month" /><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div>
-          <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", "Paid", "Skipped"] as const).map(value => <button type="button" key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</button>)}</div>
-          {filter === "Due" && activeMonth === currentMonth && <div className="bills-category-context">
-            <p className="bills-muted">Bills due through {fmtDate(cutoff)}, including overdue bills.</p>
-            {categories.filter(c => categoryMatchesScope(c, scope, accounts) && reservations[normalizedId(c.id)]).map(c => {
-              const reserved = reservations[normalizedId(c.id)]; const free = c.available == null ? null : c.available - reserved;
-              return <div key={c.id} className="bills-category-summary"><strong>{c.name}</strong><dl><div><dt>Available</dt><dd>{c.available == null ? "Unavailable" : <Money value={c.available} />}</dd></div><div><dt>Earmarked</dt><dd><Money value={reserved} /></dd></div><div><dt>Free after bills</dt><dd style={{ color: free != null && free < 0 ? "var(--danger)" : undefined }}>{free == null ? "Unavailable" : <Money value={free} />}</dd></div></dl>{free != null && free < 0 && <p className="bills-muted">Fund <Money value={-free} /> to cover these bills.</p>}</div>;
-            })}
-          </div>}
-          {shown.length ? shown.map(bill => <BillRow key={bill.id} bill={bill} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} paidMonth={filter === "Paid" ? activeMonth : undefined} />) : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}
+          <div className="bills-list-controls"><MonthPicker triggerClassName="composer-picker-chip" value={activeMonth} onChange={e => setMonth(e.target.value)} aria-label="Bill month" /><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div>
+          <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>
+          {shown.length ? shown.map(bill => <BillRow key={bill.id} bill={bill} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={filter === "Paid" ? activeMonth : undefined} />) : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}
         </>}
         {view === "detail" && selected && <>
           <section className="bills-detail-summary"><div className="bills-detail-amount"><Money value={selected.amount} currency /></div>
@@ -181,10 +179,13 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
     </PickerPopover>
   </section>;
 }
-function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, compact = false }: { bill: BillOccurrence; category?: Category; onClick: () => void; onPay: () => void; onEdit: () => void; disabled: boolean; paidMonth?: string; compact?: boolean }) {
+function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, needsFunding = false, compact = false }: { bill: BillOccurrence; category?: Category; onClick: () => void; onPay: () => void; onEdit: () => void; disabled: boolean; paidMonth?: string; needsFunding?: boolean; compact?: boolean }) {
   const payment = bill.payments.find(p => !paidMonth || p.date.slice(0, 7) === paidMonth);
   const subtitle = payment ? `Paid ${fmtDate(payment.date)}` : `${bill.state === "Overdue" ? "Overdue since" : bill.state === "Skipped" ? "Skipped for" : compact ? "" : "Due"} ${fmtDate(bill.dueDate)}`.trim();
-  const row = <TransactionRow title={bill.name} subtitle={bill.payments.length > 1 ? <>{subtitle}<span style={{ display: "block", color: "var(--danger)" }}>Recorded twice</span></> : subtitle} amount={payment?.amount ?? bill.amount} tone="expense" prefix="" amountColor="var(--text)" icon={<CategoryIcon icon={category?.icon ?? null} size={22} />} onClick={onClick} />;
+  const row = <TransactionRow title={bill.name} subtitle={<>
+    <span style={bill.state === "Overdue" ? { color: "var(--danger)" } : undefined}>{subtitle}</span>
+    {bill.payments.length > 1 ? <span style={{ display: "block", color: "var(--danger)" }}>Recorded twice</span> : needsFunding ? <span style={{ display: "block", color: "var(--danger)" }}>Needs funding</span> : null}
+  </>} amount={payment?.amount ?? bill.amount} tone="expense" prefix="" amountColor="var(--text)" icon={<CategoryIcon icon={category?.icon ?? null} size={22} />} onClick={onClick} />;
   if (bill.state !== "Due" && bill.state !== "Overdue") return row;
   return <SwipeToDelete flat surface={compact ? "var(--bg)" : "var(--surface)"} disabled={disabled} actions={[{ label: "Pay due", icon: <ReceiptIcon size={17} />, onSelect: onPay }, { label: "Edit", icon: <EditIcon size={17} />, onSelect: onEdit }]}>{row}</SwipeToDelete>;
 }

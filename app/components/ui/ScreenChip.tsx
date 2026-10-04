@@ -10,6 +10,7 @@ export function ScreenChip({
   badgeTone = "neutral",
   mode = "filter",
   ariaLabel,
+  minHeight = 36,
 }: {
   selected: boolean;
   onClick: () => void;
@@ -18,6 +19,7 @@ export function ScreenChip({
   badgeTone?: "neutral" | "metric";
   mode?: "filter" | "tab";
   ariaLabel?: string;
+  minHeight?: number;
 }) {
   return (
     <button
@@ -27,7 +29,7 @@ export function ScreenChip({
       aria-pressed={mode === "filter" ? selected : undefined}
       aria-label={ariaLabel}
       onClick={onClick}
-      style={chipStyle(selected)}
+      style={{ ...chipStyle(selected), minHeight }}
     >
       <span>{children}</span>
       {badge !== undefined && <span aria-hidden="true" style={badgeStyle(selected, badgeTone)}>{badge}</span>}
