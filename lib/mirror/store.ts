@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS finance_mirror_records (
 `;
 export type SqlDriver = { query: (sql: string, params?: any[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
 const globalStore = globalThis as typeof globalThis & { financeMirrorPool?: Pool };
+// Notion recomputes balance rollups/formulas several seconds after a write. Reads stay
+// live during this window; importing sooner publishes pre-write balances as current.
+export const WRITE_SETTLE_MS = 15_000;
 export function mirrorConfigured() { return !!process.env.DATABASE_URL; }
 export function mirrorStore(): MirrorStore | null {
   if (!mirrorConfigured()) return null;
@@ -152,6 +155,6 @@ export class MirrorStore {
   }
   async finishWrite(scope: string, id: string) {
     await this.db.query(`WITH removed AS (DELETE FROM finance_mirror_writes WHERE scope=$1 AND id=$2 RETURNING scope)
-      UPDATE finance_mirror SET revision=revision+1, not_before=now()+interval '2 seconds' WHERE scope IN (SELECT scope FROM removed)`, [scope, id]);
+      UPDATE finance_mirror SET revision=revision+1, not_before=now()+($3 * interval '1 millisecond') WHERE scope IN (SELECT scope FROM removed)`, [scope, id, WRITE_SETTLE_MS]);
   }
 }

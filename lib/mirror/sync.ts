@@ -1,6 +1,6 @@
 import { waitUntil } from "@vercel/functions";
 import { mirrorReadContext } from "./context";
-import { mirrorDatabases, mirrorScope, mirrorStore, normalizeDatabaseId, type MirrorSnapshot } from "./store";
+import { mirrorDatabases, mirrorScope, mirrorStore, normalizeDatabaseId, WRITE_SETTLE_MS, type MirrorSnapshot } from "./store";
 
 type SyncTask = { promise: Promise<unknown>; rerun: boolean };
 const globalSync = globalThis as typeof globalThis & {
@@ -18,7 +18,7 @@ export function scheduleMirrorSync(token: string, settle = false, force = false)
   cooldowns.set(scope, Date.now() + 60_000);
   const entry: SyncTask = { promise: Promise.resolve(), rerun: false };
   const task = (async () => {
-    if (settle) await new Promise(resolve => setTimeout(resolve, 2100));
+    if (settle) await new Promise(resolve => setTimeout(resolve, WRITE_SETTLE_MS + 100));
     return syncMirror(token);
   })().catch(() => console.error("Financial mirror sync failed; live Notion reads remain available"));
   entry.promise = task;

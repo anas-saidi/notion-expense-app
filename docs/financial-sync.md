@@ -44,7 +44,7 @@ be configured before these changes reach the hosted app.
   snapshot; writes can have partially succeeded even when an API response fails.
 - An importer can publish only if its lease and captured revision still match and
   no write fence remains active. Writes close their fences and schedule another
-  import after a two-second formula-settling window. The existing delayed balance
+  import after a 15-second formula-settling window (`WRITE_SETTLE_MS`; two seconds published pre-write rollup balances). The existing delayed balance
   recheck remains. Reads during this window use Notion; post-save refresh speed is
   intentionally limited by live verification rather than stale snapshots.
 - Sync leases expire after four minutes; abandoned write fences after five.
