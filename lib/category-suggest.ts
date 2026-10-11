@@ -44,6 +44,12 @@ export function createCategorySuggester(history: CategoryHistoryItem[]) {
 
     const queryWords = new Set(words(text));
     const byName = categories.filter((c) => words(c.name).some((word) => queryWords.has(word)));
-    return byName.length === 1 ? byName[0].id : null;
+    if (byName.length === 1) return byName[0].id;
+    // Conservative ingredient synonym fallback, only when one groceries category exists.
+    if (["veggies", "vegetables", "vegetable"].some(word => queryWords.has(word))) {
+      const groceries = categories.filter(c => words(c.name).some(word => word === "groceries" || word === "grocery"));
+      if (groceries.length === 1) return groceries[0].id;
+    }
+    return null;
   };
 }

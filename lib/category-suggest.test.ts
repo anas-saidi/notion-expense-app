@@ -37,3 +37,11 @@ describe("createCategorySuggester", () => {
     expect(suggest("xy", categories)).toBeNull();
   });
 });
+
+it("maps veggies to one available groceries category without inventing one", () => {
+  const suggest = createCategorySuggester([]);
+  expect(suggest("veggies", categories)).toBe("groceries");
+  expect(suggest("this morning got vegetables for 300", categories)).toBe("groceries");
+  expect(suggest("veggies", [{ id: "food", name: "Eating Out" }])).toBeNull();
+  expect(suggest("veggies", [...categories, { id: "other", name: "Groceries personal" }])).toBeNull();
+});

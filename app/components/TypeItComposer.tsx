@@ -1,4 +1,5 @@
 "use client";
+import "./finance-ai.css";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { parseTransactionLines, reconcileTypedChoices, saveTypedBatch, type TypedTransactionDraft } from "@/lib/typed-transactions";
@@ -12,6 +13,7 @@ import { Banner } from "./ui/Banner";
 import { signedAmountColor } from "./ui/TransactionRow";
 import { CheckIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
+import { validateParsing, type AIDraft } from "@/lib/finance-ai";
 
 type Props = {
   active: boolean;
@@ -26,12 +28,14 @@ type Props = {
   onBusyChange: (busy: boolean) => void;
 };
 
-type Choice = { categoryId?: string; accountId?: string };
+type Choice = { categoryId?: string; accountId?: string; transaction?: AIDraft };
 
 export function TypeItComposer(props: Props) {
   const [text, setText] = useState("");
   const [choices, setChoices] = useState<Record<number, Choice>>({});
   const [busy, setBusy] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const parseAbort = useRef<AbortController | null>(null);
   const [progress, setProgress] = useState(0);
   const [feedback, setFeedback] = useState<{ error: boolean; message: string } | null>(null);
   const lock = useRef(false);
@@ -45,6 +49,8 @@ export function TypeItComposer(props: Props) {
   const nextFocus = useRef<number | null>(null);
   const remainingBudgets = useRef<Record<string, number>>({});
   const { haptic } = useAppHaptics();
+  useEffect(() => () => { parseAbort.current?.abort(); }, []);
+  useEffect(() => { props.onBusyChange(busy || parsing); }, [busy, parsing, props.onBusyChange]);
 
   useEffect(() => {
     try {
@@ -80,12 +86,21 @@ export function TypeItComposer(props: Props) {
 
   const suggest = useMemo(() => createCategorySuggester(props.history), [props.history]);
   const parsed = parseTransactionLines(text, new Date(), props.defaultDate);
-  const rows = parsed.map(row => {
+  const rows = parsed.map(localRow => {
+    let row = localRow;
+    const draft = choices[row.line]?.transaction;
+    if (draft) {
+      try {
+        const validated = validateParsing({ transactions: [draft], questions: [] }, props.categories.map(c => ({ id: c.id, name: c.name })), props.accounts.map(a => ({ id: a.id, name: a.label })));
+        row = { line: row.line, source: row.source, transaction: validated.transactions[0] };
+      } catch { /* Stale/corrupt drafts fall back to the local parser. */ }
+    }
     // An explicit choice wins, then the category learned from past transactions. With neither,
     // the line waits for a pick rather than silently landing in the form's category.
-    const categoryId = choices[row.line]?.categoryId ?? (row.transaction ? suggest(row.transaction.name, props.categories) : null) ?? "";
+    const categoryId = choices[row.line]?.categoryId || (row.transaction ? suggest(row.transaction.name, props.categories) : null) || "";
     const category = props.categories.find(item => item.id === categoryId);
-    const accountId = choices[row.line]?.accountId ?? props.defaultAccountId;
+    const categoryDefault = props.accounts.find(a => a.id.replaceAll("-", "") === category?.defaultAccount?.replaceAll("-", ""))?.id;
+    const accountId = choices[row.line]?.accountId ?? categoryDefault ?? props.defaultAccountId;
     const account = props.accounts.find(item => item.id === accountId);
     return { ...row, category, account };
   });
@@ -121,7 +136,7 @@ export function TypeItComposer(props: Props) {
       confirmed++;
       const pending = rows.slice(confirmed);
       const pendingChoices: Record<number, Choice> = {};
-      pending.forEach((item, index) => { pendingChoices[index + 1] = { categoryId: item.category?.id, accountId: item.account?.id }; });
+      pending.forEach((item, index) => { pendingChoices[index + 1] = { ...choices[item.line], categoryId: item.category?.id, accountId: item.account?.id }; });
       try {
         if (pending.length) localStorage.setItem(props.draftKey, JSON.stringify({ text: pending.map(item => item.source).join("\n"), choices: pendingChoices }));
         else localStorage.removeItem(props.draftKey);
@@ -131,7 +146,7 @@ export function TypeItComposer(props: Props) {
     // Confirmed saves leave the draft immediately. Failed and unattempted rows retain their choices.
     const remaining = rows.slice(result.saved);
     const nextChoices: Record<number, Choice> = {};
-    remaining.forEach((row, index) => { nextChoices[index + 1] = { categoryId: row.category?.id, accountId: row.account?.id }; });
+    remaining.forEach((row, index) => { nextChoices[index + 1] = { ...choices[row.line], categoryId: row.category?.id, accountId: row.account?.id }; });
     updateDraft(remaining.map(row => row.source).join("\n"), nextChoices);
     setFeedback({ error: Boolean(result.error), message: result.error
       ? `${result.saved ? `${result.saved} saved. ` : ""}${result.error} Remaining lines are kept. Check History before retrying if the connection was interrupted.`
@@ -144,6 +159,35 @@ export function TypeItComposer(props: Props) {
   };
 
   const lines = text.split(/\r?\n/);
+  const parseWithGemini = async () => {
+    if (!text.trim() || lock.current || !props.accounts.length || !props.categories.length) return;
+    lock.current = true;
+    setParsing(true);
+    setPicker(null);
+    setFeedback(null);
+    const controller = new AbortController();
+    parseAbort.current = controller;
+    try {
+      const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
+        body: JSON.stringify({ action: "parse", text, defaultDate: props.defaultDate, categories: props.categories.map(c => ({ id: c.id, name: c.name, defaultAccountId: c.defaultAccount })), accounts: props.accounts.map(a => ({ id: a.id, name: a.label })), defaultAccountId: props.defaultAccountId }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Couldn't parse your text.");
+      const result = validateParsing(data, props.categories.map(c => ({ id: c.id, name: c.name })), props.accounts.map(a => ({ id: a.id, name: a.label })));
+      if (result.questions.length) { setFeedback({ error: true, message: result.questions.join(" ") }); return; }
+      const nextChoices: Record<number, Choice> = {};
+      result.transactions.forEach((transaction, index) => { nextChoices[index + 1] = { transaction, categoryId: transaction.categoryId ?? suggest(transaction.name, props.categories) ?? undefined, accountId: transaction.accountId ?? undefined }; });
+      updateDraft(result.transactions.map(t => `${t.name} ${t.type === "Income" ? "+" : ""}${t.amount} ${t.date}`).join("\n"), nextChoices);
+      const needsSelection = result.transactions.some((t, index) => {
+        const choice = nextChoices[index + 1];
+        const category = props.categories.find(c => c.id === choice.categoryId);
+        const accountId = choice.accountId ?? category?.defaultAccount ?? props.defaultAccountId;
+        return (t.type === "Expense" && !category) || !props.accounts.some(a => a.id.replaceAll("-", "") === accountId?.replaceAll("-", ""));
+      });
+      setFeedback({ error: needsSelection, message: needsSelection ? "Choose the missing category or account before saving." : `${result.transactions.length} ${result.transactions.length === 1 ? "transaction" : "transactions"} ready to save.` });
+    } catch (error) {
+      if (!controller.signal.aborted) setFeedback({ error: true, message: error instanceof Error ? error.message : "Couldn't reach Gemini. Your text is kept." });
+    } finally { setParsing(false); lock.current = false; }
+  };
   const editLine = (index: number, value: string) => {
     const updated = [...lines];
     updated.splice(index, 1, ...value.split(/\r?\n/));
@@ -172,7 +216,7 @@ export function TypeItComposer(props: Props) {
   };
 
   return <div style={{ display: props.active ? "flex" : "none", flexDirection: "column", flex: "1 1 auto", minHeight: 0 }}>
-    <p id="typed-help" className="sr-only">One transaction per line. Press Enter for a new line. Amounts are in MAD. Purchases are expenses; use salary, received, or a plus sign for income. Dates can be today, yesterday, a weekday, or YYYY-MM-DD. Tap a line's category or account to change it.</p>
+    <p id="typed-help" className="sr-only">Write naturally, then choose Create transactions to turn your text into transaction drafts. For local parsing, use one transaction per line and press Enter for a new line. Amounts are in MAD. Purchases are expenses; use salary, received, or a plus sign for income. Dates can be today, yesterday, a weekday, or YYYY-MM-DD. Tap a line's category or account to change it.</p>
     <div style={{ flex: "1 1 auto", overflowY: "auto", minHeight: 0, display: "flex", flexDirection: "column", paddingTop: 24 }}>
       <div role="group" aria-label="Write transactions" style={{ display: "grid", gap: 28 }}>
         {lines.map((source, index) => {
@@ -181,8 +225,8 @@ export function TypeItComposer(props: Props) {
           const income = transaction?.type === "Income";
           return <div key={index} onFocus={() => setActiveLine(index)}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <textarea className="typed-entry-line" ref={element => { inputs.current[index] = element; }} aria-label={`Transaction line ${index + 1}`} aria-describedby="typed-help" rows={1} disabled={busy} value={source}
-                placeholder={index === 0 ? "pizza 19 yesterday" : "Another transaction…"}
+              <textarea className="typed-entry-line" ref={element => { inputs.current[index] = element; }} aria-label={`Transaction line ${index + 1}`} aria-describedby="typed-help" rows={1} disabled={busy || parsing} value={source}
+                placeholder={index === 0 ? "Yesterday I spent 120 on groceries and 35 on coffee" : "Another transaction…"}
                 onFocus={() => setFocusedLine(index)} onBlur={() => setFocusedLine(null)}
                 onChange={event => editLine(index, event.target.value)}
                 onKeyDown={event => {
@@ -202,29 +246,33 @@ export function TypeItComposer(props: Props) {
               {transaction && <span aria-label={`${income ? "Income" : "Expense"} ${transaction.amount} MAD`} style={{ flexShrink: 0, paddingTop: 6, fontSize: 20, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: signedAmountColor(income ? "income" : "expense") }}>{income ? "+" : "−"}<Money value={transaction.amount} /></span>}
             </div>
             {transaction && <div style={metaRowStyle}>
-              {!income && <button type="button" disabled={busy} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "category"} aria-label={`Category for line ${index + 1}: ${row?.category?.name ?? "none"}`} onClick={event => openPicker(event, index, "category")} style={{ ...pickerChipStyle, color: row?.category ? "var(--text2)" : "var(--muted)" }}>
+              {!income && <button type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "category"} aria-label={`Category for line ${index + 1}: ${row?.category?.name ?? "none"}`} onClick={event => openPicker(event, index, "category")} style={{ ...pickerChipStyle, color: row?.category ? "var(--text2)" : "var(--muted)" }}>
                 <span style={pickerChipIconStyle}>{row?.category?.icon ?? "#"}</span>
                 <span style={pickerChipLabelStyle}>{row?.category?.name ?? "Category"}</span>
               </button>}
-              {(activeLine === index || row?.account?.id !== props.defaultAccountId) && <button type="button" disabled={busy} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "account"} aria-label={`Account for line ${index + 1}: ${row?.account?.label ?? "none"}`} onClick={event => openPicker(event, index, "account")} style={{ ...pickerChipStyle, color: "var(--muted)" }}>
+              {(activeLine === index || row?.account?.id !== props.defaultAccountId) && <button type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "account"} aria-label={`Account for line ${index + 1}: ${row?.account?.label ?? "none"}`} onClick={event => openPicker(event, index, "account")} style={{ ...pickerChipStyle, color: "var(--muted)" }}>
                 <span style={pickerChipIconStyle}>{row?.account?.icon ?? "$"}</span>
                 <span style={pickerChipLabelStyle}>{row?.account?.label ?? "Account"}</span>
               </button>}
               {transaction.date !== props.defaultDate && <span style={dateNoteStyle}>{dayLabel(transaction.date)}</span>}
             </div>}
-            {row?.error && focusedLine !== index && <p style={{ ...helperStyle, color: "var(--danger)" }}>{row.error}</p>}
+            {row?.error && focusedLine !== index && <p style={helperStyle}>{row.error} Choose Create transactions to use this text.</p>}
           </div>;
         })}
       </div>
       <div onClick={focusEnd} aria-hidden="true" style={{ flex: "1 0 80px", cursor: "text" }} />
-      {rows.length === 0 && <p style={helperStyle}>One line at a time. Try “pizza 19” or “salary +5000”.</p>}
+      
       {rows.length > 50 && <Banner tone="danger" role="alert" compact>Add up to 50 transactions at a time.</Banner>}
       {budgetErrors.map(({ category, shortfall }) => <Banner key={category.id} tone="warning" compact style={{ marginTop: 12 }}>{category.name} needs <Money value={shortfall} /> more to cover these lines. Fund it in Budget or change the line’s category.</Banner>)}
       {feedback && <Banner tone={feedback.error ? "danger" : "success"} role={feedback.error ? "alert" : "status"} compact style={{ marginTop: 12 }}>{feedback.message}</Banner>}
     </div>
+    <div style={{ flexShrink: 0, paddingTop: 12 }}>
+      <button type="button" className="ai-action" aria-busy={parsing} disabled={!text.trim() || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? "Creating…" : "Create transactions"}</button>
+      <p style={helperStyle}>Processed by Google. Avoid sensitive details.</p>
+    </div>
     {rows.length > 0 && <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 0 0" }}>
       <div style={{ color: "var(--text2)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}><Money value={total} currency /><span style={{ ...helperStyle, marginLeft: 8 }}>net</span></div>
-      <button type="button" disabled={!ready || busy} onClick={save} style={{ minHeight: 44, padding: "0 16px", display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: "var(--radius-control)", background: ready && !busy ? "var(--accent)" : "var(--surface2)", color: ready && !busy ? "var(--accent-ink)" : "var(--muted)", font: "inherit", fontSize: 14, fontWeight: 600, cursor: ready && !busy ? "pointer" : "not-allowed" }}>
+      <button type="button" disabled={!ready || busy || parsing} onClick={save} style={{ minHeight: 44, padding: "0 16px", display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: "var(--radius-control)", background: ready && !busy ? "var(--accent)" : "var(--surface2)", color: ready && !busy ? "var(--accent-ink)" : "var(--muted)", font: "inherit", fontSize: 14, fontWeight: 600, cursor: ready && !busy ? "pointer" : "not-allowed" }}>
         {busy ? `Saving ${progress}/${rows.length}…` : <><CheckIcon size={16} />Save {rows.length}</>}
       </button>
     </div>}
@@ -232,7 +280,7 @@ export function TypeItComposer(props: Props) {
       {picker?.kind === "account" && <AccountOptionList accounts={props.accounts} selectedId={pickerRow?.account?.id} onSelect={accountId => choose(picker.line, { accountId })} />}
       {picker?.kind === "category" && <CategoryOptionList categories={filterCategories(props.categories, catSearch)} selectedId={pickerRow?.category?.id} onSelect={category => choose(picker.line, { categoryId: category.id })} search={catSearch} onSearchChange={setCatSearch} />}
     </PickerPopover>
-    <span role="status" className="sr-only">{busy ? `${progress} transactions saved` : ""}</span>
+    <span role="status" className="sr-only">{parsing ? "Parsing your transactions" : busy ? `${progress} transactions saved` : ""}</span>
   </div>;
 }
 const helperStyle: CSSProperties = { color: "var(--muted)", fontSize: 13, lineHeight: 1.5, margin: "8px 0 12px" };

@@ -1,4 +1,6 @@
 "use client";
+import "./finance-ai.css";
+import { ReallocationAssistant } from "./ReallocationAssistant";
 
 import { Money } from "./Money";
 
@@ -146,11 +148,13 @@ export function RebalanceSheet({
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const [allocations, setAllocations] = useState<Record<string, number>>({});
+  const [usedSuggestion, setUsedSuggestion] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setAllocations(Object.fromEntries(allItems.map((f) => [f.id, f.original])));
-  }, [open, allItems]);
+    setUsedSuggestion(false);
+  }, [open, allItems, budgetScope]);
 
   // Savings is money set aside, not this month's money: it never enters the pool,
   // so a slider drag can't move an emergency fund into groceries by accident.
@@ -315,15 +319,30 @@ export function RebalanceSheet({
       saveButtonLabel="Apply"
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}
-      flowPreview={flowPreview}
+      flowPreview={<>{!isReadOnly && open && <ReallocationAssistant scope={budgetScope} month={homeMonth}
+        categories={visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original }))}
+        onUse={suggestion => {
+          const next = Object.fromEntries(allItems.map(item => [item.id, item.original]));
+          for (const move of suggestion.moves) { next[move.fromId] -= move.amount; next[move.toId] += move.amount; }
+          setAllocations(next); setUsedSuggestion(true);
+        }} />}{flowPreview}</>}
       heroPool
       metaLabel="Before"
       rebalanceMode
       onSave={async () => {
         if (liveTransfers.length === 0 && liveTopUps.length === 0 && liveReleases.length === 0) return;
+        if (usedSuggestion) {
+          const check = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+            action: "check", scope: budgetScope, month: homeMonth,
+            moves: [...liveTransfers.map(t => ({ fromId: t.fromId, toId: t.toId, amount: t.amount, reason: "Reviewed rebalance" }))],
+            balances: Object.fromEntries(visibleItems.map(c => [c.id, c.original])),
+            hasPoolChanges: liveTopUps.length > 0 || liveReleases.length > 0,
+          }) });
+          if (!check.ok) { const data = await check.json(); throw new Error(data.error || "Budget changed. Sync and try again."); }
+        }
         const date = today();
-        await Promise.all([
-          ...liveTransfers.map((t) =>
+        const operations = [
+          ...liveTransfers.map((t) => () =>
             fetch("/api/transfer", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -347,7 +366,7 @@ export function RebalanceSheet({
           // with the category's net planned total double-counts or cancels out.
           ...liveTopUps.map((tu) => {
             const cat = catById.get(tu.id);
-            return fetch("/api/monthly-planning/funds", {
+            return () => fetch("/api/monthly-planning/funds", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -368,7 +387,7 @@ export function RebalanceSheet({
           // reverse fund record for just that amount (same reason as top-ups above).
           ...liveReleases.map((release) => {
             const cat = catById.get(release.id);
-            return fetch("/api/monthly-planning/funds", {
+            return () => fetch("/api/monthly-planning/funds", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -385,7 +404,13 @@ export function RebalanceSheet({
               }
             });
           }),
-        ]);
+        ];
+        try {
+          // Stop on a failure instead of launching every Notion write at once.
+          for (const operation of operations) await operation();
+        } catch (error) {
+          throw new Error(`${error instanceof Error ? error.message : "Couldn’t apply moves."} Some changes may have saved. Close Rebalance and sync before trying again.`);
+        }
       }}
     />
   );

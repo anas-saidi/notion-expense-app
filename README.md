@@ -134,3 +134,41 @@ the mirror before writing; refreshes use live Notion until a new import succeeds
 
 See [the sync architecture and public-app roadmap](docs/financial-sync.md) for
 freshness, recovery, testing, and deployment limits.
+
+## Optional Gemini assistance
+
+Set server-only `GEMINI_API_KEY` in `.env.local` and Vercel, then restart or
+redeploy. `GEMINI_MODEL` defaults to `gemini-3.5-flash-lite`; choose a supported
+text model with structured output in your Google AI Studio project. Keep the
+project on Google's free tier if you require $0 API usage. Quotas and model
+access vary; the app makes one bounded request per explicit action with no
+automatic retries, grounding tools, or paid fallback. A paid Google project
+can still charge for that same request; the app cannot determine billing tier.
+
+- **Type it:** write natural text, select **Parse with Gemini**, review the
+  resulting lines and pick any missing categories/accounts, then save. Simple
+  entries such as `pizza 19 yesterday` still work locally without Gemini.
+  Ambiguous input returns questions while preserving the original text.
+- **Rebalance:** describe what you need to cover and select **Suggest moves**.
+  **Use suggestion** loads amounts into the existing review flow; **Apply**
+  confirms changes. Suggestions only move money among active spending categories
+  in the selected scope/current month. Savings, unassigned money and unpaid bill
+  reservations are excluded. Live balances and bill reservations are rechecked
+  before applying a suggestion. If bill data can't be read, suggestions fail
+  rather than assuming there are no commitments. Budget changes require a sync
+  and a fresh suggestion. Suggested moves use whole dirhams, matching Rebalance.
+
+Parsing sends the submitted text and category/account labels to Google.
+Suggestions send the request plus category labels, rounded remaining balances
+and unpaid bill reservation totals, with temporary category aliases. No full
+transaction history, bank account balances, partner identities or bill titles
+are sent for suggestions. This reduces disclosure; it is not a guarantee of
+anonymity. Google's unpaid-service terms prohibit sensitive/confidential/personal
+input and allow product improvement/human review. Use non-sensitive inputs or
+an appropriate paid data-processing arrangement for identifiable finance data.
+See [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing),
+[rate limits](https://ai.google.dev/gemini-api/docs/rate-limits), and
+[data terms](https://ai.google.dev/gemini-api/terms).
+
+The `/api/ai` endpoint is protected by the existing sign-in middleware and does
+not write finance records. Alerts and background Gemini jobs are not included.

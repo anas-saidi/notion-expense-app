@@ -211,7 +211,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       panelStyle={panelStyle}
       contentStyle={{ paddingTop: 0, overflow: "hidden" }}
     >
-      <div ref={sheetContentRef} style={{ ...sheetInnerStyle, overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget) ? "auto" : "hidden" }}>
+      <div ref={sheetContentRef} style={{ ...sheetInnerStyle, ...(entryMode === "type" ? { padding: "12px max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom))" } : {}), overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget) ? "auto" : "hidden" }}>
 
         {/* ── Header ── */}
         <header style={topBarStyle}>
@@ -222,7 +222,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 <DateCalendar value={props.date} onChange={props.onSelectDate} />
               </PickerPopover>
             </div>
-            <button type="button" disabled={typedBusy} aria-label="Type it" aria-pressed={true} title="Back to form" onClick={() => { setEntryMode("form"); props.onCloseDatePicker(); }} style={{ ...entryModeButtonStyle, ...entryModeActiveStyle }}><SparklesIcon size={20} aria-hidden="true" /></button>
           </div> : <div style={eyebrowStyle}>{isEditMode ? (isIncome ? "Edit income" : "Edit expense") : "New transaction"}</div>}
           <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
@@ -912,5 +911,4 @@ const exprPreviewStyle: CSSProperties = {
 };
 
 const entryModeButtonStyle: CSSProperties = { width: 44, height: 44, flexShrink: 0, display: "grid", placeItems: "center", border: 0, borderRadius: 999, background: "transparent", color: "var(--text2)", cursor: "pointer" };
-/** Type it is on: the same sparkle, tinted like other selected controls. */
-const entryModeActiveStyle: CSSProperties = { background: "var(--select-wash)", color: "var(--select-ink)" };
+

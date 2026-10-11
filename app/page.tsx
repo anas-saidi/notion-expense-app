@@ -1179,7 +1179,7 @@ export default function App() {
         repeat={recurringRepeat}
         onRepeatChange={setRecurringRepeat}
         typedDraftKey={`typedDraft:v2:${mode}:${budgetScope}`}
-        typedCategories={categories.filter(c => !isSavingsCategory(c) && categoryMatchesScope(c, budgetScope, accounts))}
+        typedCategories={categories.filter(c => !isSavingsCategory(c) && !c.archived)}
         typedHistory={corpus}
         onSaveTyped={async (transaction) => {
           const response = await fetch(transaction.type === "Income" ? "/api/monthly-income" : "/api/expense", {
