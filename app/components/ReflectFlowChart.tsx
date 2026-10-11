@@ -11,11 +11,7 @@ type Props = { points: FlowPoint[]; height: number };
 const SPENT = "color-mix(in srgb, var(--danger) 75%, var(--surface))";
 const MONEY_IN = "var(--action-income)";
 
-/**
- * Spending against money in, both running totals over the period. It stands in
- * for the jar when the jar is tapped, so it has no tooltip (a tap goes back to the
- * jar); the legend states where each line ends instead.
- */
+/** Running spending and money-in totals shown above Activity’s transaction history. */
 export function ReflectFlowChart({ points, height }: Props) {
   const animate = !useReducedMotion();
   const last = points[points.length - 1] ?? { spent: 0, moneyIn: 0 };

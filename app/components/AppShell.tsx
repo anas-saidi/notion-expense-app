@@ -48,6 +48,12 @@ export function AppShell({
 }) {
   const { haptic } = useAppHaptics();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workScope, setWorkScope] = useState<BudgetScope | undefined>();
+  useEffect(() => {
+    const open = (event: Event) => { setWorkScope((event as CustomEvent<BudgetScope>).detail); setSettingsOpen(true); };
+    window.addEventListener("open-work-settings", open);
+    return () => window.removeEventListener("open-work-settings", open);
+  }, []);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
   const { below: contentBelow } = useScrollEdges(contentEl);
@@ -180,7 +186,9 @@ export function AppShell({
       {onSelectTheme && (
         <SettingsSheet
           open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => { setSettingsOpen(false); setWorkScope(undefined); }}
+          workScope={workScope}
+          budgetScope={budgetScope}
           syncTimestamp={syncTimestamp}
           syncing={syncing}
           onSync={onSync}

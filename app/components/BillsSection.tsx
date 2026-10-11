@@ -6,7 +6,6 @@ import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData, t
 import { categoryMatchesScope, expenseBudgetGate, fmtDate, monthBounds, parseAmount } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ScreenChip } from "./ui/ScreenChip";
-import { TransactionRow } from "./ui/TransactionRow";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { Money } from "./Money";
 import { Banner } from "./ui/Banner";
@@ -31,6 +30,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const [name, setName] = useState(""); const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState(""); const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState(""); const [repeat, setRepeat] = useState<BillRepeat>("None");
+  const [editingPayment, setEditingPayment] = useState(false);
   const [target, setTarget] = useState<"occurrence" | "future">("occurrence");
   const [saving, setSaving] = useState(false); const [saveError, setSaveError] = useState("");
   const [savedPendingRefresh, setSavedPendingRefresh] = useState(false);
@@ -77,6 +77,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
     if (!bill) return;
     setSelectedId(bill.id); setOpen(true); setSavedPendingRefresh(false);
     setName(bill.name); setAmount(String(bill.amount)); setCategoryId(bill.categoryId); setAccountId(bill.accountId ?? "");
+    setEditingPayment(false);
     setDate(next === "pay" ? data!.today : bill.dueDate); setRepeat(bill.repeat); setTarget("occurrence"); move(next);
   }
   async function mutate(method: string, body: object) {
@@ -104,7 +105,8 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const paymentOtherReserved = selected ? Math.max(0, (reservations[normalizedId(selected.categoryId)] ?? 0) - (selected.dueDate <= currentCutoff ? selected.amount : 0)) : 0;
   const draftReservation = view === "add" && date <= currentCutoff ? expected : 0;
   const draftFree = category?.available == null ? null : category.available - (reservations[normalizedId(category.id)] ?? 0) - draftReservation;
-  const formReady = expected > 0 && date && (view === "pay" ? !!selected && !!accountId && !gate.unfunded && !gate.overBudget : !!name.trim() && !!category && !category.snoozed && !category.archived && categoryMatchesScope(category, scope, accounts));
+  const paymentAccount = accounts.find(a => normalizedId(a.id) === normalizedId(accountId));
+  const formReady = expected > 0 && date && (view === "pay" ? !!selected && !!paymentAccount && !gate.unfunded && !gate.overBudget : !!name.trim() && !!category && !category.snoozed && !category.archived && categoryMatchesScope(category, scope, accounts));
 
   return <section className="bills-section" aria-label="Due bills">
     <div className="bills-section-heading"><h2 className="section-label">Due bills</h2><div className="bills-heading-actions"><button type="button" className="bills-quiet-action" disabled={!enabled} onClick={() => { setOpen(true); move("list"); }}>All bills <ChevronRightIcon size={16} /></button></div></div>
@@ -114,10 +116,10 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
           {currentDue.slice(0, 3).map(bill => <BillRow key={bill.id} bill={bill} needsFunding={needsFunding(bill)} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}
         </> : <p className="bills-muted">No bills due.</p>}
       </>}
-    <BottomSheet open={open} onClose={() => { if (!saving) { setOpen(false); setPicker(null); setShowMore(false); } }} label={view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Pay due" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"} maxWidth="520px" contentStyle={{ paddingTop: 0 }}>
+    <BottomSheet open={open} onClose={() => { if (!saving) { setOpen(false); setPicker(null); setShowMore(false); } }} label={view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Record payment" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"} maxWidth="520px" contentStyle={{ paddingTop: 0 }}>
       <div className={`bills-sheet${view === "detail" ? " bills-sheet-detail" : ""}`}>
         <header className="bills-sheet-header">
-          <div className="bills-header-title">{(view === "pay" || view === "edit") && <button type="button" className="bills-icon-action" aria-label="Back to bill" disabled={saving || savedPendingRefresh} onClick={() => move("detail")}><ChevronLeftIcon size={20} /></button>}<h2>{view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Pay due" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"}</h2></div>
+          <div className="bills-header-title">{(view === "pay" || view === "edit") && <button type="button" className="bills-icon-action" aria-label="Back to bill" disabled={saving || savedPendingRefresh} onClick={() => move("detail")}><ChevronLeftIcon size={20} /></button>}<h2>{view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Record payment" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"}</h2></div>
           <button type="button" aria-label="Close bills" disabled={saving} className="bills-icon-action sheet-close-button" onClick={() => { setOpen(false); setPicker(null); setShowMore(false); }}><XIcon size={20} /></button>
         </header>
         {saveError && <Banner role="alert" tone="danger" compact>{saveError}{savedPendingRefresh && <button type="button" className="bills-quiet-action" disabled={saving} onClick={retrySaved}>Refresh balances</button>}</Banner>}
@@ -141,24 +143,32 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
           {confirm && <Banner tone="warning"><p>{confirm === "delete" ? "Delete this schedule? All its unpaid bills disappear. Recorded payment expenses remain." : confirm === "skip" ? "Skip this occurrence? It releases its earmarked money without recording spending. You can restore it." : confirm === "stop" ? `Stop after ${selected.period}? Later bills disappear; earlier unpaid bills remain payable.` : "Undo this payment? This removes the expense from spending and makes the bill due again."}</p><div className="bills-confirm-actions"><button type="button" className="bills-secondary" disabled={!enabled} onClick={() => setConfirm(null)}>Cancel</button><button type="button" className="bills-primary" disabled={!enabled} onClick={() => mutate(confirm === "skip" || confirm === "stop" ? "PATCH" : "DELETE", confirm === "skip" || confirm === "stop" ? { action: confirm, billId: selected.billId, period: selected.period } : confirm === "delete" ? { billId: selected.billId } : { paymentId: confirm })}>Confirm {confirm === "skip" || confirm === "stop" || confirm === "delete" ? confirm : "undo"}</button></div></Banner>}
         </>}
         {view === "detail" && !selected && <p className="bills-empty">This occurrence is no longer available. Close and reopen bills to choose another occurrence.</p>}
-        {(view === "add" || view === "pay" || view === "edit") && <form className="bills-form" onSubmit={event => { event.preventDefault(); if (!enabled || !formReady) return;
+        {(view === "add" || view === "pay" || view === "edit") && <form className={`bills-form${view === "pay" ? " bills-pay-summary" : ""}`} onSubmit={event => { event.preventDefault(); if (!enabled || !formReady) return;
           mutate(view === "edit" ? "PATCH" : "POST", view === "pay" ? { action: "pay", billId: selected?.billId, period: selected?.period, amount: expected, accountId, date }
             : { action: view === "edit" ? "edit" : "create", billId: selected?.billId, period: selected?.period, target, name, amount: expected, categoryId, accountId, dueDate: date, repeat });
         }}>
+          {view === "pay" && selected && <div className="bills-pay-overview">
+            <div className="bills-pay-title-line"><h3>Record {selected.name} payment</h3><span className="bills-pay-amount"><Money value={expected} currency /></span></div>
+            <p className="bills-muted">{selected.state === "Overdue" ? "Overdue since" : "Due"} {fmtDate(selected.dueDate)}{paymentAccount ? ` from ${paymentAccount.label}` : ""}</p>
+            <p className="bills-muted">{selectedCategory?.name ?? "Category unavailable"}</p>
+            <p className="bills-muted">Recording {fmtDate(date)}</p>
+          </div>}
           <fieldset disabled={!enabled}>
           {view === "edit" && selected?.repeat !== "None" && <label>Apply to<select value={target} onChange={e => setTarget(e.target.value as typeof target)}><option value="occurrence">This occurrence</option><option value="future">This and future occurrences</option></select></label>}
           {view !== "pay" && (view === "add" || target === "future") && <label>Bill name<input value={name} onChange={e => setName(e.target.value)} maxLength={200} required autoComplete="off" /></label>}
-          <label>{view === "pay" ? "Paid amount (MAD)" : "Expected amount (MAD)"}<input value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" placeholder="0" required /></label>
+          {(view !== "pay" || editingPayment) && <label>{view === "pay" ? "Paid amount (MAD)" : "Expected amount (MAD)"}<input value={amount} onChange={e => setAmount(e.target.value)} inputMode="decimal" placeholder="0" required /></label>}
           {view !== "pay" && <div className="bills-field"><span id="bill-category-label">Category</span><button type="button" ref={categoryRef} className="bills-choice" aria-labelledby="bill-category-label" aria-haspopup="dialog" aria-expanded={picker === "category"} onClick={() => { setSearch(""); setPicker(picker === "category" ? null : "category"); }}>{category?.name ?? "Choose category"}</button></div>}
-          {(view === "add" || view === "pay" || target === "future") && <div className="bills-field"><span id="bill-account-label">{view === "pay" ? "Payment account" : "Suggested account (optional)"}</span><button type="button" ref={accountRef} className="bills-choice" aria-labelledby="bill-account-label" aria-haspopup="dialog" aria-expanded={picker === "account"} onClick={() => setPicker(picker === "account" ? null : "account")}>{accounts.find(a => a.id === accountId)?.label ?? "Choose account"}</button></div>}
-          <div className="bills-field"><span>{view === "pay" ? "Payment date" : view === "add" ? "First due date" : "Due date"}</span>{view === "edit" && target === "future" ? <span>{fmtDate(date)}</span> : <DatePicker value={date} onChange={e => setDate(e.target.value)} aria-label={view === "pay" ? "Payment date" : "Due date"} />}</div>
+          {(view === "add" || (view === "pay" && (editingPayment || !paymentAccount)) || (view === "edit" && target === "future")) && <div className="bills-field"><span id="bill-account-label">{view === "pay" ? "Payment account" : "Suggested account (optional)"}</span><button type="button" ref={accountRef} className="bills-choice" aria-labelledby="bill-account-label" aria-haspopup="dialog" aria-expanded={picker === "account"} onClick={() => setPicker(picker === "account" ? null : "account")}>{accounts.find(a => a.id === accountId)?.label ?? "Choose account"}</button></div>}
+          {(view !== "pay" || editingPayment) && <div className="bills-field"><span>{view === "pay" ? "Payment date" : view === "add" ? "First due date" : "Due date"}</span>{view === "edit" && target === "future" ? <span>{fmtDate(date)}</span> : <DatePicker value={date} onChange={e => setDate(e.target.value)} aria-label={view === "pay" ? "Payment date" : "Due date"} />}</div>}
           {view === "add" && <label>Repeat<select value={repeat} onChange={e => setRepeat(e.target.value as BillRepeat)}><option>None</option><option>Monthly</option><option>Yearly</option></select></label>}
           </fieldset>
           {view === "edit" && target === "future" && <p className="bills-muted">Earlier unpaid bills keep their amounts. Recurrence stays {repeat.toLowerCase()}.</p>}
           {view === "add" && draftFree != null && draftFree < 0 && <Banner tone="warning">Short by <Money value={-draftFree} /> after bills. You can add this bill before funding its category.</Banner>}
-          {view === "pay" && <><p className="bills-muted">Records an expense; it does not send a bank payment. Don’t add the same payment separately.</p>{gate.unfunded || gate.overBudget ? <Banner tone="warning">{gate.unfunded ? "Category availability is missing or unfunded." : <>Short by <Money value={gate.shortfall} />.</>} Fund the category before recording payment.</Banner> : <div className="bills-payment-preview"><span>Available after payment</span><Money value={(selectedCategory?.available ?? 0) - expected} /><span>Earmarked for other bills</span><Money value={paymentOtherReserved} /><span>Free after bills</span><Money value={(selectedCategory?.available ?? 0) - expected - paymentOtherReserved} /></div>}
+          {view === "pay" && <>{gate.unfunded || gate.overBudget ? <Banner tone="warning">{gate.unfunded ? "Category availability is missing or unfunded." : <>Short by <Money value={gate.shortfall} />.</>} Fund the category before recording payment.</Banner> : null}
           {!gate.unfunded && !gate.overBudget && (selectedCategory?.available ?? 0) - expected < paymentOtherReserved && <Banner tone="warning">This payment uses money earmarked for other bills. Recording payment confirms you want to continue.</Banner>}</>}
-          <button type="submit" className="bills-primary" disabled={!enabled || !formReady}>{saving ? "Saving…" : view === "pay" ? "Pay due" : view === "edit" ? "Save changes" : "Add bill"}</button>
+          <div className={view === "pay" ? "bills-pay-actions" : undefined}><button type="submit" className="bills-primary" disabled={!enabled || !formReady}>{saving ? "Saving…" : view === "pay" ? "Record payment" : view === "edit" ? "Save changes" : "Add bill"}</button>
+          {view === "pay" && <><button type="button" className="bills-pay-edit" disabled={!enabled} onClick={() => { setEditingPayment(value => !value); setPicker(null); haptic("selection"); }} aria-expanded={editingPayment}><EditIcon size={18} />{editingPayment ? "Done editing" : "Edit"}</button><button type="button" className="bills-quiet-action" disabled={!enabled} onClick={() => move("detail")}>Cancel</button></>}
+          </div>
         </form>}
         </>}
       </div>
@@ -181,11 +191,17 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
 }
 function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, needsFunding = false, compact = false }: { bill: BillOccurrence; category?: Category; onClick: () => void; onPay: () => void; onEdit: () => void; disabled: boolean; paidMonth?: string; needsFunding?: boolean; compact?: boolean }) {
   const payment = bill.payments.find(p => !paidMonth || p.date.slice(0, 7) === paidMonth);
-  const subtitle = payment ? `Paid ${fmtDate(payment.date)}` : `${bill.state === "Overdue" ? "Overdue since" : bill.state === "Skipped" ? "Skipped for" : compact ? "" : "Due"} ${fmtDate(bill.dueDate)}`.trim();
-  const row = <TransactionRow title={bill.name} subtitle={<>
-    <span style={bill.state === "Overdue" ? { color: "var(--danger)" } : undefined}>{subtitle}</span>
-    {bill.payments.length > 1 ? <span style={{ display: "block", color: "var(--danger)" }}>Recorded twice</span> : needsFunding ? <span style={{ display: "block", color: "var(--danger)" }}>Needs funding</span> : null}
-  </>} amount={payment?.amount ?? bill.amount} tone="expense" prefix="" amountColor="var(--text)" icon={<CategoryIcon icon={category?.icon ?? null} size={22} />} onClick={onClick} />;
+  const dateValue = payment?.date || bill.dueDate;
+  const date = new Date(`${dateValue}T12:00:00`);
+  const validDate = Number.isFinite(date.getTime());
+  const weekday = validDate ? date.toLocaleDateString("en", { weekday: "short" }) : "—";
+  const day = validDate ? date.getDate() : "—";
+  const status = bill.payments.length > 1 ? "Recorded twice" : bill.state === "Overdue" ? "Overdue" : needsFunding ? "Needs funding" : payment ? "Paid" : bill.state === "Skipped" ? "Skipped" : null;
+  const row = <button type="button" className="bill-date-row" onClick={onClick} disabled={disabled} aria-label={`${bill.name}${category?.name ? `, ${category.name}` : ""}, ${payment ? "paid" : "due"} ${validDate ? date.toLocaleDateString("en", { day: "numeric", month: "long", year: "numeric" }) : "date unavailable"}, ${payment?.amount ?? bill.amount} MAD${status ? `, ${status}` : ""}, view bill`}>
+    <span className={`bill-date-tile${bill.state === "Overdue" ? " bill-date-overdue" : ""}`} aria-hidden="true"><span>{weekday}</span><strong>{day}</strong></span>
+    <span className="bill-date-copy"><span className="bill-date-title">{bill.name}</span>{(category?.name || status) && <span className="bill-date-context bill-date-metadata">{category?.name && <span>{category.name}</span>}{status && <span className={["Overdue", "Needs funding", "Recorded twice"].includes(status) ? "bill-date-alert" : undefined}>{status}</span>}</span>}</span>
+    <span className="bill-date-amount"><Money value={payment?.amount ?? bill.amount} /></span>
+  </button>;
   if (bill.state !== "Due" && bill.state !== "Overdue") return row;
   return <SwipeToDelete flat surface={compact ? "var(--bg)" : "var(--surface)"} disabled={disabled} actions={[{ label: "Pay due", icon: <ReceiptIcon size={17} />, onSelect: onPay }, { label: "Edit", icon: <EditIcon size={17} />, onSelect: onEdit }]}>{row}</SwipeToDelete>;
 }

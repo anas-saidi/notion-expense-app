@@ -846,10 +846,11 @@ button:hover .rebalance-btn-icon {
 /* ── Responsive shell ─────────────────────────────────────── */
 
 .app-content {
+  --app-content-gutter: var(--space-6);
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
-  padding: 0 var(--space-4) calc(104px + env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--app-content-gutter) calc(104px + env(safe-area-inset-bottom, 0px));
 }
 
 .app-header {
@@ -858,8 +859,8 @@ button:hover .rebalance-btn-icon {
   z-index: 60;
   min-height: 44px;
   /* Extend the header surface through the content rail’s side gutters. */
-  margin-inline: calc(-1 * var(--space-4));
-  padding-inline: var(--space-4);
+  margin-inline: calc(-1 * var(--app-content-gutter));
+  padding-inline: var(--app-content-gutter);
   padding-top: calc(var(--safe-top) + var(--space-4));
   padding-bottom: var(--space-4);
   background: var(--bg);
@@ -1201,6 +1202,10 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
   display: grid;
 }
 
+@media (max-width: 359px) {
+  .app-content { --app-content-gutter: var(--space-4); }
+}
+
 /* ── Tablet (≥ 680px) ─────────────────────────────────────── */
 @media (min-width: 680px) {
   .app-content {
@@ -1274,6 +1279,7 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
   }
 
   .app-content {
+    --app-content-gutter: 48px;
     margin-left: var(--app-sidebar-width);
     width: var(--app-desktop-content-width);
     max-width: 1100px;

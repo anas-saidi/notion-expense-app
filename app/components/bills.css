@@ -16,8 +16,6 @@
 .bills-form label, .bills-field { display: grid; gap: 8px; font-size: 13px; color: var(--text2); }
 .bills-form input, .bills-form select, .bills-choice { width: 100%; min-height: 48px; padding: 12px; border: 0; border-radius: 12px; background: var(--surface2); color: var(--text); font: inherit; font-size: 16px; }
 .bills-choice { text-align: left; cursor: pointer; }
-.bills-payment-preview { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; font-size: 13px; }
-.bills-payment-preview > span { color: var(--text2); }
 .bills-payment { display: grid; gap: 8px; font-size: 15px; }
 .bills-payment p { margin: 0; }
 .bills-payment a { font-size: 13px; color: var(--text); text-decoration: underline; text-underline-offset: 3px; min-height: 44px; display: flex; align-items: center; }
@@ -47,3 +45,27 @@
 .bills-section-heading > h2.section-label { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted); }
 .bills-heading-actions { display: flex; align-items: center; gap: 4px; }
 .bills-heading-actions button { min-width: 44px; color: var(--text2); }
+
+/* Date-led bill list: the date is grouped, while names and amounts stay flat. */
+.bill-date-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 88px; padding: 16px 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.bill-date-tile { display: grid; justify-items: center; align-content: center; gap: 4px; width: 44px; min-height: 56px; flex-shrink: 0; border-radius: var(--radius-control); background: var(--surface2); color: var(--text2); font-size: 12px; line-height: 16px; }
+.bill-date-tile strong { color: var(--text); font-size: 20px; line-height: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bill-date-overdue strong { color: var(--danger); }
+.bill-date-copy { display: grid; gap: 4px; flex: 1; min-width: 0; }
+.bill-date-title { font-size: 15px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.bill-date-context { font-size: 13px; line-height: 16px; color: var(--text2); }
+.bill-date-alert { color: var(--danger); }
+.bill-date-amount { font-size: 15px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+.bill-date-row:active { background: var(--surface2); }
+@media (hover: hover) { .bill-date-row:hover { background: var(--surface2); } }
+
+.bills-pay-summary { background: var(--surface2); border-radius: var(--radius-card); padding: 16px; }
+.bills-pay-overview { display: grid; gap: 8px; }
+.bills-pay-title-line { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.bills-pay-title-line h3 { margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; overflow-wrap: anywhere; }
+.bills-pay-amount { font-size: 20px; line-height: 24px; font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.bills-pay-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bills-pay-actions > .bills-primary { flex: 1; }
+.bills-pay-edit { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--text2); font: inherit; font-size: 13px; cursor: pointer; }
+
+.bill-date-metadata { display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 4px; }
