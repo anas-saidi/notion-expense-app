@@ -5,20 +5,60 @@ export type ReflectPeriod = { start: string; end: string };
 export type ReflectCategory = { id: string; name: string; icon: string | null; spent: number; inflow: number; net: number; share: number; transactions: Transaction[] };
 export const UNCATEGORIZED = "__uncategorized__";
 export const UNKNOWN_ACCOUNT = "__unknown_account__";
+/** A partner's money that went to Joint: transfers to the joint account and joint expenses paid from their own account. */
+export const TO_JOINT = "__to_joint__";
 const cents = (amount: number) => Math.round(amount * 100);
 
+const accountScopeOf = (id: string | null | undefined, accounts: Account[]) => {
+  const account = id ? accounts.find(entry => entry.id === id) : undefined;
+  return account ? scopeFromAccountLabel(account.label) : null;
+};
+
+/**
+ * Whether a transaction belongs in a partner's "To Joint" row. Joint's own view
+ * counts this money as its money in (see isMoneyIn), so each view counts it once.
+ * Joint → partner account transfers count too, as inflows that net the row down.
+ */
+function isToJoint(transaction: Transaction, categories: Category[], accounts: Account[], scope: BudgetScope) {
+  if (scope === "joint") return false;
+  if (transaction.type === "Transfer") {
+    if (transaction.fromCategoryId || transaction.toCategoryId) return false;
+    const from = accountScopeOf(transaction.fromAccountId, accounts);
+    const to = accountScopeOf(transaction.toAccountId, accounts);
+    return (from === scope && to === "joint") || (from === "joint" && to === scope);
+  }
+  return isExpenseTransaction(transaction)
+    && accountScopeOf(transaction.accountId, accounts) === scope
+    && transactionMatchesScope(transaction, categories, "joint", accounts);
+}
+
+/** Money coming back: income, refunds (negative amounts), and transfers not headed to Joint. */
+export const isReflectInflow = (transaction: Transaction, accounts: Account[]) =>
+  transaction.type === "Income" || transaction.amount < 0
+  || (transaction.type === "Transfer" && accountScopeOf(transaction.toAccountId, accounts) !== "joint");
+
+/** The scope's own account on a transaction: for transfers, the side that isn't Joint. */
+export const reflectAccountId = (transaction: Transaction, accounts: Account[]) =>
+  (transaction.type === "Transfer"
+    ? isReflectInflow(transaction, accounts) ? transaction.toAccountId : transaction.fromAccountId
+    : transaction.accountId || transaction.toAccountId) || UNKNOWN_ACCOUNT;
+
 export function buildSpendingBreakdown(transactions: Transaction[], categories: Category[], accounts: Account[], scope: BudgetScope, excludedCategories: string[] = [], excludedAccounts: string[] = []) {
-  const scoped = transactions.filter(transaction => transactionMatchesScope(transaction, categories, scope, accounts));
   const buckets = new Map<string, ReflectCategory>();
-  for (const transaction of scoped) {
-    if (!Number.isFinite(transaction.amount) || transaction.type === "Transfer") continue;
-    if (!isExpenseTransaction(transaction) && !(transaction.type === "Income" && transaction.category)) continue;
-    const id = transaction.category || UNCATEGORIZED;
-    if (excludedCategories.includes(id) || excludedAccounts.includes(transaction.accountId || transaction.toAccountId || UNKNOWN_ACCOUNT)) continue;
+  for (const transaction of transactions) {
+    if (!Number.isFinite(transaction.amount)) continue;
+    const toJoint = isToJoint(transaction, categories, accounts, scope);
+    if (!toJoint) {
+      if (transaction.type === "Transfer" || !transactionMatchesScope(transaction, categories, scope, accounts)) continue;
+      if (!isExpenseTransaction(transaction) && !(transaction.type === "Income" && transaction.category)) continue;
+    }
+    const id = toJoint ? TO_JOINT : transaction.category || UNCATEGORIZED;
+    if (excludedCategories.includes(id) || excludedAccounts.includes(reflectAccountId(transaction, accounts))) continue;
     const category = categories.find(item => item.id === id);
-    const bucket = buckets.get(id) ?? { id, name: category?.name ?? (id === UNCATEGORIZED ? "Uncategorized" : "Archived category"), icon: category?.icon ?? null, spent: 0, inflow: 0, net: 0, share: 0, transactions: [] };
+    const name = toJoint ? "To Joint" : category?.name ?? (id === UNCATEGORIZED ? "Uncategorized" : "Archived category");
+    const bucket = buckets.get(id) ?? { id, name, icon: toJoint ? "🤝" : category?.icon ?? null, spent: 0, inflow: 0, net: 0, share: 0, transactions: [] };
     const amount = cents(transaction.amount);
-    if (transaction.type === "Income" || amount < 0) bucket.inflow += Math.abs(amount);
+    if (isReflectInflow(transaction, accounts)) bucket.inflow += Math.abs(amount);
     else bucket.spent += amount;
     bucket.transactions.push(transaction);
     buckets.set(id, bucket);
@@ -56,11 +96,6 @@ export function reflectMonthCount(period: ReflectPeriod, transactions: Transacti
 }
 
 export type FlowPoint = { key: string; label: string; spent: number; moneyIn: number };
-
-const accountScopeOf = (id: string | null | undefined, accounts: Account[]) => {
-  const account = id ? accounts.find(entry => entry.id === id) : undefined;
-  return account ? scopeFromAccountLabel(account.label) : null;
-};
 
 /**
  * Money that came into the wallet: Income into its accounts (category-linked
@@ -116,7 +151,7 @@ export function buildMoneyFlow(
   const add = (map: Map<string, number>, date: string, value: number) => map.set(bucketOf(date), (map.get(bucketOf(date)) ?? 0) + cents(value));
 
   for (const row of spending) {
-    for (const t of row.transactions) add(spentBy, t.date, t.type === "Income" || t.amount < 0 ? -Math.abs(t.amount) : t.amount);
+    for (const t of row.transactions) add(spentBy, t.date, isReflectInflow(t, accounts) ? -Math.abs(t.amount) : t.amount);
   }
   for (const t of transactions) {
     if (!Number.isFinite(t.amount) || !isMoneyIn(t, categories, accounts, scope)) continue;

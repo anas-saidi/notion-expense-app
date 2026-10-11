@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, UNCATEGORIZED, UNKNOWN_ACCOUNT } from "./reflect-utils";
+import { buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, TO_JOINT, UNCATEGORIZED, UNKNOWN_ACCOUNT } from "./reflect-utils";
 const accounts: Account[] = [{ id: "joint", label: "Joined Account", icon: "", type: null, balance: 0, readyToAssign: 0 }, { id: "anas", label: "Anas", icon: "", type: null, balance: 0, readyToAssign: 0 }];
 const category = (id: string): Category => ({ id, name: id, icon: null, type: ["Household"], owner: null, defaultAccount: "joint", available: null, planned: null, lastMonthSpent: null, isTeamFund: true });
 const categories = [category("food"), category("rent"), category("travel")];
@@ -98,5 +98,35 @@ describe("Reflect money flow", () => {
   it("counts joint expenses a partner paid from their own account as money in to Joint", () => {
     const points = flow([transaction("groceries", 120, { accountId: "anas", date: "2026-09-04" }), transaction("rent", 300, { category: "rent", date: "2026-09-05" })]);
     expect(points[points.length - 1]).toMatchObject({ spent: 420, moneyIn: 120 });
+  });
+});
+
+describe("Reflect To Joint row", () => {
+  const gadgets: Category = { ...category("gadgets"), type: ["Wants"], owner: "Anas", defaultAccount: "anas", isTeamFund: false };
+  const all = [...categories, gadgets];
+  const personal = (transactions: Transaction[], excludedCategories: string[] = []) => buildSpendingBreakdown(transactions, all, accounts, "anas", excludedCategories);
+  const contribution = transaction("contribution", 2000, { type: "Transfer", category: null, accountId: null, fromAccountId: "anas", toAccountId: "joint" });
+  const directJoint = transaction("groceries", 300, { accountId: "anas" });
+  const own = transaction("headphones", 500, { category: "gadgets", accountId: "anas" });
+
+  it("adds contributions and joint expenses paid from the partner's account", () => {
+    const result = personal([contribution, directJoint, own]);
+    expect(result.total).toBe(2800);
+    expect(result.spending.map(row => [row.id, row.net])).toEqual([[TO_JOINT, 2300], ["gadgets", 500]]);
+  });
+  it("nets money Joint sends back and ignores budget rebalances", () => {
+    const payback = transaction("payback", 500, { type: "Transfer", category: null, accountId: null, fromAccountId: "joint", toAccountId: "anas" });
+    const rebalance = transaction("rebalance", 900, { type: "Transfer", category: null, accountId: null, fromCategoryId: "gadgets", toCategoryId: "food", fromAccountId: "anas", toAccountId: "joint" });
+    expect(personal([contribution, payback, rebalance]).spending[0].net).toBe(1500);
+  });
+  it("can be filtered out, and never shows in Joint's own view", () => {
+    expect(personal([contribution, directJoint, own], [TO_JOINT]).total).toBe(500);
+    const joint = buildSpendingBreakdown([contribution, directJoint], all, accounts, "joint");
+    expect(joint.spending.map(row => [row.id, row.net])).toEqual([["food", 300]]);
+  });
+  it("charts To Joint money in the partner's cumulative spending", () => {
+    const transactions = [contribution, own];
+    const flow = buildMoneyFlow(personal(transactions).spending, transactions, all, accounts, "anas", { start: "2026-09", end: "2026-09" }, [], new Date(2026, 8, 30));
+    expect(flow.at(-1)?.spent).toBe(2500);
   });
 });

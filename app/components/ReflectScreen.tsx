@@ -4,7 +4,7 @@ import { Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
-import { buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
+import { buildMoneyFlow, buildSpendingBreakdown, isReflectInflow, reflectAccountId, reflectMonthCount, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
 import { fmt, fmtDate, today } from "./app-utils";
 import { Money } from "./Money";
 import { MonthPicker } from "./DatePicker";
@@ -65,7 +65,7 @@ export function ReflectScreen(props: Props) {
   const allRows = [...breakdown.spending, ...breakdown.inflows, ...breakdown.settled];
   const selected = allRows.find(row => row.id === selectedId);
   const categoryOptions = [...unfiltered.spending, ...unfiltered.inflows, ...unfiltered.settled].sort((a, b) => a.name.localeCompare(b.name));
-  const accountIds = new Set(categoryOptions.flatMap(row => row.transactions.map(transaction => transaction.accountId || transaction.toAccountId || UNKNOWN_ACCOUNT)));
+  const accountIds = new Set(categoryOptions.flatMap(row => row.transactions.map(transaction => reflectAccountId(transaction, props.accounts))));
   const accountOptions = [...accountIds].map(id => ({ id, name: props.accounts.find(account => account.id === id)?.label ?? (id === UNKNOWN_ACCOUNT ? "No account" : "Archived account") }));
   const filterCount = excludedCategories.length + excludedAccounts.length;
   const months = reflectMonthCount(props.period, props.transactions);
@@ -163,7 +163,7 @@ export function ReflectScreen(props: Props) {
     </BottomSheet>
 
     <BottomSheet open={Boolean(selected)} onClose={() => setSelectedId(null)} label={selected ? `${selected.name} spending` : "Category spending"} maxWidth="500px" contentStyle={sheetContentStyle}>
-      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow from" : "Net spending across"} {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = transaction.type === "Income" || transaction.amount < 0; return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === (transaction.accountId || transaction.toAccountId))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
+      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow from" : "Net spending across"} {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = isReflectInflow(transaction, props.accounts); return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === reflectAccountId(transaction, props.accounts))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
     </BottomSheet>
   </div>;
 }
