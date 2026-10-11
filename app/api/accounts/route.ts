@@ -1,3 +1,6 @@
+// Account balances must be read per request, never captured by the production build.
+export const dynamic = "force-dynamic";
+
 import { withMirrorReads } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "../../../lib/notion-api";
