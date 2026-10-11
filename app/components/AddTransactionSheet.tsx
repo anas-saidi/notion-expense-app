@@ -223,7 +223,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               </PickerPopover>
             </div>
             <button type="button" disabled={typedBusy} aria-label="Type it" aria-pressed={true} title="Back to form" onClick={() => { setEntryMode("form"); props.onCloseDatePicker(); }} style={{ ...entryModeButtonStyle, ...entryModeActiveStyle }}><SparklesIcon size={20} aria-hidden="true" /></button>
-          </div> : <div style={eyebrowStyle}>{isEditMode ? "Edit expense" : "New transaction"}</div>}
+          </div> : <div style={eyebrowStyle}>{isEditMode ? (isIncome ? "Edit income" : "Edit expense") : "New transaction"}</div>}
           <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
@@ -550,7 +550,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               props.status === "saving" ? (isEditMode ? "Updating expense" : isIncome ? "Adding income" : "Adding expense")
               : props.status === "success" ? (isEditMode ? "Expense updated" : isIncome ? "Income added" : "Expense added")
               : props.status === "error" ? `Save failed: ${props.errorMsg}`
-              : !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
+              : !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
             }
             className="pressable cta-save"
             style={{
@@ -585,7 +585,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             ) : props.status === "error" ? (
               <><XIcon size={16} />Error</>
             ) : (
-              !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? "Update expense" : isIncome ? "Add income" : "Add expense"
+              !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
             )}
           </button>
           </div>

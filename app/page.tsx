@@ -524,12 +524,14 @@ export default function App() {
   };
 
   const editTransaction = (transaction: Transaction) => {
-    if (transaction.type !== "Expense" && transaction.type != null) {
+    // Transfers stay read-only; expenses and income open the editor.
+    const isIncome = transaction.type === "Income";
+    if (transaction.type !== "Expense" && transaction.type != null && !isIncome) {
       setDetailsTransaction(transaction);
       return;
     }
     setEditingTransactionId(transaction.id);
-    setTransactionType("Expense");
+    setTransactionType(isIncome ? "Income" : "Expense");
     setEditingOriginal({ amount: transaction.amount, accountId: transaction.accountId ?? "", categoryId: transaction.category ?? null });
     setName(transaction.name);
     setAmount(transaction.amount ? String(transaction.amount) : "");
@@ -914,9 +916,11 @@ export default function App() {
     date === shiftDate(today(), 1) ? "Tomorrow" :
     fmtDate(date);
 
+  const incomeSign = transactionType === "Income" ? -1 : 1;
   const amountAfterBalance = displayedBalance !== null && amount && evalExpr(amount) > 0
     ? editingOriginal
-      ? expenseBalancePreview({ currentAccountId: accountId, currentBalance: displayedBalance, originalAccountId: editingOriginal.accountId, originalAmount: editingOriginal.amount, editedAmount: evalExpr(amount) })
+      // Income moves the balance the other way: same preview with negated amounts.
+      ? expenseBalancePreview({ currentAccountId: accountId, currentBalance: displayedBalance, originalAccountId: editingOriginal.accountId, originalAmount: incomeSign * editingOriginal.amount, editedAmount: incomeSign * evalExpr(amount) })
       : transactionType === "Income"
         ? displayedBalance + evalExpr(amount)
         : displayedBalance - evalExpr(amount)
@@ -980,6 +984,7 @@ export default function App() {
       if (isEditing) {
         setShowAddModal(false);
         setStatus("idle");
+        setTransactionType("Expense");
       } else {
         setTimeout(() => setStatus("idle"), 2000);
       }
@@ -1271,6 +1276,7 @@ export default function App() {
             setName("");
             setSuggestedCatId(null);
             setDate(today());
+            setTransactionType("Expense");
           }
           setShowAddModal(false);
           setEditingTransactionId(null);

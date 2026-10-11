@@ -90,7 +90,7 @@ async function handlePATCH(req: NextRequest) {
 
   const { id, name, amount, accountId, categoryId, date } = await req.json();
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  if (!name || amount === undefined || amount === null || !accountId || !categoryId || !date) {
+  if (!name || amount === undefined || amount === null || !accountId || !date) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
@@ -106,18 +106,23 @@ async function handlePATCH(req: NextRequest) {
     if (!existingType) {
       return NextResponse.json({ error: "Legacy transaction has no type and cannot be edited safely. Set its type in Notion first." }, { status: 409 });
     }
-    if (existingType !== "Expense") {
+    // Transfers link two accounts/categories and stay read-only. The type itself is never written.
+    if (existingType !== "Expense" && existingType !== "Income") {
       return NextResponse.json({ error: `${existingType} transactions are read-only in the expense editor` }, { status: 409 });
     }
+    const isExpense = existingType === "Expense";
+    if (isExpense && !categoryId) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-    // Only the increase has to fit when the expense stays in its category.
-    const storedCategory = stored.page.properties?.Category?.relation?.[0]?.id ?? null;
-    const storedAmount = stored.page.properties?.Amount?.number ?? 0;
-    const sameCategory = storedCategory?.replace(/-/g, "") === String(categoryId).replace(/-/g, "");
-    try {
-      await assertExpenseFitsBudget(token, { categoryId, amount: parsedAmount, originalAmount: sameCategory ? storedAmount : 0 });
-    } catch (error: any) {
-      return NextResponse.json({ error: error.message, full: error.full }, { status: error.status ?? 500 });
+    if (isExpense) {
+      // Only the increase has to fit when the expense stays in its category.
+      const storedCategory = stored.page.properties?.Category?.relation?.[0]?.id ?? null;
+      const storedAmount = stored.page.properties?.Amount?.number ?? 0;
+      const sameCategory = storedCategory?.replace(/-/g, "") === String(categoryId).replace(/-/g, "");
+      try {
+        await assertExpenseFitsBudget(token, { categoryId, amount: parsedAmount, originalAmount: sameCategory ? storedAmount : 0 });
+      } catch (error: any) {
+        return NextResponse.json({ error: error.message, full: error.full }, { status: error.status ?? 500 });
+      }
     }
 
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
@@ -129,7 +134,7 @@ async function handlePATCH(req: NextRequest) {
           Amount: { number: parsedAmount },
           Date: { date: { start: date } },
           Account: { relation: [{ id: accountId }] },
-          Category: { relation: [{ id: categoryId }] },
+          ...(isExpense ? { Category: { relation: [{ id: categoryId }] } } : {}),
         },
       }),
     });
