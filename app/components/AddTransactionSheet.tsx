@@ -911,4 +911,3 @@ const exprPreviewStyle: CSSProperties = {
 };
 
 const entryModeButtonStyle: CSSProperties = { width: 44, height: 44, flexShrink: 0, display: "grid", placeItems: "center", border: 0, borderRadius: 999, background: "transparent", color: "var(--text2)", cursor: "pointer" };
-

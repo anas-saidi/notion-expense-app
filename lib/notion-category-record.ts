@@ -30,4 +30,3 @@ export const mapCategoryPage = (page: any) => {
     archived: props.Archived?.checkbox ?? false,
   };
 };
-

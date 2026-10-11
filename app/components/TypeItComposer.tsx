@@ -261,7 +261,7 @@ export function TypeItComposer(props: Props) {
         })}
       </div>
       <div onClick={focusEnd} aria-hidden="true" style={{ flex: "1 0 80px", cursor: "text" }} />
-      
+
       {rows.length > 50 && <Banner tone="danger" role="alert" compact>Add up to 50 transactions at a time.</Banner>}
       {budgetErrors.map(({ category, shortfall }) => <Banner key={category.id} tone="warning" compact style={{ marginTop: 12 }}>{category.name} needs <Money value={shortfall} /> more to cover these lines. Fund it in Budget or change the line’s category.</Banner>)}
       {feedback && <Banner tone={feedback.error ? "danger" : "success"} role={feedback.error ? "alert" : "status"} compact style={{ marginTop: 12 }}>{feedback.message}</Banner>}
