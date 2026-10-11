@@ -325,9 +325,12 @@ export function CategoriesScreen({
                   <SectionToggle id={id} label={group.label} count={group.rows.length} total={total} open={open} onToggle={() => toggleSection(group.label)} />
                   {open && (
                     <div style={listSurfaceStyle}>
+                      <div className="budget-table-head" aria-hidden="true">
+                        <span>Category</span><span>Budgeted</span><span>Spent</span><span>Available</span>
+                      </div>
                       {group.rows.map(({ cat, planned, spent, savings, status }) => savings
                         ? <SavingsJarRow key={cat.id} cat={cat} scope={budgetScope} available={cat.available ?? 0} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />
-                        : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />)}
+                        : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />)}
                       {onOpenNewCategory && (
                         <button type="button" onClick={() => onOpenNewCategory(group.label === "Savings" ? "Saving" : group.label)} style={addRowStyle}>
                           <PlusIcon size={16} aria-hidden="true" />

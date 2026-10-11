@@ -147,6 +147,7 @@ export function CategoryDetailsSheet({
       // Standard main sheet: from under the header to the bottom edge, like Accounts
       // and Settings. A shorter custom height left the page exposed (and scrollable) below it.
       detent="default"
+      desktopInspector
       panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0 }}
     >

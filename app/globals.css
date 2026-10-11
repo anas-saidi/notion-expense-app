@@ -33,6 +33,7 @@
 :root {
   --app-sidebar-width: 220px;
   --app-desktop-content-width: min(1100px, calc(100vw - var(--app-sidebar-width)));
+  --inspector-width: 400px;
   --bg: #ffffff;
   --surface: #ffffff;
   --surface2: #f1f1f1;
@@ -1084,7 +1085,7 @@ html.has-open-sheet .app-content {
 }
 
 /* The nav becomes a sidebar on desktop; nothing floats over the page bottom. */
-@media (min-width: 1100px) {
+@media (min-width: 900px) {
   .app-nav-blur { display: none; }
 }
 
@@ -1217,8 +1218,8 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
 }
 
 /* ── Desktop scroll-rail → wrapping grid ──────────────────── */
-/* Converts horizontal scroll cards to a wrapping flex grid at 1100px+ */
-@media (min-width: 1100px) {
+/* Converts horizontal scroll cards to a wrapping flex grid at 900px+ */
+@media (min-width: 900px) {
   /* Switch from inner-div scroll to native page scroll.
      On mobile the content div must scroll so the bottom nav stays fixed.
      On desktop the sidebar is position:fixed — the page can scroll naturally. */
@@ -1261,13 +1262,13 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
 
   /* Toast: center in content area (right of 220px sidebar) */
   .app-toast {
-    left: calc(220px + (100vw - 220px) / 2) !important;
+    left: var(--sheet-center-x) !important;
     bottom: 24px !important;
   }
 }
 
-/* ── Desktop (≥ 1100px) — sidebar nav ─────────────────────── */
-@media (min-width: 1100px) {
+/* ── Desktop (≥ 900px) — sidebar nav ─────────────────────── */
+@media (min-width: 900px) {
   :root {
     --sheet-center-x: calc(var(--app-sidebar-width) + var(--app-desktop-content-width) / 2);
   }
@@ -1350,14 +1351,17 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     max-width: 720px;
   }
 
-  .home-category-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
+  /* Two-column lists only once the content column is wide enough. */
+  @media (min-width: 1200px) {
+    .home-category-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
 
-  /* Transaction list: 2-column grid on desktop */
-  .home-txn-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Transaction list: 2-column grid on desktop */
+    .home-txn-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   /* ── Desktop type scale ─────────────────────────────────────── */
@@ -1373,6 +1377,12 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
   /* Section divider labels: 11px → 12px */
   .section-label {
     font-size: 12px !important;
+  }
+
+  /* Page transaction/bill rows: 13px → 15px, matching Budget and Reflect names.
+     Scoped to .app-content so sheets (portaled to body) keep their size. */
+  .app-content .tx-row-title {
+    font-size: 15px !important;
   }
 }
 
@@ -1458,8 +1468,8 @@ button[aria-label^="Close" i]:focus-visible {
   outline-offset: 2px;
 }
 
-/* ── Insights screen — desktop (≥ 1100px) ─────────────────── */
-@media (min-width: 1100px) {
+/* ── Insights screen — desktop (≥ 900px) ─────────────────── */
+@media (min-width: 900px) {
   /* Header: title left, controls right */
 
   .insights-controls {
@@ -1494,8 +1504,8 @@ button[aria-label^="Close" i]:focus-visible {
   gap: 12px;
 }
 
-/* ── History + Categories — desktop (≥ 1100px) ────────────── */
-@media (min-width: 1100px) {
+/* ── History + Categories — desktop (≥ 900px) ────────────── */
+@media (min-width: 900px) {
   /* History header: month nav + search side-by-side */
   .history-header-bar {
     display: flex;
@@ -1531,6 +1541,76 @@ button[aria-label^="Close" i]:focus-visible {
     padding-bottom: 4px;
   }
 
+}
+
+/* ── Docked inspector (≥ 1200px, BottomSheet desktopInspector) ── */
+/* Content column gives up the inspector's width; sheets/toasts recenter via the var. */
+@media (min-width: 1200px) {
+  html.has-inspector {
+    --app-desktop-content-width: min(1100px, calc(100vw - var(--app-sidebar-width) - var(--inspector-width)));
+  }
+}
+@media (min-width: 1200px) and (max-width: 1599px) {
+  html.has-inspector .home-category-list,
+  html.has-inspector .home-txn-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Budget tab as a table (≥ 900px) ── */
+/* Rows in CategoryJarRow gain Budgeted / Spent cells; the jar + name stay one cell. */
+.budget-col,
+.budget-table-head {
+  display: none;
+}
+@media (min-width: 900px) {
+  :root {
+    --budget-col-width: 112px;
+  }
+  .budget-row {
+    display: grid !important;
+    grid-template-columns: 60px minmax(0, 1fr) repeat(3, var(--budget-col-width));
+    min-height: 68px !important;
+  }
+  .budget-row > :last-child {
+    text-align: right;
+  }
+  .budget-row:hover {
+    background: color-mix(in srgb, var(--surface2) 60%, transparent) !important;
+  }
+  .budget-col {
+    display: block;
+    text-align: right;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text2);
+    font-variant-numeric: tabular-nums;
+  }
+  .budget-row-spent-line {
+    display: none;
+  }
+  /* Same right-hand tracks and padding as .budget-row, so the labels line up. */
+  .budget-table-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(3, var(--budget-col-width));
+    gap: 12px;
+    padding: 8px 14px 6px 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .budget-table-head > :not(:first-child) {
+    text-align: right;
+  }
+}
+/* Next to the docked inspector the column is narrower; tighten the numbers. */
+@media (min-width: 1200px) and (max-width: 1499px) {
+  html.has-inspector {
+    --budget-col-width: 84px;
+  }
 }
 
 /* ── Plan-now planner — desktop (≥ 600px, matches BottomSheet DESKTOP_BREAKPOINT) ── */

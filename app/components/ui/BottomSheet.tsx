@@ -15,6 +15,8 @@ import { createPortal } from "react-dom";
 // their bottom-attached presentation beyond that rail so a small width change
 // does not abruptly turn a phone layout into a cramped desktop dialog.
 const DESKTOP_BREAKPOINT = 768;
+// Wide enough for sidebar + content + a docked inspector (see globals.css).
+const INSPECTOR_BREAKPOINT = 1200;
 const MOBILE_SHEET_TOP = "calc(var(--safe-top) + 76px)";
 let openSheetCount = 0;
 
@@ -52,6 +54,8 @@ type BottomSheetProps = {
   mobileTop?: string;
   /** Enable swipe-to-dismiss on mobile. */
   draggable?: boolean;
+  /** Wide desktop only: dock as a non-modal right-side panel; the page stays interactive. */
+  desktopInspector?: boolean;
 };
 
 export function BottomSheet({
@@ -76,6 +80,7 @@ export function BottomSheet({
   mobileFullWidth = true,
   mobileTop,
   draggable = true,
+  desktopInspector = false,
 }: BottomSheetProps) {
   const [mounted, setMounted] = useState(false);
   const localPanelRef = useRef<HTMLDivElement>(null);
@@ -100,12 +105,26 @@ export function BottomSheet({
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= DESKTOP_BREAKPOINT,
   );
+  const [isWide, setIsWide] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= INSPECTOR_BREAKPOINT,
+  );
   useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
+    const check = () => {
+      setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
+      setIsWide(window.innerWidth >= INSPECTOR_BREAKPOINT);
+    };
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+  const isInspector = desktopInspector && isWide;
+
+  // Lets the app content shrink so the docked panel never covers it.
+  useEffect(() => {
+    if (!open || !isInspector) return;
+    document.documentElement.classList.add("has-inspector");
+    return () => document.documentElement.classList.remove("has-inspector");
+  }, [open, isInspector]);
 
   useEffect(() => {
     if (!open) return;
@@ -146,8 +165,8 @@ export function BottomSheet({
 
   const sheet = (
     <>
-      {/* Backdrop */}
-      <motion.div
+      {/* Backdrop — none for the docked inspector, so the page stays clickable */}
+      {!isInspector && <motion.div
         key="sheet-backdrop"
         initial={reduceMotion ? false : { opacity: 0 }}
         animate={{ opacity: backdropOpacity }}
@@ -163,7 +182,7 @@ export function BottomSheet({
           background: "black",
           zIndex: zIndex - 1,
         }}
-      />
+      />}
 
       {/*
        * Outer motion.div — owns position:fixed + the slide animation.
@@ -176,9 +195,9 @@ export function BottomSheet({
       <motion.div
         key="sheet-panel"
         className="bottom-sheet-frame"
-        initial={reduceMotion ? false : isDesktop ? { scale: 0.97 } : { y: "100%" }}
-        animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
-        exit={isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
+        initial={reduceMotion ? false : isInspector ? { x: "100%" } : isDesktop ? { scale: 0.97 } : { y: "100%" }}
+        animate={isInspector ? { x: 0 } : isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
+        exit={isInspector ? { x: "100%" } : isDesktop ? { opacity: 0, scale: 0.97 } : { y: "100%" }}
         transition={
           reduceMotion
             ? { duration: 0 }
@@ -198,7 +217,21 @@ export function BottomSheet({
           },
         })}
         style={
-          isDesktop
+          isInspector
+            ? {
+                position: "fixed",
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: "var(--inspector-width)",
+                background: "var(--surface)",
+                borderLeft: "1px solid color-mix(in srgb, var(--border2) 56%, transparent)",
+                zIndex,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }
+            : isDesktop
             ? desktopFullscreen
               ? {
                   position: "fixed",
@@ -256,8 +289,8 @@ export function BottomSheet({
         <div
           ref={panelRef ?? localPanelRef}
           className="bottom-sheet-panel"
-          role={isDesktop ? "dialog" : "region"}
-          aria-modal={isDesktop ? "true" : undefined}
+          role={isInspector ? "complementary" : isDesktop ? "dialog" : "region"}
+          aria-modal={isDesktop && !isInspector ? "true" : undefined}
           aria-label={label}
           aria-labelledby={labelledBy}
           tabIndex={-1}
@@ -267,11 +300,11 @@ export function BottomSheet({
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            boxShadow: isDesktop
+            boxShadow: isDesktop && !isInspector
               ? "0 20px 56px rgba(20, 24, 22, 0.16)"
               : "none",
             ...panelStyle,
-            ...(desktopFullscreen && isDesktop ? { borderRadius: 0 } : {}),
+            ...((desktopFullscreen && isDesktop) || isInspector ? { borderRadius: 0 } : {}),
           }}
         >
           {showHandle && !isDesktop && (

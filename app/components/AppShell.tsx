@@ -51,7 +51,7 @@ export function AppShell({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
   const { below: contentBelow } = useScrollEdges(contentEl);
-  // Mobile scrolls .app-content; desktop (≥1100px) scrolls the page — watch both.
+  // Mobile scrolls .app-content; desktop (≥900px) scrolls the page — watch both.
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const measure = () => setScrolled((contentRef.current?.scrollTop ?? 0) > 1 || window.scrollY > 1);

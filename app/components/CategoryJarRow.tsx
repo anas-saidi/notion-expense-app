@@ -10,27 +10,31 @@ import { CategoryJar } from "./mascot/CategoryJar";
  * One category on the Budget tab: its jar (what's left, in the status palette),
  * the name, one quiet line only when it says something, and the one number.
  * Rows sit flat on a shared section surface; tapping opens the category.
+ * On desktop the row becomes a table row: Budgeted and Spent columns appear (CSS).
  */
-export function BudgetJarRow({ cat, scope, status, spent, onOpen }: {
+export function BudgetJarRow({ cat, scope, status, planned, spent, onOpen }: {
   cat: Category;
   scope: BudgetScope;
   status: BudgetStatus;
+  planned: number;
   spent: number;
   onOpen: () => void;
 }) {
   const { state, low, amount, level } = status;
   const line = state === "over" ? { text: "Overspent", color: "var(--status-over)", strong: true }
     : low ? { text: "Spending fast", color: "var(--status-low)", strong: false }
-    : state === "normal" && Math.round(spent) > 0 ? { text: `${fmt(Math.round(spent))} spent`, color: "var(--muted)", strong: false }
+    : state === "normal" && Math.round(spent) > 0 ? { text: `${fmt(Math.round(spent))} spent`, color: "var(--muted)", strong: false, spentOnly: true }
     : null;
   const amountColor = state === "over" ? "var(--status-over)" : low ? "var(--status-low)" : state === "normal" ? "var(--text2)" : "var(--muted)";
   return (
-    <button type="button" onClick={onOpen} style={rowStyle} aria-label={`${cat.name}, ${fmt(Math.round(amount))} MAD${line ? `, ${line.text}` : state === "empty" ? ", all spent" : state === "unfunded" ? ", not funded" : ""}`}>
+    <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, ${fmt(Math.round(amount))} MAD${line ? `, ${line.text}` : state === "empty" ? ", all spent" : state === "unfunded" ? ", not funded" : ""}`}>
       <CategoryJar scope={scope} level={level} state={state} low={low} icon={cat.icon} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
-        {line && <span style={{ ...lineStyle, color: line.color, fontWeight: line.strong ? 600 : 500 }}>{line.text}</span>}
+        {/* "X spent" repeats the desktop Spent column, so it hides there. */}
+        {line && <span className={"spentOnly" in line ? "budget-row-spent-line" : undefined} style={{ ...lineStyle, color: line.color, fontWeight: line.strong ? 600 : 500 }}>{line.text}</span>}
       </span>
+      <TableCols planned={planned} spent={spent} />
       <span style={{ ...amountStyle, color: amountColor }}>{Math.round(amount) < 0 ? "−" : ""}{fmt(Math.abs(Math.round(amount)))}</span>
     </button>
   );
@@ -58,14 +62,25 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   // Without a goal the jar just shows there's money in it: a still, soft level.
   const level = goal > 0 ? pct : saved > 0 ? 0.5 : 0;
   return (
-    <button type="button" onClick={onOpen} style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}`}>
+    <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}`}>
       <CategoryJar scope={scope} level={level} state={saved > 0 ? "normal" : "unfunded"} kind="savings" icon={cat.icon} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {line && <span style={{ ...lineStyle, color: reached ? "var(--status-good)" : "var(--muted)", fontWeight: reached ? 600 : 500 }}>{line}</span>}
       </span>
+      <TableCols planned={planned} spent={spent} />
       <span style={{ ...amountStyle, color: "var(--text2)" }}>{fmt(Math.round(saved))}</span>
     </button>
+  );
+}
+
+/** Desktop-only Budgeted / Spent cells; hidden on mobile by `.budget-col`. */
+function TableCols({ planned, spent }: { planned: number; spent: number }) {
+  return (
+    <>
+      <span className="budget-col" aria-hidden="true">{fmt(Math.round(planned))}</span>
+      <span className="budget-col" aria-hidden="true">{fmt(Math.round(spent))}</span>
+    </>
   );
 }
 

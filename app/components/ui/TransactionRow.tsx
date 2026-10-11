@@ -33,7 +33,7 @@ export function TransactionRow({
     <>
       <span style={iconStyle(tone)} aria-hidden="true">{icon}</span>
       <span style={copyStyle}>
-        <span style={titleStyle}>{title}</span>
+        <span className="tx-row-title" style={titleStyle}>{title}</span>
         {subtitle && <span style={subtitleStyle}>{subtitle}</span>}
       </span>
       <span style={valueStackStyle}>
