@@ -175,6 +175,7 @@ export default function App() {
   const historyRequest = useRef(0);
   const [historyMonth, setHistoryMonth] = useState(formatMonthInput(today()));
   const [historyTransactions, setHistoryTransactions] = useState<Transaction[]>([]);
+  const [historySummary, setHistorySummary] = useState<MonthlySummary | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [corpus, setCorpus] = useState<{ description: string; categoryId: string }[]>([]);
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
@@ -284,17 +285,22 @@ export default function App() {
     setHistoryLoading(true);
     setHistoryError(null);
     setHistoryTransactions([]);
+    setHistorySummary(null);
     try {
       const query = startMonth
         ? `start=${monthBounds(`${startMonth}-01`).start}&end=${monthBounds(`${endMonth}-01`).end}`
         : "all=true";
       const snapshot = monthlySnapshot.current;
-      const txns = startMonth && startMonth === endMonth && startMonth === homeMonth
+      const monthly = startMonth && startMonth === endMonth
         ? (snapshot?.month === startMonth && snapshot.expires > Date.now()
-          ? snapshot.data.transactions
-          : (await fetchMonthlyData(startMonth, endMonth)).transactions)
-        : (await fetchApiJson<{ transactions: Transaction[] }>(`/api/transactions?${query}`)).transactions;
-      if (request === historyRequest.current) setHistoryTransactions(txns ?? []);
+          ? snapshot.data
+          : await fetchMonthlyData(startMonth, endMonth))
+        : null;
+      const txns = monthly?.transactions ?? (await fetchApiJson<{ transactions: Transaction[] }>(`/api/transactions?${query}`)).transactions;
+      if (request === historyRequest.current) {
+        setHistoryTransactions(txns ?? []);
+        setHistorySummary(monthly?.summary ?? null);
+      }
     } catch (error) {
       if (request === historyRequest.current) setHistoryError(error instanceof Error ? error.message : "Could not load Reflect");
       throw error;
@@ -1158,6 +1164,7 @@ export default function App() {
       {tab === "history" && (
         <ReflectScreen
           transactions={historyTransactions}
+          monthlySummary={historySummary}
           categories={[...categories, ...frozenCategories]}
           accounts={accounts}
           budgetScope={budgetScope}

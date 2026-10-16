@@ -3,8 +3,8 @@
 import { Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { Account, BudgetScope, Category, Transaction } from "./app-types";
-import { buildMoneyFlow, buildSpendingBreakdown, isReflectInflow, reflectAccountId, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
+import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
+import { buildMonthlyOverBudget, buildMoneyFlow, buildSpendingBreakdown, isReflectInflow, reflectAccountId, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
 import { fmt, fmtDate, today } from "./app-utils";
 import { Money } from "./Money";
 import { MonthPicker } from "./DatePicker";
@@ -24,6 +24,7 @@ import { CalendarRangeIcon, ChevronDownIcon, SlidersIcon, XIcon } from "./ui/ico
 
 type Props = {
   transactions: Transaction[];
+  monthlySummary: MonthlySummary | null;
   categories: Category[];
   accounts: Account[];
   budgetScope: BudgetScope;
@@ -80,9 +81,16 @@ export function ReflectScreen(props: Props) {
   const choosePeriod = (period: ReflectPeriod) => { props.onPeriodChange(period); setShowPeriod(false); };
   const label = periodName(props.period);
   const hasData = breakdown.transactionCount > 0;
+  const singleMonth = Boolean(props.period.start && props.period.start === props.period.end);
+  const budgetReady = singleMonth && props.monthlySummary?.start.slice(0, 7) === props.period.start
+    && props.monthlySummary?.end.slice(0, 7) === props.period.end;
+  const overBudget = useMemo(() => buildMonthlyOverBudget(breakdown.spending, props.monthlySummary?.assignedByCategory ?? [], props.categories), [breakdown.spending, props.monthlySummary, props.categories]);
+  const overBudgetByCategory = new Map(budgetReady && excludedAccounts.length === 0 ? overBudget.map(row => [row.id, row] as const) : []);
 
-  const categoryRow = (row: ReflectCategory, index: number, inflow = false) => <li key={row.id}>
-    <button type="button" onClick={() => setSelectedId(row.id)} aria-label={`${row.name}, ${inflow ? "net inflow" : "spent"} ${Math.abs(row.net)} MAD${!inflow && row.share > 0 ? `, ${(row.share * 100).toFixed(1)} percent` : ""}, view transactions`} style={categoryButtonStyle}>
+  const categoryRow = (row: ReflectCategory, index: number, inflow = false) => {
+    const variance = !inflow ? overBudgetByCategory.get(row.id) : undefined;
+    return <li key={row.id}>
+    <button type="button" onClick={() => setSelectedId(row.id)} aria-label={`${row.name}, ${inflow ? "net inflow" : "spent"} ${Math.abs(row.net)} MAD${!inflow && row.share > 0 ? `, ${(row.share * 100).toFixed(1)} percent` : ""}${variance ? `, ${variance.overBudget} MAD over budget, assigned ${variance.assigned} MAD` : ""}, view transactions`} style={categoryButtonStyle}>
       <CategoryIcon icon={row.icon} size={32} />
       <span style={{ flex: 1, minWidth: 0, display: "grid", gap: 8 }}>
         <span style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "baseline" }}>
@@ -90,12 +98,14 @@ export function ReflectScreen(props: Props) {
           <span style={{ flexShrink: 0, color: inflow ? "var(--action-income)" : "var(--text2)", fontSize: 15, fontWeight: 600 }}>{inflow ? "+" : ""}<Money value={Math.abs(row.net)} /></span>
         </span>
         <span style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {!inflow && row.net > 0 && <span aria-hidden="true" style={{ height: 4, flex: 1, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${row.share * 100}%`, background: tone(index), borderRadius: 4 }} /></span>}
+          {!inflow && row.net > 0 && <span aria-hidden="true" style={{ height: 4, flex: 1, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${row.share * 100}%`, background: variance ? "var(--danger)" : tone(index), borderRadius: 4 }} /></span>}
           <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{row.net > 0 ? `${(row.share * 100).toFixed(1)}%` : `${row.transactions.length} transactions`}</span>
         </span>
+        {variance && <span style={{ fontSize: 13, color: "var(--danger)" }}><Money value={variance.overBudget} /> over budget</span>}
       </span>
     </button>
   </li>;
+  };
 
   return <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0, paddingBottom: 100 }}>
     <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>

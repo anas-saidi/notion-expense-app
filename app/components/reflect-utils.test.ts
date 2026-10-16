@@ -1,11 +1,44 @@
 import { describe, expect, it } from "vitest";
 import type { Account, Category, Transaction } from "./app-types";
-import { buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, TO_JOINT, UNCATEGORIZED, UNKNOWN_ACCOUNT } from "./reflect-utils";
+import { buildMonthlyOverBudget, buildMoneyFlow, buildSpendingBreakdown, reflectMonthCount, reflectPreset, TO_JOINT, UNCATEGORIZED, UNKNOWN_ACCOUNT } from "./reflect-utils";
 const accounts: Account[] = [{ id: "joint", label: "Joined Account", icon: "", type: null, balance: 0, readyToAssign: 0 }, { id: "anas", label: "Anas", icon: "", type: null, balance: 0, readyToAssign: 0 }];
 const category = (id: string): Category => ({ id, name: id, icon: null, type: ["Household"], owner: null, defaultAccount: "joint", available: null, planned: null, lastMonthSpent: null, isTeamFund: true });
 const categories = [category("food"), category("rent"), category("travel")];
 const transaction = (id: string, amount: number, overrides: Partial<Transaction> = {}): Transaction => ({ id, name: id, amount, category: "food", accountId: "joint", type: "Expense", date: "2026-09-10", ...overrides });
 const breakdown = (transactions: Transaction[], excludedCategories: string[] = [], excludedAccounts: string[] = []) => buildSpendingBreakdown(transactions, categories, accounts, "joint", excludedCategories, excludedAccounts);
+
+describe("Reflect monthly over budget", () => {
+  it("reports spending above assignments even with positive available and a covering rebalance", () => {
+    const funded = [{ ...categories[0], available: 100 }];
+    const spending = buildSpendingBreakdown([
+      transaction("groceries", 1200),
+      transaction("rebalance", 300, { type: "Transfer", category: null, toCategoryId: "food", fromCategoryId: "rent" }),
+    ], funded, accounts, "joint").spending;
+    expect(buildMonthlyOverBudget(spending, [{ categoryId: "food", total: 1000 }], funded))
+      .toMatchObject([{ id: "food", assigned: 1000, net: 1200, overBudget: 200 }]);
+  });
+  it("does not flag spending below or exactly equal to assignments", () => {
+    expect(buildMonthlyOverBudget(breakdown([transaction("food", 100)]).spending, [{ categoryId: "food", total: 100 }], categories)).toEqual([]);
+    expect(buildMonthlyOverBudget(breakdown([transaction("food", 99.99)]).spending, [{ categoryId: "food", total: 100 }], categories)).toEqual([]);
+  });
+  it("nets category refunds, sums signed assignments, and compares exact cents", () => {
+    const spending = breakdown([transaction("food", 110.11), transaction("refund", 10, { type: "Income" })]).spending;
+    expect(buildMonthlyOverBudget(spending, [{ categoryId: "food", total: 110.10 }, { categoryId: "food", total: -10 }], categories))
+      .toMatchObject([{ assigned: 100.10, net: 100.11, overBudget: .01 }]);
+  });
+  it("includes spending without an assignment and ranks by excess, without netting away another category's surplus", () => {
+    const spending = breakdown([transaction("food", 50), transaction("rent", 300, { category: "rent" })]).spending;
+    expect(buildMonthlyOverBudget(spending, [{ categoryId: "rent", total: 250 }], categories).map(row => [row.id, row.assigned, row.overBudget]))
+      .toEqual([["food", 0, 50], ["rent", 250, 50]]);
+    expect(buildMonthlyOverBudget(spending, [{ categoryId: "rent", total: 1000 }], categories).map(row => row.id)).toEqual(["food"]);
+  });
+  it("omits savings, synthetic To Joint, and uncategorized rows", () => {
+    const all = [...categories, { ...category("savings"), type: ["Savings"] }];
+    const spending = buildSpendingBreakdown([transaction("saved", 100, { category: "savings" }), transaction("unknown", 20, { category: null })], all, accounts, "joint").spending;
+    expect(buildMonthlyOverBudget(spending, [], all)).toEqual([]);
+    expect(buildMonthlyOverBudget([{ ...breakdown([transaction("food", 100)]).spending[0], id: TO_JOINT }], [], all)).toEqual([]);
+  });
+});
 
 describe("Reflect spending breakdown", () => {
   it("ranks categories by net spending with shares summing to one", () => {

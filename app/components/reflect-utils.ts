@@ -1,5 +1,6 @@
-import type { Account, BudgetScope, Category, Transaction } from "./app-types";
+import type { Account, BudgetScope, Category, MonthlyCategoryTotal, Transaction } from "./app-types";
 import { isExpenseTransaction, scopeFromAccountLabel, transactionMatchesScope } from "./app-utils";
+import { isSavingsCategory } from "./wallet-utils";
 
 export type ReflectPeriod = { start: string; end: string };
 export type ReflectCategory = { id: string; name: string; icon: string | null; spent: number; inflow: number; net: number; share: number; transactions: Transaction[] };
@@ -8,6 +9,21 @@ export const UNKNOWN_ACCOUNT = "__unknown_account__";
 /** A partner's money that went to Joint: transfers to the joint account and joint expenses paid from their own account. */
 export const TO_JOINT = "__to_joint__";
 const cents = (amount: number) => Math.round(amount * 100);
+
+/** Monthly plan variance: transfers and available balances never change the baseline. */
+export function buildMonthlyOverBudget(spending: ReflectCategory[], assignments: MonthlyCategoryTotal[], categories: Category[]) {
+  const assigned = new Map<string, number>();
+  for (const entry of assignments) {
+    if (Number.isFinite(entry.total)) assigned.set(entry.categoryId, (assigned.get(entry.categoryId) ?? 0) + cents(entry.total));
+  }
+  return spending.flatMap(row => {
+    const category = categories.find(entry => entry.id === row.id);
+    if (!category || isSavingsCategory(category)) return [];
+    const planned = Math.max(0, assigned.get(row.id) ?? 0);
+    const excess = cents(row.net) - planned;
+    return excess > 0 ? [{ ...row, assigned: planned / 100, overBudget: excess / 100 }] : [];
+  }).sort((a, b) => b.overBudget - a.overBudget || a.name.localeCompare(b.name));
+}
 
 const accountScopeOf = (id: string | null | undefined, accounts: Account[]) => {
   const account = id ? accounts.find(entry => entry.id === id) : undefined;
