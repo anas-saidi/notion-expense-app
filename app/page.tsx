@@ -1339,6 +1339,7 @@ export default function App() {
         accounts={accounts}
         categories={categories}
         onClose={() => setDetailsTransaction(null)}
+        onUndone={() => { setDetailsTransaction(null); showToast(detailsTransaction?.savingsFundingOperation ? "Savings deposit undone" : "Transfer deleted"); void refreshAffectedData().catch(error => showToast(error.message)); }}
       /></DeferredMount>
 
       <DeferredMount active={showCategoryDetails}>      <CategoryDetailsSheet
@@ -1365,7 +1366,7 @@ export default function App() {
         onTakeOut={detailsCategory && isSavingsCategory(detailsCategory) ? () => setWithdrawCategory(detailsCategory) : undefined}
         onFreeze={detailsCategory && !detailsCategory.snoozed ? () => freezeCategory(detailsCategory) : undefined}
         onUnfreeze={detailsCategory?.snoozed ? () => { void reviveCategory(detailsCategory, false); setShowCategoryDetails(false); } : undefined}
-        onTransactionsChanged={refreshBudgetData}
+        onTransactionsChanged={refreshAffectedData}
       /></DeferredMount>
 
       <DeferredMount active={withdrawCategory !== null}>      <SavingsWithdrawSheet

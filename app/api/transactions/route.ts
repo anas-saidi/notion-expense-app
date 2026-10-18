@@ -1,3 +1,4 @@
+import { assertTransferCanBeDeleted } from "../../../lib/notion-transfer-deletion";
 import { FUNDING_OPERATION, readText } from "../../../lib/savings-funding";
 import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
@@ -162,6 +163,7 @@ async function handleDELETE(req: NextRequest) {
     const stored = await fetchTransactionPage(token, id);
     if (stored.error) return stored.error;
     if (readText(stored.page.properties?.[FUNDING_OPERATION])) return NextResponse.json({ error: "This transfer is linked to savings funding. Use the savings category to spend or take money out." }, { status: 409 });
+    if (stored.page.properties?.Type?.select?.name === "Transfer") await assertTransferCanBeDeleted(token, stored.page);
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: notionHeaders(token),
@@ -171,7 +173,7 @@ async function handleDELETE(req: NextRequest) {
     if (!res.ok) return NextResponse.json({ error: data.message }, { status: res.status });
     return NextResponse.json({ success: true, transaction: mapPage(data) });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: err.status ?? 500 });
   }
 }
 

@@ -76,3 +76,11 @@ describe("linked savings funding", () => {
     expect(vi.mocked(notionFetchJson).mock.calls.filter(([, path]) => path === "/pages")).toHaveLength(2);
   });
 });
+
+it("does not recreate an undone deposit after a late funding retry", async () => {
+  await fundSavings("token", draft);
+  fund.properties.Planned.number = 0;
+  fund.properties["Savings deposit undone"] = { checkbox: true };
+  await expect(fundSavings("token", draft)).rejects.toMatchObject({ status: 410, pending: false });
+  expect(vi.mocked(notionFetchJson).mock.calls.filter(([, path]) => path === "/pages")).toHaveLength(2);
+});

@@ -2,6 +2,7 @@ import type { Category } from "../app/components/app-types";
 import { isSavingsCategory } from "../app/components/wallet-utils";
 
 export type SavingsFundingTarget = "separate" | "shared";
+export const SAVINGS_UNDONE = "Savings deposit undone";
 export const SAVINGS_TARGET = "Savings funding target";
 export const FUNDING_OPERATION = "Savings funding operation";
 export const FUNDING_AMOUNT = "Savings funding amount";

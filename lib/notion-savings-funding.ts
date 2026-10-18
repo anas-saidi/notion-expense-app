@@ -3,7 +3,7 @@ import { notionFetchJson, queryDatabaseAll } from "./notion-api";
 import { mapCategoryPage } from "./notion-category-record";
 import { isSavingsCategory } from "../app/components/wallet-utils";
 import { isCalendarDate } from "./bills";
-import { FUNDING_AMOUNT, FUNDING_HOLDING, FUNDING_OPERATION, SAVINGS_TARGET, normalizeId, readText, richText, type SavingsFundingTarget } from "./savings-funding";
+import { FUNDING_AMOUNT, FUNDING_HOLDING, FUNDING_OPERATION, SAVINGS_TARGET, SAVINGS_UNDONE, normalizeId, readText, richText, type SavingsFundingTarget } from "./savings-funding";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
 const TX_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
@@ -60,6 +60,7 @@ async function performFunding(token: string, draft: Draft) {
     if (fund) {
       pending = true;
       const p = fund.properties;
+      if (p[SAVINGS_UNDONE]?.checkbox) { pending = false; fail("This savings deposit was undone. Start a new deposit instead.", 410); }
       if (p[FUNDING_AMOUNT]?.number !== draft.amount || p[SAVINGS_TARGET]?.select?.name !== draft.target ||
         normalizeId(p.Category?.relation?.[0]?.id) !== normalizeId(draft.categoryId) || normalizeId(p["🏦 Accounts"]?.relation?.[0]?.id) !== normalizeId(draft.accountId) ||
         normalizeId(readText(p[FUNDING_HOLDING])) !== normalizeId(category.defaultAccount) || p.Date?.date?.start !== draft.date) fail("Retry the original savings funding with its original account, amount, date, and target.");

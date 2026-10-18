@@ -1,5 +1,6 @@
 "use client";
 
+import { UndoSavingsDeposit } from "./UndoSavingsDeposit";
 import type { Account, Category, Transaction } from "./app-types";
 import { fmtDate } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -10,9 +11,10 @@ type Props = {
   accounts: Account[];
   categories: Category[];
   onClose: () => void;
+  onUndone: () => void | Promise<void>;
 };
 
-export function TransactionDetailsSheet({ transaction, accounts, categories, onClose }: Props) {
+export function TransactionDetailsSheet({ transaction, accounts, categories, onClose, onUndone }: Props) {
   if (!transaction) return null;
   const categoryName = (id: string | null | undefined) => categories.find(item => item.id === id)?.name ?? "Unresolved category";
   const accountName = (id: string | null | undefined) => accounts.find(item => item.id === id)?.label ?? "Unresolved account";
@@ -37,9 +39,9 @@ export function TransactionDetailsSheet({ transaction, accounts, categories, onC
           <Detail label="Date" value={fmtDate(transaction.date)} />
           {type === "Expense" ? <><Detail label="Category" value={categoryName(transaction.category)} /><Detail label="Account" value={accountName(transaction.accountId)} /></> : <Detail label="Flow" value={relationships} />}
         </dl>
-        <p style={{ margin: 0, padding: 14, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", fontSize: 14, lineHeight: 1.45 }}>
+        {type === "Transfer" ? <UndoSavingsDeposit key={transaction.id} operationId={transaction.savingsFundingOperation} transactionId={transaction.id} onUndone={onUndone} /> : <p style={{ margin: 0, padding: 14, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", fontSize: 14, lineHeight: 1.45 }}>
           {type === "Expense" ? "Expense details." : `Editing ${type.toLowerCase()} transactions is not available here. The original type and relationships are protected.`}
-        </p>
+        </p>}
         <button type="button" onClick={onClose} className="pressable" style={{ minHeight: 48, borderRadius: "var(--radius-control)", border: "1px solid var(--border2)", background: "var(--surface)", color: "var(--text)", fontWeight: 700 }}>Close</button>
       </div>
     </BottomSheet>

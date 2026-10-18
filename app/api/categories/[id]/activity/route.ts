@@ -1,4 +1,4 @@
-import { FUNDING_OPERATION, readText } from "../../../../../lib/savings-funding";
+import { FUNDING_OPERATION, SAVINGS_UNDONE, readText } from "../../../../../lib/savings-funding";
 import { withMirrorReads } from "../../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "@/lib/notion-api";
@@ -35,6 +35,7 @@ type TimelineEvent = {
   assignmentType?: "Monthly" | "Top-up" | null;
   sourceDb: "funds" | "transactions";
   readOnly?: boolean;
+  savingsFundingOperation?: string;
 };
 
 function normalizeId(id: string) {
@@ -216,7 +217,7 @@ async function handleGET(
         ?? null,
     };
 
-    const fundedEvents: TimelineEvent[] = (fundsData.results ?? []).map((page: NotionPage) => {
+    const fundedEvents: TimelineEvent[] = (fundsData.results ?? []).filter((page: NotionPage) => !page.properties[SAVINGS_UNDONE]?.checkbox).map((page: NotionPage) => {
       const accountId = page.properties[PROP_ACCOUNTS]?.relation?.[0]?.id ?? null;
       const account = accountId ? accountLookup.get(normalizeId(accountId)) : null;
       const amount = page.properties.Planned?.number ?? 0;
@@ -225,6 +226,7 @@ async function handleGET(
         id: page.id,
         date: page.properties.Date?.date?.start ?? "",
         kind: "funded",
+        savingsFundingOperation: readText(page.properties[FUNDING_OPERATION]) || undefined,
         readOnly: Boolean(readText(page.properties[FUNDING_OPERATION])),
         amount,
         direction: "in",

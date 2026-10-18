@@ -1,5 +1,6 @@
 "use client";
 
+import { UndoSavingsDeposit } from "./UndoSavingsDeposit";
 import { SkeletonRows } from "./ui/Skeleton";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -19,6 +20,7 @@ type TimelineItem = {
   id: string;
   date: string;
   readOnly?: boolean;
+  savingsFundingOperation?: string;
   kind: "funded" | "moved_in" | "moved_out" | "expense";
   amount: number;
   direction: "in" | "out";
@@ -85,6 +87,8 @@ export function CategoryDetailsSheet({
   const [data, setData] = useState<CategoryActivityPayload | null>(null);
   const [activeMonth, setActiveMonth] = useState<string>(month);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [undoingDeposit, setUndoingDeposit] = useState<TimelineItem | null>(null);
+  useEffect(() => { setUndoingDeposit(null); }, [open, category?.id]);
   const [editingFund, setEditingFund] = useState<EditableFundTransaction | null>(null);
   const [adjustingAvailable, setAdjustingAvailable] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
@@ -295,7 +299,7 @@ export function CategoryDetailsSheet({
                       : item.kind === "expense"
                         ? <CategoryIcon icon={category.icon} size={20} />
                         : <TransferIcon size={14} />}
-                    onClick={item.kind === "funded" && !item.readOnly ? () => setEditingFund({ ...item, categoryAvailable: available }) : undefined}
+                    onClick={item.kind === "funded" ? item.savingsFundingOperation ? () => setUndoingDeposit(item) : !item.readOnly ? () => setEditingFund({ ...item, categoryAvailable: available }) : undefined : undefined}
                   />
                 );
               })}
@@ -303,6 +307,13 @@ export function CategoryDetailsSheet({
           )}
         </section>
       </div>
+      <BottomSheet open={undoingDeposit !== null} onClose={() => setUndoingDeposit(null)} label="Savings deposit" detent="content" layered zIndex={150}>
+        {undoingDeposit && <div style={{ padding: 24, display: "grid", gap: 16 }}>
+          <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}><h2 style={{ fontSize: 20 }}>{undoingDeposit.title}</h2><button type="button" aria-label="Close deposit details" onClick={() => setUndoingDeposit(null)} className="sheet-close-button"><XIcon /></button></header>
+          <strong style={{ fontSize: 28, fontVariantNumeric: "tabular-nums" }}><Money value={undoingDeposit.amount} currency /></strong>
+          <UndoSavingsDeposit key={undoingDeposit.savingsFundingOperation} operationId={undoingDeposit.savingsFundingOperation!} onUndone={async () => { setUndoingDeposit(null); setRefreshKey(value => value + 1); try { await onTransactionsChanged?.(); } catch { setError("Deposit undone. Refresh to update balances."); } }} />
+        </div>}
+      </BottomSheet>
       <FundTransactionSheet
         transaction={editingFund}
         accounts={accounts}
