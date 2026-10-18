@@ -3,7 +3,7 @@ import { notionFetchJson, queryDatabaseAll } from "./notion-api";
 import { mapCategoryPage } from "./notion-category-record";
 import { isSavingsCategory } from "../app/components/wallet-utils";
 import { isCalendarDate } from "./bills";
-import { FUNDING_AMOUNT, FUNDING_HOLDING, FUNDING_OPERATION, SAVINGS_TARGET, SAVINGS_UNDONE, normalizeId, readText, richText, type SavingsFundingTarget } from "./savings-funding";
+import { FUNDING_AMOUNT, FUNDING_HOLDING, FUNDING_OPERATION, SAVINGS_TARGET, SAVINGS_UNDONE, normalizeId, readAccountBalance, readText, richText, type SavingsFundingTarget } from "./savings-funding";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
 const TX_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
@@ -68,8 +68,7 @@ async function performFunding(token: string, draft: Draft) {
       if (p.Planned?.number !== 0) fail("This savings funding was changed. Review it before retrying.");
     } else {
       const source = await pageIn(token, draft.accountId, ACC_DB);
-      const balance: any = Object.entries(source.properties ?? {}).find(([name]) => /^(current balance|balance|ledger balance)$/i.test(name))?.[1];
-      const available = balance?.formula?.number ?? balance?.rollup?.number ?? balance?.number;
+      const available = readAccountBalance(source.properties);
       if (typeof available !== "number" || !Number.isFinite(available) || available < draft.amount) fail("The funding account does not have enough cash for this deposit.");
       if (draft.target === "separate" && normalizeId(draft.accountId) === normalizeId(category.defaultAccount)) {
         const readyProp: any = Object.entries(source.properties ?? {}).find(([name]) => /^(ready to assign|available to assign)$/i.test(name))?.[1];

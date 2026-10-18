@@ -1,5 +1,5 @@
 import { notionFetchJson } from "./notion-api";
-import { normalizeId } from "./savings-funding";
+import { normalizeId, readAccountBalance } from "./savings-funding";
 
 /** A legacy transfer has no linked assignment to infer or delete. Validate its
  * receiving side before removing only that transfer from the ledger. */
@@ -16,10 +16,8 @@ export async function assertTransferCanBeDeleted(token: string, page: any) {
   for (const destination of destinations) {
     const { data } = await notionFetchJson<any>(token, `/pages/${destination.id}`);
     if (normalizeId(data.parent?.database_id) !== normalizeId(destination.db) || data.archived || data.in_trash) throw Object.assign(new Error("The receiving account or category is unavailable."), { status: 409 });
-    const property: any = destination.account
-      ? Object.entries(data.properties ?? {}).find(([name]) => /^(current balance|balance|ledger balance)$/i.test(name))?.[1]
-      : data.properties?.Available;
-    const available = property?.formula?.number ?? property?.rollup?.number ?? property?.number;
+    const property = data.properties?.Available;
+    const available = destination.account ? readAccountBalance(data.properties) : property?.formula?.number ?? property?.rollup?.number ?? property?.number;
     if (typeof available !== "number" || !Number.isFinite(available) || Math.round(available * 100) < Math.round(amount * 100)) throw Object.assign(new Error("The receiving account or category no longer has enough money to delete this transfer."), { status: 409 });
   }
 }

@@ -8,7 +8,7 @@ const sourceId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const jointId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 const draft = { operationId: "dddddddd-dddd-dddd-dddd-dddddddddddd", categoryId, accountId: sourceId, amount: 3000, date: "2026-10-18", target: "separate" as const };
 const category = { parent: { database_id: "1926a2be-8922-8029-9b90-c7d8bb55fabd" }, properties: { Category: { title: [{ plain_text: "Bedroom" }] }, Type: { multi_select: [{ name: "Saving" }] }, Default: { relation: [{ id: jointId }] } } };
-const account = (name: string) => ({ parent: { database_id: "1926a2be-8922-8014-bb54-d9f5e9d1234b" }, properties: { Name: { type: "title", title: [{ plain_text: name }] }, "Current Balance": { formula: { number: 5000 } }, "Ready to Assign": { formula: { number: 5000 } } } });
+const account = (name: string) => ({ parent: { database_id: "1926a2be-8922-8014-bb54-d9f5e9d1234b" }, properties: { Balance: { type: "relation", relation: [{ id: "balance-row" }] }, Name: { type: "title", title: [{ plain_text: name }] }, "Current Balance": { formula: { number: 5000 } }, "Ready to Assign": { formula: { number: 5000 } } } });
 let fund: any, transfer: any, rejectFinal: boolean;
 beforeEach(() => {
   vi.resetAllMocks(); fund = null; transfer = null; rejectFinal = false;

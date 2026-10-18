@@ -1,6 +1,6 @@
 import { withSavingsFundingLock } from "./savings-funding-lock";
 import { notionFetchJson, queryDatabaseAll } from "./notion-api";
-import { FUNDING_AMOUNT, FUNDING_HOLDING, FUNDING_OPERATION, SAVINGS_TARGET, SAVINGS_UNDONE, normalizeId, readText } from "./savings-funding";
+import { FUNDING_AMOUNT, FUNDING_HOLDING, FUNDING_OPERATION, SAVINGS_TARGET, SAVINGS_UNDONE, normalizeId, readAccountBalance, readText } from "./savings-funding";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
 const TX_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
@@ -42,8 +42,7 @@ export async function undoSavingsDeposit(token: string, operationId: string) {
         readText(t[FUNDING_OPERATION]) !== operationId || normalizeId(t.Category?.relation?.[0]?.id) !== normalizeId(categoryId) ||
         normalizeId(t["🏦 account ( out )"]?.relation?.[0]?.id) !== normalizeId(sourceId) || normalizeId(t["🏦 account ( in )"]?.relation?.[0]?.id) !== normalizeId(holdingId)) fail("The linked transfer was changed. Nothing was changed.");
       const holding = await pageIn(token, holdingId, ACC_DB);
-      const prop: any = Object.entries(holding.properties ?? {}).find(([name]) => /^(current balance|balance|ledger balance)$/i.test(name))?.[1];
-      const cash = prop?.formula?.number ?? prop?.rollup?.number ?? prop?.number;
+      const cash = readAccountBalance(holding.properties);
       if (typeof cash !== "number" || !Number.isFinite(cash) || Math.round(cash * 100) < Math.round(amount * 100)) fail("The holding account does not have enough cash to undo this deposit.");
     }
     if (!undone) {

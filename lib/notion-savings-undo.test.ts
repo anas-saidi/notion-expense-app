@@ -16,7 +16,7 @@ beforeEach(() => {
     "🏦 account ( out )": { relation: [{ id: sourceId }] }, "🏦 account ( in )": { relation: [{ id: holdingId }] } } };
   vi.mocked(queryDatabaseAll).mockImplementation(async (_token, database) => database.replaceAll("-", "").startsWith("1936") ? (duplicate ? [fund, fund] : [fund]) : transfer.archived ? [] : [transfer]);
   vi.mocked(notionFetchJson).mockImplementation(async (_token, path, options) => {
-    if (path === "/pages/joint") return { status: 200, data: { parent: { database_id: "1926a2be-8922-8014-bb54-d9f5e9d1234b" }, properties: { "Current Balance": { formula: { number: cash } } } } };
+    if (path === "/pages/joint") return { status: 200, data: { parent: { database_id: "1926a2be-8922-8014-bb54-d9f5e9d1234b" }, properties: { Balance: { type: "relation", relation: [{ id: "balance-row" }] }, "Current Balance": { formula: { number: cash } } } } };
     if (path === "/pages/cat") return { status: 200, data: { parent: { database_id: "1926a2be-8922-8029-9b90-c7d8bb55fabd" }, properties: { Available: { formula: { number: available } }, Default: { relation: [{ id: holdingId }] } } } };
     if (path.startsWith("/databases/")) return { status: 200, data: { properties: {} } };
     if (path === "/pages/fund") { fund.properties = { ...fund.properties, ...(options?.body as any).properties }; return { status: 200, data: fund }; }
