@@ -1,4 +1,6 @@
 "use client";
+import { SavingsFundingTargetPicker } from "./SavingsFundingTargetPicker";
+import type { SavingsFundingTarget } from "../../lib/savings-funding";
 import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -45,6 +47,9 @@ export function CategoryManageSheet({
   onSuccess,
   zIndex,
 }: CategoryManageSheetProps) {
+  const [savingsTarget, setSavingsTarget] = useState<SavingsFundingTarget>("separate");
+  const [pendingSavings, setPendingSavings] = useState(false);
+  const savingsDraft = useRef<{ operationId: string; categoryId: string; accountId: string; amount: number; date: string; target: SavingsFundingTarget } | null>(null);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("🧾");
   const [categoryType, setCategoryType] = useState(defaultType ?? availableTypes?.[0] ?? "");
@@ -73,7 +78,20 @@ export function CategoryManageSheet({
     setAccountId(category?.defaultAccount ?? (mode === "edit" ? "" : accounts[0]?.id ?? ""));
     setAmount("");
     movedRef.current = null;
-  }, [accounts, availableTypes, category, defaultType, open, mode]);
+    setSavingsTarget("separate"); setPendingSavings(false); savingsDraft.current = null;
+    if (mode === "fund" && category && isSavingsCategory(category)) {
+      try {
+        const stored = localStorage.getItem(`savingsFunding:${category.id}`);
+        if (stored) {
+          const draft = JSON.parse(stored);
+          if (draft.categoryId === category.id && draft.operationId) {
+            savingsDraft.current = draft; setPendingSavings(true);
+            setAccountId(draft.accountId); setAmount(String(draft.amount)); setSavingsTarget(draft.target);
+          }
+        }
+      } catch { /* The current mounted draft is still retained if storage is unavailable. */ }
+    }
+  }, [category?.id, open, mode]);
 
   const isCreate = mode === "create";
   const isEdit = mode === "edit";
@@ -96,6 +114,7 @@ export function CategoryManageSheet({
     (status === "idle" || status === "error") &&
     accountId &&
     (isMetadata ? name.trim().length > 0 && (!isEdit || Boolean(category?.id)) : Boolean(category?.id)) &&
+    (isMetadata || !category || !isSavingsCategory(category) || Boolean(holdingAccount)) &&
     (isEdit || ((isCreate && !amount) || (Number.isFinite(parsedAmount) && parsedAmount > 0)));
 
   // Funding a savings category reads as adding to savings.
@@ -127,6 +146,29 @@ export function CategoryManageSheet({
         categoryId = createData.category?.id;
         categoryName = createData.category?.name ?? categoryName;
         if (!categoryId) throw new Error("Category was created without an id");
+      }
+
+      if (addingToSavings && category && holdingAccount) {
+        const draft = savingsDraft.current ?? {
+          operationId: crypto.randomUUID(), categoryId: category.id, accountId,
+          amount: parsedAmount, date: today(), target: savingsTarget,
+        };
+        savingsDraft.current = draft; setPendingSavings(true);
+        try { localStorage.setItem(`savingsFunding:${category.id}`, JSON.stringify(draft)); } catch {}
+        const response = await fetch("/api/savings-funding", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          if (!data.pending) {
+            savingsDraft.current = null; setPendingSavings(false);
+            try { localStorage.removeItem(`savingsFunding:${category.id}`); } catch {}
+          }
+          throw new Error(data.pending ? `${data.error} Retry to finish the same deposit.` : data.error);
+        }
+        try { localStorage.removeItem(`savingsFunding:${category.id}`); } catch {}
+        savingsDraft.current = null; setPendingSavings(false);
+        setStatus("success"); onSuccess(`${category.name} funded`); onClose(); return;
       }
 
       if (!isEdit && parsedAmount > 0 && moveNeeded && moveKey && movedRef.current !== moveKey) {
@@ -240,7 +282,7 @@ export function CategoryManageSheet({
         <section style={sectionStyle}>
           <label style={fieldStyle}>
             <span style={labelStyle}>{isMetadata ? "Default account" : "Funding account"}</span>
-            <ChoicePicker aria-label={isMetadata ? "Default account" : "Funding account"} value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+            <ChoicePicker disabled={status === "saving" || pendingSavings} aria-label={isMetadata ? "Default account" : "Funding account"} value={accountId} onChange={(event) => setAccountId(event.target.value)}>
               <option value="" disabled>Choose account</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.icon} {account.label}</option>
@@ -248,10 +290,13 @@ export function CategoryManageSheet({
             </ChoicePicker>
           </label>
 
+          {addingToSavings && holdingAccount && /joined|joint/i.test(holdingAccount.label) && <SavingsFundingTargetPicker value={savingsTarget} onChange={setSavingsTarget} disabled={status === "saving" || pendingSavings} />}
+
           {!isEdit && <label style={fieldStyle}>
             <span style={labelStyle}>{isCreate ? "Fund this month" : "Amount to add"}</span>
             <div style={amountWrapStyle}>
               <input
+                disabled={status === "saving" || pendingSavings}
                 value={amount}
                 onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder={isCreate ? "Optional" : "0"}
@@ -287,6 +332,7 @@ export function CategoryManageSheet({
           )}
         </section>
 
+        {pendingSavings && status !== "saving" && !error && <Banner tone="warning" compact>This deposit is unfinished. Retry to complete it.</Banner>}
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         </BlurScrollArea>

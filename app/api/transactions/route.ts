@@ -1,3 +1,4 @@
+import { FUNDING_OPERATION, readText } from "../../../lib/savings-funding";
 import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { mapTransactionPage as mapPage } from "../../../lib/transaction-page";
@@ -119,7 +120,7 @@ async function handlePATCH(req: NextRequest) {
       const storedAmount = stored.page.properties?.Amount?.number ?? 0;
       const sameCategory = storedCategory?.replace(/-/g, "") === String(categoryId).replace(/-/g, "");
       try {
-        await assertExpenseFitsBudget(token, { categoryId, amount: parsedAmount, originalAmount: sameCategory ? storedAmount : 0 });
+        await assertExpenseFitsBudget(token, { categoryId, accountId, amount: parsedAmount, originalAmount: sameCategory ? storedAmount : 0 });
       } catch (error: any) {
         return NextResponse.json({ error: error.message, full: error.full }, { status: error.status ?? 500 });
       }
@@ -160,6 +161,7 @@ async function handleDELETE(req: NextRequest) {
   try {
     const stored = await fetchTransactionPage(token, id);
     if (stored.error) return stored.error;
+    if (readText(stored.page.properties?.[FUNDING_OPERATION])) return NextResponse.json({ error: "This transfer is linked to savings funding. Use the savings category to spend or take money out." }, { status: 409 });
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {
       method: "PATCH",
       headers: notionHeaders(token),
@@ -185,11 +187,12 @@ async function handlePUT(req: NextRequest) {
   try {
     const stored = await fetchTransactionPage(token, id);
     if (stored.error) return stored.error;
+    if (readText(stored.page.properties?.[FUNDING_OPERATION])) return NextResponse.json({ error: "Linked savings transfers cannot be restored independently." }, { status: 409 });
     // Restoring an expense spends its money again, so it must still fit.
     const restoredCategory = stored.page.properties?.Category?.relation?.[0]?.id;
     if (stored.page.properties?.Type?.select?.name === "Expense" && restoredCategory) {
       try {
-        await assertExpenseFitsBudget(token, { categoryId: restoredCategory, amount: stored.page.properties?.Amount?.number ?? 0 });
+        await assertExpenseFitsBudget(token, { categoryId: restoredCategory, accountId: stored.page.properties?.Account?.relation?.[0]?.id, amount: stored.page.properties?.Amount?.number ?? 0 });
       } catch (error: any) {
         return NextResponse.json({ error: error.message, full: error.full }, { status: error.status ?? 500 });
       }

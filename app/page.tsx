@@ -804,7 +804,7 @@ export default function App() {
   };
 
   const filteredCats = categories
-    .filter((c) => categoryMatchesScope(c, budgetScope, accounts))
+    .filter((c) => (c.id === categoryId || categoryMatchesScope(c, budgetScope, accounts)))
     .filter((c) => c.name.toLowerCase().includes(catSearch.toLowerCase()))
     .sort((a, b) => {
       if (a.id === lastUsedCatId) return -1;
@@ -866,10 +866,10 @@ export default function App() {
   // Remaining partner contributions reconcile current allocations with account cash.
   const contribStatus = useMemo(() => calculateContributionStatus({
     accounts,
-    categories,
+    categories: [...categories, ...frozenCategories],
     transactions: contributionTransactions,
     monthlySummary,
-  }), [accounts, categories, contributionTransactions, monthlySummary]);
+  }), [accounts, categories, frozenCategories, contributionTransactions, monthlySummary]);
 
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(
     accounts,

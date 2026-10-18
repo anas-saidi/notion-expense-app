@@ -1,9 +1,11 @@
+import { SAVINGS_TARGET } from "./savings-funding";
 const PROP_BUDGET_IN = "💰 budget (in)";
 const PROP_BUDGET_OUT = "💰 budget (out)";
 const PROP_ACCOUNT_IN = "🏦 account ( in )";
 const PROP_ACCOUNT_OUT = "🏦 account ( out )";
 
 export const mapTransactionPage = (page: any) => ({
+  savingsFundingTarget: page.properties?.[SAVINGS_TARGET]?.select?.name as "separate" | "shared" | undefined,
   id: page.id,
   name: page.properties?.Name?.title?.[0]?.plain_text ?? "",
   amount: page.properties?.Amount?.number ?? 0,

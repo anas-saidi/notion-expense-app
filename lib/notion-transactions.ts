@@ -1,3 +1,6 @@
+import { mapCategoryPage } from "./notion-category-record";
+import { isSavingsCategory } from "../app/components/wallet-utils";
+import { normalizeId } from "./savings-funding";
 import { expenseBudgetGate, fmt } from "../app/components/app-utils";
 
 const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
@@ -25,13 +28,17 @@ type BudgetError = Error & { status?: number; full?: unknown };
  * category's live Available and throws a 409 when the new spending doesn't fit.
  * `originalAmount` is the amount already counted, when editing within the same category.
  */
-export async function assertExpenseFitsBudget(token: string, { categoryId, amount, originalAmount = 0 }: { categoryId: string; amount: number; originalAmount?: number }) {
+export async function assertExpenseFitsBudget(token: string, { categoryId, amount, originalAmount = 0, accountId }: { categoryId: string; amount: number; originalAmount?: number; accountId?: string }) {
   const response = await fetch(`https://api.notion.com/v1/pages/${categoryId}`, { headers: notionHeaders(token), cache: "no-store" });
   const data = await response.json();
   if (!response.ok) {
     const error = new Error(data?.message || "Couldn't check the category's budget") as BudgetError;
     error.status = response.status;
     throw error;
+  }
+  const category = mapCategoryPage(data);
+  if (isSavingsCategory(category) && accountId && (!category.defaultAccount || normalizeId(category.defaultAccount) !== normalizeId(accountId))) {
+    throw Object.assign(new Error("Spend savings from the category’s holding account. Move money into it first."), { status: 409 });
   }
   const prop = data.properties?.Available;
   const available: number | null = prop?.formula?.number ?? prop?.number ?? null;
@@ -48,7 +55,7 @@ export async function assertExpenseFitsBudget(token: string, { categoryId, amoun
 }
 
 export async function createNotionExpense(token: string, input: CreateExpenseInput) {
-  await assertExpenseFitsBudget(token, { categoryId: input.categoryId, amount: input.amount });
+  await assertExpenseFitsBudget(token, { categoryId: input.categoryId, amount: input.amount, accountId: input.accountId });
   const response = await fetch("https://api.notion.com/v1/pages", {
     method: "POST",
     headers: notionHeaders(token),

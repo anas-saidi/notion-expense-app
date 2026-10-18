@@ -26,6 +26,7 @@ export type Transaction = {
   date: string;
   category: string | null;
   accountId: string | null;
+  savingsFundingTarget?: "separate" | "shared";
   type?: "Expense" | "Income" | "Transfer" | null;
   fromCategoryId?: string | null;
   toCategoryId?: string | null;

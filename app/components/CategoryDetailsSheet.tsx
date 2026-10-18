@@ -18,6 +18,7 @@ import { currentMonth, isPastMonth } from "./app-utils";
 type TimelineItem = {
   id: string;
   date: string;
+  readOnly?: boolean;
   kind: "funded" | "moved_in" | "moved_out" | "expense";
   amount: number;
   direction: "in" | "out";
@@ -195,9 +196,9 @@ export function CategoryDetailsSheet({
         </section>
 
         {/* ── Actions ── */}
-        <div style={actionsRowStyle}>
+        <div style={{ ...actionsRowStyle, ...(onTakeOut ? { gridTemplateColumns: "repeat(4, minmax(0, 1fr))" } : {}) }}>
           {onTakeOut ? <>
-            {/* Savings is set aside, not spent from: money only goes in, or deliberately comes out. */}
+            {/* Savings keeps deposits, purchases, and deliberate releases together. */}
             <ActionBtn
               icon={<FundIcon size={18} strokeWidth={2} />}
               label="Add"
@@ -206,6 +207,15 @@ export function CategoryDetailsSheet({
               ink="var(--bg)"
               border="1px solid transparent"
               onClick={onOpenFund}
+            />
+            <ActionBtn
+              icon={<ReceiptIcon size={18} strokeWidth={2} />}
+              label="Spend"
+              ariaLabel="Spend from savings"
+              bg="var(--surface)"
+              ink="var(--text2)"
+              border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
+              onClick={onOpenAdd}
             />
             <ActionBtn
               icon={<TransferIcon size={18} strokeWidth={2} />}
@@ -285,7 +295,7 @@ export function CategoryDetailsSheet({
                       : item.kind === "expense"
                         ? <CategoryIcon icon={category.icon} size={20} />
                         : <TransferIcon size={14} />}
-                    onClick={item.kind === "funded" ? () => setEditingFund({ ...item, categoryAvailable: available }) : undefined}
+                    onClick={item.kind === "funded" && !item.readOnly ? () => setEditingFund({ ...item, categoryAvailable: available }) : undefined}
                   />
                 );
               })}

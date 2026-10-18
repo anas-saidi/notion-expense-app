@@ -1,3 +1,4 @@
+import { FUNDING_OPERATION, readText } from "../../../../lib/savings-funding";
 import { withMirrorReads, withMirrorMutation } from "../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "@/lib/notion-api";
@@ -222,7 +223,7 @@ async function handlePOST(req: NextRequest) {
       return NextResponse.json({ error: queryData.message || "Failed to query funds" }, { status: queryRes.status });
     }
 
-    const existing = queryData.results?.[0];
+    const existing = queryData.results?.find((page: any) => !readText(page.properties?.[FUNDING_OPERATION]));
 
     if (existing) {
       const currentPlanned = existing.properties.Planned?.number ?? 0;
@@ -308,6 +309,7 @@ async function handlePATCH(req: NextRequest) {
   try {
     const stored = await fetchFundPage(token, id);
     if (stored.error) return stored.error;
+    if (readText(stored.page.properties?.[FUNDING_OPERATION])) return NextResponse.json({ error: "This assignment is linked to a savings deposit. Use Spend or Take out in the savings category." }, { status: 409 });
     const existingCategoryId = stored.page.properties.Category?.relation?.[0]?.id;
     if (!existingCategoryId) return NextResponse.json({ error: "Funding transaction has no category" }, { status: 409 });
     const reductionError = await assertFundReductionIsAvailable(token, stored.page, planned);
@@ -346,6 +348,7 @@ async function handleDELETE(req: NextRequest) {
   try {
     const stored = await fetchFundPage(token, id);
     if (stored.error) return stored.error;
+    if (readText(stored.page.properties?.[FUNDING_OPERATION])) return NextResponse.json({ error: "This assignment is linked to a savings deposit. Use Spend or Take out in the savings category." }, { status: 409 });
     const reductionError = await assertFundReductionIsAvailable(token, stored.page, 0);
     if (reductionError) return NextResponse.json({ error: reductionError }, { status: 409 });
     const response = await fetch(`https://api.notion.com/v1/pages/${id}`, {

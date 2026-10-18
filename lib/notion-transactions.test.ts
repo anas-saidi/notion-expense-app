@@ -38,3 +38,12 @@ describe("createNotionExpense", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+it("spends 6000 directly from funded savings only through its holding account", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ properties: {
+    Available: { formula: { number: 6000 } }, Type: { multi_select: [{ name: "Saving" }] }, Default: { relation: [{ id: "joint" }] },
+  } }) }));
+  await expect(assertExpenseFitsBudget("t", { categoryId: "bedroom", amount: 6000, accountId: "joint" })).resolves.toBeUndefined();
+  await expect(assertExpenseFitsBudget("t", { categoryId: "bedroom", amount: 6001, accountId: "joint" })).rejects.toMatchObject({ status: 409 });
+  await expect(assertExpenseFitsBudget("t", { categoryId: "bedroom", amount: 6000, accountId: "personal" })).rejects.toMatchObject({ status: 409 });
+});

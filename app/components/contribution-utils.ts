@@ -1,5 +1,6 @@
 import type { Account, Category, MonthlySummary, Transaction } from "./app-types";
-import { getCategoryAvailableByScope } from "./wallet-utils";
+import { savingsHeldIn } from "../../lib/savings-funding";
+import { isSavingsCategory, getCategoryAvailableByScope } from "./wallet-utils";
 import { categoryMatchesScope } from "./app-utils";
 
 export type ContributionStatus = {
@@ -46,6 +47,9 @@ export function calculateContributionStatus({
   const salmaPercent = salmaAccount?.contributionPercent ?? null;
   if (anasPercent == null || salmaPercent == null || anasPercent < 0 || salmaPercent < 0 ||
       Math.abs(anasPercent + salmaPercent - 1) > 0.000001 || joinedAccount.balance == null) return null;
+  const savingsReserve = savingsHeldIn(categories, joinedAccount.id);
+  if (savingsReserve === null) return null;
+
   const jointCategories = categories.filter(category => categoryMatchesScope(category, "joint", accounts));
   if (jointCategories.some(category => category.available == null)) return null;
 
@@ -70,12 +74,14 @@ export function calculateContributionStatus({
       if (transaction.toAccountId === joinedAccount.id) {
         joinedInflows += transaction.amount;
         const fromLabel = accountLabel(accounts, transaction.fromAccountId);
+        if (transaction.savingsFundingTarget === "separate") continue;
         if (fromLabel.includes("hubb")) anasTransferred += transaction.amount;
         else if (fromLabel.includes("wife")) salmaTransferred += transaction.amount;
       }
       if (transaction.fromAccountId === joinedAccount.id) {
         joinedOutflows += transaction.amount;
         const toLabel = accountLabel(accounts, transaction.toAccountId);
+        if (transaction.savingsFundingTarget === "separate") continue;
         if (toLabel.includes("hubb")) anasTransferred -= transaction.amount;
         else if (toLabel.includes("wife")) salmaTransferred -= transaction.amount;
       }
@@ -93,7 +99,7 @@ export function calculateContributionStatus({
 
     if (!transaction.category) continue;
     const category = categories.find((candidate) => candidate.id === transaction.category);
-    if (!category || !categoryMatchesScope(category, "joint", accounts)) continue;
+    if (!category || isSavingsCategory(category) || !categoryMatchesScope(category, "joint", accounts)) continue;
     const payerLabel = accountLabel(accounts, transaction.accountId);
     if (payerLabel.includes("hubb")) anasDirectSpend += transaction.amount;
     else if (payerLabel.includes("wife")) salmaDirectSpend += transaction.amount;
@@ -106,7 +112,8 @@ export function calculateContributionStatus({
   const cents = (amount: number) => Math.round((amount + Number.EPSILON) * 100);
   const anasActual = anasTransferred + anasDirectSpend;
   const salmaActual = salmaTransferred + salmaDirectSpend;
-  const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance));
+  // Savings cash remains outside the household spending commitments.
+  const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance - savingsReserve));
   const targetCents = cents(anasActual) + cents(salmaActual) + gapCents;
   // A partner already above their share owes zero; cap the other partner at
   // the household shortfall so paying dues never demands an implicit refund.

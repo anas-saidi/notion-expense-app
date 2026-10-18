@@ -1,3 +1,4 @@
+import { FUNDING_OPERATION, readText } from "../../../../lib/savings-funding";
 import { withMirrorMutation } from "../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../../components/app-utils";
@@ -145,6 +146,7 @@ async function handlePOST(req: NextRequest) {
     const byCategory = new Map<string, any>();
     const normalizeId = (id: string) => id.replace(/-/g, "").toLowerCase();
     for (const fund of existingFunds) {
+      if (readText(fund.properties?.[FUNDING_OPERATION])) continue;
       for (const category of fund.properties?.Category?.relation ?? []) {
         const key = normalizeId(category.id);
         if (!byCategory.has(key)) byCategory.set(key, fund);

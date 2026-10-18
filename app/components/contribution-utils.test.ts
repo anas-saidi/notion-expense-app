@@ -95,3 +95,49 @@ describe("reconciled contributions", () => {
     expect(calculateContributionStatus({ accounts: accounts.map(a => a.id === "anas" ? { ...a, contributionPercent: null } : a), categories, transactions, monthlySummary })).toBeNull();
   });
 });
+
+describe("savings deposits and purchases", () => {
+  const savings = { ...categories[0], id: "bedroom", name: "Bedroom", type: ["Saving"], available: 0, owner: "Salma", isTeamFund: false };
+  const savingsCalc = (cash: number, remaining: number, activity: Transaction[] = [], extraAccounts: Account[] = []) => calculateContributionStatus({
+    accounts: [...accounts.map(account => account.id === "joint" ? { ...account, balance: cash } : account), ...extraAccounts],
+    categories: [{ ...categories[0], available: 1000 }, { ...savings, available: remaining }],
+    transactions: activity, monthlySummary,
+  })!;
+  const deposit = (id: string, from: string, amount: number, target: "separate" | "shared"): Transaction => ({
+    id, name: "To Bedroom", amount, date: "2026-10-18", category: "bedroom", accountId: null, type: "Transfer", fromAccountId: from, toAccountId: "joint", savingsFundingTarget: target,
+  });
+  it("keeps both dues intact after 3000 each is assigned, then 6000 spent from Bedroom", () => {
+    const before = savingsCalc(0, 0);
+    const deposits = [deposit("a", "anas", 3000, "separate"), deposit("s", "salma", 3000, "separate")];
+    const funded = savingsCalc(6000, 6000, deposits);
+    const spent = savingsCalc(0, 0, [...deposits, { id: "buy", name: "Bedroom purchase", amount: 6000, date: "2026-10-18", category: "bedroom", accountId: "joint", type: "Expense" }]);
+    expect(due(before)).toEqual([650, 350]);
+    expect(due(funded)).toEqual(due(before));
+    expect(due(spent)).toEqual(due(before));
+    expect(funded.anasActual).toBe(0); expect(funded.salmaActual).toBe(0);
+    expect(spent.openingJointBalance).toBe(0);
+  });
+  it("reserves savings across months even without this month's deposits", () => {
+    expect(due(savingsCalc(6000, 6000))).toEqual([650, 350]);
+  });
+  it("credits shared savings while adding them to the percentage-based target", () => {
+    const result = savingsCalc(100, 100, [deposit("s", "salma", 100, "shared")]);
+    expect(due(result)).toEqual([715, 285]);
+    expect(result.salmaActual).toBe(100);
+  });
+  it("keeps ordinary contribution transfers working beside separate savings", () => {
+    const transfers = [deposit("s", "salma", 3000, "separate"), { ...transactions[0], amount: 200 }];
+    expect(due(savingsCalc(3200, 3000, transfers))).toEqual([450, 350]);
+  });
+  it("does not subtract a dedicated savings account's balance from joint cash", () => {
+    const result = calculateContributionStatus({ accounts, categories: [{ ...categories[0], available: 3000 }, { ...savings, available: 6000, defaultAccount: "saving" }], transactions: [], monthlySummary })!;
+    expect(due(result)).toEqual([650, 350]);
+  });
+  it("does not credit savings purchases from a personal account as household spending", () => {
+    const expense: Transaction = { ...transactions[3], category: "bedroom", amount: 100 };
+    expect(savingsCalc(0, 0, [expense]).anasActual).toBe(0);
+  });
+  it("fails closed when a held savings balance is unknown", () => {
+    expect(calculateContributionStatus({ accounts, categories: [{ ...savings, available: null }], transactions: [], monthlySummary })).toBeNull();
+  });
+});

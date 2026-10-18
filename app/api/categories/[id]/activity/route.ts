@@ -1,3 +1,4 @@
+import { FUNDING_OPERATION, readText } from "../../../../../lib/savings-funding";
 import { withMirrorReads } from "../../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "@/lib/notion-api";
@@ -33,6 +34,7 @@ type TimelineEvent = {
   relatedCategoryName?: string | null;
   assignmentType?: "Monthly" | "Top-up" | null;
   sourceDb: "funds" | "transactions";
+  readOnly?: boolean;
 };
 
 function normalizeId(id: string) {
@@ -223,6 +225,7 @@ async function handleGET(
         id: page.id,
         date: page.properties.Date?.date?.start ?? "",
         kind: "funded",
+        readOnly: Boolean(readText(page.properties[FUNDING_OPERATION])),
         amount,
         direction: "in",
         title: `Funded from ${account?.name ?? "account"}`,
