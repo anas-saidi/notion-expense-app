@@ -75,3 +75,55 @@ it("rejects a non-emoji icon without calling Notion", async () => {
   expect((await requestEdit({ ...editBody, icon: "car" })).status).toBe(400);
   expect(mock).not.toHaveBeenCalled();
 });
+
+it.each(["Everyday", "Scheduled", "Flexible", "Goal"])("saves the %s spending pattern alongside metadata", async (spendingPattern) => {
+  const mock = mockEdit(["anas", "salma"]);
+  const response = await PATCH(new NextRequest("http://localhost/api/categories", { method: "PATCH", body: JSON.stringify({ ...editBody, spendingPattern }) }));
+  expect(response.status).toBe(200);
+  expect(JSON.parse(mock.mock.calls[2][1].body).properties["Spending pattern"]).toEqual({ select: { name: spendingPattern } });
+});
+
+it("updates or clears only the spending pattern without changing owners, accounts or funding", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test");
+  for (const spendingPattern of ["Everyday", null]) {
+    const mock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ parent: { database_id: categoryDb } }))
+      .mockResolvedValueOnce(Response.json({ id: "car", properties: { "Spending pattern": { select: spendingPattern ? { name: spendingPattern } : null } } }));
+    vi.stubGlobal("fetch", mock);
+    const response = await PATCH(new NextRequest("http://localhost/api/categories", { method: "PATCH", body: JSON.stringify({ id: "car", spendingPattern }) }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).category.spendingPattern).toBe(spendingPattern);
+    expect(JSON.parse(mock.mock.calls[1][1].body)).toEqual({ properties: { "Spending pattern": { select: spendingPattern ? { name: spendingPattern } : null } } });
+  }
+});
+
+it("rejects invalid patterns before calling Notion on create or edit", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test");
+  const mock = vi.fn(); vi.stubGlobal("fetch", mock);
+  for (const value of ["Daily", "", {}, 7]) {
+    for (const handler of [POST, PATCH]) {
+      expect((await handler(new NextRequest("http://localhost/api/categories", { method: handler === POST ? "POST" : "PATCH", body: JSON.stringify({ ...editBody, spendingPattern: value }) }))).status).toBe(400);
+    }
+  }
+  expect(mock).not.toHaveBeenCalled();
+});
+
+it("rejects spending-pattern edits on pages outside Categories", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test");
+  const mock = vi.fn().mockResolvedValue(Response.json({ parent: { database_id: "other" } }));
+  vi.stubGlobal("fetch", mock);
+  expect((await PATCH(new NextRequest("http://localhost/api/categories", { method: "PATCH", body: JSON.stringify({ id: "car", spendingPattern: "Everyday" }) }))).status).toBe(400);
+  expect(mock).toHaveBeenCalledTimes(1);
+});
+
+it("creates a category with its explicit pattern and returns it", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test");
+  const mock = vi.fn()
+    .mockResolvedValueOnce(Response.json({ properties: { Category: { type: "title" }, "Spending pattern": { type: "select" } } }))
+    .mockResolvedValueOnce(Response.json({ id: "new", properties: { "Spending pattern": { select: { name: "Scheduled" } } } }));
+  vi.stubGlobal("fetch", mock);
+  const response = await POST(new NextRequest("http://localhost/api/categories", { method: "POST", body: JSON.stringify({ name: "Rent", spendingPattern: "Scheduled" }) }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).category.spendingPattern).toBe("Scheduled");
+  expect(JSON.parse(mock.mock.calls[1][1].body).properties["Spending pattern"]).toEqual({ select: { name: "Scheduled" } });
+});

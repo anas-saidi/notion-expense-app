@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import type { BudgetScope, Category } from "./app-types";
 import { fmt } from "./app-utils";
+import { runwayLabel } from "./category-runway";
 import type { BudgetStatus } from "./category-status";
 import { CategoryJar } from "./mascot/CategoryJar";
 
@@ -12,17 +13,18 @@ import { CategoryJar } from "./mascot/CategoryJar";
  * Rows sit flat on a shared section surface; tapping opens the category.
  * On desktop the row becomes a table row: Budgeted and Spent columns appear (CSS).
  */
-export function BudgetJarRow({ cat, scope, status, planned, spent, onOpen }: {
+export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, onOpen }: {
   cat: Category;
   scope: BudgetScope;
   status: BudgetStatus;
+  runwayDays?: number;
   planned: number;
   spent: number;
   onOpen: () => void;
 }) {
   const { state, low, amount, level } = status;
   const line = state === "over" ? { text: "Overspent", color: "var(--status-over)", strong: true }
-    : low ? { text: "Spending fast", color: "var(--status-low)", strong: false }
+    : low ? { text: runwayDays == null ? "Running low" : runwayLabel(runwayDays), color: "var(--status-low)", strong: false }
     : state === "normal" && Math.round(spent) > 0 ? { text: `${fmt(Math.round(spent))} spent`, color: "var(--muted)", strong: false, spentOnly: true }
     : null;
   const amountColor = state === "over" ? "var(--status-over)" : low ? "var(--status-low)" : state === "normal" ? "var(--text2)" : "var(--muted)";

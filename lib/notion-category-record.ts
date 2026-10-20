@@ -1,3 +1,5 @@
+import { isSpendingPattern, SPENDING_PATTERN_PROPERTY } from "./spending-pattern";
+
 /** Find a property value by case-insensitive name match, trying formula/rollup/number types. */
 const readNumericProp = (props: Record<string, any>, name: string): number | null => {
   const key = Object.keys(props).find(k => k.toLowerCase() === name.toLowerCase());
@@ -15,6 +17,7 @@ export const mapCategoryPage = (page: any) => {
     name: props.Category?.title?.[0]?.plain_text ?? "Unnamed",
     icon: page.icon?.emoji ?? null,
     type: typeValues,
+    spendingPattern: isSpendingPattern(props[SPENDING_PATTERN_PROPERTY]?.select?.name) ? props[SPENDING_PATTERN_PROPERTY].select.name : null,
     owner:
       props.Owner?.select?.name ??
       props.Owner?.people?.[0]?.name ??

@@ -1,3 +1,4 @@
+import { isSpendingPattern, SPENDING_PATTERN_PROPERTY } from "../../../lib/spending-pattern";
 import { mapCategoryPage } from "../../../lib/notion-category-record";
 import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
@@ -104,6 +105,11 @@ async function handlePATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing category id" }, { status: 400 });
 
   const properties: Record<string, unknown> = {};
+  const updatingPattern = "spendingPattern" in body;
+  if (updatingPattern) {
+    if (body.spendingPattern !== null && !isSpendingPattern(body.spendingPattern)) return NextResponse.json({ error: "Choose a valid spending pattern" }, { status: 400 });
+    properties[SPENDING_PATTERN_PROPERTY] = { select: body.spendingPattern === null ? null : { name: body.spendingPattern } };
+  }
   if (typeof body.snoozed === "boolean") properties.Snooze = { checkbox: body.snoozed };
   if (typeof body.archived === "boolean") properties.Archived = { checkbox: body.archived };
   const editing = ["name", "icon", "type", "accountId"].some(key => key in body);
@@ -116,13 +122,15 @@ async function handlePATCH(req: NextRequest) {
   if (!editing && !Object.keys(properties).length) return NextResponse.json({ error: "No category updates provided" }, { status: 400 });
 
   try {
-    if (editing) {
+    if (editing || updatingPattern) {
       const categoryRes = await fetch(`https://api.notion.com/v1/pages/${id}`, { headers: notionHeaders(token), cache: "no-store" });
       const category = await categoryRes.json();
       if (!categoryRes.ok) return NextResponse.json({ error: category.message || "Could not read category" }, { status: categoryRes.status });
       if (!sameDb(category.parent?.database_id, CATEGORIES_DB)) {
         return NextResponse.json({ error: "Choose a category from the categories database" }, { status: 400 });
       }
+    }
+    if (editing) {
       const owners = await readAccountOwners(token, accountId);
       if (owners instanceof NextResponse) return owners;
       properties.Category = { title: [{ text: { content: name } }] };
@@ -154,6 +162,7 @@ async function handlePOST(req: NextRequest) {
   const categoryType = typeof body?.type === "string" ? body.type.trim() : "";
   const accountId = typeof body?.accountId === "string" && body.accountId ? body.accountId : null;
 
+  if (body && "spendingPattern" in body && body.spendingPattern !== null && !isSpendingPattern(body.spendingPattern)) return NextResponse.json({ error: "Choose a valid spending pattern" }, { status: 400 });
   if (!name) return NextResponse.json({ error: "Missing category name" }, { status: 400 });
   if (icon && !isEmoji(icon)) return NextResponse.json({ error: "Icon must be a single emoji" }, { status: 400 });
 
@@ -184,6 +193,11 @@ async function handlePOST(req: NextRequest) {
     const properties: Record<string, unknown> = {
       [titleKey]: { title: [{ text: { content: name } }] },
     };
+
+    if (body.spendingPattern != null) {
+      if (meta.properties?.[SPENDING_PATTERN_PROPERTY]?.type !== "select") return NextResponse.json({ error: "Categories database needs a Spending pattern select" }, { status: 400 });
+      properties[SPENDING_PATTERN_PROPERTY] = { select: { name: body.spendingPattern } };
+    }
 
     if (typeKey && categoryType) {
       properties[typeKey] = { multi_select: [{ name: categoryType }] };

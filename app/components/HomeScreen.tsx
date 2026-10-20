@@ -8,6 +8,7 @@ import { TransactionRow } from "./ui/TransactionRow";
 import { Banner } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
+import { runningLowCategories, runwayLabel } from "./category-runway";
 
 type HomeScreenProps = {
   billsSection?: ReactNode;
@@ -31,6 +32,7 @@ type HomeScreenProps = {
   planningRemaining?: Record<BudgetScope, number>;
   plannedScopes?: Record<"joint" | "anas" | "salma", boolean>;
   transactions?: Transaction[];
+  budgetTransactions?: Transaction[];
   pendingItems?: PendingItem[];
   jointUnassigned?: number;
   /** Assign unassigned money (opens Rebalance, the same place Budget's banner goes). */
@@ -60,6 +62,7 @@ export function HomeScreen({
   plannedScopes,
   planningRemaining,
   transactions,
+  budgetTransactions,
   pendingItems,
   jointUnassigned,
   onOpenAssign,
@@ -105,8 +108,13 @@ export function HomeScreen({
     return groups;
   }, [recentTxns]);
 
+  const runningLow = useMemo(() => isCurrentMonth && !monthlyLoading && !monthlyError
+    ? runningLowCategories(visibleCategories, budgetTransactions ?? [], today())
+    : [], [isCurrentMonth, monthlyLoading, monthlyError, visibleCategories, budgetTransactions]);
+  const firstLow = runningLow[0];
+
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
-  const showJointUnassignedPrompt = isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
+  const showJointUnassignedPrompt = !firstLow && isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
 
   // Month-end planning alert: show 2 days before month end until plan is locked
   const { daysUntilMonthEnd, nextMonthLabel: planningNextMonthLabel } = useMemo(() => {
@@ -132,7 +140,7 @@ export function HomeScreen({
   const plannedCount = plannedScopes
     ? Object.values(plannedScopes).filter(Boolean).length
     : 0;
-  const showMonthEndAlert = !secondaryLoading && !monthlyLoading && !monthlyError && planningReady && isCurrentMonth && (planningCurrentMonth || daysUntilMonthEnd <= 2) && !allScopesPlanned;
+  const showMonthEndAlert = !firstLow && !secondaryLoading && !monthlyLoading && !monthlyError && planningReady && isCurrentMonth && (planningCurrentMonth || daysUntilMonthEnd <= 2) && !allScopesPlanned;
   const showPlanningPrompt = showMonthEndAlert && readyToAssign > 0;
   const planningTiming = planningCurrentMonth ? "This month is not planned yet" : daysUntilMonthEnd <= 0
     ? "Last day of the month"
@@ -156,6 +164,17 @@ export function HomeScreen({
         />
       </div>
 
+
+      {firstLow && onOpenAssign && (
+        <Banner
+          tone="warning"
+          style={{ marginBottom: 16 }}
+          title={runningLow.length === 1 ? `${firstLow.category.name} is running low` : `${runningLow.length} categories running low`}
+          action={<button type="button" onClick={onOpenAssign} style={bannerActionButtonStyle}>Rebalance</button>}
+        >
+          {runningLow.length === 1 ? runwayLabel(firstLow.daysCovered) : `${firstLow.category.name} runs out first`}
+        </Banner>
+      )}
 
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (

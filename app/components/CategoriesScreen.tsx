@@ -5,14 +5,14 @@ import { HeroSkeleton, SkeletonRows } from "./ui/Skeleton";
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import { Currency } from "./Money";
 import { MonthPicker } from "./DatePicker";
-import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
+import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { AlertTriangleIcon, CalendarIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner, bannerActionStyle } from "./ui/Banner";
-import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned, today } from "./app-utils";
 import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
 import { MascotHero, MASCOT_HERO_SIZE } from "./mascot/MascotHero";
 import { MascotSpill } from "./mascot/MascotSpill";
@@ -20,6 +20,7 @@ import { budgetJarItems } from "./mascot/budgetJar";
 import { JointFamily } from "./WalletCardSwitcher";
 import type { ContributionStatus } from "./contribution-utils";
 import { budgetStatus, budgetStatusRank, monthProgress, pace } from "./category-status";
+import { runningLowCategories, runwayLabel } from "./category-runway";
 import { BudgetJarRow, SavingsJarRow } from "./CategoryJarRow";
 import { SectionToggle } from "./ui/SectionToggle";
 
@@ -34,6 +35,7 @@ type Props = {
   assignBalanceByScope?: Record<BudgetScope, number>;
   contributionRemainingByScope: Record<BudgetScope, number>;
   monthlySummary: MonthlySummary;
+  budgetTransactions?: Transaction[];
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
   budgetScope: BudgetScope;
@@ -67,6 +69,7 @@ export function CategoriesScreen({
   assignBalanceByScope,
   contributionRemainingByScope,
   monthlySummary,
+  budgetTransactions,
   homeMonth,
   onHomeMonthChange,
   budgetScope,
@@ -129,6 +132,11 @@ export function CategoriesScreen({
 
   const past = isPastMonth(homeMonth);
   const progress = monthProgress(homeMonth);
+  const runningLow = useMemo(() => !loading && !monthError && homeMonth === today().slice(0, 7)
+    ? runningLowCategories(categories.filter(cat => getCategoryScope(cat, accounts) === budgetScope), budgetTransactions ?? [], today())
+    : [], [loading, monthError, homeMonth, categories, accounts, budgetScope, budgetTransactions]);
+  const runwayByCategory = useMemo(() => new Map(runningLow.map(risk => [risk.category.id, risk])), [runningLow]);
+  const firstLow = runningLow[0];
   const activeGroups = useMemo(() => {
     const q = search.toLowerCase().trim();
     const items = categories
@@ -142,8 +150,10 @@ export function CategoriesScreen({
         const spent = spentByCategory.get(cat.id) ?? 0;
         const savings = isSavingsCategory(cat);
         const status = budgetStatus({ available: cat.available, spent, planned, past, progress });
+        const runway = runwayByCategory.get(cat.id);
+        status.low = Boolean(runway);
         const section = savings ? "Savings" : cat.type[0] ?? "Other";
-        return { cat, planned, spent, savings, status, section };
+        return { cat, planned, spent, savings, status, section, runway };
       })
       .sort((a, b) => budgetStatusRank(a.status) - budgetStatusRank(b.status) || b.status.amount - a.status.amount);
 
@@ -160,7 +170,7 @@ export function CategoriesScreen({
     return Array.from(map.entries())
       .map(([label, rows]) => ({ label, rows }))
       .sort((a, b) => order(a.label) - order(b.label) || a.label.localeCompare(b.label));
-  }, [categories, search, budgetScope, accounts, spentByCategory, plannedByCategory, past, progress]);
+  }, [categories, search, budgetScope, accounts, spentByCategory, plannedByCategory, past, progress, runwayByCategory]);
 
   // Same figure as Home: category Available (carry-over included), savings excluded.
   const availableInCategories = useMemo(
@@ -256,8 +266,8 @@ export function CategoriesScreen({
               </span>
             </section>
 
-            {/* One banner at a time, the most urgent first: accounts falling short, then money
-                not yet in a category, then what's still due to Joint. Nothing to act on, no banner. */}
+            {/* One banner at a time, the most urgent first: accounts falling short, categories
+                running low, unassigned money, then what's still due to Joint. Nothing to act on, no banner. */}
             {shortBy > 0 ? (
               <Banner
                 tone="danger"
@@ -269,6 +279,14 @@ export function CategoriesScreen({
                   </button>
                 )}
               />
+            ) : firstLow ? (
+              <Banner
+                tone="warning"
+                title={runningLow.length === 1 ? `${firstLow.category.name} is running low` : `${runningLow.length} categories running low`}
+                action={<button type="button" onClick={onOpenRebalance} style={bannerActionStyle}>Rebalance</button>}
+              >
+                {runningLow.length === 1 ? runwayLabel(firstLow.daysCovered) : `${firstLow.category.name} runs out first`}
+              </Banner>
             ) : Math.round(leftToAllocate) > 0 ? (
               <Banner
                 tone="accent"
@@ -328,9 +346,9 @@ export function CategoriesScreen({
                       <div className="budget-table-head" aria-hidden="true">
                         <span>Category</span><span>Budgeted</span><span>Spent</span><span>Available</span>
                       </div>
-                      {group.rows.map(({ cat, planned, spent, savings, status }) => savings
+                      {group.rows.map(({ cat, planned, spent, savings, status, runway }) => savings
                         ? <SavingsJarRow key={cat.id} cat={cat} scope={budgetScope} available={cat.available ?? 0} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />
-                        : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />)}
+                        : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} runwayDays={runway?.daysCovered} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />)}
                       {onOpenNewCategory && (
                         <button type="button" onClick={() => onOpenNewCategory(group.label === "Savings" ? "Saving" : group.label)} style={addRowStyle}>
                           <PlusIcon size={16} aria-hidden="true" />

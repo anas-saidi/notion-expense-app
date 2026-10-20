@@ -1,6 +1,7 @@
 "use client";
 import { SavingsFundingTargetPicker } from "./SavingsFundingTargetPicker";
 import type { SavingsFundingTarget } from "../../lib/savings-funding";
+import { SPENDING_PATTERNS, type SpendingPattern } from "../../lib/spending-pattern";
 import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -52,6 +53,7 @@ export function CategoryManageSheet({
   const savingsDraft = useRef<{ operationId: string; categoryId: string; accountId: string; amount: number; date: string; target: SavingsFundingTarget } | null>(null);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("🧾");
+  const [spendingPattern, setSpendingPattern] = useState<SpendingPattern | "">("");
   const [categoryType, setCategoryType] = useState(defaultType ?? availableTypes?.[0] ?? "");
   const [accountId, setAccountId] = useState("");
   const [amount, setAmount] = useState("");
@@ -73,6 +75,7 @@ export function CategoryManageSheet({
     setError("");
     setName(mode === "edit" ? category?.name ?? "" : "");
     setIcon(category?.icon ?? (mode === "edit" ? "" : "🧾"));
+    setSpendingPattern(mode === "edit" ? category?.spendingPattern ?? "" : "");
     setCategoryType(mode === "edit" ? category?.type?.[0] ?? "" : defaultType ?? availableTypes?.[0] ?? "");
     // Editing never guesses an account: it rewrites the category's owners.
     setAccountId(category?.defaultAccount ?? (mode === "edit" ? "" : accounts[0]?.id ?? ""));
@@ -139,7 +142,7 @@ export function CategoryManageSheet({
         const createRes = await fetch("/api/categories", {
           method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...(isEdit ? { id: category?.id } : {}), name: name.trim(), icon, scope, type: categoryType, accountId }),
+          body: JSON.stringify({ ...(isEdit ? { id: category?.id } : {}), name: name.trim(), icon, scope, type: categoryType, accountId, spendingPattern: spendingPattern || null }),
         });
         const createData = await createRes.json();
         if (!createRes.ok) throw new Error(createData.error || (isEdit ? "Failed to save category" : "Failed to create category"));
@@ -275,6 +278,14 @@ export function CategoryManageSheet({
                 </ChoicePicker>
               </label>
             </div>
+
+            <label style={fieldStyle}>
+              <span style={labelStyle}>Spending pattern</span>
+              <ChoicePicker aria-label="Spending pattern" value={spendingPattern} disabled={status === "saving"} onChange={(event) => setSpendingPattern(event.target.value as SpendingPattern | "")}>
+                <option value="">Not set</option>
+                {SPENDING_PATTERNS.map(pattern => <option key={pattern} value={pattern}>{pattern}</option>)}
+              </ChoicePicker>
+            </label>
 
           </section>
         )}

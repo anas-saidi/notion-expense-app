@@ -1,8 +1,11 @@
+import type { SpendingPattern } from "../../lib/spending-pattern";
+
 export type Category = {
   id: string;
   name: string;
   icon: string | null;
   type: string[];
+  spendingPattern?: SpendingPattern | null;
   owner: string | null;
   defaultAccount: string | null;
   available: number | null;

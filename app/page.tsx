@@ -1,4 +1,5 @@
 "use client";
+import { runwayWindow } from "./components/category-runway";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
@@ -64,6 +65,7 @@ export default function App() {
   const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgetTransactions, setBudgetTransactions] = useState<Transaction[]>([]);
   const [contributionTransactions, setContributionTransactions] = useState<Transaction[]>([]);
   const [billsData, setBillsData] = useState<BillsData | null>(null);
   const [billsLoading, setBillsLoading] = useState(true);
@@ -321,11 +323,18 @@ export default function App() {
     try {
       const target = month ?? formatMonthInput(today());
       const { start, end } = monthBounds(`${target}-01`);
-      const data = await fetchMonthlyData(target);
+      const spendingWindow = runwayWindow(today());
+      const [data, activity] = await Promise.all([
+        fetchMonthlyData(target),
+        target === formatMonthInput(today())
+          ? fetchApiJson<{ transactions: Transaction[] }>(`/api/transactions?start=${spendingWindow.start}&end=${spendingWindow.end}`).catch(() => null)
+          : Promise.resolve(null),
+      ]);
       if (request !== monthRequest.current) return;
       monthlySnapshot.current = { month: target, data, expires: Date.now() + 15000 };
       if (target === formatMonthInput(today())) setCurrentMonthFunds(data.funds ?? []);
       setContributionTransactions(data.transactions ?? []);
+      setBudgetTransactions(activity?.transactions ?? []);
       setMonthlySummary({
         start,
         end,
@@ -1106,6 +1115,7 @@ export default function App() {
           plannedScopes={plannedScopes}
           planningRemaining={nextMonthRemaining}
           transactions={scopedTransactions}
+          budgetTransactions={budgetTransactions}
           pendingItems={scopedPendingItems}
           onOpenHistory={() => { setReflectView("activity"); setTab("history"); }}
           onClickTransaction={editTransaction}
@@ -1124,6 +1134,7 @@ export default function App() {
           assignBalanceByScope={assignBalanceByScope}
           contributionRemainingByScope={contributionRemainingByScope}
           monthlySummary={monthlySummary}
+          budgetTransactions={budgetTransactions}
           homeMonth={homeMonth}
           onHomeMonthChange={(month) => {
             if (month === homeMonth) return;
