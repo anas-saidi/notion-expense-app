@@ -15,7 +15,6 @@ struct HomeView: View {
                     WalletFamily()
                     FinancialHero(label: "Balance", amount: store.cash, color: (store.cash ?? 0) < 0 ? FinanceTheme.expense : .primary)
                 }.padding(.top, 12)
-                PersonalJointDebtSummary()
                 Button { planning = true } label: {
                     HStack {
                         Image(systemName: "calendar").font(.system(size: 18))

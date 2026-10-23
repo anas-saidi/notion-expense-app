@@ -81,14 +81,17 @@ import XCTest
         XCTAssertTrue(enable.waitForExistence(timeout: 5))
     }
 
-    func testPersonalJointDebtIsVisibleInNativeHome() throws {
+    func testPersonalJointDebtIsIncludedInExistingDue() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--sample-household"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["Anas owes Joint"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["For personal spending. Included in the amount due. Transfer from the personal account to Joint to repay."].exists)
+        let due = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Anas wallet.")).firstMatch
+        XCTAssertTrue(due.waitForExistence(timeout: 5))
+        let expectedDue = try XCTUnwrap(Decimal(string: "903.45")).formatted()
+        XCTAssertTrue(due.label.contains("\(expectedDue) MAD due"), due.label)
+        XCTAssertFalse(app.staticTexts["Anas owes Joint"].exists)
         XCTAssertEqual(app.webViews.count, 0)
-        capture(app, "Personal spending owed to Joint")
+        capture(app, "Personal spending included in due")
     }
 
     private func capture(_ app: XCUIApplication, _ name: String) {

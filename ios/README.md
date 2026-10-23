@@ -1,8 +1,8 @@
-# Build 3: personal spending paid by Joint
+# Build 4: personal spending included in due
 
-Personal-budget expenses paid from Joint now appear as debt owed by that budget's owner. Home shows the exact amount, and the expense editor explains the debt before saving. A later personal-to-Joint transfer repays outstanding personal spending first; only its remainder counts toward the household contribution. The live backend carries debt across months and recalculates edits, deletion and archived budgets. Funded savings remain separate.
+Personal-budget expenses paid from Joint now appear as debt owed by that budget's owner. It appears only in the existing amount due, without extra notices in Home or transaction entry. A later personal-to-Joint transfer repays outstanding personal spending first; only its remainder counts toward the household contribution. The live backend carries debt across months and recalculates edits, deletion and archived budgets. Funded savings remain separate.
 
-The app uses the same server calculation as the PWA. Older cached snapshots and backups remain readable; refresh to load the new fields. Build 3 is packaged at `ios/build/CoupleFinance.ipa` for an AltStore update. Keep the existing managed app so its connection and data survive.
+The app uses the same server calculation as the PWA. Older cached snapshots and backups remain readable; refresh to load the new fields. Build 4 is packaged at `ios/build/CoupleFinance.ipa` for an AltStore update. Keep the existing managed app so its connection and data survive.
 
 Verified: 38 native unit tests, all four native UI journeys (including Home debt), and the Release iPhone build. The preview journey ignores saved simulator connection settings without deleting them. Physical installation is pending because the iPhone was unavailable during this update.
 

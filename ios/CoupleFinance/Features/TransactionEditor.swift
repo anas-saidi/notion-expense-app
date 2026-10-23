@@ -24,18 +24,6 @@ struct TransactionEditor: View {
         (amount ?? 0) > 0 && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !account.isEmpty &&
         (kind != "expense" || !category.isEmpty) && (kind != "transfer" || (!destination.isEmpty && destination != account))
     }
-    private var personalJointOwner: WalletScope? {
-        guard kind == "expense", allAccounts.first(where: { $0.id == account })?.scope == .joint,
-              let category = allCategories.first(where: { $0.id == category }),
-              let owner = category.scope, owner != .joint else { return nil }
-        return owner
-    }
-    private var repaysJoint: Bool {
-        guard kind == "transfer", let source = allAccounts.first(where: { $0.id == account }),
-              source.scope == .anas || source.scope == .salma,
-              !source.label.localizedStandardContains("saving") else { return false }
-        return allAccounts.first(where: { $0.id == destination })?.scope == .joint
-    }
     private var editing: Bool { draft.operation == "editTransaction" }
     var body: some View {
         NavigationStack {
@@ -83,14 +71,6 @@ struct TransactionEditor: View {
                     }
                     if kind == "expense" && !editing {
                         Picker("Repeat", selection: $repeatRule) { ForEach(["None", "Monthly", "Yearly"], id: \.self) { Text($0).tag($0) } }
-                    }
-                    if let owner = personalJointOwner, let amount, amount > 0 {
-                        Text("\(owner.title) owes Joint \(amount.formatted(.number.precision(.fractionLength(0...2)))) MAD for this personal expense. A personal-to-Joint transfer repays it.")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    if repaysJoint {
-                        Text("This repays personal spending owed to Joint first. The rest counts toward your contribution.")
-                            .font(.subheadline).foregroundStyle(.secondary)
                     }
                     DatePicker("Date", selection: $date, displayedComponents: .date)
                         .environment(\.timeZone, FinanceDate.calendar.timeZone)

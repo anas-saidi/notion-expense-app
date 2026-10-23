@@ -59,7 +59,6 @@
 		54E052544D3B937855E04A6C /* BillReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0B6582DD6FA13AB918E305 /* BillReminder.swift */; };
 		5862B8141FA702E586339F1D /* FinanceTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 407831378F038AAF88FDCA26 /* FinanceTabBar.swift */; };
 		5BEE979D06347B0A26EC48D1 /* PlanCapacity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DD14D50219276EA01C81DC /* PlanCapacity.swift */; };
-		63522AB66615B6CF84A98585 /* PersonalJointDebtSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CED837B003F3CC8C4B46A88 /* PersonalJointDebtSummary.swift */; };
 		64B040EDB155D52B2C3C7CE5 /* ScopePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4E2ADFFFF5648E098CA11CA /* ScopePicker.swift */; };
 		655207BF38393E2DBF9B8272 /* FinanceNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 261B60C6B7EB21DEDE876C1F /* FinanceNotificationDelegate.swift */; };
 		669D67A3279DEE16B09FA6DD /* BillPayment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8D7B6D4E933DA389F8631F /* BillPayment.swift */; };
@@ -201,7 +200,6 @@
 		58CB5833DB38F47163E82EE0 /* FinanceAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinanceAPI.swift; sourceTree = "<group>"; };
 		58F472F76074ED34C99A40E8 /* DraftsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftsView.swift; sourceTree = "<group>"; };
 		5BE276B28F87491FEBBF161D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		5CED837B003F3CC8C4B46A88 /* PersonalJointDebtSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalJointDebtSummary.swift; sourceTree = "<group>"; };
 		5E6574172FAE9C82AA606DC5 /* CategoryEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryEditor.swift; sourceTree = "<group>"; };
 		5E8D7B6D4E933DA389F8631F /* BillPayment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillPayment.swift; sourceTree = "<group>"; };
 		61A389E86169F873EDD66708 /* JarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarItem.swift; sourceTree = "<group>"; };
@@ -402,7 +400,6 @@
 				9AFD4AE5958724271F99A453 /* MoneyText.swift */,
 				042EB6A087185D4F530B68F1 /* NativeSaveButton.swift */,
 				7E84431B0EA8913AA8966AC1 /* PartnerSummaries.swift */,
-				5CED837B003F3CC8C4B46A88 /* PersonalJointDebtSummary.swift */,
 				F784244230ADE8A37E6FB248 /* ReflectHeader.swift */,
 				E47215F782D2D16BA3171FA4 /* ReflectViewPicker.swift */,
 				B4E2ADFFFF5648E098CA11CA /* ScopePicker.swift */,
@@ -811,7 +808,6 @@
 				06C87AD2B6D8C3F405ACE1C1 /* PendingPurchase.swift in Sources */,
 				2C11AF4A74240EA028C06486 /* PendingResource.swift in Sources */,
 				CE6BF15B094627B2376AA595 /* PendingView.swift in Sources */,
-				63522AB66615B6CF84A98585 /* PersonalJointDebtSummary.swift in Sources */,
 				2FD97FC6233D77354DBF2021 /* PlanAllocation.swift in Sources */,
 				5BEE979D06347B0A26EC48D1 /* PlanCapacity.swift in Sources */,
 				A44A04452BD5D635D9428C67 /* PlanningContext.swift in Sources */,
@@ -899,7 +895,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 6BA3YQ63RC;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1053,7 +1049,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6BA3YQ63RC;
 				ENABLE_NS_ASSERTIONS = NO;

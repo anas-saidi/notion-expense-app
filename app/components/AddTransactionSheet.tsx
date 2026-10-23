@@ -4,13 +4,12 @@ import { IncomeUseControl } from "./IncomeUseControl";
 import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { useState, useEffect, useRef, type CSSProperties, type RefObject } from "react";
 import type { Account, Category, Transaction } from "./app-types";
-import { getCategoryScope, evalExpr, fmt, fmtDate, isExpression, shiftDate, today } from "./app-utils";
+import { evalExpr, fmt, fmtDate, isExpression, shiftDate, today } from "./app-utils";
 import { AutoscaleAmountInput } from "./ui/AutoscaleAmountInput";
 import { BottomSheet } from "./ui/BottomSheet";
 import { TypeItComposer } from "./TypeItComposer";
 import type { TypedTransactionDraft } from "@/lib/typed-transactions";
 import { anchoredDate, isCalendarDate, nextPeriod, type BillRepeat } from "@/lib/bills";
-import { isSavingsCategory } from "./wallet-utils";
 import { Money } from "./Money";
 import { TransactionRow } from "./ui/TransactionRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -155,8 +154,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
   const isEditMode = props.modeVariant === "edit";
   const isIncome = props.transactionType === "Income";
-  const personalOwner = props.selectedCat && !isSavingsCategory(props.selectedCat) ? getCategoryScope(props.selectedCat, props.filteredAccounts) : null;
-  const borrowsJoint = !isIncome && props.selectedAccount && isJointIncomeAccount(props.selectedAccount.label) && (personalOwner === "anas" || personalOwner === "salma");
   const submit = () => props.onSubmit(!isEditMode && !isIncome ? repeat : "None");
   const nextDue = repeat !== "None" && isCalendarDate(props.date) ? anchoredDate(props.date, nextPeriod(props.date.slice(0, 7), repeat === "Yearly" ? 12 : 1)) : "";
   const todayValue = today();
@@ -373,7 +370,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>
           </div>
 
-          {borrowsJoint && props.parsedAmount > 0 && <Banner compact>{personalOwner === "anas" ? "Anas" : "Salma"} owes Joint <Money value={props.parsedAmount} /> for this personal expense. A personal-to-Joint transfer repays it.</Banner>}
           {!isIncome && !props.categoryUnfunded && !props.categoryOverBudget && (props.billShortfall ?? 0) > 0 && <Banner tone="warning" compact>This expense leaves bills short by <Money value={props.billShortfall!} />. Choose Save anyway to use earmarked money.</Banner>}
           {!isIncome && props.billsUnavailable && <Banner tone="warning" compact>Bill reservations are unavailable. Your actual category budget is still checked.</Banner>}
           {/* Budget warnings */}
