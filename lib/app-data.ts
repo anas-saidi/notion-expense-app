@@ -36,11 +36,11 @@ export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
 /** A successful mutation must not join a read that started before the write. */
 export function invalidateFinancialReads() { inFlight.clear(); }
 
-export type MonthlyData = { summary: MonthlySummary; transactions: Transaction[]; funds: PlanningFund[] };
-export function fetchMonthlyData(startMonth: string, endMonth = startMonth) {
+export type MonthlyData = { summary: MonthlySummary; transactions: Transaction[]; funds: PlanningFund[]; jointDebtTransactions?: Transaction[] };
+export function fetchMonthlyData(startMonth: string, endMonth = startMonth, includeJointDebt = false) {
   const start = monthBounds(`${startMonth}-01`).start;
   const end = monthBounds(`${endMonth}-01`).end;
-  return fetchApiJson<MonthlyData>(`/api/monthly-summary?start=${start}&end=${end}&includeTransactions=true`);
+  return fetchApiJson<MonthlyData>(`/api/monthly-summary?start=${start}&end=${end}&includeTransactions=true${includeJointDebt ? "&includeJointDebt=true" : ""}`);
 }
 
 /** Financial essentials first; failures in a secondary section cannot hide Home. */

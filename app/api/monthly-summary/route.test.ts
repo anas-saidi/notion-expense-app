@@ -32,3 +32,23 @@ it("shares fully paginated transactions while excluding transfers, income, and u
   const transactionQuery = JSON.parse(fetcher.mock.calls[1][1].body);
   expect(transactionQuery.filter.and).toContainEqual({ property: "Type", select: { does_not_equal: "Due" } });
 });
+
+it("includes paginated borrowing history without including earlier spending in the monthly totals", async () => {
+  vi.stubEnv("NOTION_TOKEN", "summary-test");
+  const old = transaction("old-loan", "Expense", 100.25, "personal");
+  old.properties.Date.date.start = "2026-08-15";
+  const fetcher = vi.fn().mockImplementation(async (url: string, options: any) => {
+    const body = JSON.parse(options.body);
+    if (url.includes("1936a2be")) return Response.json({ results: [] });
+    expect(body.filter.and).not.toContainEqual({ property: "Date", date: { on_or_after: "2026-09-01" } });
+    return Response.json(body.start_cursor ? { results: [transaction("repayment", "Transfer", 40, null)], has_more: false }
+      : { results: [old, transaction("current", "Expense", 20, "food")], has_more: true, next_cursor: "second" });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const response = await GET(new NextRequest("http://localhost/api/monthly-summary?month=2026-09&includeTransactions=true&includeJointDebt=true"));
+  const data = await response.json();
+  expect(response.status).toBe(200);
+  expect(data.jointDebtTransactions.map((t: any) => t.id)).toEqual(["old-loan", "current", "repayment"]);
+  expect(data.transactions.map((t: any) => t.id)).toEqual(["current", "repayment"]);
+  expect(data.summary.totalSpent).toBe(20);
+});

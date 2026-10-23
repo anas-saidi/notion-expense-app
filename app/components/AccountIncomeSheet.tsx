@@ -1,4 +1,6 @@
 "use client";
+import { IncomeUseControl } from "./IncomeUseControl";
+import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { DatePicker } from "./DatePicker";
 
 import { useEffect, useState, type CSSProperties } from "react";
@@ -17,6 +19,7 @@ type AccountIncomeSheetProps = {
 };
 
 export function AccountIncomeSheet({ open, account, onClose, onSuccess }: AccountIncomeSheetProps) {
+  const [incomeUse, setIncomeUse] = useState<IncomeUse>("contributions");
   const [name, setName] = useState("Income");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
@@ -25,15 +28,16 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
 
   useEffect(() => {
     if (!open) return;
+    setIncomeUse("contributions");
     setName("Income");
     setAmount("");
     setDate(today());
     setStatus("idle");
     setError("");
-  }, [open]);
+  }, [open, account?.id]);
 
   const parsedAmount = parseAmount(amount) ?? 0;
-  const canSubmit = Boolean(account?.id && name.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0 && status === "idle");
+  const canSubmit = Boolean(account?.id && name.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0 && (status === "idle" || status === "error"));
 
   const submit = async () => {
     if (!account || !canSubmit) return;
@@ -48,6 +52,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
           amount: parsedAmount,
           date,
           accountId: account.id,
+          incomeUse: isJointIncomeAccount(account.label) ? incomeUse : "contributions",
         }),
       });
       const data = await res.json();
@@ -72,7 +77,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
       detent="content"
       maxHeight="calc(100dvh - 20px)"
       panelStyle={sheetStyle}
-      contentStyle={{ paddingTop: 0 }}
+      contentStyle={{ paddingTop: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
     >
       <div style={innerStyle}>
         <header style={headerStyle}>
@@ -88,6 +93,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
           </button>
         </header>
 
+        <div style={{ minHeight: 0, overflowY: "auto", display: "grid", gap: 16 }}>
         <section style={balanceCardStyle}>
           <span>Current balance</span>
           <strong><Money value={account.balance ?? 0} /></strong>
@@ -119,7 +125,11 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
           </label>
         </section>
 
+        {isJointIncomeAccount(account.label) && <IncomeUseControl value={incomeUse} onChange={setIncomeUse} disabled={status === "saving"} />}
+
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
+
+        </div>
 
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
           {status === "success" && <CheckIcon size={16} />}
@@ -139,11 +149,15 @@ const sheetStyle: CSSProperties = {
 
 const innerStyle: CSSProperties = {
   padding: "18px 18px 22px",
-  display: "grid",
-  gap: 18,
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 0,
+  overflow: "hidden",
+  gap: 16,
 };
 
 const headerStyle: CSSProperties = {
+  flexShrink: 0,
   display: "flex",
   alignItems: "flex-start",
   justifyContent: "space-between",
@@ -257,6 +271,7 @@ const amountInputStyle: CSSProperties = {
 
 
 const submitStyle: CSSProperties = {
+  flexShrink: 0,
   width: "100%",
   minHeight: 52,
   borderRadius: 14,

@@ -123,6 +123,14 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
         </div>
       </section>
 
+      {!monthlyLoading && !monthlyError && contribStatus && (contribStatus.anasPersonalDebt > 0 || contribStatus.salmaPersonalDebt > 0) && (
+        <div role="note" style={{ display: "grid", gap: 4, textAlign: "center", fontSize: 13, color: "var(--text2)" }}>
+          {(value === "joint" || value === "anas") && contribStatus.anasPersonalDebt > 0 && <span>Anas owes Joint <Money value={contribStatus.anasPersonalDebt} /> for personal spending.</span>}
+          {(value === "joint" || value === "salma") && contribStatus.salmaPersonalDebt > 0 && <span>Salma owes Joint <Money value={contribStatus.salmaPersonalDebt} /> for personal spending.</span>}
+          {(value === "joint" || (value === "anas" ? contribStatus.anasPersonalDebt : contribStatus.salmaPersonalDebt) > 0) && <span style={{ color: "var(--muted)", fontSize: 12 }}>Transfer from the personal account to Joint to repay. Included in the amount due.</span>}
+        </div>
+      )}
+
       {!monthlyLoading && !monthlyError && isJoint && !contribStatus && (
         <p style={contribUnavailableStyle} role="note">
           Contributions unavailable: set both partners' split percentages (totalling 100%) and check the joint balance and category balances.

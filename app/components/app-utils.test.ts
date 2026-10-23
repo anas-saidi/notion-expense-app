@@ -185,3 +185,12 @@ describe("savings reservations", () => {
     expect(getAssignBalanceByScope(list).anas).toBe(500);
   });
 });
+
+it("makes free joint income assignable while preserving the signed planning calculation", async () => {
+  const { getJointAccountUnassigned } = await import("./app-utils");
+  const list: Account[] = [{ id: "joint", label: "Joined Account", icon: "", type: "Joined", balance: 500, readyToAssign: -500, unassignedIncome: 500 }];
+  expect(getJointAccountUnassigned(list)).toBe(500);
+  expect(withAssignable(list)[0].assignable).toBe(500);
+  expect(getAssignBalanceByScope(list, { anas: 650, salma: 350 }).joint).toBe(500);
+  expect(getJointAccountUnassigned([{ ...list[0], unassignedIncome: 0 }])).toBe(-500);
+});

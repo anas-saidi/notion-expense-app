@@ -10,7 +10,7 @@ export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // MCP verifies its dedicated connection key before parsing or accessing finance data.
-  if (pathname === "/api/mcp") return NextResponse.next();
+  if (pathname === "/api/mcp" || pathname === "/api/native/snapshot" || pathname === "/api/native/operations" || pathname === "/api/native/resources" || pathname === "/api/native/assistant") return NextResponse.next();
 
   // Local development does not need a registered Notion OAuth redirect URI.
   const isLocalDevelopment =

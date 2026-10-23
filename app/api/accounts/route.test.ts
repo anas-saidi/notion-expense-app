@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { jointFreeIncomeReserve } from "../../../lib/notion-joint-income";
+vi.mock("../../../lib/notion-joint-income", () => ({ jointFreeIncomeReserve: vi.fn() }));
 import { GET } from "./route";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
@@ -34,4 +36,12 @@ it("returns an empty account catalog without needing schema metadata", async () 
   vi.stubGlobal("fetch", fetcher);
   expect((await (await GET(new NextRequest("http://localhost/api/accounts"))).json()).accounts).toEqual([]);
   expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+it("includes the all-time free reserve in joint accounts and caps it to actual cash", async () => {
+  vi.stubEnv("NOTION_TOKEN", "joint-account-test");
+  vi.mocked(jointFreeIncomeReserve).mockResolvedValue(500);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ results: [page("joint", "Joined Account")], has_more: false })));
+  const { accounts } = await (await GET(new NextRequest("http://localhost/api/accounts"))).json();
+  expect(accounts[0]).toMatchObject({ balance: 120, readyToAssign: 30, unassignedIncome: 120 });
 });

@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { assertJointIncomeAccount, incomeUseProperties } from "../../../lib/notion-joint-income";
+vi.mock("../../../lib/notion-joint-income", () => ({ assertJointIncomeAccount: vi.fn(), incomeUseProperties: vi.fn() }));
 import { GET, PATCH } from "./route";
 import { assertExpenseFitsBudget } from "@/lib/notion-transactions";
 vi.mock("@/lib/notion-transactions", () => ({ assertExpenseFitsBudget: vi.fn() }));
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.mocked(assertExpenseFitsBudget).mockClear(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.mocked(assertExpenseFitsBudget).mockClear(); vi.mocked(assertJointIncomeAccount).mockReset(); vi.mocked(incomeUseProperties).mockReset(); });
 const page = (id: string) => ({ id, properties: {} });
 describe("transaction history pagination", () => {
   it("fetches every page for an explicit all-time report", async () => {
@@ -65,4 +67,22 @@ describe("transaction edits", () => {
     expect((await patch({ ...edit, categoryId: "cat" })).status).toBe(409);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+});
+
+const freePage = { id: "tx", parent: { type: "database_id", database_id: "1926a2be892280be968aefa6e6dace95" }, properties: { Type: { select: { name: "Income" } }, Account: { relation: [{ id: "joint" }] }, "Unassigned income": { checkbox: true }, "Unassigned allocation baseline": { number: 1000 } } };
+const editFree = (incomeUse: string) => PATCH(new NextRequest("http://localhost/api/transactions", { method: "PATCH", body: JSON.stringify({ id: "tx", name: "Gift", amount: 700, accountId: "joint", date: "2026-10-12", incomeUse }) }));
+it("preserves the allocation baseline when editing free income", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test-token");
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json(freePage)).mockResolvedValueOnce(Response.json(freePage)); vi.stubGlobal("fetch", fetcher);
+  expect((await editFree("unassigned")).status).toBe(200);
+  expect(assertJointIncomeAccount).toHaveBeenCalledWith("test-token", "joint");
+  expect(incomeUseProperties).not.toHaveBeenCalled();
+  expect(JSON.parse(fetcher.mock.calls[1][1].body).properties["Unassigned allocation baseline"]).toBeUndefined();
+});
+it("clears the reserve classification when income is switched to contributions", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test-token");
+  vi.mocked(incomeUseProperties).mockResolvedValue({ "Unassigned income": { checkbox: false }, "Unassigned allocation baseline": { number: null } });
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json(freePage)).mockResolvedValueOnce(Response.json(freePage)); vi.stubGlobal("fetch", fetcher);
+  expect((await editFree("contributions")).status).toBe(200);
+  expect(JSON.parse(fetcher.mock.calls[1][1].body).properties["Unassigned income"]).toEqual({ checkbox: false });
 });

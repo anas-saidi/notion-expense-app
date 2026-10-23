@@ -74,7 +74,7 @@ async function handleGET(req: NextRequest) {
   const includeSnoozed = req.nextUrl.searchParams.get("includeSnoozed") === "true";
 
   try {
-    const filters: any[] = [
+    const filters: any[] = req.nextUrl.searchParams.get("includeArchived") === "true" ? [] : [
       { property: "Archived", checkbox: { equals: false } },
     ];
     if (!includeSnoozed) {
@@ -82,7 +82,7 @@ async function handleGET(req: NextRequest) {
     }
 
     const results = await queryDatabaseAll(token, CATEGORIES_DB, {
-      filter: { and: filters },
+      ...(filters.length ? { filter: { and: filters } } : {}),
       sorts: [{ property: "Category", direction: "ascending" }],
     });
 

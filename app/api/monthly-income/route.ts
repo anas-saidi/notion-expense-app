@@ -1,6 +1,8 @@
 import { withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
-import { monthBounds } from "@/app/components/app-utils";
+import { assertJointIncomeAccount, incomeUseProperties } from "../../../lib/notion-joint-income";
+import { PROP_INCOME_UNASSIGNED } from "../../../lib/joint-income";
+import { monthBounds } from "../../components/app-utils";
 
 const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
 
@@ -16,6 +18,7 @@ type IncomeItem = {
   accountId: string | null;
   amount: number;
   date: string;
+  incomeUse?: "contributions" | "unassigned";
 };
 
 function buildMockIncome(month: string) {
@@ -71,6 +74,7 @@ export async function GET(req: NextRequest) {
     }
 
     const items: IncomeItem[] = (data.results ?? []).map((page: any) => ({
+      incomeUse: page.properties?.[PROP_INCOME_UNASSIGNED]?.checkbox ? "unassigned" : "contributions",
       id: page.id,
       name: page.properties.Name?.title?.[0]?.plain_text ?? "Income",
       accountId: page.properties.Account?.relation?.[0]?.id ?? null,
@@ -100,6 +104,10 @@ async function handlePOST(req: NextRequest) {
     ? body.date
     : new Date().toISOString().slice(0, 10);
   const amount = Number(body?.amount);
+  const incomeUse = body?.incomeUse ?? "contributions";
+  if (incomeUse !== "contributions" && incomeUse !== "unassigned") {
+    return NextResponse.json({ error: "Invalid income use" }, { status: 400 });
+  }
 
   if (!accountId) return NextResponse.json({ error: "Missing accountId" }, { status: 400 });
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -107,6 +115,11 @@ async function handlePOST(req: NextRequest) {
   }
 
   try {
+    let useProperties = {};
+    if (incomeUse === "unassigned") {
+      await assertJointIncomeAccount(token, accountId);
+      useProperties = await incomeUseProperties(token, accountId, true);
+    }
     const res = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
       headers: notionHeaders(token),
@@ -118,6 +131,7 @@ async function handlePOST(req: NextRequest) {
           Date: { date: { start: date } },
           Account: { relation: [{ id: accountId }] },
           Type: { select: { name: "Income" } },
+          ...useProperties,
         },
       }),
     });
@@ -127,6 +141,7 @@ async function handlePOST(req: NextRequest) {
 
     return NextResponse.json({
       income: {
+        incomeUse,
         id: data.id,
         name,
         accountId,

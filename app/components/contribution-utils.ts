@@ -1,3 +1,4 @@
+import { calculateJointDebt } from "./joint-debt-utils";
 import type { Account, Category, MonthlySummary, Transaction } from "./app-types";
 import { savingsHeldIn } from "../../lib/savings-funding";
 import { isSavingsCategory, getCategoryAvailableByScope } from "./wallet-utils";
@@ -5,6 +6,8 @@ import { categoryMatchesScope } from "./app-utils";
 
 export type ContributionStatus = {
   fundingGap: number;
+  anasPersonalDebt: number;
+  salmaPersonalDebt: number;
   openingJointBalance: number;
   jointPlan: number;
   partnerRequirement: number;
@@ -26,10 +29,14 @@ export function calculateContributionStatus({
   categories,
   transactions,
   monthlySummary,
+  debtTransactions = transactions,
+  debtCategories = categories,
 }: {
   accounts: Account[];
   categories: Category[];
   transactions: Transaction[];
+  debtTransactions?: Transaction[];
+  debtCategories?: Category[];
   monthlySummary: MonthlySummary;
 }): ContributionStatus | null {
   const joinedAccount = accounts.find((account) =>
@@ -108,24 +115,28 @@ export function calculateContributionStatus({
   const openingJointBalance = (joinedAccount.balance ?? 0) - joinedInflows + joinedOutflows;
   // Current ledger availability includes carry-over and category rebalancing.
   // Reconstruct the total funding target from credited contributions + cash still needed.
-  // Once both displayed dues are transferred, cash covers availability exactly.
+  // Borrowed personal money is a receivable, not a shared funding gap.
+  // Repayments restore cash without also earning contribution credit.
   const cents = (amount: number) => Math.round((amount + Number.EPSILON) * 100);
-  const anasActual = anasTransferred + anasDirectSpend;
-  const salmaActual = salmaTransferred + salmaDirectSpend;
-  // Savings cash remains outside the household spending commitments.
-  const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance - savingsReserve));
+  const debt = calculateJointDebt(accounts, debtCategories, debtTransactions, monthlySummary);
+  const anasActual = anasTransferred - debt.anasRepaid + anasDirectSpend;
+  const salmaActual = salmaTransferred - debt.salmaRepaid + salmaDirectSpend;
+  // Unassigned income remains outside existing category commitments until allocated.
+  const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance - savingsReserve - (joinedAccount.unassignedIncome ?? 0) + debt.anas + debt.salma));
   const targetCents = cents(anasActual) + cents(salmaActual) + gapCents;
   // A partner already above their share owes zero; cap the other partner at
   // the household shortfall so paying dues never demands an implicit refund.
   const anasDueCents = Math.max(0, Math.min(gapCents, Math.round(targetCents * anasPercent) - cents(anasActual)));
   const salmaDueCents = gapCents - anasDueCents;
-  const fundingGap = gapCents / 100;
-  const anasPlan = anasActual + anasDueCents / 100;
-  const salmaPlan = salmaActual + salmaDueCents / 100;
+  const fundingGap = gapCents / 100 + debt.anas + debt.salma;
+  const anasPlan = anasActual + anasDueCents / 100 + debt.anas;
+  const salmaPlan = salmaActual + salmaDueCents / 100 + debt.salma;
   const partnerRequirement = anasPlan + salmaPlan;
 
   return {
     fundingGap,
+    anasPersonalDebt: debt.anas,
+    salmaPersonalDebt: debt.salma,
     openingJointBalance,
     jointPlan,
     partnerRequirement,

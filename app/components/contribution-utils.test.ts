@@ -96,6 +96,19 @@ describe("reconciled contributions", () => {
   });
 });
 
+it("keeps dues unchanged for free income and for the later allocation it funds", () => {
+  const calculateFree = (cash: number, available: number, free: number) => calculateContributionStatus({
+    accounts: accounts.map(a => a.id === "joint" ? { ...a, balance: cash, unassignedIncome: free } : a),
+    categories: [{ ...categories[0], available }], transactions: [], monthlySummary,
+  })!;
+  expect(due(calculateFree(0, 1000, 0))).toEqual([650, 350]);
+  expect(due(calculateFree(500, 1000, 500))).toEqual([650, 350]);
+  expect(due(calculateFree(500, 1200, 300))).toEqual([650, 350]);
+  expect(due(calculateFree(500, 1600, 0))).toEqual([715, 385]);
+  expect(due(calculateFree(500, 1000, 0))).toEqual([325, 175]);
+  expect(due(calculateFree(1500, 1000, 500))).toEqual([0, 0]);
+});
+
 describe("savings deposits and purchases", () => {
   const savings = { ...categories[0], id: "bedroom", name: "Bedroom", type: ["Saving"], available: 0, owner: "Salma", isTeamFund: false };
   const savingsCalc = (cash: number, remaining: number, activity: Transaction[] = [], extraAccounts: Account[] = []) => calculateContributionStatus({

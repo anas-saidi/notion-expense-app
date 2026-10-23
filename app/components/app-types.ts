@@ -23,6 +23,7 @@ export type Category = {
 export type BudgetScope = "joint" | "anas" | "salma";
 
 export type Transaction = {
+  createdAt?: string;
   id: string;
   name: string;
   amount: number;
@@ -31,6 +32,7 @@ export type Transaction = {
   accountId: string | null;
   savingsFundingOperation?: string;
   savingsFundingTarget?: "separate" | "shared";
+  incomeUse?: "contributions" | "unassigned";
   type?: "Expense" | "Income" | "Transfer" | null;
   fromCategoryId?: string | null;
   toCategoryId?: string | null;
@@ -50,6 +52,8 @@ export type Account = {
    * owner still owes Joint. Derived in the app (see withAssignable), not from Notion.
    */
   assignable?: number | null;
+  /** Cash reserved by unassigned income, after later allocations. */
+  unassignedIncome?: number;
   jointDue?: number | null;
   contributionPercent?: number | null;
 };

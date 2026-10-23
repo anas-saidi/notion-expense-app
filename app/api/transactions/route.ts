@@ -4,6 +4,8 @@ import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes"
 import { NextRequest, NextResponse } from "next/server";
 import { mapTransactionPage as mapPage } from "../../../lib/transaction-page";
 import { notionFetchJson } from "../../../lib/notion-api";
+import { assertJointIncomeAccount, incomeUseProperties } from "../../../lib/notion-joint-income";
+import { PROP_INCOME_UNASSIGNED } from "../../../lib/joint-income";
 import { assertExpenseFitsBudget } from "@/lib/notion-transactions";
 
 const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
@@ -90,7 +92,8 @@ async function handlePATCH(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
-  const { id, name, amount, accountId, categoryId, date } = await req.json();
+  const { id, name, amount, accountId, categoryId, date, incomeUse } = await req.json();
+  if (incomeUse !== undefined && incomeUse !== "contributions" && incomeUse !== "unassigned") return NextResponse.json({ error: "Invalid income use" }, { status: 400 });
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (!name || amount === undefined || amount === null || !accountId || !date) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -113,6 +116,16 @@ async function handlePATCH(req: NextRequest) {
       return NextResponse.json({ error: `${existingType} transactions are read-only in the expense editor` }, { status: 409 });
     }
     const isExpense = existingType === "Expense";
+    let useProperties = {};
+    if (!isExpense) {
+      const wasUnassigned = Boolean(stored.page.properties?.[PROP_INCOME_UNASSIGNED]?.checkbox);
+      const nextUnassigned = incomeUse === undefined ? wasUnassigned : incomeUse === "unassigned";
+      const moved = normalizeId(stored.page.properties?.Account?.relation?.[0]?.id) !== normalizeId(accountId);
+      if (nextUnassigned) await assertJointIncomeAccount(token, accountId);
+      if (nextUnassigned !== wasUnassigned || (nextUnassigned && moved)) {
+        useProperties = await incomeUseProperties(token, accountId, nextUnassigned);
+      }
+    }
     if (isExpense && !categoryId) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
     if (isExpense) {
@@ -136,6 +149,7 @@ async function handlePATCH(req: NextRequest) {
           Amount: { number: parsedAmount },
           Date: { date: { start: date } },
           Account: { relation: [{ id: accountId }] },
+          ...useProperties,
           ...(isExpense ? { Category: { relation: [{ id: categoryId }] } } : {}),
         },
       }),

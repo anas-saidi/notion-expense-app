@@ -136,7 +136,7 @@ export const pickerChipLabelStyle: CSSProperties = {
 
 /* ─── Option rows ─────────────────────────────────────────────────── */
 
-const optionRowStyle = (selected: boolean): CSSProperties => ({
+export const optionRowStyle = (selected: boolean): CSSProperties => ({
   width: "100%",
   minHeight: 54,
   padding: "12px 14px",

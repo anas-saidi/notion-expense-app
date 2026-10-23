@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { withMirrorReads } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
+import { jointFreeIncomeReserve } from "../../../lib/notion-joint-income";
+import { isJointIncomeAccount } from "../../../lib/joint-income";
 import { queryDatabaseAll } from "../../../lib/notion-api";
 
 const ACCOUNTS_DB = process.env.NOTION_ACCOUNTS_DB ?? "1926a2be-8922-8014-bb54-d9f5e9d1234b";
@@ -113,6 +115,13 @@ async function handleGET(req: NextRequest) {
       };
     });
 
+    // All-time baselines preserve free income through month changes and plan edits.
+    const enrichedAccounts = await Promise.all(accounts.map(async (account: any) => {
+      if (!isJointIncomeAccount(account.label)) return account;
+      const reserve = await jointFreeIncomeReserve(token, account.id);
+      return { ...account, unassignedIncome: Math.min(reserve, Math.max(0, account.balance ?? 0)) };
+    }));
+
     // Include debug info to help diagnose property mapping issues
     const _debug = {
       matchedProperties: {
@@ -127,7 +136,7 @@ async function handleGET(req: NextRequest) {
       allPropertyNames: props.map((p) => `${p.name} (${p.type})`),
     };
 
-    return NextResponse.json({ accounts, _debug });
+    return NextResponse.json({ accounts: enrichedAccounts, _debug });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

@@ -7,6 +7,7 @@
  */
 
 import {
+  Target,
   Pencil,
   Search,
   Calendar,
@@ -46,6 +47,7 @@ export type IconProps = LucideProps;
 
 const S = 18; // default size — matches previous hand-rolled SVG default
 
+export const TargetIcon = (p: LucideProps) => <Target size={S} {...p} />;
 export const SearchIcon       = (p: LucideProps) => <Search        size={S} {...p} />;
 export const CalendarIcon     = (p: LucideProps) => <Calendar      size={S} {...p} />;
 export const CalendarRangeIcon = (p: LucideProps) => <CalendarRange size={S} {...p} />;

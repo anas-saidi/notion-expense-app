@@ -57,8 +57,9 @@ async function handleGET(req: NextRequest) {
   }
 
   try {
-    const includeTransactions = searchParams.get("includeTransactions") === "true";
-    const [funds, transactionPages] = await Promise.all([
+    const includeJointDebt = searchParams.get("includeJointDebt") === "true";
+    const includeTransactions = includeJointDebt || searchParams.get("includeTransactions") === "true";
+    const [funds, allTransactionPages] = await Promise.all([
       queryDatabaseAll(token, FUNDS_DB, {
         filter: {
           and: [
@@ -72,7 +73,7 @@ async function handleGET(req: NextRequest) {
         filter: {
           and: [
             ...(!includeTransactions ? [{ property: "Type", select: { equals: "Expense" } }] : [{ property: "Type", select: { does_not_equal: "Due" } }]),
-            { property: "Date", date: { on_or_after: rangeStart } },
+            ...(!includeJointDebt ? [{ property: "Date", date: { on_or_after: rangeStart } }] : []),
             { property: "Date", date: { on_or_before: rangeEnd } },
             ...(!includeTransactions ? [{ property: "Category", relation: { is_not_empty: true } }] : []),
           ],
@@ -81,6 +82,10 @@ async function handleGET(req: NextRequest) {
       }),
     ]);
 
+    const transactionPages = allTransactionPages.filter((page: any) => {
+      const day = page.properties?.Date?.date?.start?.slice(0, 10);
+      return day && day >= rangeStart && day <= rangeEnd;
+    });
     const transactions = transactionPages.filter((page: any) =>
       page.properties?.Type?.select?.name === "Expense" && page.properties?.Category?.relation?.length > 0);
     const totalAssigned = funds.reduce(
@@ -96,6 +101,7 @@ async function handleGET(req: NextRequest) {
     const spentByCategory = sumByCategory(transactions, (page) => page.properties.Amount?.number ?? 0);
 
     return NextResponse.json({
+      ...(includeJointDebt ? { jointDebtTransactions: allTransactionPages.map(mapTransactionPage) } : {}),
       ...(includeTransactions ? {
         transactions: transactionPages.map(mapTransactionPage),
         funds: funds.map((page: any) => ({

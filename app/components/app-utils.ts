@@ -228,7 +228,7 @@ export const getAssignBalanceByScope = (
 ): Record<BudgetScope, number> => {
   const { anasReady, salmaReady, anasDue, salmaDue } = personalReadyAndDue(accounts, contributionRemaining);
   return {
-    joint: getJointAccountUnassigned(accounts) + anasDue + salmaDue,
+    joint: accounts.filter(account => !isSavingsAccount(account) && /joined|joint/i.test(account.label)).reduce((sum, account) => sum + (account.readyToAssign ?? 0), 0) + anasDue + salmaDue,
     anas: anasReady - anasDue,
     salma: salmaReady - salmaDue,
   };
@@ -272,6 +272,9 @@ export const withAssignable = (
   }
   return accounts.map((account) => {
     const scope = personalScope(account);
+    if (!scope && !isSavingsAccount(account) && /joined|joint/i.test(account.label) && account.unassignedIncome) {
+      return { ...account, assignable: Math.max(account.readyToAssign ?? 0, account.unassignedIncome) };
+    }
     if (!scope || account.readyToAssign === null) return { ...account, assignable: account.readyToAssign };
     const storedDue = Math.max(0, account.jointDue ?? 0);
     const due = countByScope[scope] === 1 ? contributionRemaining?.[scope] ?? storedDue : storedDue;
@@ -293,7 +296,7 @@ export const getJointAccountUnassigned = (accounts: Account[]): number => {
   return accounts.reduce((sum, account) => {
     if (isSavingsAccount(account)) return sum;
     if (!norm(account.label).includes("joined")) return sum;
-    return sum + (account.readyToAssign ?? 0);
+    return sum + ((account.unassignedIncome ?? 0) > 0 ? Math.max(account.readyToAssign ?? 0, account.unassignedIncome!) : account.readyToAssign ?? 0);
   }, 0);
 };
 

@@ -4,7 +4,7 @@ import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
-import { parseAmount, today } from "./app-utils";
+import { scopeFromAccountLabel, parseAmount, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
 import { CheckIcon, TransferIcon, XIcon } from "./ui/icons";
@@ -178,6 +178,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
           </label>
         </section>
 
+        {fromAccount && toAccount && ["anas", "salma"].includes(scopeFromAccountLabel(fromAccount.label) ?? "") && scopeFromAccountLabel(toAccount.label) === "joint" && <p style={{ fontSize: 13, lineHeight: 1.5, color: "var(--text2)", margin: 0 }}>This repays personal spending owed to Joint first. The rest counts toward your contribution. Separate savings deposits use the savings flow.</p>}
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>

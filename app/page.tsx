@@ -25,6 +25,7 @@ import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "
 const MonthPlanSheet = dynamic(() => import("./components/MonthPlanSheet").then(m => m.MonthPlanSheet));
 const TransactionDetailsSheet = dynamic(() => import("./components/TransactionDetailsSheet").then(m => m.TransactionDetailsSheet));
 import { getCategoryAllocatedByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
+import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { calculateContributionStatus } from "./components/contribution-utils";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
@@ -66,6 +67,8 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgetTransactions, setBudgetTransactions] = useState<Transaction[]>([]);
+  const [debtCategories, setDebtCategories] = useState<Category[]>([]);
+  const [jointDebtTransactions, setJointDebtTransactions] = useState<Transaction[]>([]);
   const [contributionTransactions, setContributionTransactions] = useState<Transaction[]>([]);
   const [billsData, setBillsData] = useState<BillsData | null>(null);
   const [billsLoading, setBillsLoading] = useState(true);
@@ -135,6 +138,7 @@ export default function App() {
   const transactionSaveBusy = useRef(false);
   const [recurringRepeat, setRecurringRepeat] = useState<"None" | "Monthly" | "Yearly">("None");
   const [recurringBillId, setRecurringBillId] = useState<string | null>(null);
+  const [incomeUse, setIncomeUse] = useState<IncomeUse>("contributions");
   const [transactionType, setTransactionType] = useState<"Expense" | "Income">("Expense");
   const [showCategoryDetails, setShowCategoryDetails] = useState(false);
   const [detailsCategory, setDetailsCategory] = useState<Category | null>(null);
@@ -325,7 +329,7 @@ export default function App() {
       const { start, end } = monthBounds(`${target}-01`);
       const spendingWindow = runwayWindow(today());
       const [data, activity] = await Promise.all([
-        fetchMonthlyData(target),
+        fetchMonthlyData(target, target, true),
         target === formatMonthInput(today())
           ? fetchApiJson<{ transactions: Transaction[] }>(`/api/transactions?start=${spendingWindow.start}&end=${spendingWindow.end}`).catch(() => null)
           : Promise.resolve(null),
@@ -334,6 +338,7 @@ export default function App() {
       monthlySnapshot.current = { month: target, data, expires: Date.now() + 15000 };
       if (target === formatMonthInput(today())) setCurrentMonthFunds(data.funds ?? []);
       setContributionTransactions(data.transactions ?? []);
+      setJointDebtTransactions(data.jointDebtTransactions ?? []);
       setBudgetTransactions(activity?.transactions ?? []);
       setMonthlySummary({
         start,
@@ -382,9 +387,10 @@ export default function App() {
 
   const fetchCategoryCatalog = async () => {
     const request = ++catalogRequest.current;
-    const data = await fetchApiJson<{ categories?: Category[] }>("/api/categories?includeSnoozed=true");
+    const data = await fetchApiJson<{ categories?: Category[] }>("/api/categories?includeSnoozed=true&includeArchived=true");
     if (request !== catalogRequest.current) return;
     const catalog: Category[] = data.categories ?? [];
+    setDebtCategories(catalog);
     const active = catalog.filter((category) => !category.snoozed && !category.archived);
     setCategories(active);
     setFrozenCategories(catalog.filter((category) => category.snoozed && !category.archived));
@@ -547,6 +553,7 @@ export default function App() {
     }
     setEditingTransactionId(transaction.id);
     setTransactionType(isIncome ? "Income" : "Expense");
+    setIncomeUse(transaction.incomeUse ?? "contributions");
     setEditingOriginal({ amount: transaction.amount, accountId: transaction.accountId ?? "", categoryId: transaction.category ?? null });
     setName(transaction.name);
     setAmount(transaction.amount ? String(transaction.amount) : "");
@@ -877,8 +884,10 @@ export default function App() {
     accounts,
     categories: [...categories, ...frozenCategories],
     transactions: contributionTransactions,
+    debtTransactions: jointDebtTransactions,
+    debtCategories,
     monthlySummary,
-  }), [accounts, categories, frozenCategories, contributionTransactions, monthlySummary]);
+  }), [accounts, categories, frozenCategories, contributionTransactions, jointDebtTransactions, debtCategories, monthlySummary]);
 
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(
     accounts,
@@ -953,7 +962,7 @@ export default function App() {
     setErrorMsg("");
     const isEditing = Boolean(editingTransactionId);
     try {
-      const payload = { name, amount: evalExpr(amount), accountId, categoryId, date, ...(!isEditing && transactionType === "Expense" ? { repeat, ...(recurringBillId ? { billId: recurringBillId } : {}) } : {}) };
+      const payload = { name, amount: evalExpr(amount), accountId, categoryId, date, ...(transactionType === "Income" ? { incomeUse: isJointIncomeAccount(selectedAccount?.label ?? "") ? incomeUse : "contributions" } : {}), ...(!isEditing && transactionType === "Expense" ? { repeat, ...(recurringBillId ? { billId: recurringBillId } : {}) } : {}) };
       const endpoint = isEditing ? "/api/transactions" : transactionType === "Income" ? "/api/monthly-income" : "/api/expense";
       const res = await fetch(endpoint, {
         method: isEditing ? "PATCH" : "POST",
@@ -1000,6 +1009,7 @@ export default function App() {
         setShowAddModal(false);
         setStatus("idle");
         setTransactionType("Expense");
+        setIncomeUse("contributions");
       } else {
         setTimeout(() => setStatus("idle"), 2000);
       }
@@ -1045,6 +1055,7 @@ export default function App() {
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setTransactionType("Expense");
+        setIncomeUse("contributions");
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
@@ -1247,6 +1258,8 @@ export default function App() {
         canSubmit={canSubmit}
         allCategories={categories.filter(c => !isSavingsCategory(c))}
         modeVariant={editingTransactionId ? "edit" : "create"}
+        incomeUse={incomeUse}
+        onIncomeUseChange={setIncomeUse}
         transactionType={transactionType}
         onTransactionTypeChange={(type) => {
           setTransactionType(type);
@@ -1295,6 +1308,7 @@ export default function App() {
             setSuggestedCatId(null);
             setDate(today());
             setTransactionType("Expense");
+            setIncomeUse("contributions");
           }
           setShowAddModal(false);
           setEditingTransactionId(null);
@@ -1363,6 +1377,7 @@ export default function App() {
           if (detailsCategory) selectCategory(detailsCategory);
           setEditingTransactionId(null);
           setTransactionType("Expense");
+          setIncomeUse("contributions");
           setShowCategoryDetails(false);
           setShowAddModal(true);
         }}
