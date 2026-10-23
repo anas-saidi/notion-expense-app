@@ -18,7 +18,7 @@ import Testing
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appending(path: "Finance.store")
-        let draft = TransactionDraft(input: NativeInput(name: "Retain after update", amount: 127.45), outcomeUnknown: true)
+        let draft = TransactionDraft(input: NativeInput(name: "Retain after update", amount: 127.45), outcomeUnknown: true, syncQueuedAt: .now, syncState: .queued)
         func write() throws {
             let first = try LocalRepository(storeURL: url)
             try first.save(FinanceBackup(drafts: [draft]))

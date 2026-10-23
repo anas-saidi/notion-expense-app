@@ -15,6 +15,7 @@ struct FinanceTransaction: Codable, Equatable, Identifiable {
     var toCategoryId: String?
     var savingsFundingOperation: String?
     var scopes: [WalletScope]
+    var pendingSync: Bool?
     var signedAmount: Decimal { type == "Income" ? amount : type == "Transfer" ? amount : -amount }
     var symbol: String { type == "Income" ? "arrow.down.left" : type == "Transfer" ? "arrow.left.arrow.right" : "arrow.up.right" }
 }

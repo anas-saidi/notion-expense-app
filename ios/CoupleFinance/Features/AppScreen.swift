@@ -42,8 +42,12 @@ struct AppScreen<Content: View>: View {
                     }
                 } else {
                     content()
+                    if store.waitingForSync, !store.isDemo {
+                        Text(store.syncNeedsReview ? "Sync needs review · open Drafts & sync" : store.isSubmitting ? "Syncing changes…" : "\(store.syncQueue.count) \(store.syncQueue.count == 1 ? "change" : "changes") waiting for Wi-Fi")
+                            .font(.caption).foregroundStyle(.secondary).padding(.vertical, 4)
+                    }
                     if let snapshot = store.snapshot, !store.isDemo {
-                        Text("Saved snapshot: \(FinanceDate.instant(snapshot.fetchedAt)?.formatted(date: .abbreviated, time: .shortened) ?? snapshot.fetchedAt)")
+                        Text("Balances last synced: \(FinanceDate.instant(snapshot.fetchedAt)?.formatted(date: .abbreviated, time: .shortened) ?? snapshot.fetchedAt)")
                             .font(.caption2).foregroundStyle(.secondary).padding(.bottom, 4)
                     }
                 }

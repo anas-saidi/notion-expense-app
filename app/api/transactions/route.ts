@@ -1,3 +1,4 @@
+import { checkTransactionExpectation } from "../../../lib/transaction-expectation";
 import { assertTransferCanBeDeleted } from "../../../lib/notion-transfer-deletion";
 import { FUNDING_OPERATION, readText } from "../../../lib/savings-funding";
 import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
@@ -92,7 +93,7 @@ async function handlePATCH(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
-  const { id, name, amount, accountId, categoryId, date, incomeUse } = await req.json();
+  const { id, name, amount, accountId, categoryId, date, incomeUse, expectedTransaction } = await req.json();
   if (incomeUse !== undefined && incomeUse !== "contributions" && incomeUse !== "unassigned") return NextResponse.json({ error: "Invalid income use" }, { status: 400 });
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (!name || amount === undefined || amount === null || !accountId || !date) {
@@ -107,6 +108,8 @@ async function handlePATCH(req: NextRequest) {
   try {
     const stored = await fetchTransactionPage(token, id);
     if (stored.error) return stored.error;
+    const conflict = checkTransactionExpectation(mapPage(stored.page), expectedTransaction);
+    if (conflict) return NextResponse.json({ error: conflict.error }, { status: conflict.status });
     const existingType = stored.page.properties?.Type?.select?.name;
     if (!existingType) {
       return NextResponse.json({ error: "Legacy transaction has no type and cannot be edited safely. Set its type in Notion first." }, { status: 409 });
@@ -170,12 +173,14 @@ async function handleDELETE(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
-  const { id } = await req.json();
+  const { id, expectedTransaction } = await req.json();
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   try {
     const stored = await fetchTransactionPage(token, id);
     if (stored.error) return stored.error;
+    const conflict = checkTransactionExpectation(mapPage(stored.page), expectedTransaction);
+    if (conflict) return NextResponse.json({ error: conflict.error }, { status: conflict.status });
     if (readText(stored.page.properties?.[FUNDING_OPERATION])) return NextResponse.json({ error: "This transfer is linked to savings funding. Use the savings category to spend or take money out." }, { status: 409 });
     if (stored.page.properties?.Type?.select?.name === "Transfer") await assertTransferCanBeDeleted(token, stored.page);
     const res = await fetch(`https://api.notion.com/v1/pages/${id}`, {

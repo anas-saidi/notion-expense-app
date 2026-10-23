@@ -25,7 +25,7 @@ struct HomeView: View {
                         .background(.primary.opacity(0.04), in: .rect(cornerRadius: 16))
                 }.buttonStyle(.plain)
                 if !store.backup.drafts.isEmpty {
-                    NavigationLink(value: HomeDestination.drafts) { Label("Review \(store.backup.drafts.count) drafts", systemImage: "square.and.pencil") }
+                    NavigationLink(value: HomeDestination.drafts) { Label("Drafts & sync (\(store.backup.drafts.count))", systemImage: "square.and.pencil") }
                 }
                 if let billError = store.snapshot?.billsError {
                     Text(billError).font(.subheadline).foregroundStyle(.secondary)

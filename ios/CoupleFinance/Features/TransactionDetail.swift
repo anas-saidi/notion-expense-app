@@ -24,7 +24,7 @@ struct TransactionDetail: View {
                 }
                 if deleted {
                     Section {
-                        Text("Deleted from the ledger").foregroundStyle(.secondary)
+                        Text(store.waitingForSync ? "Deletion saved on this phone" : "Deleted from the ledger").foregroundStyle(.secondary)
                         NativeSaveButton(title: "Undo deletion") {
                             try await store.submit(TransactionDraft(operation: "restoreTransaction", input: NativeInput(id: transaction.id))); deleted = false
                         }
@@ -37,7 +37,7 @@ struct TransactionDetail: View {
                                 categoryId: transaction.type == "Expense" ? transaction.category : nil, incomeUse: transaction.incomeUse, id: transaction.id))
                         }
                         Button("Delete transaction", systemImage: "trash", role: .destructive) { confirmingDelete = true }
-                            .confirmationDialog("Delete this transaction from Notion?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                            .confirmationDialog("Delete this transaction?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                                 Button("Delete transaction", role: .destructive) { Task { await delete() } }
                             } message: { Text("This changes the balances for everyone using this finance app.") }
                     }.disabled(saving)

@@ -37,12 +37,14 @@ struct SettingsView: View {
                 DailyTransactionReminderSettings()
                 if store.isConnected {
                     Section("Notion sync") {
+                        Text("Saved changes upload automatically over Wi-Fi. Background sync runs when iOS allows it; opening the app also resumes sync.").font(.caption).foregroundStyle(.secondary)
+                        Button("Send queued changes") { Task { await store.synchronizeQueuedChanges() } }.disabled(!store.canSyncOnWiFi || store.isSubmitting)
                         Button(syncing ? "Syncing…" : "Sync now", systemImage: "arrow.triangle.2.circlepath") { Task { await sync() } }.disabled(syncing)
                     }
                 }
                 Section("Finances") {
                     NavigationLink(value: "accounts") { Label("Accounts", systemImage: "building.columns") }
-                    NavigationLink(value: "drafts") { Label("Drafts", systemImage: "square.and.pencil") }
+                    NavigationLink(value: "drafts") { Label("Drafts & sync", systemImage: "square.and.pencil") }
                     NavigationLink(value: "pending") { Label("Pending purchases", systemImage: "basket") }
                     NavigationLink(value: "bills") { Label("Bills", systemImage: "calendar") }
                     NavigationLink(value: "work") { Label("Cost in work time", systemImage: "clock") }

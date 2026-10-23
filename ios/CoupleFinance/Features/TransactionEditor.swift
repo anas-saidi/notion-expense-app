@@ -80,7 +80,7 @@ struct TransactionEditor: View {
                     Button {
                         Task { await save(send: true) }
                     } label: {
-                        HStack { Spacer(); if isSaving { ProgressView() }; Text(isSaving ? "Saving…" : "Save to Notion"); Spacer() }
+                        HStack { Spacer(); if isSaving { ProgressView() }; Text(isSaving ? "Saving…" : store.canSyncOnWiFi || store.isDemo ? "Save to Notion" : "Save offline"); Spacer() }
                     }.buttonStyle(.borderedProminent).disabled(!valid || isSaving || !store.isConnected)
                     Button("Keep as draft") { Task { await save(send: false) } }.disabled(!valid || isSaving)
                 }
@@ -128,7 +128,7 @@ struct TransactionEditor: View {
             incomeUse: kind == "income" ? incomeUse : nil, id: draft.input.id)
         if kind == "expense" && !editing { draft.input.repeat = repeatRule }
         do {
-            if send { try await store.submit(draft) } else { try store.saveDraft(draft); store.notice = "Draft saved on this phone" }
+            if send { try await store.submit(draft) } else { draft.syncState = nil; draft.syncError = nil; try store.saveDraft(draft); store.notice = "Draft saved on this phone" }
             dismiss()
         } catch {
             self.error = error.localizedDescription

@@ -1,3 +1,9 @@
+# Build 5: offline editing and Wi-Fi sync
+
+Transaction saves now persist on the phone and upload automatically on Wi-Fi. New and edited rows show “Waiting to sync”; balances retain their last synced values until Notion confirms the queued requests. Drafts & sync contains waiting changes and anything needing review. Manual drafts still wait for an explicit send.
+
+Background sync is scheduled through iOS; its timing is controlled by the system. Opening the app on Wi-Fi also resumes uploads. Keep the existing AltStore-managed app when installing `ios/build/CoupleFinance.ipa` so its connection, cached data and queue survive. The backend detects stale offline transaction edits before writing them. See [offline sync details](../docs/native-offline-sync.md).
+
 # Build 4: personal spending included in due
 
 Personal-budget expenses paid from Joint now appear as debt owed by that budget's owner. It appears only in the existing amount due, without extra notices in Home or transaction entry. A later personal-to-Joint transfer repays outstanding personal spending first; only its remainder counts toward the household contribution. The live backend carries debt across months and recalculates edits, deletion and archived budgets. Funded savings remain separate.

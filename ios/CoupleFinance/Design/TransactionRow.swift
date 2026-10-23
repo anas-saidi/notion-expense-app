@@ -11,6 +11,7 @@ struct TransactionRow: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.name).font(.subheadline.weight(.semibold))
+                if transaction.pendingSync == true { Text("Waiting to sync").font(.caption).foregroundStyle(.secondary) }
                 Text(transaction.type == "Transfer" ? "Transfer" : store.categoryName(transaction.category))
                     .font(.caption).foregroundStyle(.secondary)
             }

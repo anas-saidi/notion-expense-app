@@ -37,9 +37,20 @@ struct RootView: View {
         .sheet(isPresented: $showingRebalance) { RebalanceView() }
         .sheet(isPresented: $showingSettings) { SettingsView() }
         .sheet(isPresented: $showingEntry) { TransactionEditor() }
+        .task {
+            guard !store.isDemo else { return }
+            while !Task.isCancelled {
+                await store.synchronizeQueuedChanges()
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            }
+        }
+        .task(id: SyncConnectivity.shared.canSync) {
+            if SyncConnectivity.shared.canSync { await session.live.synchronizeQueuedChanges() }
+        }
         .task(id: store.selectedMonth) { await store.refresh() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await store.refresh(); await refreshReminders() } }
+            if phase == .active { Task { await session.live.synchronizeQueuedChanges(); await store.refresh(); await refreshReminders() } }
+            else if phase == .background { OfflineSyncCoordinator.schedule(needed: session.live.waitingForSync && !session.live.syncNeedsReview) }
         }
         .alert("Could not complete the action", isPresented: errorPresented) { } message: { Text(store.error ?? "") }
         .sensoryFeedback(.selection, trigger: selection)

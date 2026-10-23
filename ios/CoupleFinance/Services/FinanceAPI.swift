@@ -1,6 +1,6 @@
 import Foundation
 
-struct FinanceAPI: Sendable {
+struct FinanceAPI: FinanceTransport {
     let baseURL: URL
     let key: String
 
@@ -39,7 +39,7 @@ struct FinanceAPI: Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let body = try encoder.encode(Operation(requestId: draft.id, operation: draft.operation, input: draft.input))
-        _ = try await request(url: baseURL.appending(path: "api/native/operations"), body: body)
+        _ = try await request(url: baseURL.appending(path: "api/native/operations"), body: body, wifiOnly: true)
     }
 
     func resourceData(_ kind: String, parameters: [String: String] = [:], post: Bool = false) async throws -> Data {
@@ -53,7 +53,7 @@ struct FinanceAPI: Sendable {
         try await request(url: baseURL.appending(path: "api/native/assistant"), body: JSONEncoder().encode(input))
     }
 
-    private func request(url: URL, body: Data? = nil) async throws -> Data {
+    private func request(url: URL, body: Data? = nil, wifiOnly: Bool = false) async throws -> Data {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 90)
         request.httpMethod = body == nil ? "GET" : "POST"
         request.httpBody = body
@@ -62,6 +62,7 @@ struct FinanceAPI: Sendable {
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let config = URLSessionConfiguration.ephemeral
         config.httpShouldSetCookies = false
+        if wifiOnly { config.allowsCellularAccess = false; config.allowsExpensiveNetworkAccess = false }
         let session = URLSession(configuration: config, delegate: SameOriginDelegate(origin: baseURL), delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
         let (data, response) = try await session.data(for: request)
@@ -69,7 +70,7 @@ struct FinanceAPI: Sendable {
         guard (200...299).contains(response.statusCode) else {
             struct ErrorBody: Decodable { let error: String }
             let message = (try? JSONDecoder().decode(ErrorBody.self, from: data).error) ?? "The server returned \(response.statusCode). Try again from Settings."
-            throw FinanceError.message(message)
+            throw FinanceError.server(response.statusCode, message)
         }
         return data
     }

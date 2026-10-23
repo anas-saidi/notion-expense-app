@@ -7,6 +7,7 @@ struct FinanceBackup: Codable, Equatable {
     var exportedAt = Date.now
     var snapshots: [String: FinanceSnapshot] = [:]
     var drafts: [TransactionDraft] = []
+    var resources: [String: Data]?
 
     static func decode(_ data: Data) throws -> Self {
         guard data.count <= 25_000_000 else { throw FinanceError.message("This backup exceeds the 25 MB limit.") }
@@ -28,7 +29,12 @@ struct FinanceBackup: Codable, Equatable {
     /// Existing drafts win. Restored drafts always require review; never submit on restore.
     mutating func merge(_ other: Self) {
         if householdID == nil { householdID = other.householdID }
-        for draft in other.drafts where !drafts.contains(where: { $0.id == draft.id }) { drafts.append(draft) }
+        for var draft in other.drafts where !drafts.contains(where: { $0.id == draft.id }) {
+            draft.syncQueuedAt = nil
+            draft.syncState = nil
+            draft.syncError = nil
+            drafts.append(draft)
+        }
         for (month, snapshot) in other.snapshots {
             if let current = snapshots[month], current.fetchedAt >= snapshot.fetchedAt { continue }
             snapshots[month] = snapshot

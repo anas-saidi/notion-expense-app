@@ -86,3 +86,15 @@ it("clears the reserve classification when income is switched to contributions",
   expect((await editFree("contributions")).status).toBe(200);
   expect(JSON.parse(fetcher.mock.calls[1][1].body).properties["Unassigned income"]).toEqual({ checkbox: false });
 });
+
+it("does not write a stale offline edit after the original transaction changed", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test-token");
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ id: "tx", parent: { type: "database_id", database_id: "1926a2be892280be968aefa6e6dace95" }, properties: {
+    Type: { select: { name: "Expense" } }, Name: { title: [{ plain_text: "Changed by partner" }] }, Amount: { number: 20 }, Date: { date: { start: "2026-10-23" } }, Account: { relation: [{ id: "acct" }] }, Category: { relation: [{ id: "cat" }] },
+  } }));
+  vi.stubGlobal("fetch", fetcher);
+  const response = await PATCH(new NextRequest("http://localhost/api/transactions", { method: "PATCH", body: JSON.stringify({ id: "tx", name: "My offline edit", amount: 25, accountId: "acct", categoryId: "cat", date: "2026-10-23", expectedTransaction: { name: "Original", amount: 20, accountId: "acct", category: "cat", date: "2026-10-23" } }) }));
+  expect(response.status).toBe(409);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(assertExpenseFitsBudget).not.toHaveBeenCalled();
+});

@@ -94,6 +94,33 @@ import XCTest
         capture(app, "Personal spending included in due")
     }
 
+    func testOfflineEditIsSavedLocallyAndListedForWiFiSync() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["--offline-household"]
+        app.launch()
+        let transaction = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Market groceries")).firstMatch
+        XCTAssertTrue(transaction.waitForExistence(timeout: 8))
+        app.swipeUp()
+        app.swipeUp()
+        capture(app, "Offline history before editing")
+        transaction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+        XCTAssertTrue(app.buttons["Edit transaction"].waitForExistence(timeout: 5))
+        app.buttons["Edit transaction"].tap()
+        let description = app.textFields["What was it for?"]
+        XCTAssertTrue(description.waitForExistence(timeout: 5))
+        description.tap()
+        description.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "Market groceries".count) + "Offline edited groceries")
+        let save = app.buttons["Save offline"]
+        if !save.isHittable { app.swipeUp() }
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+        let edited = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Offline edited groceries")).firstMatch
+        XCTAssertTrue(edited.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["1 change waiting for Wi-Fi"].exists)
+        XCTAssertFalse(app.alerts["Could not complete the action"].exists)
+        capture(app, "Offline edit waiting for Wi-Fi")
+    }
+
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

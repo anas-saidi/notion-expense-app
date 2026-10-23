@@ -36,5 +36,6 @@ struct NativeInput: Codable, Equatable {
     var claimedBy: String?
     var addedBy: String?
     var allowClear: Bool?
+    var expectedTransaction: TransactionExpectation?
     var budgetItems: [PlanAllocation]?
 }
