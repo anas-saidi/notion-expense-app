@@ -1,0 +1,407 @@
+{
+  "schemaVersion": 1,
+  "householdID": "sample-household",
+  "month": "__MONTH__",
+  "fetchedAt": "__TIMESTAMP__",
+  "categories": [
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Groceries",
+      "icon": "\ud83e\udd51",
+      "type": [
+        "Team"
+      ],
+      "owner": "Joint",
+      "defaultAccount": "00000000-0000-4000-8000-000000000001",
+      "available": 1860,
+      "planned": 3200,
+      "goal": null,
+      "goalDate": null,
+      "isTeamFund": true,
+      "scope": "joint",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Everyday"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "name": "Rent & home",
+      "icon": "\ud83c\udfe1",
+      "type": [
+        "Team"
+      ],
+      "owner": "Joint",
+      "defaultAccount": "00000000-0000-4000-8000-000000000001",
+      "available": 5000,
+      "planned": 5000,
+      "goal": null,
+      "goalDate": null,
+      "isTeamFund": true,
+      "scope": "joint",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Scheduled"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000013",
+      "name": "Eating out",
+      "icon": "\ud83c\udf5c",
+      "type": [
+        "Team"
+      ],
+      "owner": "Joint",
+      "defaultAccount": "00000000-0000-4000-8000-000000000001",
+      "available": 620,
+      "planned": 1400,
+      "goal": null,
+      "goalDate": null,
+      "isTeamFund": true,
+      "scope": "joint",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Flexible"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000014",
+      "name": "Transport",
+      "icon": "\ud83d\ude95",
+      "type": [
+        "Team"
+      ],
+      "owner": "Joint",
+      "defaultAccount": "00000000-0000-4000-8000-000000000001",
+      "available": 320,
+      "planned": 900,
+      "goal": null,
+      "goalDate": null,
+      "isTeamFund": true,
+      "scope": "joint",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Everyday"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "name": "A place of our own",
+      "icon": "\ud83c\udfe1",
+      "type": [
+        "Savings"
+      ],
+      "owner": "Joint",
+      "defaultAccount": "00000000-0000-4000-8000-000000000001",
+      "available": 12000,
+      "planned": 0,
+      "goal": 60000,
+      "goalDate": "2027-12-01",
+      "isTeamFund": false,
+      "scope": "joint",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Goal"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000016",
+      "name": "Personal",
+      "icon": "\u2615",
+      "type": [
+        "Budget"
+      ],
+      "owner": "Anas",
+      "defaultAccount": "00000000-0000-4000-8000-000000000002",
+      "available": 916.55,
+      "planned": 1800,
+      "goal": null,
+      "goalDate": null,
+      "isTeamFund": false,
+      "scope": "anas",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Flexible"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000017",
+      "name": "Personal",
+      "icon": "\ud83c\udf37",
+      "type": [
+        "Budget"
+      ],
+      "owner": "Salma",
+      "defaultAccount": "00000000-0000-4000-8000-000000000003",
+      "available": 1250,
+      "planned": 1800,
+      "goal": null,
+      "goalDate": null,
+      "isTeamFund": false,
+      "scope": "salma",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Flexible"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000018",
+      "name": "Travel",
+      "icon": "\u2708\ufe0f",
+      "type": [
+        "Savings"
+      ],
+      "owner": "Joint",
+      "defaultAccount": "00000000-0000-4000-8000-000000000001",
+      "available": 6500,
+      "planned": 0,
+      "goal": 15000,
+      "goalDate": null,
+      "isTeamFund": false,
+      "scope": "joint",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Goal"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000019",
+      "name": "Subscriptions",
+      "icon": "\ud83c\udfa7",
+      "type": [
+        "Team"
+      ],
+      "owner": "Joint",
+      "defaultAccount": "00000000-0000-4000-8000-000000000001",
+      "available": 180,
+      "planned": 250,
+      "goal": null,
+      "goalDate": null,
+      "isTeamFund": true,
+      "scope": "joint",
+      "snoozed": false,
+      "archived": false,
+      "spendingPattern": "Scheduled"
+    }
+  ],
+  "accounts": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "label": "Joined Account",
+      "icon": "",
+      "type": "Current",
+      "balance": 12356.55,
+      "readyToAssign": 1680,
+      "scope": "joint"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "label": "Hubby Account",
+      "icon": "",
+      "type": "Current",
+      "balance": 8900,
+      "readyToAssign": 2900,
+      "scope": "anas"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "label": "Wife Account",
+      "icon": "",
+      "type": "Current",
+      "balance": 7400,
+      "readyToAssign": 2100,
+      "scope": "salma"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "label": "Savings Account",
+      "icon": "",
+      "type": "Savings",
+      "balance": 18500,
+      "readyToAssign": 0,
+      "scope": "anas"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "00000000-0000-4000-8000-000000000030",
+      "name": "Market groceries",
+      "amount": 420,
+      "date": "__MONTH__-21",
+      "category": "00000000-0000-4000-8000-000000000011",
+      "accountId": "00000000-0000-4000-8000-000000000001",
+      "type": "Expense",
+      "incomeUse": "contributions",
+      "scopes": [
+        "joint"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Dinner together",
+      "amount": 230,
+      "date": "__MONTH__-20",
+      "category": "00000000-0000-4000-8000-000000000013",
+      "accountId": "00000000-0000-4000-8000-000000000001",
+      "type": "Expense",
+      "incomeUse": "contributions",
+      "scopes": [
+        "joint"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000032",
+      "name": "Taxi home",
+      "amount": 65,
+      "date": "__MONTH__-20",
+      "category": "00000000-0000-4000-8000-000000000014",
+      "accountId": "00000000-0000-4000-8000-000000000001",
+      "type": "Expense",
+      "incomeUse": "contributions",
+      "scopes": [
+        "joint"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000033",
+      "name": "Weekly groceries",
+      "amount": 480,
+      "date": "__MONTH__-18",
+      "category": "00000000-0000-4000-8000-000000000011",
+      "accountId": "00000000-0000-4000-8000-000000000001",
+      "type": "Expense",
+      "incomeUse": "contributions",
+      "scopes": [
+        "joint"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000034",
+      "name": "Coffee with a friend",
+      "amount": 45,
+      "date": "__MONTH__-17",
+      "category": "00000000-0000-4000-8000-000000000016",
+      "accountId": "00000000-0000-4000-8000-000000000002",
+      "type": "Expense",
+      "incomeUse": "contributions",
+      "scopes": [
+        "anas"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000035",
+      "name": "Flowers",
+      "amount": 80,
+      "date": "__MONTH__-16",
+      "category": "00000000-0000-4000-8000-000000000017",
+      "accountId": "00000000-0000-4000-8000-000000000003",
+      "type": "Expense",
+      "incomeUse": "contributions",
+      "scopes": [
+        "salma"
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000036",
+      "name": "Monthly income",
+      "amount": 18500,
+      "date": "__MONTH__-01",
+      "category": null,
+      "accountId": "00000000-0000-4000-8000-000000000002",
+      "type": "Income",
+      "incomeUse": "contributions",
+      "scopes": [
+        "anas"
+      ]
+    },
+    {
+      "id": "sample-personal-joint",
+      "name": "Sample personal purchase",
+      "amount": 123.45,
+      "date": "__MONTH__-15",
+      "category": "00000000-0000-4000-8000-000000000016",
+      "accountId": "00000000-0000-4000-8000-000000000001",
+      "type": "Expense",
+      "scopes": [
+        "anas",
+        "joint"
+      ]
+    }
+  ],
+  "summary": {
+    "start": "__MONTH__-01",
+    "end": "__MONTH__-31",
+    "totalAssigned": 14350,
+    "totalSpent": 1320,
+    "assignedByCategory": [
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000011",
+        "total": 3200
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000012",
+        "total": 5000
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000013",
+        "total": 1400
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000014",
+        "total": 900
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000015",
+        "total": 0
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000016",
+        "total": 1800
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000017",
+        "total": 1800
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000018",
+        "total": 0
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000019",
+        "total": 250
+      }
+    ],
+    "spentByCategory": [
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000011",
+        "total": 900
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000013",
+        "total": 230
+      },
+      {
+        "categoryId": "00000000-0000-4000-8000-000000000014",
+        "total": 65
+      }
+    ]
+  },
+  "bills": [
+    {
+      "id": "00000000-0000-4000-8000-000000000050:__MONTH__",
+      "billId": "00000000-0000-4000-8000-000000000050",
+      "period": "__MONTH__",
+      "name": "Internet",
+      "amount": 350,
+      "categoryId": "00000000-0000-4000-8000-000000000012",
+      "dueDate": "__MONTH__-25",
+      "accountId": "00000000-0000-4000-8000-000000000001",
+      "state": "Due",
+      "scope": "joint",
+      "repeat": "Monthly",
+      "payments": []
+    }
+  ],
+  "billsError": null,
+  "contributions": {
+    "fundingGap": 1323.45,
+    "anasPlan": 903.45,
+    "salmaPlan": 420,
+    "anasActual": 0,
+    "salmaActual": 0,
+    "anasPersonalDebt": 123.45,
+    "salmaPersonalDebt": 0
+  }
+}
