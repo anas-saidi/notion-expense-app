@@ -46,6 +46,9 @@ export type Account = {
   icon: string;
   type: string | null;
   balance: number | null;
+  /** Estimated cash since a shared physical balance check. Never replaces the ledger. */
+  estimatedActualBalance?: number;
+  balanceCheckedAt?: string;
   readyToAssign: number | null;
   /**
    * What can really be assigned from this account: ready to assign minus unfunded savings and what its

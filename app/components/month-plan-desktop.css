@@ -1,0 +1,96 @@
+.plan-desktop { display:flex; flex-direction:column; min-height:0; height:100%; }
+.plan-desktop-header { display:flex; align-items:center; gap:24px; padding:24px 32px; flex-shrink:0; }
+.plan-desktop-title { margin:0 auto 0 0; color:var(--text); font-size:24px; line-height:1.2; font-weight:750; letter-spacing:-.02em; }
+.plan-desktop-body { display:grid; grid-template-columns:minmax(0,1fr) 280px; flex:1; min-height:0; }
+.plan-desktop-main { overflow:auto; padding:8px 32px 32px; min-width:0; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
+.plan-desktop-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.plan-desktop h2 { margin:0; font-size:18px; font-weight:700; }
+.plan-desktop-heading button { border:0; background:transparent; color:var(--text2); font:inherit; font-weight:600; min-height:44px; cursor:pointer; }
+.plan-desktop-heading button:hover { color:var(--text); }
+.plan-table-head, .plan-table-row { display:grid; grid-template-columns:minmax(150px,1fr) 100px 100px 130px 44px; gap:12px; align-items:center; }
+.plan-table-head { color:var(--text2); font-size:12px; font-weight:600; padding:0 0 12px; }
+.plan-table-head > :not(:first-child), .plan-table-row > span { text-align:right; }
+.plan-group { font-size:13px; font-weight:700; color:var(--text2); padding:20px 0 8px; }
+.plan-table-row { min-height:60px; border-bottom:1px solid var(--border); font-size:14px; font-variant-numeric:tabular-nums; }
+.plan-category { display:flex; align-items:center; gap:12px; min-width:0; font-weight:600; }
+.plan-category > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.plan-category-icon { display:grid; place-items:center; width:36px; height:36px; flex:none; border-radius:11px; background:var(--surface2); }
+.plan-amount { width:100%; text-align:right; font-size:16px; font-variant-numeric:tabular-nums; }
+.plan-amount[data-changed] { background:var(--select-wash); border-color:var(--select-edge); }
+.plan-amount[aria-invalid="true"] { outline:2px solid var(--danger); }
+.plan-freeze { width:44px; height:44px; display:grid; place-items:center; border:0; border-radius:12px; background:transparent; color:var(--text2); cursor:pointer; }
+.plan-freeze:hover, .plan-freeze:focus-visible { color:var(--text); background:var(--surface2); }
+.plan-frozen { margin-top:24px; }
+.plan-summary { background:var(--surface2); padding:24px; display:flex; flex-direction:column; gap:16px; overflow:auto; }
+.plan-summary-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.plan-summary-line { display:flex; justify-content:space-between; gap:12px; color:var(--text2); font-size:14px; font-variant-numeric:tabular-nums; }
+.plan-summary-line strong { color:var(--text); text-align:right; }
+.plan-summary-line .plan-negative { color:var(--danger); }
+.plan-summary-divider { height:1px; background:var(--border2); }
+.plan-summary-actions { margin-top:auto; display:grid; gap:12px; padding-top:24px; color:var(--text2); font-size:14px; }
+.plan-primary { min-height:48px; border:0; border-radius:12px; background:var(--accent); color:var(--accent-ink); font:inherit; font-weight:700; cursor:pointer; }
+.plan-primary:disabled { opacity:.5; cursor:not-allowed; }
+.plan-desktop button:focus-visible, .plan-amount:focus-visible { outline:2px solid var(--select-ink); outline-offset:2px; }
+.plan-review-head, .plan-review-row { display:grid; grid-template-columns:minmax(0,1fr) 120px 120px; gap:16px; align-items:center; font-variant-numeric:tabular-nums; }
+.plan-review-head { color:var(--text2); font-size:12px; font-weight:600; padding:12px 0; }
+.plan-review-row { min-height:56px; border-bottom:1px solid var(--border2); font-size:14px; }
+.plan-review-head > :not(:first-child), .plan-review-row > :not(:first-child) { text-align:right; }
+.plan-review-row small { display:block; color:var(--text2); }
+/* Keep the workspace usable before the viewport is wide enough for generous columns. */
+@media (min-width:1000px) and (max-width:1199px) {
+  .plan-desktop-header { padding:20px 24px; }
+  .plan-desktop-body { grid-template-columns:minmax(0,1fr) 248px; }
+  .plan-desktop-main { padding:8px 24px 24px; }
+  .plan-summary { padding:24px 20px; }
+  .plan-table-head, .plan-table-row { grid-template-columns:minmax(120px,1fr) 80px 80px 112px 44px; gap:8px; }
+}
+@media (hover:hover) {
+  .plan-freeze { opacity:0; }
+  .plan-table-row:hover .plan-freeze, .plan-table-row:focus-within .plan-freeze { opacity:1; }
+}
+/* The desk workspace uses the app's quiet surfaces, with the table as its focus. */
+.plan-desktop { background:var(--surface2); }
+.plan-desktop-header { padding-bottom:20px; }
+.plan-desktop-body { padding:0 24px 24px; gap:16px; }
+.plan-desktop-main, .plan-summary { background:var(--surface); border-radius:18px; }
+.plan-desktop-main { padding:24px; }
+.plan-desktop-heading { margin-bottom:20px; }
+.plan-desktop-heading button { padding:0 14px; border-radius:12px; background:var(--surface2); color:var(--text); font-size:13px; }
+.plan-desktop-heading button:hover { background:var(--select-wash); }
+.plan-table-head { padding-bottom:12px; color:var(--muted); }
+.plan-group { padding-top:20px; }
+.plan-table-row { min-height:56px; }
+.plan-category-icon { background:var(--surface2); }
+.plan-summary { padding:24px; }
+.plan-summary-title { margin-bottom:0; }
+.plan-summary-balance { display:grid; gap:8px; color:var(--text2); font-size:13px; }
+.plan-summary-balance strong { color:var(--text); font-size:28px; line-height:1.1; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.plan-summary-balance .plan-negative { color:var(--danger); }
+.plan-summary-divider { background:var(--track, var(--border)); }
+@media (min-width:1000px) and (max-width:1199px) {
+  .plan-desktop-body { padding:0 16px 16px; gap:12px; }
+  .plan-desktop-main { padding:20px; }
+  .plan-summary { padding:20px; }
+}
+/* Keep the column labels in view as the category list scrolls. */
+.plan-table-head { position:sticky; top:-24px; z-index:2; margin:0 -24px; padding:12px 24px; background:var(--surface); box-shadow:0 8px 12px -12px var(--border2); }
+.plan-summary { min-height:0; overflow:hidden; display:flex; gap:0; }
+.plan-summary-content { min-height:0; overflow:auto; display:grid; align-content:start; gap:16px; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
+.plan-summary-actions { flex-shrink:0; margin-top:auto; padding-top:20px; }
+.plan-summary-balance { padding:12px 0 4px; }
+.plan-summary-balance strong { font-size:32px; }
+.plan-summary-balance strong .money-currency { font-size:12px; }
+.plan-table-row:hover { background:color-mix(in srgb, var(--surface2) 45%, transparent); }
+.plan-amount { transition:border-color 120ms ease, background-color 120ms ease; }
+.plan-amount:focus-visible { border-color:var(--select-ink); }
+@media (min-width:1000px) and (max-width:1199px) {
+  .plan-table-head { top:-20px; margin-inline:-20px; padding-inline:20px; }
+}
+.plan-desktop { background:var(--surface); }
+/* Use the same inset for headings and every category row. */
+.plan-table-head { padding-inline:36px; }
+.plan-group { padding:24px 12px 8px; }
+.plan-table-row { box-sizing:border-box; min-height:60px; padding:8px 12px; }
+@media (min-width:1000px) and (max-width:1199px) {
+  .plan-table-head { padding-inline:32px; }
+}

@@ -128,7 +128,7 @@ export function ReflectScreen(props: Props) {
       : <>
         {!hasData ? <section style={{ padding: "40px 0", textAlign: "center" }}><h2 style={{ fontSize: 20, fontWeight: 500 }}>{filterCount ? "Nothing matches these filters" : "No spending to reflect on yet"}</h2><p style={mutedStyle}>{filterCount ? "Include more categories or accounts to see the breakdown." : "Try another period, or add your first expense."}</p>{filterCount > 0 && <button style={quietButtonStyle} onClick={() => { setExcludedAccounts([]); setExcludedCategories([]); }}>Reset filters</button>}</section>
           : <>
-            <section aria-label="Spending breakdown" style={{ display: "grid", justifyItems: "center", gap: 12 }}>
+            <div className="reflect-desktop-panels"><section className="reflect-desktop-overview" aria-label="Spending breakdown" style={{ display: "grid", justifyItems: "center", gap: 12 }}>
               <button type="button" onClick={() => haptic("light")} aria-label="Tap spending mascot" style={jarButtonStyle}>
                 <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={REFLECT_JAR_SIZE} style={{ margin: "-28px auto -16px" }} />
               </button>
@@ -139,10 +139,11 @@ export function ReflectScreen(props: Props) {
               </div>
 
             </section>
-            <section aria-label="Spending by category">
+            <section className="reflect-desktop-categories" aria-label="Spending by category">
               <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Where it went</h2></div>
               <ul style={listStyle}>{breakdown.spending.map((row, index) => categoryRow(row, index))}</ul>
             </section>
+            </div>
             {breakdown.inflows.length > 0 && <section aria-label="Positive category inflows"><h2 style={sectionTitleStyle}>More came back than went out</h2><p style={mutedStyle}>Net inflows in these categories are separate from the spending chart.</p><ul style={listStyle}>{breakdown.inflows.map((row, index) => categoryRow(row, index, true))}</ul></section>}
             {breakdown.settled.length > 0 && <section aria-label="Fully offset categories"><h2 style={sectionTitleStyle}>Balanced out</h2><p style={mutedStyle}>Category inflows covered the spending.</p><ul style={listStyle}>{breakdown.settled.map((row, index) => categoryRow(row, index))}</ul></section>}
           </>}

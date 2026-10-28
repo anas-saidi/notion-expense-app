@@ -264,6 +264,12 @@ export function TypeItComposer(props: Props) {
 
       {rows.length > 50 && <Banner tone="danger" role="alert" compact>Add up to 50 transactions at a time.</Banner>}
       {budgetErrors.map(({ category, shortfall }) => <Banner key={category.id} tone="warning" compact style={{ marginTop: 12 }}>{category.name} needs <Money value={shortfall} /> more to cover these lines. Fund it in Budget or change the line’s category.</Banner>)}
+      {props.accounts.filter(account => account.estimatedActualBalance != null).map(account => {
+        const spending = rows.filter(row => row.account?.id === account.id && row.transaction?.type === "Expense").reduce((sum, row) => sum + (row.transaction?.amount ?? 0), 0);
+        return spending > account.estimatedActualBalance! ? <Banner key={account.id} tone="warning" role="alert" compact style={{ marginTop: 12 }}>
+          {account.label}: exceeds estimated actual funds by <Money value={spending - account.estimatedActualBalance!} />.
+        </Banner> : null;
+      })}
       {feedback && <Banner tone={feedback.error ? "danger" : "success"} role={feedback.error ? "alert" : "status"} compact style={{ marginTop: 12 }}>{feedback.message}</Banner>}
     </div>
     <div style={{ flexShrink: 0, paddingTop: 12 }}>

@@ -249,7 +249,7 @@ export function CategoriesScreen({
               </button>
             : null
         : <>
-            <section aria-label={`${fmt(Math.round(availableInCategories))} MAD allocated in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
+            <section className="budget-desktop-overview" aria-label={`${fmt(Math.round(availableInCategories))} MAD allocated in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
                   emojis stay tucked away until the jar is tapped; then every category that still
                   has money drops in, sized by its share of Available. */}
@@ -311,7 +311,7 @@ export function CategoriesScreen({
               />
             ) : null}
 
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div className="budget-desktop-controls" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <MonthPicker
                 value={homeMonth}
                 aria-label="Filter planned and spent by month"
@@ -339,7 +339,7 @@ export function CategoriesScreen({
               const total = group.rows.reduce((sum, row) => sum + (row.savings ? Math.max(0, row.cat.available ?? 0) : row.status.amount), 0);
               const id = `budget-${group.label.toLowerCase().replace(/\s+/g, "-")}`;
               return (
-                <section key={group.label} aria-labelledby={id} style={sectionStyle}>
+                <section className="budget-desktop-group" key={group.label} aria-labelledby={id} style={sectionStyle}>
                   <SectionToggle id={id} label={group.label} count={group.rows.length} total={total} open={open} onToggle={() => toggleSection(group.label)} />
                   {open && (
                     <div style={listSurfaceStyle}>

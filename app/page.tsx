@@ -9,6 +9,9 @@ import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { BillsSection } from "./components/BillsSection";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
+import { useBalanceChecks } from "./components/useBalanceChecks";
+import { BalanceCheckAccounts, PendingBalanceChecks } from "./components/BalanceChecks";
+import { accountKey, checkedFundsAfter } from "../lib/balance-checks";
 import { HomeScreen } from "./components/HomeScreen";
 const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen), { loading: () => <SkeletonRegion label="Loading Reflect"><Skeleton style={{ height: 220, marginBottom: 16 }} /><SkeletonRows /></SkeletonRegion> });
 import { CategoriesScreen } from "./components/CategoriesScreen";
@@ -65,6 +68,9 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
+  const balanceChecks = useBalanceChecks();
+  const [showBalanceAccounts, setShowBalanceAccounts] = useState(false);
+  const [startBalanceCheck, setStartBalanceCheck] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgetTransactions, setBudgetTransactions] = useState<Transaction[]>([]);
   const [debtCategories, setDebtCategories] = useState<Category[]>([]);
@@ -400,7 +406,7 @@ export default function App() {
   const fetchAccounts = async () => {
     const request = ++accountsRequest.current;
     const data = await fetchApiJson<{ accounts?: Account[] }>("/api/accounts");
-    if (request === accountsRequest.current) setAccounts(data.accounts ?? []);
+    if (request === accountsRequest.current) { setAccounts(data.accounts ?? []); void balanceChecks.refresh(); }
   };
 
 
@@ -828,7 +834,11 @@ export default function App() {
       return 0;
     });
 
-  const filteredAccounts = accounts;
+  const checkedAccounts = useMemo(() => accounts.map(account => {
+    const check = balanceChecks.checks.find(check => check.accountId === accountKey(account.id));
+    return { ...account, estimatedActualBalance: check?.estimatedActual, balanceCheckedAt: check?.checkedAt };
+  }), [accounts, balanceChecks.checks]);
+  const filteredAccounts = checkedAccounts;
 
   const homeCategories = [...categories]
     .sort((a, b) => {
@@ -950,6 +960,8 @@ export default function App() {
         : displayedBalance - evalExpr(amount)
     : null;
 
+  const selectedBalanceCheck = balanceChecks.checks.find(check => check.accountId === accountKey(accountId));
+
   const suggestCategory = (query: string) => {
     setSuggestedCatId(suggestFromHistory(query, categories));
   };
@@ -1028,6 +1040,8 @@ export default function App() {
   }
 
   const parsedAmount = amount ? evalExpr(amount) : 0;
+  const actualAfterSpending = transactionType === "Expense" && !editingOriginal && parsedAmount > 0
+    ? checkedFundsAfter(selectedBalanceCheck, parsedAmount) : null;
   const isEditingTransaction = Boolean(editingTransactionId);
   const budgetGate = transactionType === "Expense" && selectedCat
     ? expenseBudgetGate({
@@ -1065,6 +1079,8 @@ export default function App() {
       onBudgetSearch={() => window.dispatchEvent(new Event("open-budget-search"))}
       onReflectSearch={() => window.dispatchEvent(new Event("open-reflect-search"))}
       onBudgetRebalance={() => setShowRebalance(true)}
+      onCheckBalances={() => setShowBalanceAccounts(true)}
+      canCheckBalances={!balanceChecks.loading && accounts.length > 0}
       theme={theme}
       onSelectTheme={selectTheme}
       toast={microToast}
@@ -1099,6 +1115,8 @@ export default function App() {
         }}
         planningMonth={openedPlanningMonth ?? monthStartPlannerMonth ?? calendarMonth}
         scope={budgetScope}
+        onScopeChange={setBudgetScope}
+        personalScope={mode === "wife" ? "salma" : "anas"}
         categories={categories.filter((c) => !c.snoozed && !c.archived)}
         frozenCategories={frozenCategories}
         accounts={accounts}
@@ -1107,7 +1125,8 @@ export default function App() {
 
       {tab === "home" && (
         <HomeScreen
-          billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={accounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
+          balanceChecks={<PendingBalanceChecks checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} onReview={account => { setStartBalanceCheck(true); setDetailsAccount(account); }} />}
+          billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={checkedAccounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
           monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
           monthlyError={monthError}
           secondaryLoading={secondaryLoading}
@@ -1249,6 +1268,9 @@ export default function App() {
         lastUsedCatId={lastUsedCatId}
         displayedBalance={displayedBalance}
         amountAfterBalance={amountAfterBalance}
+        actualAfterSpending={actualAfterSpending}
+        balanceCheckUnavailable={!!balanceChecks.error}
+        balanceCheckedAt={selectedBalanceCheck?.checkedAt}
         parsedAmount={parsedAmount}
         categoryUnfunded={categoryUnfunded}
         categoryOverBudget={categoryOverBudget}
@@ -1418,13 +1440,18 @@ export default function App() {
         zIndex={95}
       /></DeferredMount>
 
+      <BalanceCheckAccounts open={showBalanceAccounts} accounts={accounts} onClose={() => setShowBalanceAccounts(false)} onSelect={account => { setShowBalanceAccounts(false); setStartBalanceCheck(true); setDetailsAccount(account); }} />
+
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
         open={detailsAccount !== null}
+        startBalanceCheck={startBalanceCheck}
+        balanceCheck={balanceChecks.checks.find(check => check.accountId === accountKey(detailsAccount?.id ?? ""))}
+        onBalanceCheckChanged={balanceChecks.refresh}
         account={detailsAccount && (displayAccounts.find((a) => a.id === detailsAccount.id) ?? detailsAccount)}
         transactions={transactions}
         categories={categories}
         homeMonth={homeMonth}
-        onClose={() => setDetailsAccount(null)}
+        onClose={() => { setDetailsAccount(null); setStartBalanceCheck(false); }}
         onMove={(acct) => { setDetailsAccount(null); setTransferPreset(null); setTransferAccount(acct); }}
         onIncome={(acct) => { setDetailsAccount(null); setIncomeAccount(acct); }}
         onReconcileSuccess={(msg) => { refreshAccountsData(msg); }}
@@ -1441,7 +1468,7 @@ export default function App() {
       <DeferredMount active={transferAccount !== null}>      <AccountTransferSheet
         open={transferAccount !== null}
         account={transferAccount}
-        accounts={accounts}
+        accounts={checkedAccounts}
         initialToAccountId={transferPreset?.toAccountId}
         initialAmount={transferPreset?.amount}
         initialNote={transferPreset?.note}

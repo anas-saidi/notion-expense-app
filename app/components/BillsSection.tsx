@@ -164,6 +164,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
           </fieldset>
           {view === "edit" && target === "future" && <p className="bills-muted">Earlier unpaid bills keep their amounts. Recurrence stays {repeat.toLowerCase()}.</p>}
           {view === "add" && draftFree != null && draftFree < 0 && <Banner tone="warning">Short by <Money value={-draftFree} /> after bills. You can add this bill before funding its category.</Banner>}
+          {view === "pay" && paymentAccount?.estimatedActualBalance != null && expected > paymentAccount.estimatedActualBalance && <Banner tone="warning" role="alert">Exceeds estimated actual funds by <Money value={expected - paymentAccount.estimatedActualBalance} />.</Banner>}
           {view === "pay" && <>{gate.unfunded || gate.overBudget ? <Banner tone="warning">{gate.unfunded ? "Category availability is missing or unfunded." : <>Short by <Money value={gate.shortfall} />.</>} Fund the category before recording payment.</Banner> : null}
           {!gate.unfunded && !gate.overBudget && (selectedCategory?.available ?? 0) - expected < paymentOtherReserved && <Banner tone="warning">This payment uses money earmarked for other bills. Recording payment confirms you want to continue.</Banner>}</>}
           <div className={view === "pay" ? "bills-pay-actions" : undefined}><button type="submit" className="bills-primary" disabled={!enabled || !formReady}>{saving ? "Saving…" : view === "pay" ? "Record payment" : view === "edit" ? "Save changes" : "Add bill"}</button>

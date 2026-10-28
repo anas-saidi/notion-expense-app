@@ -122,6 +122,9 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
           <BalanceTile label="To" account={toAccount} nextBalance={toAccount?.balance != null && parsedAmount > 0 ? toAccount.balance + parsedAmount : null} />
         </section>
 
+        {fromAccount?.estimatedActualBalance != null && parsedAmount > fromAccount.estimatedActualBalance && <Banner tone="warning" role="alert" compact>
+          Exceeds estimated actual funds by <Money value={parsedAmount - fromAccount.estimatedActualBalance} />.
+        </Banner>}
         <section style={formStyle}>
           <label style={fieldStyle}>
             <span style={labelStyle}>From account</span>

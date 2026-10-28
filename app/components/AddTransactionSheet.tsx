@@ -42,6 +42,9 @@ type AddTransactionSheetProps = {
   lastUsedCatId: string;
   displayedBalance: number | null;
   amountAfterBalance: number | null;
+  actualAfterSpending?: number | null;
+  balanceCheckUnavailable?: boolean;
+  balanceCheckedAt?: string;
   parsedAmount: number;
   categoryUnfunded: boolean;
   categoryOverBudget: boolean;
@@ -215,7 +218,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       panelStyle={panelStyle}
       contentStyle={{ paddingTop: 0, overflow: "hidden" }}
     >
-      <div ref={sheetContentRef} style={{ ...sheetInnerStyle, ...(entryMode === "type" ? { padding: "12px max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom))" } : {}), overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget) ? "auto" : "hidden" }}>
+      <div ref={sheetContentRef} style={{ ...sheetInnerStyle, ...(entryMode === "type" ? { padding: "12px max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom))" } : {}), overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget || props.actualAfterSpending != null || props.balanceCheckUnavailable) ? "auto" : "hidden" }}>
 
         {/* ── Header ── */}
         <header style={topBarStyle}>
@@ -276,10 +279,20 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           )}
           {visibleBalance !== null && props.amount.trim() !== "" && (
             <p style={{ ...heroCopyStyle, color: isIncome && visibleBalance >= 0 ? "var(--action-income)" : "var(--danger)" }}>
-              Balance after: <Money value={visibleBalance} />
+              {props.balanceCheckedAt ? "Ledger after" : "Balance after"}: <Money value={visibleBalance} />
             </p>
           )}
         </section>
+
+        {props.actualAfterSpending != null && props.actualAfterSpending < 0 && <Banner tone="warning" role="alert" compact icon={<AlertTriangleIcon size={18} />}>
+          Exceeds estimated actual funds by <Money value={Math.abs(props.actualAfterSpending)} />
+          {props.balanceCheckedAt && <span style={{ display: "block", marginTop: 4 }}>Checked {fmtDate(props.balanceCheckedAt.slice(0, 10))}</span>}
+        </Banner>}
+        {props.actualAfterSpending != null && props.actualAfterSpending >= 0 && props.balanceCheckedAt && <p style={{ ...heroCopyStyle, margin: "8px 0" }}>
+          Estimated actual after: <Money value={props.actualAfterSpending} />
+          <span style={{ display: "block", marginTop: 4 }}>Checked {fmtDate(props.balanceCheckedAt.slice(0, 10))}</span>
+        </p>}
+        {props.balanceCheckUnavailable && <Banner tone="warning" compact>Actual-funds checks unavailable. Refresh before spending.</Banner>}
 
         {/* ── Form fields ── */}
         <section style={formSectionStyle}>

@@ -19,12 +19,14 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { CheckIcon, XIcon } from "./ui/icons";
+import { CheckIcon, FreezeIcon, XIcon } from "./ui/icons";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { freezeMonthPlanCategory } from "./month-plan-actions";
 import { SlideToConfirm } from "./SlideToConfirm";
 import { SectionToggle } from "./ui/SectionToggle";
 import { pickerChipStyle } from "./TransactionPickers";
+import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
+import "./month-plan-desktop.css";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 
@@ -78,6 +80,8 @@ type MonthPlanSheetProps = {
   planningMonth: string;
   /** The app-wide mode: the sheet plans that wallet's categories. */
   scope: BudgetScope;
+  onScopeChange: (scope: BudgetScope) => void;
+  personalScope: Exclude<BudgetScope, "joint">;
   categories: Category[];
   frozenCategories: Category[];
   accounts: Account[];
@@ -94,12 +98,24 @@ export function MonthPlanSheet({
   onCategoriesChanged,
   planningMonth,
   scope,
+  onScopeChange,
+  personalScope,
   categories,
   frozenCategories,
   accounts,
   planningCapacity,
 }: MonthPlanSheetProps) {
   const reduceMotion = useReducedMotion();
+  const [desktop, setDesktop] = useState(false);
+  const [expressions, setExpressions] = useState<Record<string, string>>({});
+  const [reviewing, setReviewing] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1000px)");
+    const update = () => setDesktop(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const currentMonth = shiftMonth(planningMonth, -1);
   const planLabel = monthName(planningMonth);
 
@@ -166,6 +182,8 @@ export function MonthPlanSheet({
   useEffect(() => {
     if (!open) { setLoading(true); return; }
     setDraft({});
+    setExpressions({});
+    setReviewing(false);
     setRevived([]);
     setLocallyFrozen([]);
     setHeroHidden(false);
@@ -245,14 +263,22 @@ export function MonthPlanSheet({
   const jarMood: Mood = left < 0 ? "worried" : plannedTotal > 0 && Math.round(left) === 0 ? "happy" : left > 0 ? "curious" : "idle";
 
   const setAmount = (cat: Category, value: number) =>
-    setDraft((prev) => ({ ...prev, [normId(cat.id)]: Math.max(0, Math.round(value)) }));
+    setDraft((prev) => ({ ...prev, [normId(cat.id)]: Math.max(0, Math.round(value * 100) / 100) }));
 
   const copyCurrentPlan = () => {
+    setExpressions((prev) => {
+      const next = { ...prev };
+      for (const cat of scopeCategories) {
+        const value = currentPlanned.get(normId(cat.id));
+        if (value && value > 0) delete next[normId(cat.id)];
+      }
+      return next;
+    });
     setDraft((prev) => {
       const next = { ...prev };
       for (const cat of scopeCategories) {
         const value = currentPlanned.get(normId(cat.id));
-        if (value && value > 0) next[normId(cat.id)] = Math.round(value);
+        if (value && value > 0) next[normId(cat.id)] = value;
       }
       return next;
     });
@@ -294,6 +320,7 @@ export function MonthPlanSheet({
         },
       });
       setAmount(cat, 0);
+      setExpressions(prev => { const next = { ...prev }; delete next[normId(cat.id)]; return next; });
       setRevived((prev) => prev.filter((c) => c.id !== cat.id));
       setLocallyFrozen((prev) => [...prev, { ...cat, snoozed: true }]);
       onCategoriesChanged();
@@ -329,6 +356,8 @@ export function MonthPlanSheet({
         return next;
       });
       setDraft({});
+      setExpressions({});
+      setReviewing(false);
       onSaved();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Couldn't save the plan");
@@ -354,6 +383,66 @@ export function MonthPlanSheet({
     </SwipeToDelete>
   );
 
+  const invalidExpressions = Object.values(expressions).some((text) => text.trim() !== "" && parseAmount(text) === null);
+  const desktopGroups = [
+    ...(savingsCategories.length ? [{ key: "savings", label: "Savings", items: savingsCategories }] : []),
+    ...budgetGroups,
+  ];
+  if (desktop) return (
+    <BottomSheet open={open} onClose={onClose} label={`Plan ${planLabel}`} desktopViewportCentered maxWidth="1200px" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
+      <div className="plan-desktop">
+        <header className="plan-desktop-header">
+          <h1 className="plan-desktop-title">Plan {planLabel}</h1>
+          <GlobalBudgetScopePicker value={scope} onChange={onScopeChange} personalScope={personalScope} />
+          <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close"><XIcon size={20} /></button>
+        </header>
+        {loading ? <SkeletonRegion label="Loading monthly plan"><SkeletonRows label="Loading planned categories" count={4} iconSize={44} /></SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <div className="plan-desktop-body">
+          <main className="plan-desktop-main">
+            {reviewing ? <>
+              <div className="plan-desktop-heading"><h2>Review changes</h2><button type="button" onClick={() => setReviewing(false)}>Edit plan</button></div>
+              <div className="plan-review-head"><span>Category</span><span>Saved</span><span>New plan</span></div>
+              {changed.map(cat => <div className="plan-review-row" key={cat.id}><span>{cat.name} <small>{BUDGET_SCOPE_LABELS[getCategoryScope(cat, accounts) ?? scope]}</small></span><span>{fmt(saved.get(normId(cat.id)) ?? 0)}</span><strong>{fmt(amountFor(cat))}</strong></div>)}
+            </> : <>
+              <div className="plan-desktop-heading"><h2>{BUDGET_SCOPE_LABELS[scope]} categories</h2>{hasCurrentPlan && <button type="button" disabled={saving || !!freezing} onClick={copyCurrentPlan}>Copy last month</button>}</div>
+              <div className="plan-table" role="table" aria-label={`${BUDGET_SCOPE_LABELS[scope]} category plan`}>
+                <div className="plan-table-head" role="row"><span role="columnheader">Category</span><span role="columnheader">Last plan</span><span role="columnheader">Spent</span><span role="columnheader">{planLabel} plan</span><span /></div>
+                {desktopGroups.map(group => <div key={group.key} role="rowgroup"><div className="plan-group">{group.label}</div>{group.items.map(cat => {
+                  const id = normId(cat.id);
+                  const changedRow = amountFor(cat) !== (saved.get(id) ?? 0);
+                  return <div className="plan-table-row" role="row" key={id}>
+                    <div className="plan-category" role="cell"><span className="plan-category-icon"><CategoryIcon icon={cat.icon} size={20} /></span><span>{cat.name}</span></div>
+                    <span role="cell">{fmt(currentPlanned.get(id) ?? 0)}</span><span role="cell">{fmt(currentSpent.get(id) ?? 0)}</span>
+                    <div role="cell"><input className="field-input plan-amount" data-changed={changedRow || undefined} type="text" inputMode="decimal" aria-label={`${planLabel} plan for ${cat.name}${changedRow ? ", changed" : ""}`} aria-invalid={expressions[id] != null && expressions[id].trim() !== "" && parseAmount(expressions[id]) === null} value={expressions[id] ?? (amountFor(cat) ? String(amountFor(cat)) : "")} placeholder="0" disabled={saving || !!freezing} onFocus={e => e.currentTarget.select()} onChange={e => { const text = e.target.value.replace(/[^\d+\-*/, .()]/g, ""); setExpressions(prev => ({ ...prev, [id]: text })); const value = text.trim() ? parseAmount(text) : 0; if (value !== null) setAmount(cat, value); }} onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { const inputs = Array.from(e.currentTarget.closest(".plan-table")?.querySelectorAll<HTMLInputElement>("input:not(:disabled)") ?? []); const next = inputs[inputs.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)]; if (next) { e.preventDefault(); next.focus(); } else if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } } }} /></div>
+                    <button type="button" className="plan-freeze" disabled={saving || !!freezing} onClick={() => void freeze(cat)} aria-label={`Freeze ${cat.name} and clear its ${planLabel} allocation`} title={`Freeze ${cat.name}`}><FreezeIcon size={17} aria-hidden="true" /></button>
+                  </div>;
+                })}</div>)}
+              </div>
+              {!scopeCategories.length && <div style={emptyStyle}>No active {BUDGET_SCOPE_LABELS[scope]} categories.</div>}
+              {frozenInScope.length > 0 && <section className="plan-frozen"><SectionToggle id="desktop-plan-frozen" label="Frozen" count={frozenInScope.length} open={!collapsed.has("frozen")} onToggle={() => toggleSection("frozen")} />{!collapsed.has("frozen") && frozenInScope.map(cat => <div key={cat.id} style={frozenRowStyle}><CategoryIcon icon={cat.icon} size={20} /><span style={frozenNameStyle}>{cat.name}</span><button type="button" onClick={() => void unfreeze(cat)} disabled={!!unfreezing || !!freezing || saving} style={unfreezeButtonStyle}>{unfreezing === cat.id ? "…" : "Unfreeze"}</button></div>)}</section>}
+            </>}
+          </main>
+          <aside className="plan-summary" aria-label="Household summary">
+            <div className="plan-summary-content">
+            <div className="plan-summary-title"><h2>Household</h2><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} /></div>
+            <div className="plan-summary-balance"><span>{BUDGET_SCOPE_LABELS[scope]} unassigned</span><strong className={left < 0 ? "plan-negative" : ""}><Money value={left} currency /></strong></div>
+            <div className="plan-summary-divider" />
+            <div className="plan-summary-line"><span>Joint planned</span><strong>{fmt(totals.joint)}</strong></div>
+            <div className="plan-summary-line"><span>Anas planned</span><strong>{fmt(totals.anas)}</strong></div>
+            <div className="plan-summary-line"><span>Salma planned</span><strong>{fmt(totals.salma)}</strong></div>
+            <div className="plan-summary-divider" />
+            <div className="plan-summary-line"><span>Anas for Joint</span><strong>{fmt(capacity.due.anas)}</strong></div>
+            <div className="plan-summary-line"><span>Salma for Joint</span><strong>{fmt(capacity.due.salma)}</strong></div>
+            </div>
+            <div className="plan-summary-actions">
+              {(saveError || capacityError || invalidExpressions) && <Banner role="alert" tone="danger" compact>{saveError || capacityError || "Complete the amount before reviewing."}</Banner>}
+              {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : <span role="status">{savedTotal > 0 ? "Plan saved" : "Nothing planned yet"}</span>}
+            </div>
+          </aside>
+        </div>}
+      </div>
+    </BottomSheet>
+  );
+
   return (
     <BottomSheet
       open={open}
@@ -367,7 +456,6 @@ export function MonthPlanSheet({
       <div style={innerStyle} className="planner-wrap">
         <header style={headerStyle}>
           <div>
-            <div style={eyebrowStyle}>{BUDGET_SCOPE_LABELS[scope]} budget</div>
             <h1 style={titleStyle}>Plan {planLabel}</h1>
           </div>
           <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close">
@@ -612,7 +700,7 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
             disabled={disabled}
             onFocus={(e) => { setText(amount > 0 ? String(amount) : ""); e.target.select(); }}
             onChange={(e) => {
-              const next = e.target.value.replace(/[^\d+\-*/.() ]/g, "");
+              const next = e.target.value.replace(/[^\d+\-*/, .()]/g, "");
               setText(next);
               // Update totals as you type; a half-typed sum like "500+" keeps the last value.
               const value = next.trim() ? parseAmount(next) : 0;
@@ -673,15 +761,6 @@ const headerStyle: CSSProperties = {
   justifyContent: "space-between",
   padding: "18px 16px 4px 20px",
   flexShrink: 0,
-};
-
-const eyebrowStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
-  color: "var(--muted)",
-  marginBottom: 4,
 };
 
 const titleStyle: CSSProperties = {

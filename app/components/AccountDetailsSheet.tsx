@@ -1,5 +1,6 @@
 "use client";
 
+import { money, type BalanceCheckView } from "../../lib/balance-checks";
 import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
 import { DatePicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
@@ -29,6 +30,9 @@ import {
 
 type AccountDetailsSheetProps = {
   open: boolean;
+  startBalanceCheck?: boolean;
+  balanceCheck?: BalanceCheckView;
+  onBalanceCheckChanged?: () => Promise<void>;
   account: Account | null;
   transactions: Transaction[];
   categories: Category[];
@@ -59,6 +63,9 @@ function fmtMonth(m: string) {
 
 export function AccountDetailsSheet({
   open,
+  startBalanceCheck = false,
+  balanceCheck,
+  onBalanceCheckChanged,
   account,
   transactions,
   categories,
@@ -70,6 +77,9 @@ export function AccountDetailsSheet({
   onTransactionsChanged,
 }: AccountDetailsSheetProps) {
   const [showReconcile, setShowReconcile] = useState(false);
+  const [checkVersion, setCheckVersion] = useState<string | null>(null);
+  const [checkSaving, setCheckSaving] = useState(false);
+  const [checkMessage, setCheckMessage] = useState<string | null>(null);
   const [actualBalance, setActualBalance] = useState("");
   const [reconcileStatus, setReconcileStatus] = useState<ReconcileStatus>("idle");
   const [reconcileError, setReconcileError] = useState("");
@@ -101,8 +111,10 @@ export function AccountDetailsSheet({
       setChartTxns([]);
       setShowAllActivity(false);
       setLiveBalance(account?.balance ?? 0);
-      setShowReconcile(false);
-      setActualBalance("");
+      setShowReconcile(startBalanceCheck);
+      setCheckVersion(balanceCheck?.version ?? null);
+      setCheckMessage(null);
+      setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : "");
       setReconcileStatus("idle");
       setReconcileError("");
       setAddedTxns([]);
@@ -191,6 +203,7 @@ export function AccountDetailsSheet({
   const lastPoint = chartData.points[chartData.points.length - 1];
 
   const handleClose = () => {
+    if (checkSaving || txnSaving || reconcileStatus === "saving") return;
     setShowReconcile(false);
     setActualBalance("");
     setReconcileStatus("idle");
@@ -205,6 +218,7 @@ export function AccountDetailsSheet({
   };
 
   const closeReconcile = () => {
+    if (checkSaving || txnSaving || reconcileStatus === "saving") return;
     setShowReconcile(false);
     setActualBalance("");
     setReconcileStatus("idle");
@@ -289,6 +303,21 @@ export function AccountDetailsSheet({
     [categories],
   );
 
+  const changeCheck = async (action: "save" | "close") => {
+    if (!account || checkSaving) return;
+    setCheckSaving(true); setReconcileError(""); setCheckMessage(null);
+    try {
+      const response = await fetch("/api/balance-checks", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, accountId: account.id, actualBalance: parsedActual, expectedVersion: checkVersion }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not save the check.");
+      setCheckVersion(data.check?.version ?? null);
+      setCheckMessage(action === "save" ? "Saved for review. Ledger unchanged." : "Balance check resolved.");
+      await onBalanceCheckChanged?.();
+    } catch (error) { setReconcileError(error instanceof Error ? error.message : "Could not save the check."); }
+    finally { setCheckSaving(false); }
+  };
+
   const submitReconcile = async () => {
     if (!account || !Number.isFinite(parsedActual)) return;
     setReconcileStatus("saving");
@@ -308,6 +337,7 @@ export function AccountDetailsSheet({
       if (!res.ok) throw new Error(data.error ?? "Failed to reconcile");
       setReconcileStatus("success");
       onReconcileSuccess(`${account.label} reconciled`);
+      await onBalanceCheckChanged?.();
       setTimeout(() => {
         setShowReconcile(false);
         setActualBalance("");
@@ -352,6 +382,17 @@ export function AccountDetailsSheet({
       setLiveBalance(prev => prev + (txnType === "Income" ? amt : -amt));
       setTxnAmount("");
       setTxnName("");
+      if (checkVersion) {
+        // This is a missing transaction already reflected in the physical count.
+        try {
+        const response = await fetch("/api/balance-checks", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "include", accountId: account.id, expectedVersion: checkVersion, transactionId: id }) });
+        const result = await response.json();
+        if (response.ok) setCheckVersion(result.check.version);
+        else setTxnError(`Transaction saved. ${result.error ?? "Update the actual count before relying on this check."}`);
+        } catch { setTxnError("Transaction saved. Update the actual balance before relying on this check."); }
+        await onBalanceCheckChanged?.();
+      }
       onTransactionsChanged?.();
     } catch (e: unknown) {
       setTxnError(e instanceof Error ? e.message : "Failed to add transaction");
@@ -362,20 +403,18 @@ export function AccountDetailsSheet({
 
   const undoAddedTxn = async (id: string) => {
     const removed = addedTxns.find(t => t.id === id);
-    if (!removed) return;
-    setAddedTxns(prev => prev.filter(t => t.id !== id));
-    setLiveBalance(prev => prev - (removed.type === "Income" ? removed.amount : -removed.amount));
+    if (!removed || txnSaving) return;
+    setTxnSaving(true); setTxnError("");
     try {
-      await fetch("/api/transactions", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      const response = await fetch("/api/transactions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not undo the transaction.");
+      setAddedTxns(prev => prev.filter(t => t.id !== id));
+      setLiveBalance(prev => prev - (removed.type === "Income" ? removed.amount : -removed.amount));
       onTransactionsChanged?.();
-    } catch {
-      // Best-effort undo — the transaction may still exist in Notion even though it's
-      // no longer shown here; a background refresh will reconcile the discrepancy.
-    }
+      await onBalanceCheckChanged?.();
+    } catch (error) { setTxnError(error instanceof Error ? error.message : "Could not undo the transaction."); }
+    finally { setTxnSaving(false); }
   };
 
   if (!account) return null;
@@ -388,17 +427,18 @@ export function AccountDetailsSheet({
       onClose={handleClose}
       label={`${account.label} details`}
       detent="content"
-      maxWidth="520px"
+      maxWidth="900px"
+      desktopViewportCentered
       snapPoints={[0, 0.88]}
       initialSnap={1}
       maxHeight="calc(100dvh - 20px)"
       panelStyle={panelStyle}
       contentStyle={{ paddingTop: 0 }}
     >
-      <div style={innerStyle}>
+      <div className="account-desktop-layout" style={innerStyle}>
 
         {/* Header */}
-        <header style={headerStyle}>
+        <header className="account-desktop-header" style={headerStyle}>
           <div style={acctIdentityStyle}>
             <div style={iconCircleStyle}>{account.icon}</div>
             <div>
@@ -411,6 +451,7 @@ export function AccountDetailsSheet({
           </button>
         </header>
 
+        <div className="account-desktop-overview">
         {/* Balance hero */}
         <div style={heroStyle}>
           <div style={heroTopRowStyle}>
@@ -575,21 +616,21 @@ export function AccountDetailsSheet({
           />
           <ActionBtn
             icon={<ScaleIcon size={18} strokeWidth={2.2} />}
-            ariaLabel="Reconcile balance"
+            ariaLabel="Check balance"
             bg="color-mix(in srgb, var(--surface2) 54%, var(--surface))"
             ink="var(--text2)"
-            onClick={() => setShowReconcile(true)}
+            onClick={() => { setCheckVersion(balanceCheck?.version ?? null); setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : ""); setCheckMessage(null); setShowReconcile(true); }}
           />
         </div>
 
         {/* Reconcile form */}
         {showReconcile && (
-          <BottomSheet open onClose={closeReconcile} label="Reconcile balance" detent="default" layered maxWidth="500px" zIndex={140} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+          <BottomSheet open onClose={closeReconcile} label="Check balance" detent="content" layered maxWidth="500px" zIndex={140} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
           <div style={reconcilePanelStyle}>
             <header style={reconcileHeaderStyle}>
               <div style={{ display: "grid", gap: 5 }}>
-                <h2 style={reconcileTitleStyle}>Reconcile balance</h2>
-                <p style={reconcileHintStyle}>Enter your bank balance.</p>
+                <h2 style={reconcileTitleStyle}>Check {account.label}</h2>
+                {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
               </div>
               <button type="button" className="sheet-close-button" onClick={closeReconcile} aria-label="Close reconciliation"><XIcon size={18} /></button>
             </header>
@@ -608,6 +649,8 @@ export function AccountDetailsSheet({
                     value={actualBalance}
                     onChange={e => setActualBalance(e.target.value)}
                     placeholder="0"
+                    aria-label="Actual balance"
+                    inputMode="decimal"
                     style={reconcileInputStyle}
                     autoFocus
                   />
@@ -628,7 +671,7 @@ export function AccountDetailsSheet({
             {/* Add missed transaction — shrinks the difference above instead of reconciling it away */}
             <div style={addTxnSectionStyle}>
               <div style={addTxnHeaderRowStyle}>
-                <p style={addTxnHintStyle}>Missing a transaction? Add it first.</p>
+                <p style={addTxnHintStyle}>Already paid or received before this check?</p>
                 <button
                   type="button"
                   onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }}
@@ -736,6 +779,16 @@ export function AccountDetailsSheet({
               )}
             </div>
 
+            {checkMessage && <Banner tone="success" compact role="status">{checkMessage}</Banner>}
+            <button type="button" onClick={() => void changeCheck("save")}
+              disabled={!Number.isFinite(parsedActual) || checkSaving || txnSaving || reconcileStatus === "saving"}
+              style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)", opacity: checkSaving || !Number.isFinite(parsedActual) ? 0.42 : 1 }}>
+              {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : "Save for later"}
+            </button>
+            {checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0 && <button type="button"
+              onClick={() => void changeCheck("close")} disabled={checkSaving || txnSaving || reconcileStatus === "saving"}
+              style={{ ...reconcileSubmitStyle, background: "var(--surface2)", color: "var(--text)" }}>Mark resolved</button>}
+
             {reconcileError && (
               <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
             )}
@@ -743,7 +796,7 @@ export function AccountDetailsSheet({
             <button
               type="button"
               onClick={submitReconcile}
-              disabled={!Number.isFinite(parsedActual) || reconcileStatus === "saving" || reconcileStatus === "success"}
+              disabled={!Number.isFinite(parsedActual) || checkSaving || txnSaving || reconcileStatus === "saving" || reconcileStatus === "success"}
               style={{
                 ...reconcileSubmitStyle,
                 opacity: !Number.isFinite(parsedActual) ? 0.42 : 1,
@@ -751,12 +804,12 @@ export function AccountDetailsSheet({
                   ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
                   : reconcileStatus === "error"
                   ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
-                  : "var(--accent)",
+                  : "var(--surface2)",
                 color: reconcileStatus === "success"
                   ? "var(--success)"
                   : reconcileStatus === "error"
                   ? "var(--danger)"
-                  : "var(--accent-ink)",
+                  : "var(--text)",
               }}
             >
               {reconcileStatus === "saving" && (
@@ -768,7 +821,7 @@ export function AccountDetailsSheet({
                reconcileStatus === "error" ? "Try again" :
                isFullyReconciled ? "Mark as reconciled" :
                difference !== null ? `Reconcile remaining ${difference > 0 ? "+" : ""}${fmt(Math.round(difference * 100) / 100)}` :
-               "Save reconciliation"}
+               "Reconcile ledger"}
             </button>
           </div>
           </BottomSheet>
@@ -803,6 +856,8 @@ export function AccountDetailsSheet({
           </div>
         )}
 
+        </div>
+        <div className="account-desktop-activity">
         {/* Activity list */}
         {(() => {
           const shownTxns = showAllActivity ? allActivityTxns : accountTxns;
@@ -850,6 +905,7 @@ export function AccountDetailsSheet({
             </div>
           );
         })()}
+        </div>
 
       </div>
     </BottomSheet>
@@ -1097,7 +1153,6 @@ const actionIconStyle: CSSProperties = {
 
 // Reconcile panel
 const reconcilePanelStyle: CSSProperties = {
-  minHeight: "100%",
   padding: "8px 20px 24px",
   display: "flex",
   flexDirection: "column",
@@ -1350,7 +1405,7 @@ const undoBtnStyle: CSSProperties = {
 const reconcileSubmitStyle: CSSProperties = {
   width: "100%",
   minHeight: 48,
-  marginTop: "auto",
+  marginTop: 8,
   borderRadius: 14,
   border: "none",
   cursor: "pointer",

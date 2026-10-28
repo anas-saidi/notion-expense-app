@@ -1706,3 +1706,70 @@ html[data-theme="dark"] .bottom-sheet-panel {
 textarea.typed-entry-line { font-size: 22px !important; }
 textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 .date-picker-trigger.typed-date-trigger { border: 0 !important; background: transparent !important; padding: 0 !important; font-size: 20px !important; }
+
+/* Desktop workspaces keep the primary task beside its supporting context. */
+.home-desktop-panels, .home-bills-panel, .reflect-desktop-panels, .account-desktop-overview, .account-desktop-activity { display:contents; }
+@media (min-width:1200px) {
+  .home-desktop-panels { display:grid; grid-template-columns:minmax(0, 0.85fr) minmax(0, 1.15fr); align-items:start; gap:24px; }
+  .home-bills-panel, .home-content { display:grid; align-content:start; gap:24px; min-width:0; }
+  .home-bills-panel > *, .home-content > section { min-width:0; }
+  .home-content > section { background:var(--surface); border-radius:16px; box-shadow:var(--elevation-card); padding:20px; }
+  .home-txn-list { grid-template-columns:1fr !important; }
+  .reflect-desktop-panels { display:grid; grid-template-columns:minmax(240px, 0.8fr) minmax(0, 1.2fr); gap:24px; align-items:start; }
+  .reflect-desktop-overview, .reflect-desktop-categories { min-width:0; background:var(--surface); border-radius:16px; box-shadow:var(--elevation-card); padding:24px; }
+  .budget-desktop-overview { padding:16px 24px !important; border-radius:16px; background:var(--surface2) !important; }
+  .budget-desktop-controls { padding:8px 0; }
+  .budget-desktop-group { gap:8px !important; }
+}
+@media (min-width:900px) {
+  .account-desktop-layout { grid-template-columns:minmax(230px, 0.8fr) minmax(0, 1.2fr); align-items:start; gap:24px !important; padding:24px !important; }
+  .account-desktop-header { grid-column:1 / -1; }
+  .account-desktop-overview, .account-desktop-activity { display:grid; gap:20px; min-width:0; align-content:start; }
+  .account-desktop-overview { background:var(--surface2); border-radius:16px; padding:20px; }
+  .account-desktop-activity { padding:8px 0; }
+}
+@media (min-width:1200px) {
+  .wallet-overview-card { padding:16px 24px !important; border-radius:16px; background:var(--surface2) !important; }
+  .wallet-overview-card > div { display:flex !important; align-items:center; justify-content:flex-start; gap:32px !important; }
+  .wallet-overview-card > div > div:last-child { justify-items:start !important; text-align:left !important; margin-top:0 !important; }
+  .wallet-overview-card [aria-label="Balance"] > span:first-child { font-size:56px !important; }
+  .budget-desktop-overview { grid-template-columns:auto minmax(0,1fr); grid-template-rows:auto auto; justify-items:start !important; align-items:center; column-gap:32px !important; }
+  .budget-desktop-overview > :first-child { grid-row:1 / 3; }
+  .budget-desktop-overview > :nth-child(2) { align-self:end; }
+  .budget-desktop-overview > :nth-child(3) { align-self:start; }
+}
+
+.desktop-nav-actions { display:none; }
+@media (min-width:900px) {
+  .app-header-actions, .mobile-check-balances { display:none !important; }
+  .desktop-nav-actions { display:flex; flex-direction:column; gap:2px; padding:24px 10px 0; pointer-events:auto; }
+  .desktop-nav-action { display:flex; align-items:center; gap:12px; min-height:48px; width:100%; padding:11px 14px; border:0; border-radius:12px; background:transparent; color:var(--muted); font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+  .desktop-nav-action:hover { background:var(--surface2); color:var(--text2); }
+  .desktop-nav-action:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+  .desktop-nav-action:disabled { opacity:.45; cursor:not-allowed; }
+  .account-desktop-overview { background:transparent; padding:0; }
+}
+@media (min-width:1200px) {
+  .wallet-overview-card, .budget-desktop-overview { background:transparent !important; }
+  .home-content > section { background:transparent; box-shadow:none; padding:0; border-radius:0; }
+}
+@media (min-width:900px) {
+  .app-nav { overflow-y:auto; }
+  .app-nav-inner { height:auto; }
+}
+
+@media (min-width:900px) {
+  .desktop-nav-action { font-size:13px; font-weight:650; letter-spacing:.2px; line-height:normal; }
+  .desktop-nav-action:active { transform:scale(.96); }
+}
+@media (min-width:1200px) {
+  .home-bills-panel .bills-section { margin:0; }
+}
+.desktop-nav-search { display:none; }
+@media (min-width:900px) {
+  .desktop-nav-search { display:flex; justify-content:flex-start; padding:0 24px 12px; }
+  .desktop-nav-search:empty { display:none; }
+  .desktop-search-button { width:44px; height:44px; display:grid; place-items:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--muted); cursor:pointer; }
+  .desktop-search-button:hover { background:var(--surface2); color:var(--text2); }
+  .desktop-search-button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+}

@@ -12,6 +12,7 @@ import { runningLowCategories, runwayLabel } from "./category-runway";
 
 type HomeScreenProps = {
   billsSection?: ReactNode;
+  balanceChecks?: ReactNode;
   categories: Category[];
   monthlyLoading?: boolean;
   monthlyError?: boolean;
@@ -42,6 +43,7 @@ type HomeScreenProps = {
 
 export function HomeScreen({
   billsSection,
+  balanceChecks,
   categories,
   monthlyLoading = false,
   monthlyError = false,
@@ -165,6 +167,8 @@ export function HomeScreen({
       </div>
 
 
+      {balanceChecks}
+
       {firstLow && onOpenAssign && (
         <Banner
           tone="warning"
@@ -215,6 +219,8 @@ export function HomeScreen({
         </Banner>
       )}
 
+      <div className="home-desktop-panels">
+      <div className="home-bills-panel">
       {billsSection}
 
       {/* Zone 2.5: Upcoming bills strip */}
@@ -242,6 +248,7 @@ export function HomeScreen({
         </section>
       )}
 
+      </div>
       <div className="home-content" style={contentStyle}>
 
         {/* Zone 6: Recent transactions */}
@@ -288,6 +295,7 @@ export function HomeScreen({
           </section>
         )}
 
+      </div>
       </div>
     </div>
   );

@@ -46,6 +46,8 @@ type BottomSheetProps = {
   align?: "bottom" | "center";
   /** Desktop only: fill the full viewport (width 100vw, height 100dvh, no border-radius). */
   desktopFullscreen?: boolean;
+  /** Center a wide workspace within the viewport instead of the app content rail. */
+  desktopViewportCentered?: boolean;
   /** Mobile modal presented above another sheet; preserves a small visible edge of the parent layer. */
   layered?: boolean;
   /** Let task-focused mobile sheets use the full viewport width. */
@@ -75,6 +77,7 @@ export function BottomSheet({
   backdropTop,
   align = "bottom",
   desktopFullscreen = false,
+  desktopViewportCentered = false,
   detent = "default",
   layered = false,
   mobileFullWidth = true,
@@ -248,7 +251,7 @@ export function BottomSheet({
               : {
                   position: "fixed",
                   top: "50%",
-                  left: "var(--sheet-center-x, 50%)",
+                  left: desktopViewportCentered ? "50%" : "var(--sheet-center-x, 50%)",
                   x: "-50%",
                   y: "-50%",
                   width: `min(${maxWidth}, calc(100vw - 48px))`,

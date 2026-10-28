@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { AppTab } from "./app-types";
 import { HomeIcon, SlidersIcon, ChartPieIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -5,9 +6,11 @@ import { useAppHaptics } from "./ui/useAppHaptics";
 type BottomNavProps = {
   tab: AppTab;
   onTabChange: (tab: AppTab) => void;
+  desktopActions?: ReactNode;
+  desktopSearch?: ReactNode;
 };
 
-export function BottomNav({ tab, onTabChange }: BottomNavProps) {
+export function BottomNav({ tab, onTabChange, desktopActions, desktopSearch }: BottomNavProps) {
   const { haptic } = useAppHaptics();
   const items: { key: AppTab; label: string }[] = [
     { key: "home", label: "Home" },
@@ -16,8 +19,9 @@ export function BottomNav({ tab, onTabChange }: BottomNavProps) {
   ];
 
   return (
-    <nav role="tablist" aria-label="App navigation" className="app-nav">
-      <div className="app-nav-inner">
+    <nav aria-label="App navigation" className="app-nav">
+      <div className="desktop-nav-search">{desktopSearch}</div>
+      <div className="app-nav-inner" role="tablist" aria-label="Main screens">
         {items.map((item) => {
           const activeColor = "var(--accent-foreground)";
 
@@ -44,6 +48,7 @@ export function BottomNav({ tab, onTabChange }: BottomNavProps) {
           );
         })}
       </div>
+      <div className="desktop-nav-actions" aria-label="Tools">{desktopActions}</div>
     </nav>
   );
 }

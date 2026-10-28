@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { AppTab, BudgetScope } from "./app-types";
 import { BottomNav } from "./BottomNav";
-import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon } from "./ui/icons";
+import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon, ScaleIcon } from "./ui/icons";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import { SettingsSheet } from "./SettingsSheet";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -18,6 +18,8 @@ export function AppShell({
   onBudgetSearch,
   onReflectSearch,
   onBudgetRebalance,
+  onCheckBalances,
+  canCheckBalances = true,
   theme = "light",
   onSelectTheme,
   toast,
@@ -37,6 +39,8 @@ export function AppShell({
   onBudgetSearch?: () => void;
   onReflectSearch?: () => void;
   onBudgetRebalance?: () => void;
+  onCheckBalances?: () => void;
+  canCheckBalances?: boolean;
   theme?: "system" | "light" | "dark";
   onSelectTheme?: (theme: "system" | "light" | "dark") => void;
   toast?: string | null;
@@ -153,7 +157,11 @@ export function AppShell({
       />
 
       <div className="app-nav-wrap">
-        <BottomNav tab={tab} onTabChange={onTabChange} />
+        <BottomNav tab={tab} onTabChange={onTabChange} desktopSearch={tab === "budget" && onBudgetSearch ? <button type="button" className="desktop-search-button" onClick={onBudgetSearch} aria-label="Search categories" title="Search categories"><SearchIcon size={20} /></button> : tab === "history" && onReflectSearch ? <button type="button" className="desktop-search-button" onClick={onReflectSearch} aria-label="Search activity" title="Search activity"><SearchIcon size={20} /></button> : null} desktopActions={<>
+          {onBudgetRebalance && <button type="button" className="desktop-nav-action" onClick={onBudgetRebalance}><ShuffleIcon size={20} /><span>Rebalance</span></button>}
+          {onCheckBalances && <button type="button" className="desktop-nav-action" disabled={!canCheckBalances} onClick={onCheckBalances}><ScaleIcon size={20} /><span>Check balances</span></button>}
+          {onSelectTheme && <button type="button" className="desktop-nav-action" onClick={() => setSettingsOpen(true)}><SettingsIcon size={20} /><span>Settings</span></button>}
+        </>} />
 
         {showAddButton && (
           <button
