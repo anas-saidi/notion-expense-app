@@ -2,7 +2,8 @@
    references. Below 900px, the established phone layout owns every surface. */
 .desktop-page-title, .desktop-nav-brand,
 .desktop-month-budget, .desktop-top-spending { display:none; }
-.home-overview-grid, .home-balance-panel, .home-attention, .wallet-mascot-group { display:contents; }
+.home-overview-grid, .home-balance-panel, .home-attention, .wallet-mascot-group,
+.home-balance-notices, .home-budget-context, .budget-overview-context, .budget-overview-notices { display:contents; }
 
 @media (min-width:900px) {
   :root {
@@ -49,7 +50,11 @@
   .wallet-number-group > div > span:first-child { font-size:clamp(40px,4.5vw,64px) !important; line-height:1 !important; }
   .home-balance-panel .contribution-entry { margin-top:auto; padding:16px 0 0; }
   .home-balance-panel .contribution-entry-title { font-size:13px; }
-  .desktop-month-budget { background:var(--surface2); box-shadow:none; justify-content:space-between; gap:16px; }
+  .home-budget-context { display:flex; flex-direction:column; min-width:0; padding:var(--desktop-panel-padding); border-radius:var(--radius-card); background:var(--surface2); }
+  .desktop-month-budget { padding:0; background:transparent; box-shadow:none; justify-content:space-between; gap:16px; flex:1; }
+  .home-balance-panel .home-balance-notices { display:block; margin-top:12px; }
+  .home-balance-notices > .balance-check-notices { margin-bottom:0 !important; gap:4px !important; }
+  .home-balance-notices:not(:has(.app-banner)) { display:none; }
   .desktop-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .desktop-panel-heading h2 { margin:0; font-size:16px; line-height:24px; font-weight:600; color:var(--text); }
   .desktop-panel-heading > button { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-height:44px; border:0; padding:0 4px; font:inherit; font-size:13px; color:var(--text); background:transparent; cursor:pointer; }
@@ -65,7 +70,7 @@
   .desktop-budget-facts dt { color:var(--text2); }
   .desktop-budget-facts dd { margin:0; color:var(--text); text-align:right; font-variant-numeric:tabular-nums; }
   .desktop-budget-facts .desktop-budget-over dt, .desktop-budget-facts .desktop-budget-over dd { color:var(--danger); }
-  .home-attention { display:grid; gap:16px; margin-bottom:24px; }
+  .home-attention { display:grid; gap:8px; margin-top:16px; margin-bottom:0; }
   .home-attention > .home-planning-reminder { padding:0 4px !important; border:0 !important; border-radius:0 !important; background:transparent !important; color:var(--muted) !important; min-height:44px; }
   .home-planning-reminder button { background:transparent !important; color:var(--text) !important; }
   .home-attention:empty { display:none; }
@@ -116,7 +121,10 @@
 @media (min-width:900px) {
   #panel-home, #panel-budget, #panel-history { min-width:0; }
   #panel-budget { gap:24px !important; }
-  .categories-main .budget-desktop-overview { padding:24px !important; background:var(--surface) !important; border-radius:var(--radius-card); box-shadow:var(--elevation-card); }
+  .budget-overview-context { display:grid; gap:12px; min-width:0; padding:var(--desktop-panel-padding); background:var(--surface); border-radius:var(--radius-card); box-shadow:var(--elevation-card); }
+  .categories-main .budget-overview-context > .budget-desktop-overview { padding:0 !important; background:transparent !important; box-shadow:none; }
+  .budget-overview-notices { display:block; max-width:640px; width:100%; }
+  .budget-overview-notices:empty { display:none; }
   #panel-history { grid-template-columns:minmax(0,1fr) auto; }
   #panel-history > * { grid-column:1 / -1; min-width:0; }
   #panel-history > .reflect-view-toolbar { grid-column:2; grid-row:1; min-height:44px; }
@@ -141,4 +149,15 @@
 }
 @media (min-width:1200px) {
   html.has-inspector .reflect-desktop-panels { grid-template-columns:minmax(0,1fr); }
+}
+
+/* Local status belongs to its financial object, not a page-wide alert strip.
+   Explicit blocking alerts retain their filled treatment. */
+@media (min-width:900px) {
+  .app-banner--desktop-inline { background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; padding:8px 0 !important; min-width:0; }
+  .app-banner--desktop-inline .banner-content { overflow-wrap:anywhere; }
+  .app-banner--desktop-inline > .banner-action button { min-height:44px; background:transparent !important; color:var(--text) !important; border:0; padding-inline:8px !important; box-shadow:none !important; }
+  .app-banner--desktop-inline > .banner-action button:hover { text-decoration:underline; text-underline-offset:4px; }
+  .app-banner--desktop-inline > .banner-action button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
+  .home-balance-notices .app-banner[role="alert"] { color:var(--muted) !important; }
 }

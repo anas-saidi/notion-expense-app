@@ -1138,7 +1138,7 @@ export default function App() {
       {tab === "home" && (
         <HomeScreen
           contributions={!monthLoading && !monthError && <ContributionEntry status={contribStatus} scope={budgetScope} onOpen={() => setShowContributions(true)} />}
-          balanceChecks={<PendingBalanceChecks checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} onReview={account => { setStartBalanceCheck(true); setDetailsAccount(account); }} />}
+          balanceChecks={<PendingBalanceChecks onRetry={() => void balanceChecks.refresh()} checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} onReview={account => { setStartBalanceCheck(true); setDetailsAccount(account); }} />}
           billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={checkedAccounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
           monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
           monthlyError={monthError}

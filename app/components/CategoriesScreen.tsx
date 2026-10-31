@@ -249,6 +249,7 @@ export function CategoriesScreen({
               </button>
             : null
         : <>
+            <div className="budget-overview-context">
             <section className="budget-desktop-overview" aria-label={`${fmt(Math.round(availableInCategories))} MAD allocated in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
                   emojis stay tucked away until the jar is tapped; then every category that still
@@ -268,8 +269,10 @@ export function CategoriesScreen({
 
             {/* One banner at a time, the most urgent first: accounts falling short, categories
                 running low, unassigned money, then what's still due to Joint. Nothing to act on, no banner. */}
+            <div className="budget-overview-notices">
             {shortBy > 0 ? (
               <Banner
+                desktopInline
                 tone="danger"
                 icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
                 title={`Short by ${fmt(shortBy)}`}
@@ -311,6 +314,8 @@ export function CategoriesScreen({
               />
             ) : null}
 
+            </div>
+            </div>
             <div className="budget-desktop-controls" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <MonthPicker
                 value={homeMonth}

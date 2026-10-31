@@ -6,6 +6,8 @@ type BannerTone = "neutral" | "info" | "accent" | "warning" | "danger" | "succes
 
 type BannerProps = {
   className?: string;
+  /** Contextual desktop notices are flat; blocking alerts can keep their surface. */
+  desktopInline?: boolean;
   tone?: BannerTone;
   icon?: ReactNode;
   title?: ReactNode;
@@ -49,7 +51,7 @@ const toneStyles: Record<BannerTone, { background: string; border: string; foreg
   },
 };
 
-export function Banner({ className, tone = "neutral", icon, title, children, action, role = "note", style, compact = false }: BannerProps) {
+export function Banner({ className, tone = "neutral", icon, title, children, action, role = "note", style, compact = false, desktopInline = role !== "alert" && tone !== "danger" }: BannerProps) {
   const colors = toneStyles[tone];
   const sharedStyle: CSSProperties = {
     width: "100%",
@@ -68,16 +70,16 @@ export function Banner({ className, tone = "neutral", icon, title, children, act
   };
   const content = (
     <>
-      {icon && <span aria-hidden="true" style={{ display: "inline-flex", flexShrink: 0 }}>{icon}</span>}
-      <span style={{ minWidth: 0, display: "grid", gap: title && children ? 3 : 0 }}>
+      {icon && <span className="banner-icon" aria-hidden="true" style={{ display: "inline-flex", flexShrink: 0 }}>{icon}</span>}
+      <span className="banner-content" style={{ minWidth: 0, display: "grid", gap: title && children ? 3 : 0 }}>
         {title && <strong style={{ color: "var(--text)", fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{title}</strong>}
         {children && <span style={{ color: "inherit", fontSize: 12, lineHeight: 1.45 }}>{children}</span>}
       </span>
-      {action && <span style={{ flexShrink: 0, justifySelf: "end" }}>{action}</span>}
+      {action && <span className="banner-action" style={{ flexShrink: 0, justifySelf: "end" }}>{action}</span>}
     </>
   );
 
-  return <div className={className} role={role} style={sharedStyle}>{content}</div>;
+  return <div className={["app-banner", desktopInline && "app-banner--desktop-inline", className].filter(Boolean).join(" ")} data-tone={tone} role={role} style={sharedStyle}>{content}</div>;
 }
 
 /** Neutral action for warning/error banners; shared with compact composer alerts. */

@@ -173,11 +173,11 @@ export function HomeScreen({
 
 
       {contributions}
+      <div className="home-balance-notices">{balanceChecks}</div>
       </div>
+      <div className="home-budget-context">
       <DesktopMonthBudget summary={monthlySummary} available={categoryAvailableByScope[budgetScope]} month={homeMonth} loading={monthlyLoading} error={monthlyError} onOpenPlan={onOpenPlan} />
-      </div>
       <div className="home-attention">
-      {balanceChecks}
 
       {firstLow && onOpenAssign && (
         <Banner
@@ -232,6 +232,8 @@ export function HomeScreen({
         </Banner>
       )}
 
+      </div>
+      </div>
       </div>
       <div className="home-desktop-panels">
       <div className="home-bills-panel">
