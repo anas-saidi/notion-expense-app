@@ -7,10 +7,9 @@ type BottomNavProps = {
   tab: AppTab;
   onTabChange: (tab: AppTab) => void;
   desktopActions?: ReactNode;
-  desktopSearch?: ReactNode;
 };
 
-export function BottomNav({ tab, onTabChange, desktopActions, desktopSearch }: BottomNavProps) {
+export function BottomNav({ tab, onTabChange, desktopActions }: BottomNavProps) {
   const { haptic } = useAppHaptics();
   const items: { key: AppTab; label: string }[] = [
     { key: "home", label: "Home" },
@@ -21,7 +20,6 @@ export function BottomNav({ tab, onTabChange, desktopActions, desktopSearch }: B
   return (
     <nav aria-label="App navigation" className="app-nav">
       <span className="desktop-nav-brand" role="img" aria-label="Couple Finance" title="Couple Finance"><WalletIcon size={24} /></span>
-      <div className="desktop-nav-search">{desktopSearch}</div>
       <div className="app-nav-inner" role="tablist" aria-label="Main screens">
         {items.map((item) => {
           const activeColor = "var(--accent-foreground)";
@@ -50,7 +48,7 @@ export function BottomNav({ tab, onTabChange, desktopActions, desktopSearch }: B
           );
         })}
       </div>
-      <div className="desktop-nav-actions" aria-label="Tools">{desktopActions}</div>
+      <div className="desktop-nav-actions" role="group" aria-label="Actions">{desktopActions}</div>
     </nav>
   );
 }

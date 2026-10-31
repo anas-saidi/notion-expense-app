@@ -108,14 +108,14 @@ export function ReflectScreen(props: Props) {
   };
 
   return <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0, paddingBottom: 100 }}>
-    <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+    <header className="reflect-view-toolbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
       <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}>Reflect</h1>
       <div role="group" aria-label="Reflect view" style={{ display: "flex", gap: 8 }}>
         <ScreenChip selected={props.view === "spending"} onClick={() => props.onViewChange("spending")}>Spending</ScreenChip>
         <ScreenChip selected={props.view === "activity"} onClick={() => props.onViewChange("activity")}>Activity</ScreenChip>
       </div>
     </header>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+    <div className="reflect-period-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
       <button type="button" onClick={() => { setCustomPeriod(props.period.start ? props.period : reflectPreset("month")); setShowPeriod(true); }} aria-label={`Time period: ${label}`} aria-haspopup="dialog" style={quietButtonStyle}><CalendarRangeIcon size={16} /><span>{label}</span><ChevronDownIcon size={14} /></button>
       {props.view === "spending" && <button type="button" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, background: filterCount ? "var(--select-wash)" : "transparent", color: filterCount ? "var(--select-ink)" : "var(--text2)" }}><SlidersIcon size={16} /><span>Filter{filterCount ? ` (${filterCount})` : ""}</span></button>}
     </div>

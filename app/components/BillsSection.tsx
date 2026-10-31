@@ -204,5 +204,5 @@ function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, 
     <span className="bill-date-amount"><Money value={payment?.amount ?? bill.amount} /></span>
   </button>;
   if (bill.state !== "Due" && bill.state !== "Overdue") return row;
-  return <SwipeToDelete flat surface={compact ? "var(--bg)" : "var(--surface)"} disabled={disabled} actions={[{ label: "Pay due", icon: <ReceiptIcon size={17} />, onSelect: onPay }, { label: "Edit", icon: <EditIcon size={17} />, onSelect: onEdit }]}>{row}</SwipeToDelete>;
+  return <SwipeToDelete flat surface={compact ? "var(--bill-row-surface, var(--bg))" : "var(--surface)"} disabled={disabled} actions={[{ label: "Pay due", icon: <ReceiptIcon size={17} />, onSelect: onPay }, { label: "Edit", icon: <EditIcon size={17} />, onSelect: onEdit }]}>{row}</SwipeToDelete>;
 }

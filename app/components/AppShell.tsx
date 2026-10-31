@@ -116,10 +116,6 @@ export function AppShell({
           {/* Content scrolling up melts into the header instead of cutting off at its edge. */}
           <ProgressiveBlur position="top" height={32} maxBlur={6} tint="var(--bg)" visible={scrolled} style={{ top: "100%", zIndex: -1 }} />
           <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
-          <div className="desktop-header-actions">
-            {tab !== "home" && <button type="button" className="desktop-header-search" onClick={tab === "budget" ? onBudgetSearch : onReflectSearch} aria-label={tab === "budget" ? "Search categories" : "Search activity"}><SearchIcon size={20} /></button>}
-            {showAddButton && <button type="button" className="desktop-add-transaction" onClick={() => { haptic("light"); onOpenAdd(); }}><PlusIcon size={18} />Add transaction</button>}
-          </div>
           <div className="app-header-actions">
             {tab === "budget" ? (
               <>
@@ -164,7 +160,9 @@ export function AppShell({
       />
 
       <div className="app-nav-wrap">
-        <BottomNav tab={tab} onTabChange={onTabChange} desktopSearch={tab === "budget" && onBudgetSearch ? <button type="button" className="desktop-search-button" onClick={onBudgetSearch} aria-label="Search categories" title="Search categories"><SearchIcon size={20} /></button> : tab === "history" && onReflectSearch ? <button type="button" className="desktop-search-button" onClick={onReflectSearch} aria-label="Search activity" title="Search activity"><SearchIcon size={20} /></button> : null} desktopActions={<>
+        <BottomNav tab={tab} onTabChange={onTabChange} desktopActions={<>
+          {showAddButton && <button type="button" className="desktop-nav-action desktop-nav-add" onClick={() => { haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></button>}
+          {tab !== "home" && <button type="button" className="desktop-nav-action" onClick={tab === "budget" ? onBudgetSearch : onReflectSearch} aria-label={tab === "budget" ? "Search categories" : "Search activity"}><SearchIcon size={20} /><span>{tab === "budget" ? "Search categories" : "Search activity"}</span></button>}
           {onBudgetRebalance && <button type="button" className="desktop-nav-action" onClick={onBudgetRebalance} aria-label="Rebalance"><ShuffleIcon size={20} /><span>Rebalance</span></button>}
           {onCheckBalances && <button type="button" className="desktop-nav-action" disabled={!canCheckBalances} onClick={onCheckBalances} aria-label="Check balances"><ScaleIcon size={20} /><span>Check balances</span></button>}
           {onSelectTheme && <button type="button" className="desktop-nav-action" onClick={() => setSettingsOpen(true)} aria-label="Settings"><SettingsIcon size={20} /><span>Settings</span></button>}

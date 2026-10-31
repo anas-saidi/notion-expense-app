@@ -5,6 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 type BannerTone = "neutral" | "info" | "accent" | "warning" | "danger" | "success";
 
 type BannerProps = {
+  className?: string;
   tone?: BannerTone;
   icon?: ReactNode;
   title?: ReactNode;
@@ -48,7 +49,7 @@ const toneStyles: Record<BannerTone, { background: string; border: string; foreg
   },
 };
 
-export function Banner({ tone = "neutral", icon, title, children, action, role = "note", style, compact = false }: BannerProps) {
+export function Banner({ className, tone = "neutral", icon, title, children, action, role = "note", style, compact = false }: BannerProps) {
   const colors = toneStyles[tone];
   const sharedStyle: CSSProperties = {
     width: "100%",
@@ -76,7 +77,7 @@ export function Banner({ tone = "neutral", icon, title, children, action, role =
     </>
   );
 
-  return <div role={role} style={sharedStyle}>{content}</div>;
+  return <div className={className} role={role} style={sharedStyle}>{content}</div>;
 }
 
 /** Neutral action for warning/error banners; shared with compact composer alerts. */

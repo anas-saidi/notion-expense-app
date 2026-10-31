@@ -11,14 +11,14 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createPortal } from "react-dom";
 
-// The app's mobile content rail remains fluid through 640px. Keep sheets in
-// their bottom-attached presentation beyond that rail so a small width change
-// does not abruptly turn a phone layout into a cramped desktop dialog.
-const DESKTOP_BREAKPOINT = 768;
+// Match the app shell: mobile navigation and sheets switch to the desktop
+// rail and centered dialogs together.
+const DESKTOP_BREAKPOINT = 900;
 // Wide enough for sidebar + content + a docked inspector (see globals.css).
 const INSPECTOR_BREAKPOINT = 1200;
 const MOBILE_SHEET_TOP = "calc(var(--safe-top) + 76px)";
 let openSheetCount = 0;
+const openPanels: HTMLElement[] = [];
 
 type BottomSheetProps = {
   open: boolean;
@@ -135,11 +135,25 @@ export function BottomSheet({
     const panel = panelRef?.current ?? localPanelRef.current;
     if (!panel) return;
 
+    openPanels.push(panel);
     const selector = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
-    const focusable = () => Array.from(panel.querySelectorAll<HTMLElement>(selector)).filter(element => !element.hidden);
+    const focusable = () => Array.from(panel.querySelectorAll<HTMLElement>(selector)).filter(element => !element.hidden && element.getClientRects().length > 0);
     const frame = requestAnimationFrame(() => (focusable()[0] ?? panel).focus());
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // Anchored pickers are portalled and own their keyboard loop.
+      if (event.defaultPrevented || (event.target instanceof Element && event.target.closest("[data-picker-popover]"))) return;
+      if (openPanels.at(-1) !== panel) return;
+      if (event.key === "Tab" && isDesktop && !isInspector) {
+        const items = focusable();
+        const first = items[0];
+        const last = items.at(-1);
+        const outside = !panel.contains(document.activeElement);
+        if (!first || (event.shiftKey ? document.activeElement === first || outside : document.activeElement === last || outside)) {
+          event.preventDefault();
+          (event.shiftKey ? last ?? panel : first ?? panel).focus();
+        }
+      }
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
@@ -149,11 +163,13 @@ export function BottomSheet({
 
     document.addEventListener("keydown", onKeyDown);
     return () => {
+      const index = openPanels.indexOf(panel);
+      if (index !== -1) openPanels.splice(index, 1);
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
       returnFocusRef.current?.focus();
     };
-  }, [open, panelRef, mounted]);
+  }, [open, panelRef, mounted, isDesktop, isInspector]);
 
   if (!mounted) return null;
 
@@ -192,8 +208,8 @@ export function BottomSheet({
        * Kept separate from panelStyle so the consumer's `position:"relative"`
        * (or any other positional style) never clobbers our fixed layout.
        *
-       * Desktop (≥ 768px): centered modal with fade+scale animation, no drag.
-       * Mobile (< 768px): bottom sheet with slide-up animation and drag-to-close.
+       * Desktop (≥ 900px): centered modal with fade+scale animation, no drag.
+       * Mobile (< 900px): bottom sheet with slide-up animation and drag-to-close.
        */}
       <motion.div
         key="sheet-panel"
@@ -258,7 +274,7 @@ export function BottomSheet({
                   height: detent === "default"
                     ? `min(760px, ${maxHeight ?? "calc(100dvh - 80px)"})`
                     : "auto",
-                  maxHeight: maxHeight ?? "calc(100dvh - 80px)",
+                  maxHeight: `min(${maxHeight ?? "calc(100dvh - 80px)"}, calc(100dvh - 48px))`,
                   borderRadius: "var(--radius-sheet)",
                   background: "var(--surface)",
                   zIndex,
@@ -292,6 +308,7 @@ export function BottomSheet({
         <div
           ref={panelRef ?? localPanelRef}
           className="bottom-sheet-panel"
+          data-presentation={isInspector ? "inspector" : isDesktop ? "dialog" : "sheet"}
           role={isInspector ? "complementary" : isDesktop ? "dialog" : "region"}
           aria-modal={isDesktop && !isInspector ? "true" : undefined}
           aria-label={label}
@@ -307,7 +324,7 @@ export function BottomSheet({
               ? "0 20px 56px rgba(20, 24, 22, 0.16)"
               : "none",
             ...panelStyle,
-            ...((desktopFullscreen && isDesktop) || isInspector ? { borderRadius: 0 } : {}),
+            ...(isDesktop ? { borderRadius: desktopFullscreen || isInspector ? 0 : "var(--radius-sheet)", maxHeight: "100%", minHeight: 0 } : {}),
           }}
         >
           {showHandle && !isDesktop && (

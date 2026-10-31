@@ -193,6 +193,7 @@ export function HomeScreen({
       {/* Zone 2: Ready to assign */}
       {showPlanningPrompt && (
         <Banner
+          className="home-planning-reminder"
           tone="accent"
           style={{ marginBottom: 16 }}
           title={`Plan ${planningLabel}`}
@@ -210,6 +211,7 @@ export function HomeScreen({
       {/* Zone 2a: Joint account has unassigned money */}
       {showJointUnassignedPrompt && !showMonthEndAlert && (
         <Banner
+          className="home-planning-reminder"
           tone="accent"
           style={{ marginBottom: 16 }}
           title={`${fmt(Math.round(jointUnassigned ?? 0))} unassigned`}
@@ -220,6 +222,7 @@ export function HomeScreen({
       {/* Zone 2.5a: Month-end planning alert */}
       {showMonthEndAlert && !showPlanningPrompt && (
         <Banner
+          className="home-planning-reminder"
           tone="accent"
           style={{ marginBottom: 16 }}
           title={plannedCount > 0 ? `${plannedCount}/3 budgets ready for ${planningLabel}` : `Plan ${planningLabel}`}
