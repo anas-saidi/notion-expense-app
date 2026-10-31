@@ -9,6 +9,7 @@ import { Banner } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { runningLowCategories, runwayLabel } from "./category-runway";
+import { DesktopMonthBudget, DesktopTopSpending } from "./DesktopHomeOverview";
 
 type HomeScreenProps = {
   contributions?: ReactNode;
@@ -154,6 +155,8 @@ export function HomeScreen({
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
 
       {/* Zone 1: Hero */}
+      <div className="home-overview-grid">
+      <div className="home-balance-panel">
       <div style={walletSwitcherWrapStyle}>
         <WalletCardSwitcher
           value={budgetScope}
@@ -170,6 +173,10 @@ export function HomeScreen({
 
 
       {contributions}
+      </div>
+      <DesktopMonthBudget summary={monthlySummary} available={categoryAvailableByScope[budgetScope]} month={homeMonth} loading={monthlyLoading} error={monthlyError} onOpenPlan={onOpenPlan} />
+      </div>
+      <div className="home-attention">
       {balanceChecks}
 
       {firstLow && onOpenAssign && (
@@ -222,6 +229,7 @@ export function HomeScreen({
         </Banner>
       )}
 
+      </div>
       <div className="home-desktop-panels">
       <div className="home-bills-panel">
       {billsSection}
@@ -252,6 +260,7 @@ export function HomeScreen({
       )}
 
       </div>
+      <DesktopTopSpending summary={monthlySummary} categories={categories} loading={monthlyLoading} error={monthlyError} />
       <div className="home-content" style={contentStyle}>
 
         {/* Zone 6: Recent transactions */}

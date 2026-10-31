@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { AppTab } from "./app-types";
-import { HomeIcon, SlidersIcon, ChartPieIcon } from "./ui/icons";
+import { HomeIcon, SlidersIcon, ChartPieIcon, WalletIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
 type BottomNavProps = {
@@ -20,6 +20,7 @@ export function BottomNav({ tab, onTabChange, desktopActions, desktopSearch }: B
 
   return (
     <nav aria-label="App navigation" className="app-nav">
+      <span className="desktop-nav-brand" role="img" aria-label="Couple Finance" title="Couple Finance"><WalletIcon size={24} /></span>
       <div className="desktop-nav-search">{desktopSearch}</div>
       <div className="app-nav-inner" role="tablist" aria-label="Main screens">
         {items.map((item) => {
@@ -32,6 +33,7 @@ export function BottomNav({ tab, onTabChange, desktopActions, desktopSearch }: B
               role="tab"
               aria-selected={tab === item.key}
               aria-controls={`panel-${item.key}`}
+              aria-label={item.label}
               onClick={() => {
                 if (tab !== item.key) haptic("selection");
                 onTabChange(item.key);

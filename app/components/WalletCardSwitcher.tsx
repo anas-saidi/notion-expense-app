@@ -101,7 +101,8 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
   return (
     <div style={switcherStyle}>
       <section className="wallet-overview-card" style={wrapStyle} aria-label="Wallet overview">
-        <div style={heroStyle} key={value}>
+        <div className="wallet-balance-hero" style={heroStyle} key={value}>
+          <div className="wallet-mascot-group">
           {monthlyLoading ? <HeroSkeleton size={HOME_POOL_SIZE} /> : monthlyError ? (
             <span role="status" style={{ ...captionStyle, minHeight: HOME_POOL_SIZE, display: "grid", placeItems: "center" }}>Monthly details unavailable</span>
           ) : isJoint && contribStatus ? (
@@ -114,7 +115,8 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
             pool || <span style={captionStyle}>No monthly plan</span>
           )}
 
-          <div style={numberGroupStyle}>
+          </div>
+          <div className="wallet-number-group" style={numberGroupStyle}>
             <span style={labelStyle}>Balance</span>
             <div style={amountRowStyle} aria-label="Balance">
               <span style={bigNumberStyle(isOver)}><AnimatedCounter value={balance ?? 0} /></span>
