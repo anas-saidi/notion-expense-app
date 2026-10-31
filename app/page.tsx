@@ -129,6 +129,7 @@ export default function App() {
     return () => window.removeEventListener("finance-data-source", handler);
   }, []);
   const [refreshState, setRefreshState] = useState<"idle" | "updating" | "stale">("idle");
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [budgetRefreshing, setBudgetRefreshing] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [tab, setTab] = useState<AppTab>("home");
@@ -422,6 +423,8 @@ export default function App() {
     const loadLiveData = async () => {
       try {
         setLoading(!coreReady.current);
+        setRefreshState(coreReady.current ? "updating" : "idle");
+        setRefreshError(null);
         setLoadError(null);
         setSecondaryLoading(true);
         const results = await loadHomeData({
@@ -429,10 +432,12 @@ export default function App() {
           onReady: () => { coreReady.current = true; initialLoadComplete.current = true; setLoading(false); },
           secondary: [fetchTransactions, fetchPending, fetchBills, () => fetchMonthlySummary(homeMonth), fetchNextMonthFunds],
         });
-        setRefreshState(results.some(result => result.status === "rejected") ? "stale" : "idle");
+        const failure = results.find(result => result.status === "rejected");
+        setRefreshError(failure?.status === "rejected" && failure.reason instanceof Error ? failure.reason.message : null);
+        setRefreshState(failure ? "stale" : "idle");
       } catch (error) {
         console.error("[app] Failed to load live data:", error);
-        if (coreReady.current) setRefreshState("stale");
+        if (coreReady.current) { setRefreshState("stale"); setRefreshError(error instanceof Error ? error.message : null); }
         else setLoadError(error instanceof Error ? error.message : "Could not load financial data");
       } finally {
         initialLoadComplete.current = coreReady.current;
@@ -470,6 +475,7 @@ export default function App() {
     if (!initialLoadComplete.current) return;
     void fetchMonthlySummary(homeMonth).catch((error) => {
       console.error("[app] Failed to refresh monthly summary:", error);
+      setRefreshError(error instanceof Error ? error.message : null);
       setRefreshState("stale");
     }); // eslint-disable-line react-hooks/exhaustive-deps
   }, [homeMonth]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -581,6 +587,7 @@ export default function App() {
 
   const refreshAffectedData = useCallback(async () => {
     setRefreshState("updating");
+    setRefreshError(null);
     setBillsLoading(true);
     invalidateFinancialReads();
     monthlySnapshot.current = null;
@@ -588,7 +595,9 @@ export default function App() {
       refreshBudgetData(), fetchTransactions(), fetchBills(),
       ...(tab === "history" ? [fetchHistoryTransactions(historyStartMonth, historyMonth)] : []),
     ]);
-    if (results.some(result => result.status === "rejected")) {
+    const failure = results.find(result => result.status === "rejected");
+    if (failure?.status === "rejected") {
+      setRefreshError(failure.reason instanceof Error ? failure.reason.message : null);
       setRefreshState("stale");
       setBillsLoading(false);
       setBillsError("Balances could not refresh. Refresh before changing bills.");
@@ -718,9 +727,11 @@ export default function App() {
       do {
         entry.rerun = false;
         const results = await Promise.allSettled([fetchCategoryCatalog(), fetchMonthlySummary(homeMonth), fetchAccounts()]);
-        if (results.some(result => result.status === "rejected")) {
+        const failure = results.find(result => result.status === "rejected");
+        if (failure?.status === "rejected") {
+          setRefreshError(failure.reason instanceof Error ? failure.reason.message : null);
           setRefreshState("stale");
-          throw new Error("Some balances could not be refreshed");
+          throw failure.reason;
         }
         if (entry.rerun) invalidateFinancialReads();
       } while (entry.rerun);
@@ -1100,7 +1111,7 @@ export default function App() {
     >
       {refreshState !== "idle" && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
-          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>Could not refresh</span> <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
+          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>{refreshError ?? "Could not refresh"}</span> <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
         </div>
       )}
       {showManageScreen && (

@@ -94,3 +94,12 @@ invalidation fails. Query tests cover more than 100 rows, combined bill queries,
 and unsupported operators. Production builds and browser comparisons exercise the
 same API routes; local embedded Postgres is a test backend, not a hosted Neon
 latency guarantee.
+
+
+## Shared-database quota failure
+
+A PostgreSQL `53000` error explicitly reporting an exceeded quota is a provider availability failure. Balance-check and monthly-summary reads return HTTP 503 with `DATABASE_QUOTA_EXCEEDED` and `retryable: false`. The client surfaces the cause and does not immediately repeat the same failed monthly request. Manual Retry still performs a new read after access is restored. Other transient 429/5xx responses retain the existing retry behavior.
+
+The mirror can fall back to live Notion, but contribution agreements and unresolved balance checks are authoritative PostgreSQL records. Do not replace their read failures with empty agreements, zero debt, settled statuses or fabricated local records. Restoring the existing provider’s access preserves those records; migration requires copying the authoritative tables as well as any mirror data.
+
+For Neon, inspect the project usage and billing period in the console. Compute/network allowance exhaustion may require waiting for the billing-period reset or changing plan; storage limits do not reset monthly. A database connection error alone does not identify the exhausted resource or reset time. See [Neon quota guidance](https://neon.com/faqs/free-plan-limits-and-quotas) and [billing management](https://neon.com/docs/introduction/manage-billing).

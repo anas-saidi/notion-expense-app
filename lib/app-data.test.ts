@@ -58,3 +58,24 @@ it("starts fresh after a mutation and an old read cannot clear the newer in-flig
   resolves[1](Response.json({ balance: 90 }));
   expect(await Promise.all([fresh, shared])).toEqual([{ balance: 90 }, { balance: 90 }]);
 });
+
+it("does not automatically retry exhausted quota, but a manual retry can recover", async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce(Response.json({ error: "Shared database quota exceeded", code: "DATABASE_QUOTA_EXCEEDED", retryable: false }, { status: 503 }))
+    .mockResolvedValueOnce(Response.json({ balance: 20 }));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(fetchApiJson("/api/quota-recovery")).rejects.toThrow("Shared database quota exceeded");
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(await fetchApiJson("/api/quota-recovery")).toEqual({ balance: 20 });
+});
+
+it("still retries a transient service failure", async () => {
+  vi.useFakeTimers();
+  const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ error: "Temporarily unavailable" }, { status: 503 }))
+    .mockResolvedValueOnce(Response.json({ balance: 30 }));
+  vi.stubGlobal("fetch", fetcher);
+  const request = fetchApiJson("/api/transient-recovery");
+  await vi.runAllTimersAsync();
+  expect(await request).toEqual({ balance: 30 });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});

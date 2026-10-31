@@ -1,13 +1,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import type { BalanceCheck } from "../../../lib/balance-checks";
-const state = vi.hoisted(() => ({ checks: [] as BalanceCheck[], balance: 2000, pages: [] as any[], rejectSave: false }));
+const state = vi.hoisted(() => ({ checks: [] as BalanceCheck[], balance: 2000, pages: [] as any[], rejectSave: false, readError: null as Error | null }));
 vi.mock("../../../lib/notion-accounts", () => ({ readAccountResponse: async () => Response.json({ accounts: [{ id: "a".repeat(32), balance: state.balance }] }) }));
 vi.mock("../../../lib/notion-api", () => ({ queryDatabaseAll: async () => state.pages }));
 vi.mock("../../../lib/mirror/routes", () => ({ withMirrorReads: (fn: unknown) => fn }));
 vi.mock("../../../lib/mirror/store", () => ({ mirrorScope: () => "household" }));
 vi.mock("../../../lib/balance-check-store", () => ({ balanceCheckStore: () => ({
-  list: async () => state.checks,
+  list: async () => { if (state.readError) throw state.readError; return state.checks; },
   save: async (_: string, check: BalanceCheck) => { if (state.rejectSave) return false; state.checks = [check]; return true; },
   close: async () => { state.checks = []; return true; },
 }) }));
@@ -15,7 +15,7 @@ import { GET, POST } from "./route";
 const accountId = "a".repeat(32);
 const post = (body: object) => POST(new NextRequest("http://localhost/api/balance-checks", { method: "POST", body: JSON.stringify({ accountId, ...body }) }));
 beforeEach(() => {
-  vi.stubEnv("NOTION_TOKEN", "test-token"); state.checks = []; state.balance = 2000; state.pages = []; state.rejectSave = false;
+  vi.stubEnv("NOTION_TOKEN", "test-token"); state.checks = []; state.balance = 2000; state.pages = []; state.rejectSave = false; state.readError = null;
 });
 it("records a pending actual count without a Notion write and returns a sanitized view", async () => {
   expect((await post({ action: "save", actualBalance: 1650, expectedVersion: null })).status).toBe(200);
@@ -55,4 +55,13 @@ it("includes an already-paid missing transaction without reducing actual funds a
   const response = await post({ action: "include", transactionId: "new-expense", expectedVersion: state.checks[0].version });
   expect(response.status).toBe(200);
   expect((await response.json()).check.estimatedActual).toBe(1650);
+});
+
+it("reports quota exhaustion as unavailable rather than an empty set of balance checks", async () => {
+  state.readError = Object.assign(new Error("Your account or project has exceeded the quota."), { code: "53000" });
+  const response = await GET();
+  expect(response.status).toBe(503);
+  const data = await response.json();
+  expect(data).toMatchObject({ code: "DATABASE_QUOTA_EXCEEDED", retryable: false });
+  expect(data).not.toHaveProperty("checks");
 });

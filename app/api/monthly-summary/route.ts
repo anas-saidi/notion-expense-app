@@ -1,3 +1,4 @@
+import { databaseQuotaFailure } from "../../../lib/database-errors";
 import { withMirrorReads } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../components/app-utils";
@@ -126,6 +127,8 @@ async function handleGET(req: NextRequest) {
       },
     });
   } catch (err: any) {
+    const quota = databaseQuotaFailure(err);
+    if (quota) return NextResponse.json(quota, { status: 503 });
     return NextResponse.json({ error: err.message || "Failed to load monthly summary" }, { status: err.status ?? 500 });
   }
 }

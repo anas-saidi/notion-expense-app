@@ -21,7 +21,7 @@ export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
         } }));
         return data as T;
       }
-      if ((response.status === 429 || response.status >= 500) && attempt < retries) {
+      if (data.retryable !== false && (response.status === 429 || response.status >= 500) && attempt < retries) {
         const retryAfter = Number(response.headers.get("Retry-After"));
         await wait(retryAfter > 0 ? retryAfter * 1000 : 900 * (attempt + 1));
         continue;

@@ -1,3 +1,4 @@
+import { databaseQuotaFailure } from "../../../lib/database-errors";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readAccountResponse } from "../../../lib/notion-accounts";
@@ -10,7 +11,11 @@ import { queryDatabaseAll } from "../../../lib/notion-api";
 import { mapTransactionPage } from "../../../lib/transaction-page";
 
 export const dynamic = "force-dynamic";
-const fail = (error: unknown) => NextResponse.json({ error: error instanceof Error ? error.message : "Balance checks unavailable." }, { status: (error as { status?: number }).status ?? 500 });
+const fail = (error: unknown) => {
+  const quota = databaseQuotaFailure(error);
+  if (quota) return NextResponse.json(quota, { status: 503 });
+  return NextResponse.json({ error: error instanceof Error ? error.message : "Balance checks unavailable." }, { status: (error as { status?: number }).status ?? 500 });
+};
 const conflict = () => NextResponse.json({ error: "This check changed on another device. Refresh and review it again." }, { status: 409 });
 function connection() {
   const token = process.env.NOTION_TOKEN;
