@@ -50,7 +50,7 @@ it("reports a rejected write as an error", async () => {
     .mockResolvedValueOnce(Response.json({ results: [] }))
     .mockResolvedValueOnce(Response.json({ message: "Invalid relation" }, { status: 400 })));
   const response = await save();
-  expect(response.status).toBe(500);
+  expect(response.status).toBe(400);
   expect(await response.json()).toEqual({ error: "Invalid relation" });
 });
 

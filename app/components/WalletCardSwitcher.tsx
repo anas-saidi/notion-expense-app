@@ -2,6 +2,7 @@ import { HeroSkeleton } from "./ui/Skeleton";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { BudgetScope, Category, MonthlySummary } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
+import { contributionDue } from "./contribution-utils";
 import { Currency, Money } from "./Money";
 import { fmt } from "./app-utils";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
@@ -65,8 +66,8 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
 
   // The joint pool keeps an eye on whoever owes the most (Anas stands on the
   // left, Salma on the right); with nothing due it just watches its waterline.
-  const anasDue  = contribStatus ? Math.max(0, contribStatus.anasPlan - contribStatus.anasActual) : 0;
-  const salmaDue = contribStatus ? Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual) : 0;
+  const anasDue  = contribStatus ? contributionDue(contribStatus, "anas") : 0;
+  const salmaDue = contribStatus ? contributionDue(contribStatus, "salma") : 0;
   const poolLook = !isJoint || Math.max(anasDue, salmaDue) <= 0.005 ? 0 : anasDue >= salmaDue ? -18 : 18;
 
   // Tapped, the pool also shows where the money went: the top three spending
@@ -145,9 +146,9 @@ type JointFamilyProps = { children: ReactNode } & (
 export function JointFamily({ contribStatus, planningCapacity, children }: JointFamilyProps) {
   return (
     <div style={familyRowStyle}>
-      <PartnerJar scope="anas" name="Anas" actual={contribStatus?.anasActual ?? 0} plan={contribStatus?.anasPlan ?? 0} capacity={planningCapacity?.anas} />
+      <PartnerJar scope="anas" name="Anas" actual={contribStatus?.anasActual ?? 0} plan={contribStatus?.anasPlan ?? 0} capacity={planningCapacity?.anas} dueOverride={contribStatus ? contributionDue(contribStatus, "anas") : undefined} />
       {children}
-      <PartnerJar scope="salma" name="Salma" actual={contribStatus?.salmaActual ?? 0} plan={contribStatus?.salmaPlan ?? 0} capacity={planningCapacity?.salma} />
+      <PartnerJar scope="salma" name="Salma" actual={contribStatus?.salmaActual ?? 0} plan={contribStatus?.salmaPlan ?? 0} capacity={planningCapacity?.salma} dueOverride={contribStatus ? contributionDue(contribStatus, "salma") : undefined} />
     </div>
   );
 }
@@ -158,14 +159,15 @@ export function JointFamily({ contribStatus, planningCapacity, children }: Joint
  * They look towards the joint pool; the face is happy once settled, sheepish
  * while something is still due. Tapping spills their status.
  */
-function PartnerJar({ scope, name, actual, plan, capacity }: {
+function PartnerJar({ scope, name, actual, plan, capacity, dueOverride }: {
   scope: "anas" | "salma";
   name: string;
   actual: number;
   plan: number;
   capacity?: number;
+  dueOverride?: number;
 }) {
-  const due = Math.max(0, plan - actual);
+  const due = dueOverride ?? Math.max(0, plan - actual);
   const overpaid = Math.max(0, actual - plan);
   const settled = due <= 0.005;
   const rounded = Math.round(settled ? overpaid : due);

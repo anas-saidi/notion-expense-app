@@ -7,7 +7,9 @@ const cents = (amount: number) => Math.round(amount * 100);
 /** Current commitments are already deducted from capacity. Only the future plan
  * is deducted here. Existing Joint cash covers its plan before new contributions. */
 export function calculateMonthPlanCapacity(capacity: PlanAmounts, planned: PlanAmounts, split: ContributionSplit) {
-  const cash = Math.max(0, cents(capacity.joint));
+  // Negative capacity is an existing unfunded commitment (including advances),
+  // not zero cash. New contributions must cover it before new allocations.
+  const cash = cents(capacity.joint);
   const needed = Math.max(0, cents(planned.joint) - cash);
   const anasDue = Math.round(needed * split.anas);
   const salmaDue = needed - anasDue;

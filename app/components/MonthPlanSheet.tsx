@@ -27,6 +27,8 @@ import { SectionToggle } from "./ui/SectionToggle";
 import { pickerChipStyle } from "./TransactionPickers";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import "./month-plan-desktop.css";
+import { ContributionAgreementEditor, contributionMonthName } from "./ContributionDetails";
+import type { ContributionAgreement, ContributionLedger } from "../../lib/contribution-agreements";
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 
@@ -70,6 +72,9 @@ function sumByCategory(entries: Array<{ categoryId?: string | null; total?: numb
 /* ─── Types ───────────────────────────────────────────────────────── */
 
 type MonthPlanSheetProps = {
+  advanceReserve?: number;
+  advances?: ContributionLedger | null;
+  contributionsReady?: boolean;
   open: boolean;
   onClose: () => void;
   /** Called after a save so the app can refresh balances and the Home banner. */
@@ -92,6 +97,9 @@ type MonthPlanSheetProps = {
 /* ─── Main component ──────────────────────────────────────────────── */
 
 export function MonthPlanSheet({
+  advanceReserve = 0,
+  advances,
+  contributionsReady = true,
   open,
   onClose,
   onSaved,
@@ -121,6 +129,7 @@ export function MonthPlanSheet({
 
   // Saved plan for the planning month, and this month's plan + spending (for context).
   const [saved, setSaved] = useState<Map<string, number>>(new Map());
+  const [agreement, setAgreement] = useState<ContributionAgreement | undefined>();
   const [currentPlanned, setCurrentPlanned] = useState<Map<string, number>>(new Map());
   const [currentSpent, setCurrentSpent] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -165,10 +174,12 @@ export function MonthPlanSheet({
     setLoading(true);
     setLoadError("");
     try {
-      const [funds, summary] = await Promise.all([
+      const [funds, summary, agreements] = await Promise.all([
         fetchApiJson<{ funds: any[] }>(`/api/monthly-planning/funds?month=${planningMonth}`),
         fetchMonthlyData(currentMonth),
+        fetchApiJson<{ agreements: ContributionAgreement[] }>("/api/contribution-agreements"),
       ]);
+      setAgreement(agreements.agreements.find(a => a.month === planningMonth));
       setSaved(sumByCategory(funds.funds ?? []));
       setCurrentPlanned(sumByCategory(summary.summary?.assignedByCategory ?? []));
       setCurrentSpent(sumByCategory(summary.summary?.spentByCategory ?? []));
@@ -240,6 +251,7 @@ export function MonthPlanSheet({
     if (owner) totals[owner] += amountFor(cat);
   }
   const capacity = calculateMonthPlanCapacity(planningCapacity, totals, split);
+  const confirmingAgreement = !agreement && totals.joint > 0;
   const notAssigned = capacity.pool[scope];
   const left = capacity.left[scope];
   const shortfalls = (["anas", "salma"] as const)
@@ -335,7 +347,7 @@ export function MonthPlanSheet({
   };
 
   const save = async () => {
-    if (!changed.length || loading || saving || freezing || loadError || capacityError) return;
+    if (!changed.length || loading || saving || freezing || loadError || capacityError || !contributionsReady) return;
     setSaving(true);
     setSaveError("");
     try {
@@ -359,6 +371,13 @@ export function MonthPlanSheet({
       setExpressions({});
       setReviewing(false);
       onSaved();
+      if (confirmingAgreement) {
+        const response = await fetch("/api/contribution-agreements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month: planningMonth, targets: { anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }, shares: split, expectedVersion: null }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(`Plan saved. Contributions were not confirmed. ${result.error ?? "Use Set monthly contributions to retry."}`);
+        setAgreement(result.agreement);
+        onSaved();
+      }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Couldn't save the plan");
     } finally {
@@ -384,6 +403,11 @@ export function MonthPlanSheet({
   );
 
   const invalidExpressions = Object.values(expressions).some((text) => text.trim() !== "" && parseAmount(text) === null);
+  const contributionReservation = advanceReserve > 0 ? <section className="contribution-agreement" aria-label="Repay carried advances">
+    <h3>Repay advances</h3>
+    <dl className="contribution-rows">{advances?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0).map(m => <div key={m.month}><dt>{contributionMonthName(m.month)}</dt><dd><Money value={m.outstanding.anas + m.outstanding.salma} /></dd></div>)}<div className="contribution-emphasis"><dt>Reserved before new allocations</dt><dd><Money value={advanceReserve} /></dd></div></dl>
+  </section> : null;
+  const contributionAgreement = <ContributionAgreementEditor month={planningMonth} agreement={agreement} proposed={{ anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }} shares={split} disabled={loading || saving || changed.length > 0 || !!loadError || !!capacityError || !contributionsReady || totals.joint <= 0} onSaved={() => { void loadPlan(); onSaved(); }} />;
   const desktopGroups = [
     ...(savingsCategories.length ? [{ key: "savings", label: "Savings", items: savingsCategories }] : []),
     ...budgetGroups,
@@ -432,10 +456,13 @@ export function MonthPlanSheet({
             <div className="plan-summary-divider" />
             <div className="plan-summary-line"><span>Anas for Joint</span><strong>{fmt(capacity.due.anas)}</strong></div>
             <div className="plan-summary-line"><span>Salma for Joint</span><strong>{fmt(capacity.due.salma)}</strong></div>
+            {confirmingAgreement && <p className="contribution-note">Saving the first shared plan confirms these monthly contributions.</p>}
+            {contributionReservation}
+            {contributionAgreement}
             </div>
             <div className="plan-summary-actions">
               {(saveError || capacityError || invalidExpressions) && <Banner role="alert" tone="danger" compact>{saveError || capacityError || "Complete the amount before reviewing."}</Banner>}
-              {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : <span role="status">{savedTotal > 0 ? "Plan saved" : "Nothing planned yet"}</span>}
+              {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions || !contributionsReady} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : <span role="status">{savedTotal > 0 ? "Plan saved" : "Nothing planned yet"}</span>}
             </div>
           </aside>
         </div>}
@@ -528,6 +555,8 @@ export function MonthPlanSheet({
             )}
           </section>
 
+          {contributionReservation}
+          {contributionAgreement}
           {[
             ...(savingsCategories.length ? [{ key: "savings", label: "Savings", items: savingsCategories, savings: true }] : []),
             ...budgetGroups.map((g) => ({ ...g, savings: false })),
@@ -592,7 +621,7 @@ export function MonthPlanSheet({
           <div style={footerRowStyle} className="planner-footer-row">
             {/* A month's plan is a big commitment: slide to save, so a stray tap never does. */}
             {loading ? <SkeletonRegion label="Loading plan status"><Skeleton style={{ width: 140, height: 18 }} /></SkeletonRegion> : loadError ? null : changed.length || saving ? (
-              <SlideToConfirm label="Slide to save plan" busy={saving} busyLabel="Saving…" disabled={loading || !!freezing || !!loadError || !!capacityError} onConfirm={() => void save()} />
+              <SlideToConfirm label={confirmingAgreement ? "Save plan and contributions" : "Slide to save plan"} busy={saving} busyLabel="Saving…" disabled={loading || !!freezing || !!loadError || !!capacityError || !contributionsReady} onConfirm={() => void save()} />
             ) : (
               <span role="status" style={savedStatusStyle}>
                 <CheckIcon size={16} aria-hidden="true" /> {savedTotal > 0 ? "Plan saved" : "Nothing planned yet"}

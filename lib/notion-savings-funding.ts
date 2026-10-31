@@ -1,4 +1,5 @@
 import { withSavingsFundingLock } from "./savings-funding-lock";
+import { assertAdvanceReservation } from "./contribution-service";
 import { notionFetchJson, queryDatabaseAll } from "./notion-api";
 import { mapCategoryPage } from "./notion-category-record";
 import { isSavingsCategory } from "../app/components/wallet-utils";
@@ -70,6 +71,7 @@ async function performFunding(token: string, draft: Draft) {
       const source = await pageIn(token, draft.accountId, ACC_DB);
       const available = readAccountBalance(source.properties);
       if (typeof available !== "number" || !Number.isFinite(available) || available < draft.amount) fail("The funding account does not have enough cash for this deposit.");
+      await assertAdvanceReservation(token, draft.accountId, draft.categoryId, draft.amount);
       if (draft.target === "separate" && normalizeId(draft.accountId) === normalizeId(category.defaultAccount)) {
         const readyProp: any = Object.entries(source.properties ?? {}).find(([name]) => /^(ready to assign|available to assign)$/i.test(name))?.[1];
         const ready = readyProp?.formula?.number ?? readyProp?.rollup?.number ?? readyProp?.number;

@@ -11,7 +11,9 @@ export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
   if (existing) return existing as Promise<T>;
   const request = (async () => {
     for (let attempt = 0; ; attempt += 1) {
-      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30000) });
+      // An expired mirror needs a fully paginated ledger read. Let that finish
+      // instead of launching repeated history reads after 30-second aborts.
+      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(url.includes("includeJointDebt=true") ? 180000 : 30000) });
       const data = await response.json();
       if (response.ok) {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("finance-data-source", { detail: {

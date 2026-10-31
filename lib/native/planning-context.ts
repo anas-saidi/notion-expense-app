@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { GET as readAccounts } from "../../app/api/accounts/route";
 import { GET as readCategories } from "../../app/api/categories/route";
 import { GET as readMonthly } from "../../app/api/monthly-summary/route";
-import { calculateContributionStatus } from "../../app/components/contribution-utils";
+import { calculateContributionStatus, contributionDue } from "../../app/components/contribution-utils";
 import { getAssignBalanceByScope, getCategoryScope, getJointAccountUnassigned } from "../../app/components/app-utils";
 import { getPlanningSplit } from "../../app/components/month-plan-capacity";
 import { billToday } from "../bills";
@@ -16,15 +16,16 @@ export async function planningContext(request: NextRequest) {
   const accounts: Account[] = accountData.accounts, categories: Category[] = categoryData.categories.filter((category: Category) => !category.archived);
   if (accounts.some(a => !a.type?.toLowerCase().includes("saving") && a.readyToAssign == null)) throw new Error("An account's available planning balance is unknown.");
   const contribution = calculateContributionStatus({ accounts, categories, transactions: monthly.transactions, debtTransactions: monthly.jointDebtTransactions, debtCategories: categoryData.categories, monthlySummary: monthly.summary });
-  const assignable = getAssignBalanceByScope(accounts, contribution ? { anas: Math.max(0, contribution.anasPlan - contribution.anasActual), salma: Math.max(0, contribution.salmaPlan - contribution.salmaActual) } : undefined);
-  const capacity = { ...assignable, joint: getJointAccountUnassigned(accounts) };
+  const assignable = getAssignBalanceByScope(accounts, contribution ? { anas: contributionDue(contribution, "anas"), salma: contributionDue(contribution, "salma") } : undefined);
+  const advanceReserve = (contribution?.advances?.outstanding.anas ?? 0) + (contribution?.advances?.outstanding.salma ?? 0);
+  const capacity = { ...assignable, joint: getJointAccountUnassigned(accounts) - advanceReserve };
   if (request.nextUrl.searchParams.get("month") === month) {
-    capacity.joint = assignable.joint;
+    capacity.joint = assignable.joint - advanceReserve;
     for (const item of monthly.summary.assignedByCategory) {
       const category = categories.find(c => c.id === item.categoryId);
       const scope = category && getCategoryScope(category, accounts) as BudgetScope | null;
       if (scope) capacity[scope] += item.total;
     }
   }
-  return { capacity, split: getPlanningSplit(accounts) };
+  return { capacity, split: getPlanningSplit(accounts), categories };
 }

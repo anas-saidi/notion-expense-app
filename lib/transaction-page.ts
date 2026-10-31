@@ -6,6 +6,7 @@ const PROP_ACCOUNT_IN = "🏦 account ( in )";
 const PROP_ACCOUNT_OUT = "🏦 account ( out )";
 
 export const mapTransactionPage = (page: any) => ({
+  contributionRepaymentId: readText(page.properties?.["Contribution repayment"]) || undefined,
   savingsFundingOperation: readText(page.properties?.[FUNDING_OPERATION]) || undefined,
   savingsFundingTarget: page.properties?.[SAVINGS_TARGET]?.select?.name as "separate" | "shared" | undefined,
   id: page.id,

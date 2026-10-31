@@ -3,6 +3,7 @@ import { withMirrorReads, withMirrorMutation } from "../../../../lib/mirror/rout
 import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "@/lib/notion-api";
 import { monthBounds } from "@/app/components/app-utils";
+import { assertAdvanceReservation } from "../../../../lib/contribution-service";
 
 const NOTION_VERSION = "2022-06-28";
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
@@ -177,6 +178,7 @@ async function handlePOST(req: NextRequest) {
       if (planned <= 0) {
         return NextResponse.json({ fund: null, mode: "skipped" });
       }
+      await assertAdvanceReservation(token, accountId, categoryId, planned);
       const createRes = await fetch("https://api.notion.com/v1/pages", {
         method: "POST",
         headers: notionHeaders(token),
@@ -228,6 +230,7 @@ async function handlePOST(req: NextRequest) {
     if (existing) {
       const currentPlanned = existing.properties.Planned?.number ?? 0;
       const nextPlanned = Math.max(0, shouldIncrement ? currentPlanned + planned : planned);
+      await assertAdvanceReservation(token, accountId, categoryId, nextPlanned - currentPlanned);
 
       // Skip if already at 0 and result would remain 0
       if (nextPlanned <= 0 && currentPlanned <= 0) {
@@ -265,6 +268,7 @@ async function handlePOST(req: NextRequest) {
       });
     }
 
+    await assertAdvanceReservation(token, accountId, categoryId, planned);
     const createRes = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
       headers: notionHeaders(token),
@@ -289,7 +293,7 @@ async function handlePOST(req: NextRequest) {
       mode: "created",
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to upsert fund" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Failed to upsert fund" }, { status: err.status ?? 500 });
   }
 }
 
@@ -314,6 +318,8 @@ async function handlePATCH(req: NextRequest) {
     if (!existingCategoryId) return NextResponse.json({ error: "Funding transaction has no category" }, { status: 409 });
     const reductionError = await assertFundReductionIsAvailable(token, stored.page, planned);
     if (reductionError) return NextResponse.json({ error: reductionError }, { status: 409 });
+    const previousAccountId = stored.page.properties["🏦 Accounts"]?.relation?.[0]?.id;
+    await assertAdvanceReservation(token, accountId, existingCategoryId, normalizeId(previousAccountId ?? "") === normalizeId(accountId) ? planned - (stored.page.properties.Planned?.number ?? 0) : planned);
     const assignmentType = stored.page.properties["Assignment Type"]?.select?.name ?? "Additional";
 
     const response = await fetch(`https://api.notion.com/v1/pages/${id}`, {
@@ -333,7 +339,7 @@ async function handlePATCH(req: NextRequest) {
     if (!response.ok) return NextResponse.json({ error: data.message || "Failed to update funding transaction" }, { status: response.status });
     return NextResponse.json({ success: true, fund: { id: data.id, categoryId: existingCategoryId, planned, date, accountId } });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to update funding transaction" }, { status: 500 });
+    return NextResponse.json({ error: err.message || "Failed to update funding transaction" }, { status: err.status ?? 500 });
   }
 }
 

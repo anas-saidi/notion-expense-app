@@ -29,7 +29,10 @@ const MonthPlanSheet = dynamic(() => import("./components/MonthPlanSheet").then(
 const TransactionDetailsSheet = dynamic(() => import("./components/TransactionDetailsSheet").then(m => m.TransactionDetailsSheet));
 import { getCategoryAllocatedByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
 import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
-import { calculateContributionStatus } from "./components/contribution-utils";
+import { calculateContributionStatus, contributionDue } from "./components/contribution-utils";
+import { ContributionDetails, ContributionEntry } from "./components/ContributionDetails";
+import { contributionLedger, money as contributionMoney } from "../lib/contribution-agreements";
+import { scopeFromAccountLabel } from "./components/app-utils";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
   categoryMatchesScope,
@@ -60,6 +63,7 @@ const FALLBACK_ACCOUNTS: Account[] = [];
 const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
 
 export default function App() {
+  const [showContributions, setShowContributions] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [withdrawCategory, setWithdrawCategory] = useState<Category | null>(null);
@@ -347,6 +351,7 @@ export default function App() {
       setJointDebtTransactions(data.jointDebtTransactions ?? []);
       setBudgetTransactions(activity?.transactions ?? []);
       setMonthlySummary({
+        contributionAgreements: data.summary.contributionAgreements,
         start,
         end,
         totalAssigned: data.summary?.totalAssigned ?? 0,
@@ -637,7 +642,11 @@ export default function App() {
   const selectedAccount = accounts.find((a) => a.id === accountId) ?? null;
 
   const balanceByScope = useMemo(() => getBalanceByScope(accounts), [accounts]);
-  const jointUnassigned = useMemo(() => getJointAccountUnassigned(accounts), [accounts]);
+  const currentAdvances = useMemo(() => monthlySummary.contributionAgreements
+    ? contributionLedger(accounts, debtCategories, jointDebtTransactions, monthlySummary.contributionAgreements, calendarMonth) : null,
+  [accounts, debtCategories, jointDebtTransactions, monthlySummary.contributionAgreements, calendarMonth]);
+  const advanceReserve = contributionMoney((currentAdvances?.outstanding.anas ?? 0) + (currentAdvances?.outstanding.salma ?? 0));
+  const jointUnassigned = useMemo(() => contributionMoney(getJointAccountUnassigned(accounts) - advanceReserve), [accounts, advanceReserve]);
 
   // Derive which scopes have allocations for the month offered by the planner.
   const plannedScopes = useMemo((): Record<"joint" | "anas" | "salma", boolean> => {
@@ -902,29 +911,29 @@ export default function App() {
   const readyToAssignByScope = useMemo(() => getLeftToAssignByScope(
     accounts,
     contribStatus ? {
-      anas: Math.max(0, contribStatus.anasPlan - contribStatus.anasActual),
-      salma: Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual),
+      anas: contributionDue(contribStatus, "anas"),
+      salma: contributionDue(contribStatus, "salma"),
     } : undefined,
   ), [accounts, contribStatus]);
-  const assignBalanceByScope = useMemo(() => getAssignBalanceByScope(
+  const assignBalanceByScope = useMemo(() => { const balance = getAssignBalanceByScope(
     accounts,
     contribStatus ? {
-      anas: Math.max(0, contribStatus.anasPlan - contribStatus.anasActual),
-      salma: Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual),
+      anas: contributionDue(contribStatus, "anas"),
+      salma: contributionDue(contribStatus, "salma"),
     } : undefined,
-  ), [accounts, contribStatus]);
+  ); return { ...balance, joint: contributionMoney(balance.joint - advanceReserve) }; }, [accounts, contribStatus, advanceReserve]);
   // Accounts as the UI shows them: personal "ready to assign" keeps back the Joint due.
   const displayAccounts = useMemo(() => withAssignable(
     accounts,
     contribStatus ? {
-      anas: Math.max(0, contribStatus.anasPlan - contribStatus.anasActual),
-      salma: Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual),
+      anas: contributionDue(contribStatus, "anas"),
+      salma: contributionDue(contribStatus, "salma"),
     } : undefined,
   ), [accounts, contribStatus]);
   const contributionRemainingByScope = useMemo((): Record<BudgetScope, number> => ({
     joint: 0,
-    anas: contribStatus ? Math.max(0, contribStatus.anasPlan - contribStatus.anasActual) : 0,
-    salma: contribStatus ? Math.max(0, contribStatus.salmaPlan - contribStatus.salmaActual) : 0,
+    anas: contribStatus ? contributionDue(contribStatus, "anas") : 0,
+    salma: contribStatus ? contributionDue(contribStatus, "salma") : 0,
   }), [contribStatus]);
 
   const nextMonthRemaining = useMemo(() => {
@@ -1104,6 +1113,9 @@ export default function App() {
       )}
 
       <DeferredMount active={showMonthStartPlanner}>      <MonthPlanSheet
+        advanceReserve={advanceReserve}
+        advances={currentAdvances}
+        contributionsReady={!monthLoading && !monthError}
         open={showMonthStartPlanner}
         onClose={() => setShowMonthStartPlanner(false)}
         onSaved={() => {
@@ -1125,6 +1137,7 @@ export default function App() {
 
       {tab === "home" && (
         <HomeScreen
+          contributions={!monthLoading && !monthError && <ContributionEntry status={contribStatus} scope={budgetScope} onOpen={() => setShowContributions(true)} />}
           balanceChecks={<PendingBalanceChecks checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} onReview={account => { setStartBalanceCheck(true); setDetailsAccount(account); }} />}
           billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={checkedAccounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
           monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
@@ -1442,7 +1455,10 @@ export default function App() {
 
       <BalanceCheckAccounts open={showBalanceAccounts} accounts={accounts} onClose={() => setShowBalanceAccounts(false)} onSelect={account => { setShowBalanceAccounts(false); setStartBalanceCheck(true); setDetailsAccount(account); }} />
 
+      <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} cash={accounts.find(a => !/saving/i.test(a.label) && /joined|joint/i.test(a.label))?.balance ?? null} loading={monthLoading} error={monthError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
+
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
+        contributions={!monthLoading && !monthError && detailsAccount && !/saving/i.test(detailsAccount.label) && <ContributionEntry status={contribStatus} scope={scopeFromAccountLabel(detailsAccount.label) ?? budgetScope} onOpen={() => { setDetailsAccount(null); setShowContributions(true); }} />}
         open={detailsAccount !== null}
         startBalanceCheck={startBalanceCheck}
         balanceCheck={balanceChecks.checks.find(check => check.accountId === accountKey(detailsAccount?.id ?? ""))}

@@ -3,6 +3,11 @@ import { withMirrorMutation } from "../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../../components/app-utils";
 import { notionFetchJson, queryDatabaseAll } from "../../../../lib/notion-api";
+import { contributionStore } from "../../../../lib/contribution-store";
+import { mirrorScope } from "../../../../lib/mirror/store";
+import { planningContext } from "../../../../lib/native/planning-context";
+import { calculateMonthPlanCapacity, type PlanAmounts } from "../../../components/month-plan-capacity";
+import { getCategoryScope } from "../../../components/app-utils";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
 
@@ -153,6 +158,29 @@ async function handlePOST(req: NextRequest) {
       }
     }
     const savedFunds = [];
+    if (process.env.DATABASE_URL && (await contributionStore().list(mirrorScope(token))).length) {
+      const url = new URL(req.url); url.searchParams.set("month", String(body.month));
+      const { capacity, split, categories } = await planningContext(new NextRequest(url));
+      const proposed = new Map<string, number>();
+      for (const fund of existingFunds) {
+        if (readText(fund.properties?.[FUNDING_OPERATION])) continue;
+        const id = normalizeId(fund.properties?.Category?.relation?.[0]?.id ?? "");
+        proposed.set(id, (proposed.get(id) ?? 0) + (fund.properties.Planned?.number ?? 0));
+      }
+      for (const allocation of allocations) {
+        const id = normalizeId(allocation.categoryId);
+        const existing = byCategory.get(id)?.properties.Planned?.number ?? 0;
+        proposed.set(id, (proposed.get(id) ?? 0) - existing + allocation.amount);
+      }
+      const totals: PlanAmounts = { joint: 0, anas: 0, salma: 0 };
+      for (const [id, amount] of proposed) {
+        const category = categories.find(c => normalizeId(c.id) === id);
+        const scope = category && getCategoryScope(category);
+        if (scope) totals[scope] += amount;
+      }
+      const result = calculateMonthPlanCapacity(capacity, totals, split);
+      if (result.left.anas < -.005 || result.left.salma < -.005) return NextResponse.json({ error: "This plan exceeds the money available after existing commitments and advance repayments. Refresh and reduce allocations." }, { status: 409 });
+    }
     for (const allocation of allocations) {
       savedFunds.push(await upsertFund(token, allocation, bounds.start, byCategory.get(normalizeId(allocation.categoryId)), body.allowClear === true));
     }
@@ -166,7 +194,7 @@ async function handlePOST(req: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to save monthly plan";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: (error as { status?: number }).status ?? 500 });
   }
 }
 

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { calculateContributionStatus } from "../../../components/contribution-utils";
+import { calculateContributionStatus, contributionDue } from "../../../components/contribution-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateNative } from "../../../../lib/native/auth";
 import { GET as readCategories } from "../../categories/route";
@@ -38,13 +38,14 @@ export async function GET(request: NextRequest) {
         .filter(bill => bill.period === month || ((bill.state === "Due" || bill.state === "Overdue") && bill.dueDate < month + "-01"))
         .map(bill => ({ ...bill, scope: (() => { const category = categories.find(c => c.id === bill.categoryId); return category ? getCategoryScope(category, accounts) : null; })() }));
     } catch { billsError = "Bills are unavailable. Pull to refresh to try again."; }
+    const contribution = calculateContributionStatus({ accounts, categories, transactions: monthly.transactions, debtTransactions: monthly.jointDebtTransactions, debtCategories: categoryData.categories, monthlySummary: monthly.summary });
     return NextResponse.json({
       schemaVersion: 1, householdID: createHash("sha256").update(process.env.NOTION_CATEGORIES_DB ?? "1926a2be-8922-8029-9b90-c7d8bb55fabd").digest("hex"), month, fetchedAt: new Date().toISOString(), bills, billsError,
       categories: categories.map(category => ({ ...category, scope: getCategoryScope(category, accounts) })),
       accounts: accounts.map(account => ({ ...account, scope: scopeFromAccountLabel(account.label) })),
       transactions: monthly.transactions.map((transaction: Transaction) => ({ ...transaction, scopes: resolveTransactionScopes(transaction, categories, accounts) })),
       summary: monthly.summary,
-      contributions: calculateContributionStatus({ accounts, categories, transactions: monthly.transactions, debtTransactions: monthly.jointDebtTransactions, debtCategories: categoryData.categories, monthlySummary: monthly.summary }),
+      contributions: contribution ? { ...contribution, anasPlan: contribution.anasActual + contributionDue(contribution, "anas"), salmaPlan: contribution.salmaActual + contributionDue(contribution, "salma") } : null,
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "Could not load finances. Your saved data is still on the phone." }, { status: 502 });

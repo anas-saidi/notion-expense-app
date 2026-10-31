@@ -5,7 +5,7 @@ import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
 import { DatePicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
 
-import { useState, useMemo, useEffect, type CSSProperties } from "react";
+import { useState, useMemo, useEffect, type CSSProperties, type ReactNode } from "react";
 import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -29,6 +29,7 @@ import {
 } from "./ui/icons";
 
 type AccountDetailsSheetProps = {
+  contributions?: ReactNode;
   open: boolean;
   startBalanceCheck?: boolean;
   balanceCheck?: BalanceCheckView;
@@ -62,6 +63,7 @@ function fmtMonth(m: string) {
 }
 
 export function AccountDetailsSheet({
+  contributions,
   open,
   startBalanceCheck = false,
   balanceCheck,
@@ -481,6 +483,7 @@ export function AccountDetailsSheet({
           )}
         </div>
 
+        {contributions}
         {/* Balance history chart */}
         {showChart && (
           <div style={chartPanelStyle}>

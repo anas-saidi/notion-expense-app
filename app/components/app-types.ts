@@ -23,6 +23,7 @@ export type Category = {
 export type BudgetScope = "joint" | "anas" | "salma";
 
 export type Transaction = {
+  contributionRepaymentId?: string;
   createdAt?: string;
   id: string;
   name: string;
@@ -78,6 +79,7 @@ export type MonthlyCategoryTotal = {
 };
 
 export type MonthlySummary = {
+  contributionAgreements?: import("../../lib/contribution-agreements").ContributionAgreement[];
   month?: string | null;
   start: string;
   end: string;

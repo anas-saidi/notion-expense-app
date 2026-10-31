@@ -3,8 +3,13 @@ import type { Account, Category, MonthlySummary, Transaction } from "./app-types
 import { savingsHeldIn } from "../../lib/savings-funding";
 import { isSavingsCategory, getCategoryAvailableByScope } from "./wallet-utils";
 import { categoryMatchesScope } from "./app-utils";
+import { contributionLedger, type ContributionLedger, type ContributionAgreement } from "../../lib/contribution-agreements";
 
 export type ContributionStatus = {
+  anasDue?: number;
+  salmaDue?: number;
+  agreement?: ContributionAgreement;
+  advances?: ContributionLedger;
   fundingGap: number;
   anasPersonalDebt: number;
   salmaPersonalDebt: number;
@@ -20,6 +25,10 @@ export type ContributionStatus = {
   anasTransferred: number;
   salmaTransferred: number;
 };
+
+export function contributionDue(status: ContributionStatus, partner: "anas" | "salma") {
+  return partner === "anas" ? status.anasDue ?? Math.max(0, status.anasPlan - status.anasActual) : status.salmaDue ?? Math.max(0, status.salmaPlan - status.salmaActual);
+}
 
 const accountLabel = (accounts: Account[], id: string | null | undefined) =>
   id ? (accounts.find((account) => account.id === id)?.label ?? "").toLowerCase() : "";
@@ -88,7 +97,7 @@ export function calculateContributionStatus({
       if (transaction.fromAccountId === joinedAccount.id) {
         joinedOutflows += transaction.amount;
         const toLabel = accountLabel(accounts, transaction.toAccountId);
-        if (transaction.savingsFundingTarget === "separate") continue;
+        if (transaction.savingsFundingTarget === "separate" || transaction.contributionRepaymentId) continue;
         if (toLabel.includes("hubb")) anasTransferred -= transaction.amount;
         else if (toLabel.includes("wife")) salmaTransferred -= transaction.amount;
       }
@@ -119,8 +128,11 @@ export function calculateContributionStatus({
   // Repayments restore cash without also earning contribution credit.
   const cents = (amount: number) => Math.round((amount + Number.EPSILON) * 100);
   const debt = calculateJointDebt(accounts, debtCategories, debtTransactions, monthlySummary);
-  const anasActual = anasTransferred - debt.anasRepaid + anasDirectSpend;
-  const salmaActual = salmaTransferred - debt.salmaRepaid + salmaDirectSpend;
+  const advances = monthlySummary.contributionAgreements ? contributionLedger(accounts, debtCategories, debtTransactions, monthlySummary.contributionAgreements, monthlySummary.start.slice(0, 7)) : undefined;
+  const agreement = monthlySummary.contributionAgreements?.find(a => a.month === monthlySummary.start.slice(0, 7));
+  const agreedMonth = advances?.months.find(m => m.month === agreement?.month);
+  const anasActual = agreedMonth?.contributed.anas ?? anasTransferred - debt.anasRepaid + anasDirectSpend;
+  const salmaActual = agreedMonth?.contributed.salma ?? salmaTransferred - debt.salmaRepaid + salmaDirectSpend;
   // Unassigned income remains outside existing category commitments until allocated.
   const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance - savingsReserve - (joinedAccount.unassignedIncome ?? 0) + debt.anas + debt.salma));
   const targetCents = cents(anasActual) + cents(salmaActual) + gapCents;
@@ -129,11 +141,15 @@ export function calculateContributionStatus({
   const anasDueCents = Math.max(0, Math.min(gapCents, Math.round(targetCents * anasPercent) - cents(anasActual)));
   const salmaDueCents = gapCents - anasDueCents;
   const fundingGap = gapCents / 100 + debt.anas + debt.salma;
-  const anasPlan = anasActual + anasDueCents / 100 + debt.anas;
-  const salmaPlan = salmaActual + salmaDueCents / 100 + debt.salma;
+  const anasPlan = (agreement?.targets.anas ?? anasActual + anasDueCents / 100) + debt.anas;
+  const salmaPlan = (agreement?.targets.salma ?? salmaActual + salmaDueCents / 100) + debt.salma;
   const partnerRequirement = anasPlan + salmaPlan;
 
   return {
+    anasDue: agreement ? Math.max(0, cents(agreement.targets.anas) - cents(anasActual)) / 100 + debt.anas : anasDueCents / 100 + debt.anas,
+    salmaDue: agreement ? Math.max(0, cents(agreement.targets.salma) - cents(salmaActual)) / 100 + debt.salma : salmaDueCents / 100 + debt.salma,
+    agreement,
+    advances,
     fundingGap,
     anasPersonalDebt: debt.anas,
     salmaPersonalDebt: debt.salma,

@@ -11,6 +11,7 @@ import { isSavingsCategory } from "./wallet-utils";
 import { runningLowCategories, runwayLabel } from "./category-runway";
 
 type HomeScreenProps = {
+  contributions?: ReactNode;
   billsSection?: ReactNode;
   balanceChecks?: ReactNode;
   categories: Category[];
@@ -42,6 +43,7 @@ type HomeScreenProps = {
 
 
 export function HomeScreen({
+  contributions,
   billsSection,
   balanceChecks,
   categories,
@@ -167,6 +169,7 @@ export function HomeScreen({
       </div>
 
 
+      {contributions}
       {balanceChecks}
 
       {firstLow && onOpenAssign && (

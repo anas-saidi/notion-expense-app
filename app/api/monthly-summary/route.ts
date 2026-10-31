@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../components/app-utils";
 import { mapTransactionPage } from "../../../lib/transaction-page";
 import { queryDatabaseAll } from "../../../lib/notion-api";
+import { contributionStore } from "../../../lib/contribution-store";
+import { mirrorScope } from "../../../lib/mirror/store";
+import { billToday } from "../../../lib/bills";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be-8922-8058-990d-c549172f1d45";
 const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
@@ -59,7 +62,8 @@ async function handleGET(req: NextRequest) {
   try {
     const includeJointDebt = searchParams.get("includeJointDebt") === "true";
     const includeTransactions = includeJointDebt || searchParams.get("includeTransactions") === "true";
-    const [funds, allTransactionPages] = await Promise.all([
+    const [agreements, funds, allTransactionPages] = await Promise.all([
+      includeJointDebt && process.env.DATABASE_URL ? contributionStore().list(mirrorScope(token)) : Promise.resolve([]),
       queryDatabaseAll(token, FUNDS_DB, {
         filter: {
           and: [
@@ -74,7 +78,7 @@ async function handleGET(req: NextRequest) {
           and: [
             ...(!includeTransactions ? [{ property: "Type", select: { equals: "Expense" } }] : [{ property: "Type", select: { does_not_equal: "Due" } }]),
             ...(!includeJointDebt ? [{ property: "Date", date: { on_or_after: rangeStart } }] : []),
-            { property: "Date", date: { on_or_before: rangeEnd } },
+            { property: "Date", date: { on_or_before: includeJointDebt && billToday() > rangeEnd ? billToday() : rangeEnd } },
             ...(!includeTransactions ? [{ property: "Category", relation: { is_not_empty: true } }] : []),
           ],
         },
@@ -111,6 +115,7 @@ async function handleGET(req: NextRequest) {
         })),
       } : {}),
       summary: {
+        ...(includeJointDebt ? { contributionAgreements: agreements } : {}),
         month: month ?? null,
         start: rangeStart,
         end: rangeEnd,
