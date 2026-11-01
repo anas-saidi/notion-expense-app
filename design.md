@@ -322,7 +322,7 @@ The older dev-only `/due-lab` remains a sample-data exploration of the previous 
 
 All bills opens on the chosen month as a calendar, so you see *when* money leaves before reading *what* it is. It lives only inside All bills; Home keeps its short due-bills list.
 
-- **Summary sentence first** (current month only): what's overdue (red), what's still due this month, and which bill comes next ("**Rent** is due **today**", or "is next, on **5 Dec**"). The date opens that bill.
+- **Summary sentence first** (current month only), saying only the totals nothing else shows: "**5.210** is still due, **430** of it **overdue**" (overdue in red). It doesn't name the month (the picker does), the next bill or today's bill (the calendar and list do).
 - **Grid:** Monday-first, seven equal columns of square cells at least 44 points, 4-point gaps, the shared control radius. Weekday initials sit above in 12px muted text. The day number is 12px in the bottom-right of each cell.
 - **Empty days stay faint** (a half-strength `--surface2` wash, not interactive). A day with bills is a button on full `--surface2` carrying the first bill's category artwork (`CategoryIcon`, 24px) and a "+N" count beside it when more bills share the day.
 - **State colours the cell, not the art:** overdue gets a light `--danger` wash, paid or skipped days fade their art to 40%, and today has a thin ink ring. A selected day gets a stronger ring.

@@ -72,14 +72,12 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   };
   const enabled = !saving && !savedPendingRefresh && !loading && !error;
   const categoryOf = (bill: BillOccurrence) => categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId));
-  // Current month only: what's overdue, what's still due, and which bill comes next.
-  const overdue = currentDue.filter(o => o.state === "Overdue");
-  const next = currentDue.filter(o => o.state === "Due").sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
-  const billsSummary = activeMonth !== currentMonth ? [] : [
-    overdue.length > 0 && <span key="overdue"><Fact>{overdue.length === 1 ? overdue[0].name : `${overdue.length} bills`}</Fact> {overdue.length === 1 ? "is" : "are"} <Fact tone="danger" onClick={() => { setDay(null); setFilter("Due"); }} label="Show due bills">overdue</Fact></span>,
-    currentDue.length > 0 && <span key="due"><Fact>{fmt(Math.round(currentDue.reduce((sum, o) => sum + o.amount, 0)))}</Fact> is still due this month</span>,
-    next && <span key="next"><Fact icon={<CategoryIcon icon={categoryOf(next)?.icon ?? null} categoryName={categoryOf(next)?.name} size={20} />}>{next.name}</Fact> {next.dueDate === data?.today ? "is due" : "is next, on"} <Fact onClick={() => details(next)} label={`${next.name}, view bill`}>{next.dueDate === data?.today ? "today" : fmtDate(next.dueDate)}</Fact></span>,
-  ].filter(Boolean);
+  // Current month only, and only totals: the month picker names the month, and the calendar and list already show each bill and its date.
+  const dueTotal = Math.round(currentDue.reduce((sum, o) => sum + o.amount, 0));
+  const overdueTotal = Math.round(currentDue.filter(o => o.state === "Overdue").reduce((sum, o) => sum + o.amount, 0));
+  const billsSummary = activeMonth !== currentMonth || dueTotal <= 0 ? [] : [
+    <span key="due"><Fact>{fmt(dueTotal)}</Fact> is still due{overdueTotal > 0 && <>, <Fact>{fmt(overdueTotal)}</Fact> of it <Fact tone="danger" onClick={() => { setDay(null); setFilter("Due"); }} label="Show overdue bills">overdue</Fact></>}</span>,
+  ];
 
   function move(next: View) { setShowMore(false); setView(next); setSaveError(""); setConfirm(null); setPicker(null); haptic("selection"); }
   function add() {
