@@ -91,12 +91,14 @@ export function ReflectScreen(props: Props) {
 
   const overRows = budgetReady && excludedAccounts.length === 0 ? overBudget : [];
   const factIcon = (row: ReflectCategory) => <CategoryIcon icon={row.icon} categoryName={row.name} size={20} />;
+  // The current month is still running, so its recap speaks in the present.
+  const ongoing = singleMonth && props.period.start === currentMonth;
   const recap = [
     // The list below already shows each category's share, so the recap says what it doesn't: how concentrated spending was.
-    breakdown.spending.length > 3 && <span key="top">your <Fact>top 3 categories</Fact> took <Fact>{Math.round(breakdown.spending.slice(0, 3).reduce((sum, row) => sum + row.share, 0) * 100)}%</Fact> of it</span>,
-    overRows.length === 1 && <span key="over"><Fact icon={factIcon(overRows[0])}>{overRows[0].name}</Fact> went <Fact tone="danger" onClick={() => setSelectedId(overRows[0].id)} label={`${overRows[0].name} spending`}>{fmt(Math.round(overRows[0].overBudget))} over</Fact> budget</span>,
-    overRows.length > 1 && <span key="over"><Fact>{overRows.length} categories</Fact> went <Fact tone="danger">over budget</Fact></span>,
-    budgetReady && excludedAccounts.length === 0 && overRows.length === 0 && <span key="within">every category <Fact tone="success">stayed within budget</Fact></span>,
+    breakdown.spending.length > 3 && <span key="top">your <Fact>top 3 categories</Fact> {ongoing ? "have taken" : "took"} <Fact>{Math.round(breakdown.spending.slice(0, 3).reduce((sum, row) => sum + row.share, 0) * 100)}%</Fact> of it</span>,
+    overRows.length === 1 && <span key="over"><Fact icon={factIcon(overRows[0])}>{overRows[0].name}</Fact> {ongoing ? "is" : "went"} <Fact tone="danger" onClick={() => setSelectedId(overRows[0].id)} label={`${overRows[0].name} spending`}>{fmt(Math.round(overRows[0].overBudget))} over</Fact> budget</span>,
+    overRows.length > 1 && <span key="over"><Fact>{overRows.length} categories</Fact> {ongoing ? "are" : "went"} <Fact tone="danger">over budget</Fact></span>,
+    budgetReady && excludedAccounts.length === 0 && overRows.length === 0 && <span key="within">every category <Fact tone="success">{ongoing ? "is within budget so far" : "stayed within budget"}</Fact></span>,
   ].filter(Boolean);
 
   const categoryRow = (row: ReflectCategory, index: number, inflow = false) => {
