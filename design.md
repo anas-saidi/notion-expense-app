@@ -584,3 +584,10 @@ Linked savings transfers expose **Undo deposit** in transaction details. The sam
 - Opening Month plan copies the app-wide wallet into a local planning selection. Switching Joint/Anas/Salma inside the planner updates only that session; it never writes the page's scope, html[data-scope] or the saved app-wide preference. Reopening starts from the main page's current wallet. Drafts still survive wallet changes inside the same plan, and Save still submits changes across wallets.
 - Planner selection colors resolve under data-plan-scope on its own content, using existing ownership tokens. The picker is labeled Monthly plan wallet. Phone includes this local picker inside the sheet.
 - Month plan and its saved receipt opt into BottomSheet lockBackground. The full-viewport backdrop covers the phone header; the app-shell-root is inert until the last locking modal closes; Tab stays within the modal on desktop and phone. The page retains its existing scroll lock. Dismissal restores its original interactivity and focus. Other sheets retain their established presentation.
+
+
+## Screen-specific loading recovery
+
+- The ten-second loading recovery follows the visible screen. Reflect/Activity uses historyLoading; hidden Home bills/monthly planning requests do not show Retry loading on Activity. Budget follows its monthly data and budget refresh. Initial essential reads retain the global recovery. Changing screens resets the delay.
+- Retrying Reflect restarts only the selected period's history requests, clears its reusable monthly snapshot and keeps Home/account requests running. Both the slow-read action and Reflect's error action use this recovery. A Home retry retains its full-load behavior.
+- Activity reads transactions directly unless a completed matching monthly response is already available. It does not wait for the funds query needed by the Spending comparison. Changing between Activity and Spending loads the data required by that view. Home's background updating indicator is omitted on Reflect; genuine refresh errors remain visible.

@@ -3,7 +3,7 @@ import type { MonthlySummary, Transaction } from "../app/components/app-types";
 import { monthBounds } from "../app/components/app-utils";
 
 const inFlight = new Map<string, Promise<unknown>>();
-const controllers = new Set<AbortController>();
+const controllers = new Map<AbortController, string>();
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // An expired mirror needs a fully paginated ledger read: let that finish instead of relaunching it.
 // Accounts recompute every account's Notion formulas on each read, so they get longer than the rest.
@@ -14,7 +14,7 @@ export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
   const existing = inFlight.get(url);
   if (existing) return existing as Promise<T>;
   const controller = new AbortController();
-  controllers.add(controller);
+  controllers.set(controller, url);
   const request = (async () => {
     for (let attempt = 0; ; attempt += 1) {
       let response: Response;
@@ -57,11 +57,35 @@ export function fetchMonthlyData(startMonth: string, endMonth = startMonth, incl
   return fetchApiJson<MonthlyData>(`/api/monthly-summary?start=${start}&end=${end}&includeTransactions=true${includeJointDebt ? "&includeJointDebt=true" : ""}`);
 }
 
+export function historyReadUrls(startMonth: string, endMonth = startMonth) {
+  const start = startMonth ? monthBounds(`${startMonth}-01`).start : "";
+  const end = startMonth ? monthBounds(`${endMonth}-01`).end : "";
+  return {
+    transactions: `/api/transactions?${start ? `start=${start}&end=${end}` : "all=true"}`,
+    summary: start ? `/api/monthly-summary?start=${start}&end=${end}&includeTransactions=true` : null,
+  };
+}
+
+/** Activity needs transactions, not the funds query used by spending comparisons. */
+export async function fetchHistoryData({ startMonth, endMonth = startMonth, view, snapshot }: {
+  startMonth: string; endMonth?: string; view: "spending" | "activity";
+  snapshot?: { month: string; expires: number; data: MonthlyData } | null;
+}) {
+  const monthly = startMonth && startMonth === endMonth
+    ? snapshot?.month === startMonth && snapshot.expires > Date.now() ? snapshot.data
+      : view === "spending" ? await fetchMonthlyData(startMonth, endMonth) : null
+    : null;
+  const transactions = monthly?.transactions ?? (await fetchApiJson<{ transactions: Transaction[] }>(historyReadUrls(startMonth, endMonth).transactions)).transactions;
+  return { transactions: transactions ?? [], summary: monthly?.summary ?? null };
+}
+
 /** Explicit user recovery cancels pending GETs so retry cannot rejoin a stalled read. */
-export function restartFinancialReads() {
-  inFlight.clear();
-  for (const controller of controllers) controller.abort();
-  controllers.clear();
+export function restartFinancialReads(matches: (url: string) => boolean = () => true) {
+  for (const url of inFlight.keys()) if (matches(url)) inFlight.delete(url);
+  for (const [controller, url] of controllers) if (matches(url)) {
+    controller.abort();
+    controllers.delete(controller);
+  }
 }
 
 /** Financial essentials first; failures in a secondary section cannot hide Home. */

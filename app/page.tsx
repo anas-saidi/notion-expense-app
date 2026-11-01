@@ -1,9 +1,10 @@
 "use client";
+import { screenIsLoading } from "../lib/screen-loading";
 import { runwayWindow } from "./components/category-runway";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
-import { fetchApiJson, fetchMonthlyData, invalidateFinancialReads, restartFinancialReads, loadHomeData, type MonthlyData } from "@/lib/app-data";
+import { fetchApiJson, fetchMonthlyData, fetchHistoryData, historyReadUrls, invalidateFinancialReads, restartFinancialReads, loadHomeData, type MonthlyData } from "@/lib/app-data";
 import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
@@ -305,19 +306,10 @@ export default function App() {
     setHistoryTransactions([]);
     setHistorySummary(null);
     try {
-      const query = startMonth
-        ? `start=${monthBounds(`${startMonth}-01`).start}&end=${monthBounds(`${endMonth}-01`).end}`
-        : "all=true";
-      const snapshot = monthlySnapshot.current;
-      const monthly = startMonth && startMonth === endMonth
-        ? (snapshot?.month === startMonth && snapshot.expires > Date.now()
-          ? snapshot.data
-          : await fetchMonthlyData(startMonth, endMonth))
-        : null;
-      const txns = monthly?.transactions ?? (await fetchApiJson<{ transactions: Transaction[] }>(`/api/transactions?${query}`)).transactions;
+      const result = await fetchHistoryData({ startMonth, endMonth, view: reflectView, snapshot: monthlySnapshot.current });
       if (request === historyRequest.current) {
-        setHistoryTransactions(txns ?? []);
-        setHistorySummary(monthly?.summary ?? null);
+        setHistoryTransactions(result.transactions);
+        setHistorySummary(result.summary);
       }
     } catch (error) {
       if (request === historyRequest.current) setHistoryError(error instanceof Error ? error.message : "Could not load Reflect");
@@ -325,7 +317,7 @@ export default function App() {
     } finally {
       if (request === historyRequest.current) setHistoryLoading(false);
     }
-  }, [homeMonth]);
+  }, [reflectView]);
 
   useEffect(() => {
     if (tab !== "history") return;
@@ -1101,12 +1093,18 @@ export default function App() {
     } finally { transactionSaveBusy.current = false; }
   };
 
+  const retryHistory = () => {
+    const urls = historyReadUrls(historyStartMonth, historyMonth);
+    monthlySnapshot.current = null;
+    restartFinancialReads(url => url === urls.transactions || url === urls.summary);
+    void fetchHistoryTransactions(historyStartMonth, historyMonth).catch(() => {});
+  };
   const retryLoading = () => {
+    if (tab === "history" && !loading) { retryHistory(); return; }
     restartFinancialReads();
     setLoadAttempt(value => value + 1);
-    if (tab === "history") void fetchHistoryTransactions(historyStartMonth, historyMonth).catch(() => {});
   };
-  const recovery = <LoadingRecovery loading={loading || secondaryLoading || monthLoading || billsLoading || (tab === "history" && historyLoading)} onRetry={retryLoading} />;
+  const recovery = <LoadingRecovery key={tab} loading={screenIsLoading({ tab, core: loading, home: secondaryLoading, month: monthLoading, budget: budgetRefreshing, bills: billsLoading, history: historyLoading })} onRetry={retryLoading} />;
 
   // Not yet mounted: server and first client render must match — show a neutral shell
   if (!mounted || loading) return <AppLoadingSkeleton recovery={recovery} />;
@@ -1175,7 +1173,7 @@ export default function App() {
       showAddButton={!showManageScreen}
     >
       {recovery}
-      {refreshState !== "idle" && (
+      {refreshState !== "idle" && (tab !== "history" || refreshState === "stale") && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
           {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>{refreshError ?? "Could not refresh"}</span> <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
         </div>
@@ -1321,7 +1319,7 @@ export default function App() {
           view={reflectView}
           onViewChange={setReflectView}
           error={historyError}
-          onRetry={() => { void fetchHistoryTransactions(historyStartMonth, historyMonth).catch(() => {}); }}
+          onRetry={retryHistory}
           transactionsLoading={historyLoading}
           onAddExpense={() => {
             setEditingTransactionId(null);

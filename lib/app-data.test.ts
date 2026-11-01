@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchApiJson, fetchMonthlyData, loadHomeData, readTimeout, restartFinancialReads } from "./app-data";
+import { fetchApiJson, fetchMonthlyData, fetchHistoryData, historyReadUrls, loadHomeData, readTimeout, restartFinancialReads } from "./app-data";
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 it("coalesces simultaneous reads but fetches a fresh response on the next refresh", async () => {
@@ -132,4 +132,51 @@ describe("slow Notion reads", () => {
     expect(readTimeout("/api/accounts")).toBe(60000);
     expect(readTimeout("/api/categories")).toBe(30000);
   });
+});
+
+
+it("retries Activity without aborting or replacing a pending Home balance read", async () => {
+  const urls: string[] = [];
+  const signals = new Map<string, AbortSignal>();
+  const resolve = new Map<string, (response: Response) => void>();
+  vi.stubGlobal("fetch", vi.fn((url: string, init: RequestInit) => new Promise<Response>((done, reject) => {
+    urls.push(url); signals.set(url, init.signal!); resolve.set(url, done);
+    init.signal!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+  })));
+  const home = fetchApiJson("/api/accounts?screen-scope");
+  const oldHistory = fetchApiJson("/api/transactions?screen-scope").catch(error => error.name);
+  restartFinancialReads(url => url === "/api/transactions?screen-scope");
+  expect(signals.get("/api/accounts?screen-scope")!.aborted).toBe(false);
+  expect(signals.get("/api/transactions?screen-scope")!.aborted).toBe(true);
+  expect(await oldHistory).toBe("AbortError");
+  const history = fetchApiJson("/api/transactions?screen-scope");
+  expect(fetchApiJson("/api/accounts?screen-scope")).toBe(home);
+  expect(urls).toEqual(["/api/accounts?screen-scope", "/api/transactions?screen-scope", "/api/transactions?screen-scope"]);
+  resolve.get("/api/accounts?screen-scope")!(Response.json({ accounts: [] }));
+  resolve.get("/api/transactions?screen-scope")!(Response.json({ transactions: [] }));
+  await Promise.all([home, history]);
+});
+
+
+it("loads Activity directly without waiting for the monthly funds/summary request", async () => {
+  const request = vi.fn().mockResolvedValue(Response.json({ transactions: [{ id: "activity-only" }] }));
+  vi.stubGlobal("fetch", request);
+  const result = await fetchHistoryData({ startMonth: "2026-11", view: "activity" });
+  expect(result).toEqual({ transactions: [{ id: "activity-only" }], summary: null });
+  expect(request).toHaveBeenCalledOnce();
+  expect(request.mock.calls[0][0]).toBe("/api/transactions?start=2026-11-01&end=2026-11-30");
+});
+it("retains the monthly summary when the visible task is the spending comparison", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ transactions: [], summary: { totalSpent: 20 } })));
+  const result = await fetchHistoryData({ startMonth: "2026-10", view: "spending" });
+  expect(result.summary).toEqual({ totalSpent: 20 });
+  expect(vi.mocked(fetch).mock.calls[0][0]).toContain("/api/monthly-summary?");
+});
+it("can reuse an already completed matching Home snapshot for Activity", async () => {
+  vi.stubGlobal("fetch", vi.fn());
+  const snapshot = { month: "2026-11", expires: Date.now() + 10000, data: { transactions: [], funds: [], summary: { totalSpent: 15 } } };
+  const result = await fetchHistoryData({ startMonth: "2026-11", view: "activity", snapshot: snapshot as any });
+  expect(result.summary).toEqual({ totalSpent: 15 });
+  expect(fetch).not.toHaveBeenCalled();
+  expect(historyReadUrls("").transactions).toBe("/api/transactions?all=true");
 });
