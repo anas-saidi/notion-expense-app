@@ -20,6 +20,10 @@ type HomeScreenProps = {
   /** Balance checks waiting for review; they lead the summary sentence. */
   balanceReviews?: { key: string; account: Account; counted: number }[];
   onReviewBalance?: (account: Account) => void;
+  /** A savings account holding less than its categories promise (personal views only). */
+  savingsGap?: { account: Account; gap: number; source?: Account; onFix: () => void };
+  /** Each partner's share still to put into Joined this month (opens the plan, where advances are applied). */
+  contributionLeft?: { partner: "anas" | "salma"; left: number }[];
   categories: Category[];
   monthlyLoading?: boolean;
   monthlyError?: boolean;
@@ -54,6 +58,8 @@ export function HomeScreen({
   balanceChecks,
   balanceReviews = [],
   onReviewBalance,
+  savingsGap,
+  contributionLeft = [],
   categories,
   monthlyLoading = false,
   monthlyError = false,
@@ -163,12 +169,14 @@ export function HomeScreen({
 
   // ponytail: first three facts in priority order; Budget still lists every running-low category.
   const summaryClauses = [
+    savingsGap && <span key="savings-gap"><Fact icon={<CategoryIcon icon={accountIconSource(savingsGap.account.type)} size={20} />}>{savingsGap.account.label}</Fact> is <Fact tone="danger" onClick={savingsGap.onFix} label={savingsGap.source ? `Move money from ${savingsGap.source.label} to ${savingsGap.account.label}` : `Review ${savingsGap.account.label}`}>{fmt(savingsGap.gap)} short</Fact></span>,
     ...balanceReviews.map(({ key, account, counted }) => {
       const off = account.balance == null ? null : Math.abs(counted - account.balance);
       const review = onReviewBalance && (() => onReviewBalance(account));
       const reviewLabel = `Review balance check for ${account.label}`;
       return <span key={key}><Fact icon={<CategoryIcon icon={accountIconSource(account.type)} size={20} />}>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact> your count</>}</span>;
     }),
+    ...contributionLeft.map(({ partner, left }) => <span key={`left-${partner}`}><Fact>{partner === "anas" ? "Anas" : "Salma"}</Fact> has <Fact onClick={onOpenPlan} label={`Open the plan: ${partner === "anas" ? "Anas" : "Salma"} has ${fmt(left)} MAD left to put in`}>{fmt(left)}</Fact> left to put in</span>),
     // Below zero is money already wrong, so it comes before what's about to run out. Opens Rebalance to cover it.
     overspentCategories.length > 0 && (overspentCategories.length === 1
       ? <span key="overspent"><Fact icon={<CategoryIcon icon={overspentCategories[0].icon} categoryName={overspentCategories[0].name} size={20} />}>{overspentCategories[0].name}</Fact> is <Fact tone="danger" onClick={onOpenAssign} label={`Rebalance to cover ${overspentCategories[0].name}`}>{fmt(Math.ceil(-(overspentCategories[0].available ?? 0) - 0.005))} overspent</Fact></span>

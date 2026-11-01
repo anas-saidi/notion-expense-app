@@ -109,6 +109,8 @@
   .desktop-spending-list strong { font-size:13px; line-height:20px; font-weight:600; color:var(--text); }
   .desktop-spending-track { grid-column:1 / -1; }
   .desktop-empty { color:var(--text2); font-size:13px; line-height:20px; padding:16px 0; }
+  /* In the month card the empty line stands in for the main number, so it uses body size rather than a caption. */
+  .desktop-month-budget .desktop-empty { font-size:15px; line-height:22px; padding:8px 0 0; }
 }
 
 @media (min-width:1100px) {
@@ -191,7 +193,8 @@
 }
 
 @media (min-width:900px) {
-  .desktop-planning-action { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; margin-top:16px; padding:0; border:0; background:transparent; color:var(--text); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  /* Pinned to the card's foot (like the balance card's Retry), so it never floats mid-card when the content is short. */
+  .desktop-planning-action { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; margin-top:auto; padding:0; border:0; background:transparent; color:var(--text); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
   .desktop-planning-action:hover { color:var(--strong); }
   .desktop-planning-action:active { opacity:.7; }
   .desktop-planning-action:disabled { opacity:.5; cursor:default; }

@@ -20,7 +20,8 @@ export function DesktopMonthBudget({ summary, month, loading, error, showPlanAct
   const overWidth = comparisonTotal > 0 ? over / comparisonTotal * 100 : 0;
   return <section className="desktop-month-budget" aria-label={`${label} spending`}>
     <CardHeader className="desktop-panel-heading" title={`${label} spending`} action={showPlanAction ? <CardHeaderAction disabled={!!summary.contributionError} title={summary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label="Open monthly planning">Plan</CardHeaderAction> : undefined} />
-    {loading ? <SkeletonRows label="Loading monthly budget" count={3} /> : error ? <p className="desktop-empty">Monthly budget unavailable. Refresh to try again.</p> : <>
+    {/* An unplanned month with no spending has nothing to measure: one quiet line instead of a big 0, "0 assigned" and an empty bar. */}
+    {loading ? <SkeletonRows label="Loading monthly budget" count={3} /> : error ? <p className="desktop-empty">Monthly budget unavailable. Refresh to try again.</p> : assigned <= 0 && spent <= 0 ? <p className="desktop-empty">Nothing planned or spent yet.</p> : <>
       <div className="desktop-budget-spent" data-over={over > 0 || undefined}><strong><Money value={spent} subtleDecimals /></strong></div>
       <div className="desktop-budget-comparison">
         <div className="desktop-budget-comparison-track" role="img" aria-label={`${fmt(spent)} MAD spent against ${fmt(assigned)} MAD assigned${over > 0 ? `; ${fmt(over)} MAD above assigned` : ""}`}>

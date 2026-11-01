@@ -22,7 +22,7 @@ export function useBalanceChecks() {
       if (!response.ok) throw new Error(data.error ?? "Could not load balance checks.");
       if (request === sequence.current) { setChecks(data.checks); setReviewCounts(data.reviewCounts ?? []); setError(null); }
     } catch (error) {
-      if (request === sequence.current) { setError(error instanceof Error ? error.message : "Balance checks unavailable."); setPaused(pausedRef.current); }
+      if (request === sequence.current) { setError(error instanceof DOMException || error instanceof TypeError ? "Balance checks are slow to load right now." : error instanceof Error ? error.message : "Balance checks unavailable."); setPaused(pausedRef.current); }
     } finally { if (request === sequence.current) setLoading(false); }
   }, []);
   useEffect(() => {

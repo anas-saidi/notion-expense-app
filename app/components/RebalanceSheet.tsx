@@ -10,6 +10,7 @@ import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
 import { isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
+import { Fact, Summary } from "./ui/Summary";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Banner } from "./ui/Banner";
 import type { PlanningAllocationItem } from "./app-types";
@@ -26,6 +27,8 @@ type RebalanceSheetProps = {
   // Unassigned money that can be pulled in on top of what's already allocated —
   // only meaningful (and only ever non-zero) for the current month.
   readyToAssignByScope?: Record<BudgetScope, number>;
+  /** The scope is short outside this pool (over-assigned savings, advances owed back): never call that balanced. */
+  shortfall?: { amount: number; onOpen?: () => void };
   jointUnassigned?: number;
 };
 
@@ -110,6 +113,7 @@ export function RebalanceSheet({
   budgetScope,
   readyToAssignByScope,
   jointUnassigned = 0,
+  shortfall,
 }: RebalanceSheetProps) {
   const monthCtx = useMemo(() => getMonthContext(homeMonth), [homeMonth]);
   const isReadOnly = monthCtx !== "current";
@@ -317,6 +321,7 @@ export function RebalanceSheet({
       // The global mode already names the scope, so the header carries no scope pill.
       headerControls={false}
       balancedLabel="Balanced"
+      balancedNote={shortfall && shortfall.amount >= 0.5 ? <Summary className="rebalance-short">Still <Fact tone="danger" onClick={shortfall.onOpen} label={`${fmt(Math.ceil(shortfall.amount - 0.005))} MAD short outside this pool. Open what fixes it.`}>{fmt(Math.ceil(shortfall.amount - 0.005))} short</Fact></Summary> : undefined}
       saveButtonLabel="Apply"
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}

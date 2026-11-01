@@ -14,7 +14,7 @@
 
 /* Table: category, last plan, spent, new plan, freeze. Columns sit on the 4-point grid. */
 /* Numbers sit beside the plan box they inform; the name column takes what's left. */
-.plan-table-head, .plan-table-row { margin-inline:-12px; padding-inline:12px; display:grid; grid-template-columns:minmax(160px,1fr) 96px 96px 144px 44px; gap:12px; align-items:center; }
+.plan-table-head, .plan-table-row { margin-inline:-12px; padding-inline:12px; display:grid; grid-template-columns:minmax(160px,1fr) 96px 96px 112px 44px; gap:12px; align-items:center; }
 /* The first group's name shares this row, so it scrolls away with that group rather than sticking. */
 .plan-table-head { min-height:44px; background:var(--surface); color:var(--muted); font-size:12px; line-height:16px; font-weight:600; }
 .plan-table-head > :not(:first-child), .plan-table-row > span { text-align:right; }
@@ -39,10 +39,11 @@
 /* Plan cells are inline-editable numbers, like a spreadsheet: at rest they read as the third number column
    (same size, right-aligned, tabular); hover hints they're editable; focus shows a clear field. The cell's
    -8px margin lines the digits up with Spent and Last plan despite the field's inner padding. */
-.plan-amount { width:100%; min-height:36px !important; height:36px; padding:0 8px !important; border:1px solid transparent !important; border-radius:var(--radius-control) !important; background:transparent !important; color:var(--text); font-size:14px !important; font-weight:400; text-align:right; font-variant-numeric:tabular-nums; transition:border-color 120ms ease, background-color 120ms ease; }
+.plan-amount { width:100%; min-height:32px !important; height:32px; padding:0 8px !important; border:1px solid transparent !important; border-radius:var(--radius-control) !important; background:transparent !important; color:var(--text); font-size:14px !important; font-weight:400; text-align:right; font-variant-numeric:tabular-nums; transition:border-color 120ms ease, background-color 120ms ease; }
 .plan-amount::placeholder { color:var(--muted); opacity:.6; }
+.plan-amount:focus::placeholder { color:transparent; }
 @media (hover:hover) { .plan-table-row:hover .plan-amount:not(:focus) { background:var(--surface2) !important; } }
-.plan-amount:focus { background:var(--surface) !important; border-color:var(--select-ink) !important; outline:none; }
+.plan-amount:focus { background:var(--surface) !important; border-color:color-mix(in srgb, var(--select-ink) 45%, var(--border)) !important; box-shadow:0 0 0 3px color-mix(in srgb, var(--select-ink) 10%, transparent); outline:none; }
 .plan-amount[data-changed] { background:var(--select-wash) !important; font-weight:600; }
 .plan-amount[aria-invalid="true"] { outline:2px solid var(--danger); }
 .plan-freeze { width:44px; height:44px; display:grid; place-items:center; border:0; border-radius:var(--radius-control); background:transparent; color:var(--text2); cursor:pointer; }
@@ -56,8 +57,9 @@
 
 /* Summary: flat like the rest of the sheet ("Glass, not cards"), set apart by a faint divider; it stays put while the table scrolls. */
 .plan-summary { display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:12px 0 0 var(--dialog-inset); border-left:1px solid color-mix(in srgb, var(--border) 45%, transparent); }
-.plan-summary-content { min-height:0; overflow:auto; display:grid; align-content:start; gap:16px; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
-.plan-summary-balance { display:grid; gap:4px; color:var(--text2); font-size:13px; line-height:16px; }
+/* Sections flow top-down with even 32px spacing (no forced gap); never scrolls sideways. */
+.plan-summary-content { min-height:0; flex:1; overflow-x:hidden; overflow-y:auto; display:flex; flex-direction:column; gap:32px; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
+.plan-summary-balance { display:grid; gap:4px; color:var(--text); font-size:15px; line-height:22px; font-weight:600; }
 .plan-summary-balance strong { color:var(--text); font-size:32px; line-height:1.1; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
 .plan-summary-balance strong .money-currency { font-size:12px; }
 .plan-summary-balance .plan-negative { color:var(--danger); --money-decimal-color:var(--danger); }
@@ -88,10 +90,30 @@
 /* Keep the workspace usable before the viewport is wide enough for generous columns. */
 @media (min-width:1000px) and (max-width:1199px) {
   .plan-desktop-body { grid-template-columns:minmax(0,1fr) 300px; gap:16px; }
-  .plan-table-head, .plan-table-row { grid-template-columns:minmax(120px,1fr) 80px 80px 112px 44px; gap:8px; }
+  .plan-table-head, .plan-table-row { grid-template-columns:minmax(120px,1fr) 80px 80px 96px 44px; gap:8px; }
 }
 .planner-wrap .plan-shortfall { text-align:center; }
 
 /* Settle: one line per person, the transfer and a quiet Mark sent. */
 .plan-settle { display:grid; gap:8px; }
 .plan-settle-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+
+/* From last month: same hierarchy as the money above it. The label matches "Over capacity" (13px, secondary),
+   rows match the summary lines (13/20, secondary name, semibold value), and nothing is wider than the panel. */
+.plan-insights { display:grid; gap:12px; }
+.plan-insights-label { margin:0; color:var(--text); font-size:15px; line-height:22px; font-weight:600; }
+.plan-gaps { display:grid; gap:4px; margin:0; padding:0; list-style:none; }
+.plan-gap { display:flex; align-items:center; gap:12px; width:100%; min-height:44px; padding:0; border:0; background:transparent; color:var(--text2); font:inherit; font-size:13px; line-height:20px; text-align:left; cursor:pointer; }
+.plan-gap-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.plan-gap-amount { color:var(--danger); font-weight:600; font-variant-numeric:tabular-nums; }
+.plan-gap-value { color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
+.plan-gap:disabled { cursor:default; }
+@media (hover:hover) { .plan-gap:hover .plan-gap-name { color:var(--text); text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--text) 25%, transparent); text-underline-offset:4px; } }
+.plan-gap:active { opacity:.6; }
+.plan-gap:focus-visible { outline:2px solid var(--select-ink); outline-offset:2px; border-radius:var(--radius-control); }
+.plan-compare { display:grid; gap:8px; }
+.plan-compare-track { height:8px; overflow:hidden; border-radius:4px; background:var(--track); }
+.plan-compare-track > span { display:block; height:100%; border-radius:4px; background:var(--text2); transition:width 200ms ease; }
+@media (prefers-reduced-motion:reduce) { .plan-compare-track > span { transition:none; } }
+.plan-compare-labels { display:flex; justify-content:space-between; gap:12px; color:var(--text2); font-size:13px; line-height:20px; font-variant-numeric:tabular-nums; }
+.plan-compare-labels strong { color:var(--text); font-weight:600; }

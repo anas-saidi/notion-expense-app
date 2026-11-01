@@ -32,6 +32,10 @@ export type ContributionLedger = {
   unappliedRepayments: PartnerAmounts;
 };
 export const REPAYMENT_PROPERTY = "Contribution repayment";
+/** The contribution half of an applied advance carries "offset:<request id>": it counts as that month's contribution,
+ *  while the repayment half (the plain request id) repays the advance. Together they move no cash. */
+export const OFFSET_PREFIX = "offset:";
+const isRepaymentLeg = (id: string | undefined) => Boolean(id) && !id!.startsWith(OFFSET_PREFIX);
 export const cents = (amount: number) => Math.round((amount + Number.EPSILON) * 100);
 export const money = (amount: number) => cents(amount) / 100;
 export const emptyAmounts = (): PartnerAmounts => ({ anas: 0, salma: 0 });
@@ -53,7 +57,7 @@ export function contributionLedger(accounts: Account[], categories: Category[], 
     const range = monthBounds(`${agreement.month}-01`);
     const credited = emptyAmounts();
     for (const t of entries) {
-      if (t.date.slice(0, 7) !== agreement.month || t.contributionRepaymentId || t.savingsFundingTarget === "separate") continue;
+      if (t.date.slice(0, 7) !== agreement.month || isRepaymentLeg(t.contributionRepaymentId) || t.savingsFundingTarget === "separate") continue;
       if (t.type === "Transfer") {
         if (scope(t.toAccountId) === "joint") {
           const owner = scope(t.fromAccountId);
@@ -76,7 +80,7 @@ export function contributionLedger(accounts: Account[], categories: Category[], 
   }
   // Explicit repayment transfers pay the oldest agreement first. Never consume
   // an advance from a later month; edits that exceed the debt remain visible.
-  for (const t of [...entries].filter(t => t.contributionRepaymentId).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))) {
+  for (const t of [...entries].filter(t => isRepaymentLeg(t.contributionRepaymentId)).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))) {
     const owner = scope(t.toAccountId);
     if (t.type !== "Transfer" || scope(t.fromAccountId) !== "joint" || (owner !== "anas" && owner !== "salma")) continue;
     let remaining = cents(t.amount);

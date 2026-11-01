@@ -799,6 +799,35 @@ export default function App() {
   // Rebalance only moves money between categories, so it can't fix every "Short by". Joint short because of
   // advances owed back is covered by contributions (the plan); a partner short because a savings account holds
   // more assigned than it has is fixed on that account (balance check or undoing a deposit).
+  // What each partner still has to put into Joined this month: their agreed share minus what's already counted
+  // (transfers to Joined, Joint bills paid from their own account, applied advances). Only once the month is agreed.
+  const contributionLeft = (() => {
+    const month = currentAdvances?.months.find(m => m.month === calendarMonth);
+    if (!month) return [];
+    const partners = budgetScope === "joint" ? (["anas", "salma"] as const) : [budgetScope] as const;
+    return partners.flatMap(partner => {
+      const left = Math.round(month.agreement.targets[partner] - month.contributed[partner]);
+      return left >= 1 ? [{ partner, left }] : [];
+    });
+  })();
+
+  // Savings holding less than its categories promise is its own problem, even when the owner isn't short overall
+  // (their checking covers it on paper). The fix is a real transfer, so the app names it and pre-fills it.
+  const savingsGap = (() => {
+    if (budgetScope === "joint") return null;
+    const saving = accounts.find(a => /saving/i.test(a.label) && scopeFromAccountLabel(a.label) === budgetScope && (a.readyToAssign ?? 0) < -0.5);
+    if (!saving) return null;
+    const gap = Math.ceil(-(saving.readyToAssign ?? 0) - 0.005);
+    const source = accounts
+      .filter(a => !/saving/i.test(a.label) && scopeFromAccountLabel(a.label) === budgetScope && (a.readyToAssign ?? 0) > 0.5)
+      .sort((a, b) => (b.readyToAssign ?? 0) - (a.readyToAssign ?? 0))[0];
+    const move = source ? Math.min(gap, Math.floor(source.readyToAssign ?? 0)) : 0;
+    const onFix = source && move > 0
+      ? () => { setTransferPreset({ toAccountId: saving.id, amount: move, note: "Move to savings" }); setTransferAccount(source); }
+      : () => setDetailsAccount(saving);
+    return { account: saving, gap, source: move > 0 ? source : undefined, onFix };
+  })();
+
   const shortfallAction = (() => {
     if (budgetScope === "joint") return advanceReserve > 0.005 ? { label: "Plan", onClick: () => openMonthlyPlan() } : undefined;
     const overAssignedSavings = accounts
@@ -1168,6 +1197,7 @@ export default function App() {
         onClose={() => setShowMonthStartPlanner(false)}
         // Over-assignment is money already committed, not this plan: it's fixed on the account that holds
         // more assigned than it has (a balance check, or undoing a savings deposit), so open that account.
+        onOpenContributions={() => { setShowMonthStartPlanner(false); setShowContributions(true); }}
         onOpenOverAssigned={partner => {
           const account = accounts
             .filter(a => scopeFromAccountLabel(a.label) === partner && (a.readyToAssign ?? 0) < 0)
@@ -1196,6 +1226,8 @@ export default function App() {
       {tab === "home" && (
         <HomeScreen
           contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : <ContributionEntry status={contribStatus} scope={budgetScope} onOpen={() => setShowContributions(true)} />)}
+          savingsGap={savingsGap ?? undefined}
+          contributionLeft={contributionLeft}
           balanceReviews={balanceChecksToReview(balanceChecks.checks, balanceChecks.reviewCounts, accounts, budgetScope)}
           onReviewBalance={account => { setStartBalanceCheck(true); setDetailsAccount(account); }}
           balanceChecks={<PendingBalanceChecks reviewCounts={balanceChecks.reviewCounts} onRetry={() => void balanceChecks.refresh()} checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} paused={balanceChecks.paused} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} />}
@@ -1254,6 +1286,7 @@ export default function App() {
           onOpenCategoryDetails={openCategoryDetails}
           onOpenRebalance={() => setShowRebalance(true)}
           shortfallAction={shortfallAction}
+          savingsGap={savingsGap ?? undefined}
           onReviveCategory={reviveCategory}
           onMoveContribution={() => {
             const sourceNeedle = budgetScope === "anas" ? "hubb" : "wife";
@@ -1525,7 +1558,7 @@ export default function App() {
 
       <BalanceCheckAccounts open={showBalanceAccounts} accounts={accounts} onClose={() => setShowBalanceAccounts(false)} onSelect={account => { setShowBalanceAccounts(false); setStartBalanceCheck(true); setDetailsAccount(account); }} />
 
-      <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} cash={accounts.find(a => !/saving/i.test(a.label) && /joined|joint/i.test(a.label))?.balance ?? null} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
+      <ContributionDetails onOpenPlan={() => { setShowContributions(false); openMonthlyPlan(); }} planMonthLabel={monthStartPlannerMonth ? new Date(`${monthStartPlannerMonth}-01T12:00:00`).toLocaleDateString("en", { month: "long" }) : undefined} open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} cash={accounts.find(a => !/saving/i.test(a.label) && /joined|joint/i.test(a.label))?.balance ?? null} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
 
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
         contributions={!monthLoading && !monthError && !monthlySummary.contributionError && detailsAccount && !/saving/i.test(detailsAccount.label) && <ContributionEntry status={contribStatus} scope={scopeFromAccountLabel(detailsAccount.label) ?? budgetScope} onOpen={() => { setDetailsAccount(null); setShowContributions(true); }} />}
@@ -1569,6 +1602,7 @@ export default function App() {
 
       <DeferredMount active={showRebalance}>      <RebalanceSheet
         open={showRebalance}
+        shortfall={assignBalanceByScope[budgetScope] < -0.5 ? { amount: -assignBalanceByScope[budgetScope], onOpen: shortfallAction ? () => { setShowRebalance(false); shortfallAction.onClick(); } : undefined } : undefined}
         onClose={() => {
           setShowRebalance(false);
           rebalanceReturnToAdd.current = false;

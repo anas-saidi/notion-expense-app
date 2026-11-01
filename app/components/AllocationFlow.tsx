@@ -44,6 +44,8 @@ type AllocationFlowProps = {
   flowPreview?: ReactNode;
   title?: string;
   balancedLabel?: string;
+  /** Replaces the balanced mark when the pool balances but the scope is still short outside it (savings, advances). */
+  balancedNote?: ReactNode;
   heroPool?: boolean;
   metaLabel?: string;
   rebalanceMode?: boolean;
@@ -77,6 +79,7 @@ export function AllocationFlow({
   flowPreview,
   title = "Set Monthly Budget",
   balancedLabel = "Fully assigned",
+  balancedNote,
   heroPool = false,
   metaLabel = "Last month",
   rebalanceMode = false,
@@ -227,7 +230,7 @@ export function AllocationFlow({
                 <Money value={availablePool} currency animated />
               </span>
               <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
-                {isBalanced ? (
+                {isBalanced && balancedNote ? balancedNote : isBalanced ? (
                   <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
                     ✓ {balancedLabel}
                   </span>
@@ -256,7 +259,7 @@ export function AllocationFlow({
                     <Money value={availablePool} currency />
                   </span>
                 </div>
-                {isBalanced ? (
+                {isBalanced && balancedNote ? balancedNote : isBalanced ? (
                   <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
                     ✓ {balancedLabel}
                   </span>

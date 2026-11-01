@@ -18,6 +18,10 @@ A text-only receipt for the month that just closed, which both partners sign.
 
 Dragging Home's hero down reveals a calm daily brief (spending pace, next bill, what Joint owes), with the jars leaning in as if saying it. Insights only: anything actionable stays visible in the summary sentence. Needs a discovery hint, a non-gesture alternative for VoiceOver and keyboard, a Reduce Motion fallback, and a decision on whether the gesture replaces pull-to-refresh. Mascots inline in the sentence were deferred to this.
 
+## Faster loads
+
+Every screen reads live from Notion (no Postgres mirror since the Notion-only move), and the heaviest reads are slow on a busy Notion day: accounts (formula recalculation, ~36 s), the all-time ledger behind joint advances (over 2 min), and balance checks (over 2 min). A short server cache for those three, cleared on every write, would make reloads near-instant locally; on Vercel each instance has its own memory, so the live app would need a stored copy of the data instead.
+
 ## Smaller follow-ups
 
 - Plan sheet "spent so far" hint on the phone layout (desktop only today).

@@ -67,6 +67,19 @@ describe("confirmed monthly contributions and advances", () => {
     expect(ledger.months[1].contributed.anas).toBe(650);
     expect(contributionLedger(accounts, categories, entries, [agreement], "2026-11").outstanding.anas).toBe(820.75);
   });
+  it("applies an advance to the next month's contribution without moving cash", () => {
+    const november = { ...agreement, month: "2026-11", targets: { anas: 650, salma: 350 }, original: { anas: 650, salma: 350 } };
+    // Salma's 314,25 advance applied: her contribution half (offset marker) and Joined's repayment half, same day.
+    const applied = [
+      { ...transfer("offset-in", 314.25, "s", "j", "2026-11-01"), contributionRepaymentId: "offset:request" },
+      { ...transfer("offset-out", 314.25, "j", "s", "2026-11-01"), contributionRepaymentId: "request" },
+    ];
+    const ledger = contributionLedger(accounts, categories, [...entries, ...applied], [agreement, november], "2026-11");
+    expect(ledger.outstanding.salma).toBe(0);
+    expect(ledger.months[1].contributed.salma).toBe(314.25);
+    expect(ledger.months[1].outstanding.salma).toBe(0);
+    expect(ledger.outstanding.anas).toBe(820.75);
+  });
   it("preserves original amounts after an explicit agreement revision", () => {
     const revised = { ...agreement, targets: { ...agreement.targets, anas: 12000 } };
     const month = contributionLedger(accounts, categories, entries, [revised], "2026-10").months[0];

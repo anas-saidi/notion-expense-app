@@ -45,6 +45,8 @@ type Props = {
   onOpenRebalance: () => void;
   /** What actually fixes "Short by" when Rebalance can't (advances owed back, over-assigned savings). */
   shortfallAction?: { label: string; onClick: () => void };
+  /** A savings account holding less than its categories promise; the fix moves money in from the owner's checking. */
+  savingsGap?: { account: Account; gap: number; source?: Account; onFix: () => void };
   onReviveCategory: (cat: Category) => void;
   onMoveContribution: () => void;
   onOpenNewCategory?: (defaultType: string) => void;
@@ -81,6 +83,7 @@ export function CategoriesScreen({
   onOpenCategoryDetails,
   onOpenRebalance,
   shortfallAction,
+  savingsGap,
   onReviveCategory,
   onMoveContribution,
   onOpenNewCategory,
@@ -280,7 +283,15 @@ export function CategoriesScreen({
             {/* One banner at a time, the most urgent first: accounts falling short, categories
                 running low, unassigned money, then what's still due to Joint. Nothing to act on, no banner. */}
             <div className="budget-overview-notices">
-            {loading ? null : shortBy > 0 ? (
+            {loading ? null : savingsGap ? (
+              <Banner
+                desktopInline
+                tone="warning"
+                icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
+                title={`Savings ${fmt(savingsGap.gap)} short`}
+                action={<button type="button" onClick={savingsGap.onFix} style={bannerActionStyle}>{savingsGap.source ? `Move from ${savingsGap.source.label}` : "Review"}</button>}
+              />
+            ) : shortBy > 0 ? (
               <Banner
                 desktopInline
                 tone="danger"

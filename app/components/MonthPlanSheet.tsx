@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { fetchApiJson, fetchMonthlyData } from "../../lib/app-data";
 import { useReducedMotion } from "motion/react";
 import type { Account, BudgetScope, Category } from "./app-types";
-import { BUDGET_SCOPE_LABELS, categoryMatchesScope, getCategoryScope, fmt, monthBounds, parseAmount, scopeFromAccountLabel, today } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, categoryMatchesScope, getCategoryScope, fmt, monthBounds, parseAmount, today } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { calculateMonthPlanCapacity, getPlanningSplit, planCost, type PlanAmounts } from "./month-plan-capacity";
 import { JointFamily } from "./WalletCardSwitcher";
@@ -90,6 +90,8 @@ type MonthPlanSheetProps = {
   onScopeChange: (scope: BudgetScope) => void;
   /** Opens the partner's over-assigned account, where the commitment behind a blocker can actually be fixed. */
   onOpenOverAssigned?: (partner: "anas" | "salma") => void;
+  /** Opens Contributions, where each person's advance and its repayment live. */
+  onOpenContributions?: () => void;
   personalScope: Exclude<BudgetScope, "joint">;
   categories: Category[];
   frozenCategories: Category[];
@@ -112,6 +114,7 @@ export function MonthPlanSheet({
   scope,
   onScopeChange,
   onOpenOverAssigned,
+  onOpenContributions,
   personalScope,
   categories,
   frozenCategories,
@@ -302,44 +305,36 @@ export function MonthPlanSheet({
 
   const capacityLabel = left < 0 ? "Over capacity" : "Unassigned";
 
-  // Settle: once Joint's plan is saved, each partner's share and what Joint owes them net into one bank transfer.
-  // "Mark sent" records both sides (their full contribution and the advance repayment), so nothing is entered twice.
-  const [settling, setSettling] = useState<"anas" | "salma" | null>(null);
-  const [settleError, setSettleError] = useState("");
-  const settleIds = useRef<Record<string, string>>({});
-  const accountFor = (partner: "anas" | "salma") => accounts.find((a) => !/saving/i.test(a.label) && scopeFromAccountLabel(a.label) === partner);
-  const jointAccount = accounts.find((a) => !/saving/i.test(a.label) && /joined|joint/i.test(a.label));
-  const settleRows = scope !== "joint" || savedTotal <= 0 || changed.length > 0 || !jointAccount ? [] : (["anas", "salma"] as const).flatMap((partner) => {
-    const share = Math.round(capacity.due[partner] * 100) / 100;
+  // After Joint's plan is saved, each partner sees what's left of their share, kept current by every transfer to
+  // Joined and every Joint bill they pay from their own account (both already count as contributions). An advance
+  // Joined owes them is applied with one tap: it counts toward this month's share and clears the debt, moving no cash.
+  const [applying, setApplying] = useState<"anas" | "salma" | null>(null);
+  const [applyError, setApplyError] = useState("");
+  const applyIds = useRef<Record<string, string>>({});
+  const monthLedger = advances?.months.find((m) => m.month === planningMonth);
+  const contributionRows = scope !== "joint" || !agreement || changed.length > 0 ? [] : (["anas", "salma"] as const).flatMap((partner) => {
+    const left = Math.max(0, Math.round((agreement.targets[partner] - (monthLedger?.contributed[partner] ?? 0)) * 100) / 100);
     const owed = Math.round((advances?.outstanding[partner] ?? 0) * 100) / 100;
-    return (share > 0.005 || owed > 0.005) && accountFor(partner) ? [{ partner, share, owed, net: Math.round((share - owed) * 100) / 100 }] : [];
+    return left >= 0.5 ? [{ partner, left, apply: Math.min(owed, left) }] : [];
   });
-  const markSent = async ({ partner, share, owed }: (typeof settleRows)[number]) => {
-    if (settling) return;
-    setSettling(partner); setSettleError("");
-    const date = today();
+  const applyAdvance = async ({ partner, apply }: (typeof contributionRows)[number]) => {
+    if (applying) return;
+    setApplying(partner); setApplyError("");
     try {
-      // The repayment is idempotent by request id, so it goes first: a retry after a failed transfer can't repeat it.
-      if (owed > 0.005) {
-        settleIds.current[partner] ??= crypto.randomUUID();
-        const response = await fetch("/api/contribution-repayments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner, amount: owed, date, requestId: settleIds.current[partner] }) });
-        if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't record the repayment.");
-      }
-      if (share > 0.005) {
-        const response = await fetch("/api/account-transfer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fromAccountId: accountFor(partner)!.id, toAccountId: jointAccount!.id, amount: share, date, note: `Joint contribution for ${planningMonth}` }) });
-        if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't record the contribution. Check Joined activity before retrying.");
-      }
-      delete settleIds.current[partner];
+      applyIds.current[partner] ??= crypto.randomUUID();
+      const response = await fetch("/api/contribution-offsets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner, amount: apply, date: today(), requestId: applyIds.current[partner] }) });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't apply the advance.");
+      delete applyIds.current[partner];
       onSaved();
-    } catch (error) { setSettleError(error instanceof Error ? error.message : "Couldn't record this. Check Joined activity before retrying."); }
-    finally { setSettling(null); }
+    } catch (error) { setApplyError(error instanceof Error ? error.message : "Couldn't apply the advance. Retry to finish it safely."); }
+    finally { setApplying(null); }
   };
-  const settleList = settleRows.length > 0 && <div className="plan-settle">
-    {settleRows.map((row) => <div key={row.partner} className="plan-settle-row">
-      <Summary className="plan-shortfall">{row.net >= 0 ? <><Fact>{name(row.partner)}</Fact> sends <Fact>{fmt(Math.round(row.net))}</Fact></> : <>Joint sends <Fact>{name(row.partner)}</Fact> <Fact>{fmt(Math.round(-row.net))}</Fact></>}</Summary>
-      <button type="button" className="plan-copy" disabled={!!settling} onClick={() => void markSent(row)} aria-label={`Mark ${name(row.partner)}'s transfer sent`}>{settling === row.partner ? "Saving…" : "Mark sent"}</button>
+  const settleList = contributionRows.length > 0 && <div className="plan-settle">
+    {contributionRows.map((row) => <div key={row.partner} className="plan-settle-row">
+      <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact>{fmt(Math.round(row.left))}</Fact> left to put in</Summary>
+      {row.apply >= 0.5 && <button type="button" className="plan-copy" disabled={!!applying} onClick={() => void applyAdvance(row)} aria-label={`Apply ${fmt(row.apply)} MAD of ${name(row.partner)}'s advance to ${planLabel}`}>{applying === row.partner ? "Applying…" : `Apply ${fmt(Math.round(row.apply))}`}</button>}
     </div>)}
-    {settleError && <Banner role="alert" tone="danger" compact>{settleError}</Banner>}
+    {applyError && <Banner role="alert" tone="danger" compact>{applyError}</Banner>}
   </div>;
   const personalRemaining = {
     anas: Math.max(0, planningCapacity.anas - costs.anas),
@@ -488,11 +483,53 @@ export function MonthPlanSheet({
   const contributionReservation = advanceReserve > 0 ? <section className="contribution-agreement" aria-label="Advances reserved before new allocations">
     <dl className="contribution-rows">{advanceMonths.map(m => <div key={m.month}><dt>Repay {contributionMonthName(m.month)} advances</dt><dd><Money value={Math.round(m.outstanding.anas + m.outstanding.salma)} /></dd></div>)}{advanceMonths.length !== 1 && <div className="contribution-emphasis"><dt>Reserved for repayments</dt><dd><Money value={Math.round(advanceReserve)} /></dd></div>}</dl>
   </section> : null;
+  // Desktop: the advance is a row you can act on (opens Contributions, who's owed what and the repayments).
+  const advanceRows = advanceReserve > 0 && <div className="plan-gaps">{advanceMonths.map(m => <button key={m.month} type="button" className="plan-gap" disabled={!onOpenContributions} onClick={onOpenContributions} aria-label={`${monthName(m.month)} advances owed back, ${fmt(Math.round(m.outstanding.anas + m.outstanding.salma))} MAD. Open contributions.`}>
+    <span className="plan-gap-name">{monthName(m.month)} advances</span><span className="plan-gap-value">{fmt(Math.round(m.outstanding.anas + m.outstanding.salma))}</span>
+  </button>)}</div>;
   const contributionAgreement = <ContributionAgreementEditor month={planningMonth} agreement={agreement} proposed={{ anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }} shares={split} disabled={loading || saving || changed.length > 0 || !!loadError || !!capacityError || !contributionsReady || totals.joint <= 0} onSaved={() => { void loadPlan(); onSaved(); }} />;
+  // "From <last month>": only what the table can't say on its own (totals, gaps, a ranking). Spent and Last plan per
+  // row are already in the table. Facts are tappable without looking like buttons: the category count filters the
+  // table to the rows over plan, and a ranked gap jumps to its row's plan cell.
+  const [onlyOver, setOnlyOver] = useState(false);
+  const lastLabel = monthName(currentMonth);
+  const gaps = scopeCategories.filter((c) => !isSavingsCategory(c))
+    .map((cat) => ({ cat, gap: (currentSpent.get(normId(cat.id)) ?? 0) - (currentPlanned.get(normId(cat.id)) ?? 0) }))
+    .filter((g) => g.gap >= 0.5).sort((a, b) => b.gap - a.gap);
+  const overIds = new Set(gaps.map((g) => normId(g.cat.id)));
+  const overTotal = gaps.reduce((sum, g) => sum + g.gap, 0);
+  const lastSpentTotal = scopeCategories.filter((c) => !isSavingsCategory(c)).reduce((sum, c) => sum + Math.max(0, currentSpent.get(normId(c.id)) ?? 0), 0);
+  const planTotal = scopeCategories.filter((c) => !isSavingsCategory(c)).reduce((sum, c) => sum + amountFor(c), 0);
+  const focusRow = (id: string) => {
+    if (onlyOver && !overIds.has(id)) setOnlyOver(false);
+    requestAnimationFrame(() => {
+      const row = document.querySelector<HTMLElement>(`[data-plan-row="${id}"]`);
+      row?.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+      row?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+    });
+  };
+  const insights = lastSpentTotal > 0 && <section className="plan-insights" aria-label={`From ${lastLabel}`}>
+    <h3 className="plan-insights-label">From {lastLabel}</h3>
+    <Summary className="plan-shortfall">{gaps.length > 0
+      ? <><Fact tone="danger">{fmt(Math.round(overTotal))} over</Fact> plan across <Fact onClick={() => setOnlyOver((value) => !value)} label={onlyOver ? "Show all categories" : `Show only the ${gaps.length} categories over plan`}>{gaps.length} {gaps.length === 1 ? "category" : "categories"}</Fact>.</>
+      : <>Stayed <Fact tone="success">within plan</Fact>.</>}</Summary>
+    {gaps.length > 0 && <ol className="plan-gaps">{gaps.slice(0, 3).map(({ cat, gap }) => <li key={cat.id}>
+      <button type="button" className="plan-gap" onClick={() => focusRow(normId(cat.id))} aria-label={`${cat.name}, ${fmt(Math.round(gap))} MAD over plan in ${lastLabel}. Go to its plan.`}>
+        <CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} /><span className="plan-gap-name">{cat.name}</span><span className="plan-gap-amount">+{fmt(Math.round(gap))}</span>
+      </button>
+    </li>)}</ol>}
+  </section>;
+  // This plan against last month's spending: only once the plan has amounts, at the foot of the summary.
+  const planCompare = planTotal > 0 && lastSpentTotal > 0 && (
+    <div className="plan-compare" role="img" aria-label={`${planLabel} plan ${fmt(Math.round(planTotal))} MAD against ${fmt(Math.round(lastSpentTotal))} MAD spent in ${lastLabel}`}>
+      <div className="plan-compare-track" aria-hidden="true"><span style={{ width: `${Math.min(100, planTotal / lastSpentTotal * 100)}%` }} /></div>
+      <div className="plan-compare-labels" aria-hidden="true"><span>This plan <strong>{fmt(Math.round(planTotal))}</strong></span><span>{lastLabel} spent <strong>{fmt(Math.round(lastSpentTotal))}</strong></span></div>
+    </div>
+  );
   const desktopGroups = [
     ...(savingsCategories.length ? [{ key: "savings", label: "Savings", items: savingsCategories }] : []),
     ...budgetGroups,
-  ];
+  ].map((group) => onlyOver ? { ...group, items: group.items.filter((cat) => overIds.has(normId(cat.id))) } : group).filter((group) => group.items.length > 0);
   if (desktop) return (
     <BottomSheet open={open} onClose={onClose} label={`Plan ${planLabel}`} desktopViewportCentered size="planning" desktopHeight="fill" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
       <div className="plan-desktop">
@@ -513,7 +550,7 @@ export function MonthPlanSheet({
                 {desktopGroups.map((group, index) => <div key={group.key} role="rowgroup">{index > 0 && <div className="plan-group">{group.label}</div>}{group.items.map(cat => {
                   const id = normId(cat.id);
                   const changedRow = amountFor(cat) !== (saved.get(id) ?? 0);
-                  return <div className="plan-table-row" role="row" key={id}>
+                  return <div className="plan-table-row" role="row" key={id} data-plan-row={id}>
                     <div className="plan-category" role="cell"><CategoryIcon icon={cat.icon} categoryName={cat.name} size={32} /><span className="plan-category-name"><span>{cat.name}</span>{(spentSoFar.get(id) ?? 0) >= 0.5 && <small>{fmt(Math.round(spentSoFar.get(id)!))} spent so far</small>}</span></div>
                     {/* Spent, then the plan it's measured against, then the new plan: copy moves the middle column one step right. */}
                     <span role="cell" data-over={Math.round(currentSpent.get(id) ?? 0) > Math.round(currentPlanned.get(id) ?? 0) || undefined}>{fmt(Math.round(currentSpent.get(id) ?? 0))}</span><span role="cell">{fmt(Math.round(currentPlanned.get(id) ?? 0))}</span>
@@ -530,12 +567,15 @@ export function MonthPlanSheet({
             <div className="plan-summary-content">
             <div className="plan-summary-balance"><span>{capacityLabel}</span><strong className={left < 0 ? "plan-negative" : ""}>{shownLeft < 0 && "−"}<Money value={Math.abs(shownLeft)} currency /></strong></div>
             {shortfallSummary}
-            {(["joint", "anas", "salma"] as const).some(s => totals[s] > 0) && <dl className="plan-summary-lines">{(["joint", "anas", "salma"] as const).filter(s => totals[s] > 0).map(s => <div key={s} className="plan-summary-line"><dt>{BUDGET_SCOPE_LABELS[s]} planned</dt><dd>{fmt(Math.round(totals[s]))}</dd></div>)}</dl>}
-            {confirmingAgreement && <p className="contribution-note">Saving the first shared plan confirms these monthly contributions.</p>}
-            {contributionReservation}
+            {/* The scope you're viewing already shows its total in the bar at the foot, so only the other scopes get a row. */}
+            {(["joint", "anas", "salma"] as const).some(s => s !== scope && totals[s] > 0) && <dl className="plan-summary-lines">{(["joint", "anas", "salma"] as const).filter(s => s !== scope && totals[s] > 0).map(s => <div key={s} className="plan-summary-line"><dt>{BUDGET_SCOPE_LABELS[s]} planned</dt><dd>{fmt(Math.round(totals[s]))}</dd></div>)}</dl>}
+            {confirmingAgreement && <p className="contribution-note">Saving confirms {planLabel}'s contributions.</p>}
+            {advanceRows}
+            {insights}
             {(agreement || totals.joint > 0) && contributionAgreement}
             </div>
             <div className="plan-summary-actions">
+              {planCompare}
               {(saveError || invalidExpressions) && <Banner role="alert" tone="danger" compact>{saveError || "Complete the amount before reviewing."}</Banner>}
               {settleList}
               {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions || !contributionsReady} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : savedTotal > 0 && !settleList && <span role="status">Plan saved</span>}

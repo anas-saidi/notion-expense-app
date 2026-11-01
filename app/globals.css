@@ -1811,3 +1811,11 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 .summary-fact[data-tone="success"] { color:var(--success); }
 .summary-fact-icon { display:inline-flex; vertical-align:-.18em; margin-right:.2em; }
 .summary-fact-icon > * { width:1.1em !important; height:1.1em !important; }
+
+.bottom-sheet-panel:focus { outline:none; }
+
+/* Bar tracks (month budget, top spending, plan comparison) were referencing an undefined token; it follows surface2 in both themes. */
+:root { --track: var(--surface2); }
+
+/* Rebalance's "Still 384 short" sits where the Balanced mark would, at a small size. */
+.rebalance-short { --summary-size:15px; text-align:center; }

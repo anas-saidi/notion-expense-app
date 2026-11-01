@@ -149,7 +149,11 @@ export function BottomSheet({
     openPanels.push(panel);
     const selector = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
     const focusable = () => Array.from(panel.querySelectorAll<HTMLElement>(selector)).filter(element => !element.hidden && element.getClientRects().length > 0);
-    const frame = requestAnimationFrame(() => (focusable()[0] ?? panel).focus());
+    // Focus the sheet itself, not its first control: a first control focused on open (a scope chip, say) shows a
+    // focus ring nobody asked for. Screen readers still land in the dialog; Tab moves to the first control.
+    // A control that already took focus (autoFocus) keeps it.
+    if (!panel.hasAttribute("tabindex")) panel.setAttribute("tabindex", "-1");
+    const frame = requestAnimationFrame(() => { if (!panel.contains(document.activeElement)) panel.focus({ preventScroll: true }); });
 
     const onKeyDown = (event: KeyboardEvent) => {
       // Anchored pickers are portalled and own their keyboard loop.

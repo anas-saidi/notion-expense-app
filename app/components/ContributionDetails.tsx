@@ -9,6 +9,7 @@ import { contributionDue } from "./contribution-utils";
 import type { ContributionAgreement, ContributionLedger, Partner, PartnerAmounts } from "../../lib/contribution-agreements";
 import { money } from "../../lib/contribution-agreements";
 import { fmt, parseAmount, today } from "./app-utils";
+import { Fact } from "./ui/Summary";
 import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
@@ -69,10 +70,12 @@ export function ContributionAgreementEditor({ month, agreement, proposed, shares
   </section>;
 }
 
-export function ContributionDetails({ open, month, scope, status, currentAdvances, cash, loading, error, onClose, onChanged, onRetry, onMonthChange }: {
+export function ContributionDetails({ open, month, scope, status, currentAdvances, cash, loading, error, onClose, onChanged, onRetry, onMonthChange, onOpenPlan, planMonthLabel }: {
   open: boolean; month: string; scope: BudgetScope; status: ContributionStatus | null; cash: number | null; loading: boolean; error: boolean;
   currentAdvances: ContributionLedger | null; onMonthChange: (month: string) => void;
   onClose: () => void; onChanged: () => void; onRetry: () => void;
+  /** Opens the month plan, whose Settle step nets each advance against that partner's contribution. */
+  onOpenPlan?: () => void; planMonthLabel?: string;
 }) {
   const [repaying, setRepaying] = useState<Partner | null>(null);
   const [amount, setAmount] = useState("");
@@ -117,7 +120,8 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
             {scope === "joint" && <div className="contribution-split" role="img" aria-label={`Outstanding repayments: ${partners.filter(partner => outstanding[partner] > 0).map(partner => `${person(partner)} ${fmt(outstanding[partner])} MAD`).join(", ")}`}>
               {partners.filter(partner => outstanding[partner] > 0).map(partner => <span key={partner} className="contribution-split-part" data-partner={partner} style={{ flexGrow: outstanding[partner] }} />)}
             </div>}
-            <span className="contribution-note">Reserved until repaid</span></>
+            {/* Joined rarely has the cash to repay on its own; advances settle by netting against the next contributions. */}
+            {onOpenPlan && planMonthLabel ? <span className="contribution-note">Settled with <Fact onClick={onOpenPlan} label={`Open ${planMonthLabel}'s plan`}>{planMonthLabel}&rsquo;s plan</Fact></span> : <span className="contribution-note">Reserved until repaid</span>}</>
             : scopedDue > 0 ? <><span>Due to Joined</span><p className="contribution-hero-amount"><Money value={scopedDue} currency /></p></>
             : <p className="contribution-all-settled">{status.agreement ? "All settled" : "No agreed amounts"}</p>}
         </section>
