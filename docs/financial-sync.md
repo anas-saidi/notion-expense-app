@@ -129,3 +129,10 @@ The same underlying readers power web, native snapshots/resources, MCP reports a
 Recovery is intentionally conservative about writes: `withMirrorMutation` refuses to bypass its existing durable invalidation fence, and database-dependent locks/receipts refuse to run. Some independent Notion actions can retain their existing behavior, but this recovery mode is not a promise that all saves work offline from PostgreSQL. Once access is restored, disable the flag and restart to resume ordinary shared-database operation.
 
 Verification: live localhost Accounts, Categories and October monthly summary returned 200 with `X-Finance-Data-Source: notion`; the summary retained valid totals while explicitly flagging unavailable contributions. Balance checks and agreements returned non-retryable `DATABASE_NOTION_ONLY`, and sync returned configured=false. Tests assert that direct mode never constructs a PostgreSQL pool or executes a protected mutation; partial-read and contribution tests protect unknown-vs-zero behavior.
+
+
+## Contribution agreement namespace
+
+Legacy finance namespaces incorporate the Notion connection token. Rotating it can leave the same household's contribution agreements under the previous scope while live Notion account/category reads continue working. `FINANCE_CONTRIBUTION_SCOPE` can pin the verified existing 64-character scope for contribution reads, plan validation and agreement writes. All consumers use contributionScope; the default remains the existing token-derived namespace. Invalid configured values fail visibly.
+
+Verify the database belongs to the same household and check existing agreement versions/targets before setting this value. This is a server-only configuration value, not an account identifier from a client request. It does not move or rewrite any financial record and does not change the namespaces used by the read mirror, balance checks, write fences or operation receipts. PostgreSQL continues to provide atomic agreement updates in production. Do not enable the local-only Notion writer on Vercel as a workaround.

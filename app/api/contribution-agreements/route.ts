@@ -1,7 +1,7 @@
+import { contributionScope } from "../../../lib/contribution-scope";
 import { databaseUnavailableFailure } from "../../../lib/database-errors";
 import { NextRequest, NextResponse } from "next/server";
 import { contributionStore } from "../../../lib/contribution-store";
-import { mirrorScope } from "../../../lib/mirror/store";
 import { validMonth, cents } from "../../../lib/contribution-agreements";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export async function GET() {
   try {
     const token = process.env.NOTION_TOKEN;
     if (!token) return NextResponse.json({ error: "Finance connection unavailable." }, { status: 503 });
-    return NextResponse.json({ agreements: await contributionStore().list(mirrorScope(token)) }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ agreements: await contributionStore().list(contributionScope(token)) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return fail(error); }
 }
 export async function POST(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
     const token = process.env.NOTION_TOKEN;
     if (!token) return NextResponse.json({ error: "Finance connection unavailable." }, { status: 503 });
-    const agreement = await contributionStore().save(mirrorScope(token), body.month, body.targets, shares, body.expectedVersion ?? null);
+    const agreement = await contributionStore().save(contributionScope(token), body.month, body.targets, shares, body.expectedVersion ?? null);
     if (!agreement) return NextResponse.json({ error: "Contributions changed on another device. Refresh and review the agreement again." }, { status: 409 });
     return NextResponse.json({ agreement });
   } catch (error) { return fail(error); }

@@ -1,3 +1,4 @@
+import { contributionScope } from "../../../../lib/contribution-scope";
 import { notionLedgerConfigured } from "../../../../lib/notion-ledger";
 import { FUNDING_OPERATION, readText } from "../../../../lib/savings-funding";
 import { withMirrorMutation } from "../../../../lib/mirror/routes";
@@ -5,7 +6,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../../components/app-utils";
 import { notionFetchJson, queryDatabaseAll } from "../../../../lib/notion-api";
 import { contributionStore } from "../../../../lib/contribution-store";
-import { mirrorScope } from "../../../../lib/mirror/store";
 import { planningContext } from "../../../../lib/native/planning-context";
 import { billToday } from "../../../../lib/bills";
 import { calculateMonthPlanCapacity, planCost, type PlanAmounts } from "../../../components/month-plan-capacity";
@@ -160,7 +160,7 @@ async function handlePOST(req: NextRequest) {
       }
     }
     const savedFunds = [];
-    if ((notionLedgerConfigured() || process.env.DATABASE_URL) && (await contributionStore().list(mirrorScope(token))).length) {
+    if ((notionLedgerConfigured() || process.env.DATABASE_URL) && (await contributionStore().list(contributionScope(token))).length) {
       const url = new URL(req.url); url.searchParams.set("month", String(body.month));
       const { capacity, split, categories } = await planningContext(new NextRequest(url));
       const proposed = new Map<string, number>();

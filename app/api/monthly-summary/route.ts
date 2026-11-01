@@ -1,3 +1,4 @@
+import { contributionScope } from "../../../lib/contribution-scope";
 import { databaseUnavailableFailure } from "../../../lib/database-errors";
 import { withMirrorReads } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
@@ -5,7 +6,6 @@ import { monthBounds } from "../../components/app-utils";
 import { mapTransactionPage } from "../../../lib/transaction-page";
 import { queryDatabaseAll } from "../../../lib/notion-api";
 import { contributionStore } from "../../../lib/contribution-store";
-import { mirrorScope } from "../../../lib/mirror/store";
 import { billToday } from "../../../lib/bills";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be-8922-8058-990d-c549172f1d45";
@@ -67,7 +67,7 @@ async function handleGET(req: NextRequest) {
     const agreementsRead = async () => {
       if (!includeJointDebt) return { agreements: undefined, error: undefined };
       try {
-        return { agreements: await contributionStore().list(mirrorScope(token)), error: undefined };
+        return { agreements: await contributionStore().list(contributionScope(token)), error: undefined };
       } catch (error) {
         return { agreements: undefined, error: databaseUnavailableFailure(error)?.error ?? "Confirmed contributions are temporarily unavailable." };
       }
