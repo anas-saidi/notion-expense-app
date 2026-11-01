@@ -47,3 +47,41 @@ it("spends 6000 directly from funded savings only through its holding account", 
   await expect(assertExpenseFitsBudget("t", { categoryId: "bedroom", amount: 6001, accountId: "joint" })).rejects.toMatchObject({ status: 409 });
   await expect(assertExpenseFitsBudget("t", { categoryId: "bedroom", amount: 6000, accountId: "personal" })).rejects.toMatchObject({ status: 409 });
 });
+
+describe("advance expenses", () => {
+  const jointCategory = { ok: true, json: async () => ({ properties: { Available: { formula: { number: 0 } }, Category: { title: [{ plain_text: "Groceries" }] }, "Team Fund": { formula: { boolean: true } } } }) };
+  const personalCategory = { ok: true, json: async () => ({ properties: { Available: { formula: { number: 0 } }, Category: { title: [{ plain_text: "Clothes" }] }, Owner: { select: { name: "Salma" } } } }) };
+  const account = (label: string) => ({ ok: true, json: async () => ({ properties: { Name: { type: "title", title: [{ plain_text: label }] } } }) });
+
+  it("lets a personal account pay an empty joint category as an advance", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jointCategory).mockResolvedValueOnce(account("Wife Account")));
+    await expect(assertExpenseFitsBudget("t", { categoryId: "c", amount: 500, accountId: "wife", advance: true })).resolves.toBeUndefined();
+  });
+
+  it("refuses an advance paid from the joint account", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jointCategory).mockResolvedValueOnce(account("Joined Account")));
+    await expect(assertExpenseFitsBudget("t", { categoryId: "c", amount: 500, accountId: "joint", advance: true })).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("refuses an advance into a personal category", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(personalCategory));
+    await expect(assertExpenseFitsBudget("t", { categoryId: "c", amount: 500, accountId: "wife", advance: true })).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("still blocks an empty joint category without the advance flag", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jointCategory));
+    await expect(assertExpenseFitsBudget("t", { categoryId: "c", amount: 500, accountId: "wife" })).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe("confirmed overspending", () => {
+  it("saves real spending into an empty category once confirmed", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(categoryPage(0)));
+    await expect(assertExpenseFitsBudget("t", { categoryId: "c", amount: 44, overspend: true })).resolves.toBeUndefined();
+  });
+
+  it("still asks first when the spending isn't confirmed", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(categoryPage(10)));
+    await expect(assertExpenseFitsBudget("t", { categoryId: "c", amount: 44 })).rejects.toMatchObject({ status: 409 });
+  });
+});

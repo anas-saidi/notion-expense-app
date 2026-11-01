@@ -99,7 +99,7 @@ async function performPayment(token: string, draft: any) {
   const { schedule, occurrence } = await occurrenceFor(token, draft.billId, draft.period);
   if (occurrence.state === "Paid" || occurrence.state === "Skipped") throw billError("This occurrence is already paid or skipped. Refresh bills.", 409);
   await validateBillDraft(token, { ...draft, name: schedule.name, dueDate: draft.date, repeat: "None", categoryId: occurrence.categoryId });
-  await assertExpenseFitsBudget(token, { categoryId: occurrence.categoryId, amount: draft.amount });
+  await assertExpenseFitsBudget(token, { categoryId: occurrence.categoryId, amount: draft.amount, overspend: draft.overspend === true });
   const properties = { Name: { title: [{ text: { content: schedule.name } }] }, Type: { select: { name: "Expense" } },
     Amount: { number: draft.amount }, Category: { relation: [{ id: occurrence.categoryId }] }, Account: { relation: [{ id: draft.accountId }] },
     Date: { date: { start: draft.date } }, Bill: { relation: [{ id: schedule.id }] }, "Bill period": textProperty(draft.period) };
@@ -190,7 +190,7 @@ export async function createRecurringExpense(token: string, draft: any) {
   const billDraft = { ...draft, dueDate: draft.date };
   await validateBillDraft(token, billDraft);
   // Check funding before writing the schedule, so budget failures leave no due bill.
-  if (!draft.billId) await assertExpenseFitsBudget(token, { categoryId: draft.categoryId, amount: draft.amount });
+  if (!draft.billId) await assertExpenseFitsBudget(token, { categoryId: draft.categoryId, amount: draft.amount, overspend: draft.overspend === true });
   const schedule = draft.billId ? (await readSchedule(token, draft.billId)).schedule : await createBill(token, billDraft);
   if (schedule.name !== draft.name.trim() || schedule.amount !== draft.amount || normalizedId(schedule.categoryId) !== normalizedId(draft.categoryId) || schedule.dueDate !== draft.date || schedule.repeat !== draft.repeat) throw billError("The saved schedule differs from this expense. Finish it from Bills before creating another expense.", 409);
   try {

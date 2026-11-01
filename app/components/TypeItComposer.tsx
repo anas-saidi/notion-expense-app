@@ -115,9 +115,11 @@ export function TypeItComposer(props: Props) {
     const cap = remainingBudgets.current[id];
     const available = cap === undefined ? category.available : Math.min(cap, category.available ?? cap);
     const gate = expenseBudgetGate({ available, amount });
-    return gate.shortfall > 0 ? [{ category, shortfall: gate.shortfall }] : [];
+    return gate.shortfall > 0 ? [{ category, belowZero: amount - (available ?? 0) }] : [];
   });
-  const ready = rows.length > 0 && rows.length <= 50 && rows.every(row => row.transaction && row.account && (row.transaction.type === "Income" || row.category)) && !budgetErrors.length;
+  // Lines that don't fit are still real spending: they save once confirmed and the category goes below zero.
+  const overspentIds = new Set(budgetErrors.map(({ category }) => category.id));
+  const ready = rows.length > 0 && rows.length <= 50 && rows.every(row => row.transaction && row.account && (row.transaction.type === "Income" || row.category));
   const total = rows.reduce((sum, row) => sum + ((row.transaction?.amount ?? 0) * (row.transaction?.type === "Income" ? 1 : -1)), 0);
 
   const save = async () => {
@@ -129,7 +131,7 @@ export function TypeItComposer(props: Props) {
     setProgress(0);
     let confirmed = 0;
     const result = await saveTypedBatch(rows, async row => {
-      await props.onSave({ ...row.transaction!, accountId: row.account!.id, categoryId: row.transaction!.type === "Expense" ? row.category!.id : "" });
+      await props.onSave({ ...row.transaction!, accountId: row.account!.id, categoryId: row.transaction!.type === "Expense" ? row.category!.id : "", ...(row.category && overspentIds.has(row.category.id) ? { overspend: true } : {}) });
     }, row => {
       if (row.transaction?.type === "Expense" && row.category) {
         const current = remainingBudgets.current[row.category.id] ?? row.category.available;
@@ -265,7 +267,7 @@ export function TypeItComposer(props: Props) {
       <div onClick={focusEnd} aria-hidden="true" style={{ flex: "1 0 80px", cursor: "text" }} />
 
       {rows.length > 50 && <Banner tone="danger" role="alert" compact>Add up to 50 transactions at a time.</Banner>}
-      {budgetErrors.map(({ category, shortfall }) => <Banner key={category.id} tone="warning" compact style={{ marginTop: 12 }}>{category.name} needs <Money value={shortfall} /> more to cover these lines. Fund it in Budget or change the line’s category.</Banner>)}
+      {budgetErrors.map(({ category, belowZero }) => <Banner key={category.id} tone="warning" compact style={{ marginTop: 12 }}><strong>{category.name}</strong> goes <strong><Money value={Math.round(belowZero)} /></strong> below zero.</Banner>)}
       {props.accounts.filter(account => account.estimatedActualBalance != null).map(account => {
         const spending = rows.filter(row => row.account?.id === account.id && row.transaction?.type === "Expense").reduce((sum, row) => sum + (row.transaction?.amount ?? 0), 0);
         return spending > account.estimatedActualBalance! ? <Banner key={account.id} tone="warning" role="alert" compact style={{ marginTop: 12 }}>
@@ -281,7 +283,7 @@ export function TypeItComposer(props: Props) {
     {rows.length > 0 && <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 0 0" }}>
       <div style={{ color: "var(--text2)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}><Money value={total} currency /><span style={{ ...helperStyle, marginLeft: 8 }}>net</span></div>
       <button type="button" disabled={!ready || busy || parsing} onClick={save} style={{ minHeight: 44, padding: "0 16px", display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: "var(--radius-control)", background: ready && !busy ? "var(--accent)" : "var(--surface2)", color: ready && !busy ? "var(--accent-ink)" : "var(--muted)", font: "inherit", fontSize: 14, fontWeight: 600, cursor: ready && !busy ? "pointer" : "not-allowed" }}>
-        {busy ? `Saving ${progress}/${rows.length}…` : <><CheckIcon size={16} />Save {rows.length}</>}
+        {busy ? `Saving ${progress}/${rows.length}…` : <><CheckIcon size={16} />{budgetErrors.length ? "Save anyway" : `Save ${rows.length}`}</>}
       </button>
     </div>}
     <PickerPopover open={picker !== null} title={picker?.kind === "account" ? "Account" : "Category"} onClose={() => setPicker(null)} align="left" placement="bottom" size="choice" zIndex={140} anchorRef={pickerAnchor}>

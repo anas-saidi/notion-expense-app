@@ -5,6 +5,9 @@ import { monthBounds } from "../app/components/app-utils";
 const inFlight = new Map<string, Promise<unknown>>();
 const controllers = new Set<AbortController>();
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// An expired mirror needs a fully paginated ledger read: let that finish instead of relaunching it.
+// Accounts recompute every account's Notion formulas on each read, so they get longer than the rest.
+export const readTimeout = (url: string) => url.includes("includeJointDebt=true") ? 180000 : url.startsWith("/api/accounts") ? 60000 : 30000;
 
 /** Share concurrent reads only; completed financial responses are never cached. */
 export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
@@ -14,9 +17,14 @@ export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
   controllers.add(controller);
   const request = (async () => {
     for (let attempt = 0; ; attempt += 1) {
-      // An expired mirror needs a fully paginated ledger read. Let that finish
-      // instead of launching repeated history reads after 30-second aborts.
-      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(url.includes("includeJointDebt=true") ? 180000 : 30000)]) });
+      let response: Response;
+      try {
+        response = await fetch(url, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(readTimeout(url))]) });
+      } catch (error) {
+        // A slow Notion answer is worth one more try; a user's own Retry (controller abort) is not.
+        if (error instanceof DOMException && error.name === "TimeoutError" && !controller.signal.aborted && attempt < Math.min(retries, 1)) continue;
+        throw error instanceof DOMException && error.name === "TimeoutError" ? new Error("Notion is slow to respond right now. Try again in a moment.") : error;
+      }
       const data = await response.json();
       if (response.ok) {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("finance-data-source", { detail: {

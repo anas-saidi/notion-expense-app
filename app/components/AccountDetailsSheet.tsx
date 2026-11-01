@@ -309,6 +309,11 @@ export function AccountDetailsSheet({
     () => categories.filter(c => !c.snoozed && !c.archived),
     [categories],
   );
+  // A missed expense found by counting was really spent: when its category can't cover it, it still
+  // saves once confirmed and the category goes below zero (design.md, "Overspending").
+  const txnCategory = txnType === "Expense" ? activeCategories.find(c => c.id === txnCategoryId) : undefined;
+  const txnParsed = parseAmount(txnAmount) ?? 0;
+  const txnBelowZero = txnCategory?.available != null && txnParsed > txnCategory.available + 0.005 ? txnParsed - txnCategory.available : 0;
 
   const changeCheck = async (action: "save" | "close") => {
     if (!account || checkSaving) return;
@@ -378,7 +383,7 @@ export function AccountDetailsSheet({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           txnType === "Expense"
-            ? { name, amount: amt, accountId: account.id, categoryId: txnCategoryId, date: txnDate }
+            ? { name, amount: amt, accountId: account.id, categoryId: txnCategoryId, date: txnDate, ...(txnBelowZero > 0 ? { overspend: true } : {}) }
             : { name, amount: amt, accountId: account.id, date: txnDate },
         ),
       });
@@ -748,6 +753,7 @@ export function AccountDetailsSheet({
                     style={txnSelectStyle}
                   />
 
+                  {txnBelowZero > 0 && txnCategory && <Banner tone="warning" compact><strong>{txnCategory.name}</strong> goes <strong>{fmt(Math.round(txnBelowZero))}</strong> below zero.</Banner>}
                   {txnError && <Banner role="alert" tone="danger" compact>{txnError}</Banner>}
 
                   <button
@@ -757,7 +763,7 @@ export function AccountDetailsSheet({
                     style={{ ...txnAddBtnStyle, opacity: txnSaving ? 0.7 : 1 }}
                   >
                     {txnSaving && <span style={spinnerStyle} />}
-                    {txnSaving ? "Adding…" : `Add ${txnType.toLowerCase()}`}
+                    {txnSaving ? "Adding…" : txnBelowZero > 0 ? "Save anyway" : `Add ${txnType.toLowerCase()}`}
                   </button>
                 </div>
               )}

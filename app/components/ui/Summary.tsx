@@ -6,8 +6,8 @@ import { Fragment, type CSSProperties, type ReactNode } from "react";
  * The app's narrative summary (design.md, "Summary sentence"): connecting words stay muted and
  * each fact is in full ink with a small inline icon. The tappable fact is the problem to resolve ("516 off"), not its name.
  */
-export function Summary({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <p className="summary" style={style}>{children}</p>;
+export function Summary({ children, style, className = "" }: { children: ReactNode; style?: CSSProperties; className?: string }) {
+  return <p className={`summary ${className}`.trim()} style={style}>{children}</p>;
 }
 
 /** `tone` colours a number or state only: danger = already wrong, warning = needs attention soon, success = good news. */

@@ -99,6 +99,8 @@ async function handlePOST(request: NextRequest) {
       date,
       categoryId: category.option.id,
       accountId: account.option.id,
+      // A Shortcut can record spending that doesn't fit only by saying so explicitly.
+      overspend: body?.overspend === true,
     });
 
     return NextResponse.json({

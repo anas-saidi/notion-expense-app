@@ -94,6 +94,11 @@ export function HomeScreen({
     [visibleCategories, isCurrentMonth],
   );
 
+  const overspentCategories = useMemo(
+    () => isCurrentMonth ? visibleCategories.filter((cat) => !isSavingsCategory(cat) && (cat.available ?? 0) < -0.005) : [],
+    [visibleCategories, isCurrentMonth],
+  );
+
   const upcomingBills = useMemo(() => {
     if (!pendingItems?.length) return [];
     const todayStr = today();
@@ -164,6 +169,10 @@ export function HomeScreen({
       const reviewLabel = `Review balance check for ${account.label}`;
       return <span key={key}><Fact icon={<CategoryIcon icon={accountIconSource(account.type)} size={20} />}>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact> your count</>}</span>;
     }),
+    // Below zero is money already wrong, so it comes before what's about to run out. Opens Rebalance to cover it.
+    overspentCategories.length > 0 && (overspentCategories.length === 1
+      ? <span key="overspent"><Fact icon={<CategoryIcon icon={overspentCategories[0].icon} categoryName={overspentCategories[0].name} size={20} />}>{overspentCategories[0].name}</Fact> is <Fact tone="danger" onClick={onOpenAssign} label={`Rebalance to cover ${overspentCategories[0].name}`}>{fmt(Math.ceil(-(overspentCategories[0].available ?? 0) - 0.005))} overspent</Fact></span>
+      : <span key="overspent"><Fact>{overspentCategories.length} categories</Fact> are <Fact tone="danger" onClick={onOpenAssign} label="Rebalance to cover overspent categories">{fmt(Math.ceil(overspentInCategories - 0.005))} overspent</Fact></span>),
     firstLow && (runningLow.length === 1
       ? <span key="low"><Fact icon={<CategoryIcon icon={firstLow.category.icon} categoryName={firstLow.category.name} size={20} />}>{firstLow.category.name}</Fact> <Fact tone={firstLow.daysCovered < 1 ? "danger" : "warning"} onClick={onOpenAssign} label={`Rebalance ${firstLow.category.name}`}>runs out {firstLow.daysCovered < 1 ? "today" : `in about ${Math.round(firstLow.daysCovered)} days`}</Fact></span>
       : <span key="low"><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenAssign} label="Rebalance running low categories">running low</Fact></span>),

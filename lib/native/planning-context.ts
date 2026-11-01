@@ -4,7 +4,7 @@ import { GET as readCategories } from "../../app/api/categories/route";
 import { GET as readMonthly } from "../../app/api/monthly-summary/route";
 import { calculateContributionStatus, contributionDue } from "../../app/components/contribution-utils";
 import { getAssignBalanceByScope, getCategoryScope, getJointAccountUnassigned } from "../../app/components/app-utils";
-import { getPlanningSplit } from "../../app/components/month-plan-capacity";
+import { getPlanningSplit, planCost } from "../../app/components/month-plan-capacity";
 import { billToday } from "../bills";
 import type { Account, Category, BudgetScope } from "../../app/components/app-types";
 export async function planningContext(request: NextRequest) {
@@ -25,7 +25,8 @@ export async function planningContext(request: NextRequest) {
     for (const item of monthly.summary.assignedByCategory) {
       const category = categories.find(c => c.id === item.categoryId);
       const scope = category && getCategoryScope(category, accounts) as BudgetScope | null;
-      if (scope) capacity[scope] += item.total;
+      // Add back only what the saved plan actually took from unassigned money.
+      if (scope) capacity[scope] += category.available == null ? item.total : planCost(item.total, category.available - item.total);
     }
   }
   return { capacity, split: getPlanningSplit(accounts), categories };

@@ -141,6 +141,8 @@ the mirror before writing; refreshes use live Notion until a new import succeeds
 See [the sync architecture and public-app roadmap](docs/financial-sync.md) for
 freshness, recovery, testing, and deployment limits.
 
+Parked product ideas and their open decisions live in the [product roadmap](docs/roadmap.md).
+
 ## Optional Gemini assistance
 
 Set server-only `GEMINI_API_KEY` in `.env.local` and Vercel, then restart or

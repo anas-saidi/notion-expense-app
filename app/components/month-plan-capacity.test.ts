@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { calculateMonthPlanCapacity as calculate } from "./month-plan-capacity";
+import { calculateMonthPlanCapacity as calculate, planCost } from "./month-plan-capacity";
 const split = { anas: 0.65, salma: 0.35 };
 
 it("reserves personal allocations before calculating affordable Joint spending", () => {
@@ -51,4 +51,11 @@ it("unfunded savings reduce affordable Joint allocation exactly once across a sa
   const after = calculate(capacity(1400, 0), plan, split);
   expect(before.pool.joint).toBe(2153.84);
   expect(after).toEqual(before);
+});
+
+it("nets spending recorded before the plan out of what the plan costs", () => {
+  expect(planCost(3800, -200)).toBe(3600); // spent 200 first: the plan's first 200 refills the hole
+  expect(planCost(150, -200)).toBe(0); // still below zero: Ready To Assign doesn't move
+  expect(planCost(3800, 50)).toBe(3800); // category holds money: the full plan
+  expect(planCost(3800, null)).toBe(3800); // balance unknown (or a future month): the full plan
 });

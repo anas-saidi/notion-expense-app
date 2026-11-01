@@ -43,6 +43,8 @@ type Props = {
   budgetScope: BudgetScope;
   onOpenCategoryDetails: (cat: Category) => void;
   onOpenRebalance: () => void;
+  /** What actually fixes "Short by" when Rebalance can't (advances owed back, over-assigned savings). */
+  shortfallAction?: { label: string; onClick: () => void };
   onReviveCategory: (cat: Category) => void;
   onMoveContribution: () => void;
   onOpenNewCategory?: (defaultType: string) => void;
@@ -78,6 +80,7 @@ export function CategoriesScreen({
   budgetScope,
   onOpenCategoryDetails,
   onOpenRebalance,
+  shortfallAction,
   onReviveCategory,
   onMoveContribution,
   onOpenNewCategory,
@@ -284,8 +287,8 @@ export function CategoriesScreen({
                 icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
                 title={`Short by ${fmt(shortBy)}`}
                 action={(
-                  <button type="button" onClick={onOpenRebalance} style={bannerActionStyle}>
-                    Rebalance
+                  <button type="button" onClick={shortfallAction?.onClick ?? onOpenRebalance} style={bannerActionStyle}>
+                    {shortfallAction?.label ?? "Rebalance"}
                   </button>
                 )}
               />

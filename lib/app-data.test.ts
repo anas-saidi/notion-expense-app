@@ -1,5 +1,5 @@
-import { afterEach, expect, it, vi } from "vitest";
-import { fetchApiJson, fetchMonthlyData, loadHomeData, restartFinancialReads } from "./app-data";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fetchApiJson, fetchMonthlyData, loadHomeData, readTimeout, restartFinancialReads } from "./app-data";
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 it("coalesces simultaneous reads but fetches a fresh response on the next refresh", async () => {
@@ -108,4 +108,28 @@ it("manual recovery prevents an abandoned transient read from retrying after bac
   await vi.runAllTimersAsync();
   await rejected;
   expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+describe("slow Notion reads", () => {
+  it("retries once when a read times out, then succeeds", async () => {
+    const ok = { ok: true, status: 200, headers: new Headers(), json: async () => ({ accounts: [] }) };
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"))
+      .mockResolvedValueOnce(ok);
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchApiJson("/api/accounts?slow-1")).resolves.toEqual({ accounts: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("gives up after the second timeout with a plain message", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new DOMException("timed out", "TimeoutError")));
+    await expect(fetchApiJson("/api/accounts?slow-2")).rejects.toThrow("Notion is slow to respond right now. Try again in a moment.");
+    vi.unstubAllGlobals();
+  });
+
+  it("gives accounts longer than other reads", () => {
+    expect(readTimeout("/api/accounts")).toBe(60000);
+    expect(readTimeout("/api/categories")).toBe(30000);
+  });
 });

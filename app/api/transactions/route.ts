@@ -93,7 +93,7 @@ async function handlePATCH(req: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
-  const { id, name, amount, accountId, categoryId, date, incomeUse, expectedTransaction } = await req.json();
+  const { id, name, amount, accountId, categoryId, date, incomeUse, expectedTransaction, advance, overspend } = await req.json();
   if (incomeUse !== undefined && incomeUse !== "contributions" && incomeUse !== "unassigned") return NextResponse.json({ error: "Invalid income use" }, { status: 400 });
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (!name || amount === undefined || amount === null || !accountId || !date) {
@@ -137,7 +137,7 @@ async function handlePATCH(req: NextRequest) {
       const storedAmount = stored.page.properties?.Amount?.number ?? 0;
       const sameCategory = storedCategory?.replace(/-/g, "") === String(categoryId).replace(/-/g, "");
       try {
-        await assertExpenseFitsBudget(token, { categoryId, accountId, amount: parsedAmount, originalAmount: sameCategory ? storedAmount : 0 });
+        await assertExpenseFitsBudget(token, { categoryId, accountId, amount: parsedAmount, originalAmount: sameCategory ? storedAmount : 0, advance: advance === true, overspend: overspend === true });
       } catch (error: any) {
         return NextResponse.json({ error: error.message, full: error.full }, { status: error.status ?? 500 });
       }

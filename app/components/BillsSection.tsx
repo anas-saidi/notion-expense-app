@@ -118,7 +118,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const draftReservation = view === "add" && date <= currentCutoff ? expected : 0;
   const draftFree = category?.available == null ? null : category.available - (reservations[normalizedId(category.id)] ?? 0) - draftReservation;
   const paymentAccount = accounts.find(a => normalizedId(a.id) === normalizedId(accountId));
-  const formReady = expected > 0 && date && (view === "pay" ? !!selected && !!paymentAccount && !gate.unfunded && !gate.overBudget : !!name.trim() && !!category && !category.snoozed && !category.archived && categoryMatchesScope(category, scope, accounts));
+  const formReady = expected > 0 && date && (view === "pay" ? !!selected && !!paymentAccount : !!name.trim() && !!category && !category.snoozed && !category.archived && categoryMatchesScope(category, scope, accounts));
 
   return <section className="bills-section" aria-label="Due bills">
     <CardHeader className="bills-section-heading" title="Due bills" titleClassName="section-label" action={<CardHeaderAction className="bills-quiet-action" disabled={!enabled} onClick={() => { setOpen(true); move("list"); }}>All bills</CardHeaderAction>} />
@@ -159,7 +159,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
         </>}
         {view === "detail" && !selected && <p className="bills-empty">This occurrence is no longer available. Close and reopen bills to choose another occurrence.</p>}
         {(view === "add" || view === "pay" || view === "edit") && <form className={`bills-form${view === "pay" ? " bills-pay-summary" : ""}`} onSubmit={event => { event.preventDefault(); if (!enabled || !formReady) return;
-          mutate(view === "edit" ? "PATCH" : "POST", view === "pay" ? { action: "pay", billId: selected?.billId, period: selected?.period, amount: expected, accountId, date }
+          mutate(view === "edit" ? "PATCH" : "POST", view === "pay" ? { action: "pay", billId: selected?.billId, period: selected?.period, amount: expected, accountId, date, ...(gate.unfunded || gate.overBudget ? { overspend: true } : {}) }
             : { action: view === "edit" ? "edit" : "create", billId: selected?.billId, period: selected?.period, target, name, amount: expected, categoryId, accountId, dueDate: date, repeat });
         }}>
           {view === "pay" && selected && <div className="bills-pay-overview">
@@ -180,9 +180,10 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
           {view === "edit" && target === "future" && <p className="bills-muted">Earlier unpaid bills keep their amounts. Recurrence stays {repeat.toLowerCase()}.</p>}
           {view === "add" && draftFree != null && draftFree < 0 && <Banner tone="warning">Short by <Money value={-draftFree} /> after bills. You can add this bill before funding its category.</Banner>}
           {view === "pay" && paymentAccount?.estimatedActualBalance != null && expected > paymentAccount.estimatedActualBalance && <Banner tone="warning" role="alert">Exceeds estimated actual funds by <Money value={expected - paymentAccount.estimatedActualBalance} />.</Banner>}
-          {view === "pay" && <>{gate.unfunded || gate.overBudget ? <Banner tone="warning">{gate.unfunded ? "Category availability is missing or unfunded." : <>Short by <Money value={gate.shortfall} />.</>} Fund the category before recording payment.</Banner> : null}
-          {!gate.unfunded && !gate.overBudget && (selectedCategory?.available ?? 0) - expected < paymentOtherReserved && <Banner tone="warning">This payment uses money earmarked for other bills. Recording payment confirms you want to continue.</Banner>}</>}
-          <div className={view === "pay" ? "bills-pay-actions" : undefined}><button type="submit" className="bills-primary" disabled={!enabled || !formReady}>{saving ? "Saving…" : view === "pay" ? "Record payment" : view === "edit" ? "Save changes" : "Add bill"}</button>
+          {/* A payment that doesn't fit is still real: it records once confirmed and the category goes below zero. */}
+          {view === "pay" && <>{(gate.unfunded || gate.overBudget) && selectedCategory ? <Banner tone="warning"><strong>{selectedCategory.name}</strong> goes <strong>{fmt(Math.round(expected - (selectedCategory.available ?? 0)))}</strong> below zero.</Banner> : null}
+          {!gate.unfunded && !gate.overBudget && (selectedCategory?.available ?? 0) - expected < paymentOtherReserved && <Banner tone="warning">Uses money set aside for other bills.</Banner>}</>}
+          <div className={view === "pay" ? "bills-pay-actions" : undefined}><button type="submit" className="bills-primary" disabled={!enabled || !formReady}>{saving ? "Saving…" : view === "pay" ? (gate.unfunded || gate.overBudget ? "Record anyway" : "Record payment") : view === "edit" ? "Save changes" : "Add bill"}</button>
           {view === "pay" && <><button type="button" className="bills-pay-edit" disabled={!enabled} onClick={() => { setEditingPayment(value => !value); setPicker(null); haptic("selection"); }} aria-expanded={editingPayment}><EditIcon size={18} />{editingPayment ? "Done editing" : "Edit"}</button><button type="button" className="bills-quiet-action" disabled={!enabled} onClick={() => move("detail")}>Cancel</button></>}
           </div>
         </form>}

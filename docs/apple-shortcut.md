@@ -89,6 +89,8 @@ are rejected.
 `date` (`YYYY-MM-DD`). It returns the created transaction plus the resolved
 category and account names for the confirmation step.
 
+When the category can't cover the expense, the request is refused unless the body includes `"overspend": true`. Send it only for spending that really happened; the category then goes below zero for the month.
+
 For a lightweight local check, start the app and run:
 
 ```bash

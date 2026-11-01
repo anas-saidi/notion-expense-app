@@ -4,6 +4,15 @@ export type PlanAmounts = Record<BudgetScope, number>;
 export type ContributionSplit = { anas: number; salma: number };
 const cents = (amount: number) => Math.round(amount * 100);
 
+/**
+ * What planning `amount` into a category takes from its account's unassigned money. Notion's Ready To Assign
+ * counts only categories that still hold money, so spending recorded before the plan already came out of it:
+ * the first part of a plan into a negative category just refills that hole and costs nothing.
+ * `availableBefore` is the category's balance without this plan (null when unknown: charge the full plan).
+ */
+export const planCost = (amount: number, availableBefore: number | null | undefined) =>
+  availableBefore != null && availableBefore < 0 ? Math.max(0, availableBefore + amount) : amount;
+
 /** Current commitments are already deducted from capacity. Only the future plan
  * is deducted here. Existing Joint cash covers its plan before new contributions. */
 export function calculateMonthPlanCapacity(capacity: PlanAmounts, planned: PlanAmounts, split: ContributionSplit) {

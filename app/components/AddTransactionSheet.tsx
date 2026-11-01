@@ -54,6 +54,10 @@ type AddTransactionSheetProps = {
   categoryOverBudget: boolean;
   /** Budget this expense still needs in its category (0 when covered). */
   categoryShortfall: number;
+  /** Set when this expense saves as an advance: how far below zero its joint category goes. */
+  advanceBelowZero?: number;
+  /** Set when this expense doesn't fit its category: it saves once confirmed and the category goes this far below zero. */
+  overspendBelowZero?: number;
   billShortfall?: number;
   billsUnavailable?: boolean;
   canSubmit: boolean;
@@ -386,8 +390,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>
           </div>
 
-          {!isIncome && !props.categoryUnfunded && !props.categoryOverBudget && (props.billShortfall ?? 0) > 0 && <Banner tone="warning" compact>This expense leaves bills short by <Money value={props.billShortfall!} />. Choose Save anyway to use earmarked money.</Banner>}
-          {!isIncome && props.billsUnavailable && <Banner tone="warning" compact>Bill reservations are unavailable. Your actual category budget is still checked.</Banner>}
+          {!isIncome && !props.categoryUnfunded && !props.categoryOverBudget && (props.billShortfall ?? 0) > 0 && <Banner tone="warning" compact>Uses <strong><Money value={props.billShortfall!} /></strong> set aside for bills.</Banner>}
+          {!isIncome && props.billsUnavailable && <Banner tone="warning" compact>Bill reservations unavailable.</Banner>}
           {/* Budget warnings */}
           {!isIncome && (props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
             <div style={{ display: "grid", gap: 10 }}>
@@ -397,10 +401,13 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   <span>Suggested: <strong style={{ fontWeight: 600 }}>{props.suggestedCategory.name}</strong></span>
                 </button>
               )}
-              {(props.categoryUnfunded || props.categoryOverBudget) && props.selectedCat && (
+              {props.advanceBelowZero != null && props.selectedCat && (
+                <Banner tone="warning" compact>Joint owes you this. <strong>{props.selectedCat.name}</strong> goes <strong>{fmt(Math.round(props.advanceBelowZero))}</strong> below zero.</Banner>
+              )}
+              {props.advanceBelowZero == null && (props.categoryUnfunded || props.categoryOverBudget) && props.selectedCat && (
                 <Banner
                   role="alert"
-                  tone="danger"
+                  tone="warning"
                   compact
                   icon={<AlertTriangleIcon size={15} />}
                   action={(
@@ -472,10 +479,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     </div>
                   )}
                 >
-                  {props.categoryUnfunded
-                    ? <>No budget in <strong>{props.selectedCat.name}</strong></>
-                    : <>Short <strong>{fmt(deficit)}</strong> in <strong>{props.selectedCat.name}</strong></>
-                  }
+                  <strong>{props.selectedCat.name}</strong> goes <strong>{fmt(Math.round(props.overspendBelowZero ?? deficit))}</strong> below zero.
                 </Banner>
               )}
             </div>
@@ -571,7 +575,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               props.status === "saving" ? (isEditMode ? "Updating expense" : isIncome ? "Adding income" : "Adding expense")
               : props.status === "success" ? (isEditMode ? "Expense updated" : isIncome ? "Income added" : "Expense added")
               : props.status === "error" ? `Save failed: ${props.errorMsg}`
-              : !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
+              : !isIncome && props.advanceBelowZero != null ? "Save as advance" : !isIncome && (props.overspendBelowZero != null || (props.billShortfall ?? 0) > 0) ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
             }
             className="pressable cta-save"
             style={{
@@ -606,7 +610,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             ) : props.status === "error" ? (
               <><XIcon size={16} />Error</>
             ) : (
-              !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
+              !isIncome && props.advanceBelowZero != null ? "Save as advance" : !isIncome && (props.overspendBelowZero != null || (props.billShortfall ?? 0) > 0) ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
             )}
           </button>
           </SheetFooter>

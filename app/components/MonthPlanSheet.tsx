@@ -7,9 +7,9 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { fetchApiJson, fetchMonthlyData } from "../../lib/app-data";
 import { useReducedMotion } from "motion/react";
 import type { Account, BudgetScope, Category } from "./app-types";
-import { BUDGET_SCOPE_LABELS, categoryMatchesScope, getCategoryScope, fmt, monthBounds, parseAmount } from "./app-utils";
+import { BUDGET_SCOPE_LABELS, categoryMatchesScope, getCategoryScope, fmt, monthBounds, parseAmount, scopeFromAccountLabel, today } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
-import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "./month-plan-capacity";
+import { calculateMonthPlanCapacity, getPlanningSplit, planCost, type PlanAmounts } from "./month-plan-capacity";
 import { JointFamily } from "./WalletCardSwitcher";
 import { Money } from "./Money";
 import { MascotHero } from "./mascot/MascotHero";
@@ -19,6 +19,7 @@ import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
+import { Fact, Summary, joinClauses } from "./ui/Summary";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FreezeIcon, XIcon } from "./ui/icons";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
@@ -87,6 +88,8 @@ type MonthPlanSheetProps = {
   /** The app-wide mode: the sheet plans that wallet's categories. */
   scope: BudgetScope;
   onScopeChange: (scope: BudgetScope) => void;
+  /** Opens the partner's over-assigned account, where the commitment behind a blocker can actually be fixed. */
+  onOpenOverAssigned?: (partner: "anas" | "salma") => void;
   personalScope: Exclude<BudgetScope, "joint">;
   categories: Category[];
   frozenCategories: Category[];
@@ -108,6 +111,7 @@ export function MonthPlanSheet({
   planningMonth,
   scope,
   onScopeChange,
+  onOpenOverAssigned,
   personalScope,
   categories,
   frozenCategories,
@@ -133,6 +137,9 @@ export function MonthPlanSheet({
   const [agreement, setAgreement] = useState<ContributionAgreement | undefined>();
   const [currentPlanned, setCurrentPlanned] = useState<Map<string, number>>(new Map());
   const [currentSpent, setCurrentSpent] = useState<Map<string, number>>(new Map());
+  // Spending already recorded in the month being planned (only when that's this calendar month).
+  const [spentSoFar, setSpentSoFar] = useState<Map<string, number>>(new Map());
+  const planningThisMonth = planningMonth === today().slice(0, 7);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   // Draft amounts by normalised category id; missing = the saved amount.
@@ -175,11 +182,13 @@ export function MonthPlanSheet({
     setLoading(true);
     setLoadError("");
     try {
-      const [funds, summary, agreements] = await Promise.all([
+      const [funds, summary, agreements, thisMonth] = await Promise.all([
         fetchApiJson<{ funds: any[] }>(`/api/monthly-planning/funds?month=${planningMonth}`),
         fetchMonthlyData(currentMonth),
         fetchApiJson<{ agreements: ContributionAgreement[] }>("/api/contribution-agreements"),
+        planningThisMonth ? fetchMonthlyData(planningMonth) : Promise.resolve(null),
       ]);
+      setSpentSoFar(sumByCategory(thisMonth?.summary?.spentByCategory ?? []));
       setAgreement(agreements.agreements.find(a => a.month === planningMonth));
       setSaved(sumByCategory(funds.funds ?? []));
       setCurrentPlanned(sumByCategory(summary.summary?.assignedByCategory ?? []));
@@ -245,25 +254,96 @@ export function MonthPlanSheet({
 
   // Include saved frozen categories as commitments; drafts in every wallet
   // participate immediately, before any of them are saved.
+  // Totals are what you planned; costs are what that takes from unassigned money. Planning this month,
+  // spending already recorded comes off the cost (planCost), since Ready To Assign already absorbed it.
   const totals: PlanAmounts = { joint: 0, anas: 0, salma: 0 };
+  const costs: PlanAmounts = { joint: 0, anas: 0, salma: 0 };
   const catalog = new Map([...frozenCategories, ...activeCategories].map((c) => [normId(c.id), c]));
   for (const cat of catalog.values()) {
     const owner = getCategoryScope(cat, accounts);
-    if (owner) totals[owner] += amountFor(cat);
+    if (!owner) continue;
+    totals[owner] += amountFor(cat);
+    costs[owner] += planningThisMonth && cat.available != null ? planCost(amountFor(cat), cat.available - (saved.get(normId(cat.id)) ?? 0)) : amountFor(cat);
   }
-  const capacity = calculateMonthPlanCapacity(planningCapacity, totals, split);
+  const capacity = calculateMonthPlanCapacity(planningCapacity, costs, split);
   const confirmingAgreement = !agreement && totals.joint > 0;
   const notAssigned = capacity.pool[scope];
   const left = capacity.left[scope];
-  const shortfalls = (["anas", "salma"] as const)
-    .filter((partner) => capacity.left[partner] < -0.005)
-    .map((partner) => `${BUDGET_SCOPE_LABELS[partner]} is short by ${fmt(Math.ceil(-capacity.left[partner]))}`);
-  const capacityError = shortfalls.length ? `${shortfalls.join(". ")}. Reduce personal or Joint allocations before saving.` : "";
+  const shortPartners = (["anas", "salma"] as const).filter((partner) => capacity.left[partner] < -0.005);
+  const capacityError = shortPartners.length ? "short" : "";
+  // One cause per number: Joint's gap and who covers it, then each partner whose own money is already
+  // committed (or runs out after planning). The hero number is the result; the sentence says why.
+  // Never "for this plan": with nothing planned, every shortfall is one that already exists.
+  const name = (partner: "anas" | "salma") => BUDGET_SCOPE_LABELS[partner];
+  const roundUp = (value: number) => fmt(Math.ceil(value - 0.005));
+  const jointCovered = capacity.due.anas + capacity.due.salma > 0.005;
+  const jointReason = planningCapacity.joint < 0 && totals.joint > 0 ? "Joint is already short and its plan needs more"
+    : planningCapacity.joint < 0 ? "Joint is already short" : "Joint's plan needs more than it holds";
+  // Each view only talks about its own money: Joint names who covers its gap; a partner's view adds their own shortfall.
+  const partnerClauses = shortPartners.filter((partner) => partner === scope).map((partner) => {
+    const open = partner === scope ? undefined : () => onScopeChange(partner);
+    return planningCapacity[partner] < -0.005
+      ? <span key={partner}><Fact>{name(partner)}</Fact>&rsquo;s money is already <Fact tone="danger" onClick={open} label={`Show ${name(partner)}'s plan`}>{roundUp(-planningCapacity[partner])} over-assigned</Fact></span>
+      : <span key={partner}><Fact>{name(partner)}</Fact> is <Fact tone="danger" onClick={open} label={`Show ${name(partner)}'s plan`}>{roundUp(-capacity.left[partner])} short</Fact> after planning</span>;
+  });
+  // A shortfall rounds up everywhere, so the number and the sentence never disagree by one.
+  const shownLeft = left < 0 ? -Math.ceil(-left - 0.005) : Math.round(left);
+  // One thing at a time: in Joint's view, a partner whose money is already committed blocks saving, so that
+  // is all the sentence says until it's resolved. It names the amount, not the account (it opens their view).
+  const blockers = scope === "joint" ? (["anas", "salma"] as const).filter((partner) => planningCapacity[partner] < -0.005) : [];
+  const shortfallSummary = blockers.length > 0 ? <Summary className="plan-shortfall">{joinClauses(blockers.map((partner) => <span key={partner}><Fact>{name(partner)}</Fact> needs to free up <Fact tone="danger" onClick={() => onOpenOverAssigned ? onOpenOverAssigned(partner) : onScopeChange(partner)} label={`Review ${name(partner)}'s over-assigned account`}>{roundUp(-planningCapacity[partner])}</Fact></span>))} first.</Summary>
+    : (jointCovered || partnerClauses.length > 0) && <Summary className="plan-shortfall">
+    {jointCovered && (scope === "joint"
+      ? <>{jointReason}, so <Fact>{name("anas")}</Fact> puts in <Fact>{fmt(Math.round(capacity.due.anas))}</Fact> and <Fact>{name("salma")}</Fact> <Fact>{fmt(Math.round(capacity.due.salma))}</Fact>.</>
+      : capacity.due[scope] > 0.005 && <>{jointReason}, so <Fact>{name(scope)}</Fact> puts in <Fact>{fmt(Math.round(capacity.due[scope]))}</Fact>.</>)}
+    {jointCovered && (scope === "joint" || capacity.due[scope] > 0.005) && partnerClauses.length > 0 && " "}
+    {partnerClauses.length > 0 && <>{joinClauses(partnerClauses)}.</>}
+  </Summary>;
 
   const capacityLabel = left < 0 ? "Over capacity" : "Unassigned";
+
+  // Settle: once Joint's plan is saved, each partner's share and what Joint owes them net into one bank transfer.
+  // "Mark sent" records both sides (their full contribution and the advance repayment), so nothing is entered twice.
+  const [settling, setSettling] = useState<"anas" | "salma" | null>(null);
+  const [settleError, setSettleError] = useState("");
+  const settleIds = useRef<Record<string, string>>({});
+  const accountFor = (partner: "anas" | "salma") => accounts.find((a) => !/saving/i.test(a.label) && scopeFromAccountLabel(a.label) === partner);
+  const jointAccount = accounts.find((a) => !/saving/i.test(a.label) && /joined|joint/i.test(a.label));
+  const settleRows = scope !== "joint" || savedTotal <= 0 || changed.length > 0 || !jointAccount ? [] : (["anas", "salma"] as const).flatMap((partner) => {
+    const share = Math.round(capacity.due[partner] * 100) / 100;
+    const owed = Math.round((advances?.outstanding[partner] ?? 0) * 100) / 100;
+    return (share > 0.005 || owed > 0.005) && accountFor(partner) ? [{ partner, share, owed, net: Math.round((share - owed) * 100) / 100 }] : [];
+  });
+  const markSent = async ({ partner, share, owed }: (typeof settleRows)[number]) => {
+    if (settling) return;
+    setSettling(partner); setSettleError("");
+    const date = today();
+    try {
+      // The repayment is idempotent by request id, so it goes first: a retry after a failed transfer can't repeat it.
+      if (owed > 0.005) {
+        settleIds.current[partner] ??= crypto.randomUUID();
+        const response = await fetch("/api/contribution-repayments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner, amount: owed, date, requestId: settleIds.current[partner] }) });
+        if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't record the repayment.");
+      }
+      if (share > 0.005) {
+        const response = await fetch("/api/account-transfer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fromAccountId: accountFor(partner)!.id, toAccountId: jointAccount!.id, amount: share, date, note: `Joint contribution for ${planningMonth}` }) });
+        if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't record the contribution. Check Joined activity before retrying.");
+      }
+      delete settleIds.current[partner];
+      onSaved();
+    } catch (error) { setSettleError(error instanceof Error ? error.message : "Couldn't record this. Check Joined activity before retrying."); }
+    finally { setSettling(null); }
+  };
+  const settleList = settleRows.length > 0 && <div className="plan-settle">
+    {settleRows.map((row) => <div key={row.partner} className="plan-settle-row">
+      <Summary className="plan-shortfall">{row.net >= 0 ? <><Fact>{name(row.partner)}</Fact> sends <Fact>{fmt(Math.round(row.net))}</Fact></> : <>Joint sends <Fact>{name(row.partner)}</Fact> <Fact>{fmt(Math.round(-row.net))}</Fact></>}</Summary>
+      <button type="button" className="plan-copy" disabled={!!settling} onClick={() => void markSent(row)} aria-label={`Mark ${name(row.partner)}'s transfer sent`}>{settling === row.partner ? "Saving…" : "Mark sent"}</button>
+    </div>)}
+    {settleError && <Banner role="alert" tone="danger" compact>{settleError}</Banner>}
+  </div>;
   const personalRemaining = {
-    anas: Math.max(0, planningCapacity.anas - totals.anas),
-    salma: Math.max(0, planningCapacity.salma - totals.salma),
+    anas: Math.max(0, planningCapacity.anas - costs.anas),
+    salma: Math.max(0, planningCapacity.salma - costs.salma),
   };
 
   const jarItems = useMemo(
@@ -404,9 +484,9 @@ export function MonthPlanSheet({
   );
 
   const invalidExpressions = Object.values(expressions).some((text) => text.trim() !== "" && parseAmount(text) === null);
-  const contributionReservation = advanceReserve > 0 ? <section className="contribution-agreement" aria-label="Repay carried advances">
-    <h3>Repay advances</h3>
-    <dl className="contribution-rows">{advances?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0).map(m => <div key={m.month}><dt>{contributionMonthName(m.month)}</dt><dd><Money value={m.outstanding.anas + m.outstanding.salma} /></dd></div>)}<div className="contribution-emphasis"><dt>Reserved before new allocations</dt><dd><Money value={advanceReserve} /></dd></div></dl>
+  const advanceMonths = advances?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0) ?? [];
+  const contributionReservation = advanceReserve > 0 ? <section className="contribution-agreement" aria-label="Advances reserved before new allocations">
+    <dl className="contribution-rows">{advanceMonths.map(m => <div key={m.month}><dt>Repay {contributionMonthName(m.month)} advances</dt><dd><Money value={Math.round(m.outstanding.anas + m.outstanding.salma)} /></dd></div>)}{advanceMonths.length !== 1 && <div className="contribution-emphasis"><dt>Reserved for repayments</dt><dd><Money value={Math.round(advanceReserve)} /></dd></div>}</dl>
   </section> : null;
   const contributionAgreement = <ContributionAgreementEditor month={planningMonth} agreement={agreement} proposed={{ anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }} shares={split} disabled={loading || saving || changed.length > 0 || !!loadError || !!capacityError || !contributionsReady || totals.joint <= 0} onSaved={() => { void loadPlan(); onSaved(); }} />;
   const desktopGroups = [
@@ -419,25 +499,25 @@ export function MonthPlanSheet({
         <header className="sheet-header plan-desktop-header">
           <h1 className="plan-desktop-title">Plan {planLabel}</h1>
           <GlobalBudgetScopePicker value={scope} onChange={onScopeChange} personalScope={personalScope} />
-          <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close"><XIcon size={20} /></button>
+          <button type="button" className="plan-desktop-close" onClick={onClose} style={closeButtonStyle} aria-label="Close"><XIcon size={20} /></button>
         </header>
-        {loading ? <SkeletonRegion label="Loading monthly plan"><SkeletonRows label="Loading planned categories" count={4} iconSize={44} /></SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <div className="plan-desktop-body">
+        {loading ? <SkeletonRegion label="Loading monthly plan" style={{ padding: "0 var(--dialog-inset)" }}><SkeletonRows label="Loading planned categories" count={4} iconSize={44} /></SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <div className="plan-desktop-body">
           <main className="plan-desktop-main">
             {reviewing ? <>
               <div className="plan-desktop-heading"><h2>Review changes</h2><button type="button" onClick={() => setReviewing(false)}>Edit plan</button></div>
               <div className="plan-review-head"><span>Category</span><span>Saved</span><span>New plan</span></div>
               {changed.map(cat => <div className="plan-review-row" key={cat.id}><span>{cat.name} <small>{BUDGET_SCOPE_LABELS[getCategoryScope(cat, accounts) ?? scope]}</small></span><span>{fmt(saved.get(normId(cat.id)) ?? 0)}</span><strong>{fmt(amountFor(cat))}</strong></div>)}
             </> : <>
-              <div className="plan-desktop-heading"><h2>{BUDGET_SCOPE_LABELS[scope]} categories</h2>{hasCurrentPlan && <button type="button" disabled={saving || !!freezing} onClick={copyCurrentPlan}>Copy last month</button>}</div>
               <div className="plan-table" role="table" aria-label={`${BUDGET_SCOPE_LABELS[scope]} category plan`}>
-                <div className="plan-table-head" role="row"><span role="columnheader">Category</span><span role="columnheader">Last plan</span><span role="columnheader">Spent</span><span role="columnheader">{planLabel} plan</span><span /></div>
-                {desktopGroups.map(group => <div key={group.key} role="rowgroup"><div className="plan-group">{group.label}</div>{group.items.map(cat => {
+                <div className="plan-table-head" role="row"><span role="columnheader"><span className="sr-only">Category, </span>{desktopGroups[0]?.label}</span><span role="columnheader">Spent</span><span role="columnheader">Last plan</span><span role="columnheader" className="plan-column-action"><span className="sr-only">{planLabel} plan</span>{hasCurrentPlan && <button type="button" className="plan-copy" disabled={saving || !!freezing} onClick={copyCurrentPlan}>Copy last month</button>}</span></div>
+                {desktopGroups.map((group, index) => <div key={group.key} role="rowgroup">{index > 0 && <div className="plan-group">{group.label}</div>}{group.items.map(cat => {
                   const id = normId(cat.id);
                   const changedRow = amountFor(cat) !== (saved.get(id) ?? 0);
                   return <div className="plan-table-row" role="row" key={id}>
-                    <div className="plan-category" role="cell"><span className="plan-category-icon"><CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} /></span><span>{cat.name}</span></div>
-                    <span role="cell">{fmt(currentPlanned.get(id) ?? 0)}</span><span role="cell">{fmt(currentSpent.get(id) ?? 0)}</span>
-                    <div role="cell"><input className="field-input plan-amount" data-changed={changedRow || undefined} type="text" inputMode="decimal" aria-label={`${planLabel} plan for ${cat.name}${changedRow ? ", changed" : ""}`} aria-invalid={expressions[id] != null && expressions[id].trim() !== "" && parseAmount(expressions[id]) === null} value={expressions[id] ?? (amountFor(cat) ? String(amountFor(cat)) : "")} placeholder="0" disabled={saving || !!freezing} onFocus={e => e.currentTarget.select()} onChange={e => { const text = e.target.value.replace(/[^\d+\-*/, .()]/g, ""); setExpressions(prev => ({ ...prev, [id]: text })); const value = text.trim() ? parseAmount(text) : 0; if (value !== null) setAmount(cat, value); }} onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { const inputs = Array.from(e.currentTarget.closest(".plan-table")?.querySelectorAll<HTMLInputElement>("input:not(:disabled)") ?? []); const next = inputs[inputs.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)]; if (next) { e.preventDefault(); next.focus(); } else if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } } }} /></div>
+                    <div className="plan-category" role="cell"><CategoryIcon icon={cat.icon} categoryName={cat.name} size={32} /><span className="plan-category-name"><span>{cat.name}</span>{(spentSoFar.get(id) ?? 0) >= 0.5 && <small>{fmt(Math.round(spentSoFar.get(id)!))} spent so far</small>}</span></div>
+                    {/* Spent, then the plan it's measured against, then the new plan: copy moves the middle column one step right. */}
+                    <span role="cell" data-over={Math.round(currentSpent.get(id) ?? 0) > Math.round(currentPlanned.get(id) ?? 0) || undefined}>{fmt(Math.round(currentSpent.get(id) ?? 0))}</span><span role="cell">{fmt(Math.round(currentPlanned.get(id) ?? 0))}</span>
+                    <label role="cell" className="plan-amount-cell"><input className="field-input plan-amount" data-changed={changedRow || undefined} type="text" inputMode="decimal" placeholder="—" aria-label={`${planLabel} plan for ${cat.name}${changedRow ? ", changed" : ""}`} aria-invalid={expressions[id] != null && expressions[id].trim() !== "" && parseAmount(expressions[id]) === null} value={expressions[id] ?? (amountFor(cat) ? String(amountFor(cat)) : "")} disabled={saving || !!freezing} onFocus={e => e.currentTarget.select()} onChange={e => { const text = e.target.value.replace(/[^\d+\-*/, .()]/g, ""); setExpressions(prev => ({ ...prev, [id]: text })); const value = text.trim() ? parseAmount(text) : 0; if (value !== null) setAmount(cat, value); }} onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { const inputs = Array.from(e.currentTarget.closest(".plan-table")?.querySelectorAll<HTMLInputElement>("input:not(:disabled)") ?? []); const next = inputs[inputs.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)]; if (next) { e.preventDefault(); next.focus(); } else if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } } }} /></label>
                     <button type="button" className="plan-freeze" disabled={saving || !!freezing} onClick={() => void freeze(cat)} aria-label={`Freeze ${cat.name} and clear its ${planLabel} allocation`} title={`Freeze ${cat.name}`}><FreezeIcon size={17} aria-hidden="true" /></button>
                   </div>;
                 })}</div>)}
@@ -448,22 +528,17 @@ export function MonthPlanSheet({
           </main>
           <aside className="plan-summary" aria-label="Household summary">
             <div className="plan-summary-content">
-            <div className="plan-summary-title"><h2>Household</h2><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} /></div>
-            <div className="plan-summary-balance"><span>{BUDGET_SCOPE_LABELS[scope]} unassigned</span><strong className={left < 0 ? "plan-negative" : ""}><Money value={left} currency /></strong></div>
-            <div className="plan-summary-divider" />
-            <div className="plan-summary-line"><span>Joint planned</span><strong>{fmt(totals.joint)}</strong></div>
-            <div className="plan-summary-line"><span>Anas planned</span><strong>{fmt(totals.anas)}</strong></div>
-            <div className="plan-summary-line"><span>Salma planned</span><strong>{fmt(totals.salma)}</strong></div>
-            <div className="plan-summary-divider" />
-            <div className="plan-summary-line"><span>Anas for Joint</span><strong>{fmt(capacity.due.anas)}</strong></div>
-            <div className="plan-summary-line"><span>Salma for Joint</span><strong>{fmt(capacity.due.salma)}</strong></div>
+            <div className="plan-summary-balance"><span>{capacityLabel}</span><strong className={left < 0 ? "plan-negative" : ""}>{shownLeft < 0 && "−"}<Money value={Math.abs(shownLeft)} currency /></strong></div>
+            {shortfallSummary}
+            {(["joint", "anas", "salma"] as const).some(s => totals[s] > 0) && <dl className="plan-summary-lines">{(["joint", "anas", "salma"] as const).filter(s => totals[s] > 0).map(s => <div key={s} className="plan-summary-line"><dt>{BUDGET_SCOPE_LABELS[s]} planned</dt><dd>{fmt(Math.round(totals[s]))}</dd></div>)}</dl>}
             {confirmingAgreement && <p className="contribution-note">Saving the first shared plan confirms these monthly contributions.</p>}
             {contributionReservation}
-            {contributionAgreement}
+            {(agreement || totals.joint > 0) && contributionAgreement}
             </div>
             <div className="plan-summary-actions">
-              {(saveError || capacityError || invalidExpressions) && <Banner role="alert" tone="danger" compact>{saveError || capacityError || "Complete the amount before reviewing."}</Banner>}
-              {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions || !contributionsReady} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : <span role="status">{savedTotal > 0 ? "Plan saved" : "Nothing planned yet"}</span>}
+              {(saveError || invalidExpressions) && <Banner role="alert" tone="danger" compact>{saveError || "Complete the amount before reviewing."}</Banner>}
+              {settleList}
+              {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions || !contributionsReady} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : savedTotal > 0 && !settleList && <span role="status">Plan saved</span>}
             </div>
           </aside>
         </div>}
@@ -517,7 +592,7 @@ export function MonthPlanSheet({
               <span style={stickyLabelStyle}>{capacityLabel}</span>
               <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
                 {left < 0 ? "−" : ""}
-                <Money value={Math.abs(Math.round(left))} currency animated />
+                <Money value={Math.abs(shownLeft)} currency animated />
               </span>
             </div>
             {plannedTotal > 0 && (
@@ -544,7 +619,7 @@ export function MonthPlanSheet({
             <span style={heroLabelStyle}>{capacityLabel}</span>
             <span ref={setHeroTarget} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
               {left < 0 ? "−" : ""}
-              <Money value={Math.abs(Math.round(left))} currency animated />
+              <Money value={Math.abs(shownLeft)} currency animated />
             </span>
             {plannedTotal > 0 && (
               <span style={heroSubStyle}>
@@ -613,7 +688,9 @@ export function MonthPlanSheet({
         </div>
 
         <footer className="sheet-footer" style={footerStyle}>
-          {!loading && !loadError && (saveError || capacityError) && <Banner role="alert" tone="danger" compact>{saveError || capacityError}</Banner>}
+          {!loading && !loadError && saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
+          {!loading && !loadError && shortfallSummary}
+          {!loading && !loadError && settleList}
           {!loading && hasCurrentPlan && (
             <button type="button" onClick={copyCurrentPlan} disabled={loading || saving || !!freezing} style={copyLinkStyle}>
               Copy last month's plan

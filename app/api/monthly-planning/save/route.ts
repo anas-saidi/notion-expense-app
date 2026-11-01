@@ -7,7 +7,8 @@ import { notionFetchJson, queryDatabaseAll } from "../../../../lib/notion-api";
 import { contributionStore } from "../../../../lib/contribution-store";
 import { mirrorScope } from "../../../../lib/mirror/store";
 import { planningContext } from "../../../../lib/native/planning-context";
-import { calculateMonthPlanCapacity, type PlanAmounts } from "../../../components/month-plan-capacity";
+import { billToday } from "../../../../lib/bills";
+import { calculateMonthPlanCapacity, planCost, type PlanAmounts } from "../../../components/month-plan-capacity";
 import { getCategoryScope } from "../../../components/app-utils";
 
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
@@ -168,16 +169,19 @@ async function handlePOST(req: NextRequest) {
         const id = normalizeId(fund.properties?.Category?.relation?.[0]?.id ?? "");
         proposed.set(id, (proposed.get(id) ?? 0) + (fund.properties.Planned?.number ?? 0));
       }
+      const savedBefore = new Map(proposed);
       for (const allocation of allocations) {
         const id = normalizeId(allocation.categoryId);
         const existing = byCategory.get(id)?.properties.Planned?.number ?? 0;
         proposed.set(id, (proposed.get(id) ?? 0) - existing + allocation.amount);
       }
+      // Same rule as the sheet: this month, spending already recorded comes off what a plan costs.
+      const thisMonth = String(body.month) === billToday().slice(0, 7);
       const totals: PlanAmounts = { joint: 0, anas: 0, salma: 0 };
       for (const [id, amount] of proposed) {
         const category = categories.find(c => normalizeId(c.id) === id);
         const scope = category && getCategoryScope(category);
-        if (scope) totals[scope] += amount;
+        if (scope) totals[scope] += thisMonth && category.available != null ? planCost(amount, category.available - (savedBefore.get(id) ?? 0)) : amount;
       }
       const result = calculateMonthPlanCapacity(capacity, totals, split);
       if (result.left.anas < -.005 || result.left.salma < -.005) return NextResponse.json({ error: "This plan exceeds the money available after existing commitments and advance repayments. Refresh and reduce allocations." }, { status: 409 });

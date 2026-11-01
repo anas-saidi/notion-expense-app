@@ -32,7 +32,7 @@ describe("Notion bills contract", () => {
   });
   it("creates linked expenses without updating the schedule's expected amount", async () => {
     await payBill("token", { billId, period: "2026-10", amount: 550, date: "2026-10-06", accountId });
-    expect(assertExpenseFitsBudget).toHaveBeenCalledWith("token", { categoryId: catId, amount: 550 });
+    expect(assertExpenseFitsBudget).toHaveBeenCalledWith("token", { categoryId: catId, amount: 550, overspend: false });
     const call = vi.mocked(notionFetchJson).mock.calls.find(c => c[1] === "/pages")!;
     expect((call[2]!.body as any).properties).toMatchObject({ Type: { select: { name: "Expense" } }, Amount: { number: 550 }, Bill: { relation: [{ id: billId }] }, "Bill period": { rich_text: [{ text: { content: "2026-10" } }] } });
     expect(vi.mocked(notionFetchJson).mock.calls.some(c => c[2]?.method === "PATCH")).toBe(false);

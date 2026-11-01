@@ -8,7 +8,7 @@ async function handlePOST(req: NextRequest) {
 
   if (!token) return NextResponse.json({ error: "NOTION_TOKEN not set" }, { status: 500 });
 
-  const { name, amount, accountId, categoryId, date, repeat, billId } = await req.json();
+  const { name, amount, accountId, categoryId, date, repeat, billId, advance, overspend } = await req.json();
 
   if (!name || !amount || !accountId || !categoryId || !date) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -27,6 +27,8 @@ async function handlePOST(req: NextRequest) {
       accountId,
       categoryId,
       date,
+      advance: advance === true,
+      overspend: overspend === true,
     };
     const transaction = repeat && repeat !== "None" ? await createRecurringExpense(token, { ...input, repeat, billId }) : await createNotionExpense(token, input);
     return NextResponse.json({ success: true, id: transaction.id });

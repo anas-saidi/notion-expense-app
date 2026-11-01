@@ -876,8 +876,16 @@ button:hover .rebalance-btn-icon {
   }
 }
 
-html.has-open-sheet .app-content {
-  overflow-y: hidden !important;
+/* A modal sheet owns scrolling (HIG "Sheets", WAI-ARIA modal dialog): the page behind it stays put.
+   The page scrolls on <html>, so the lock goes there. A docked inspector isn't modal, so it leaves the page scrolling.
+   Scroll areas inside sheets contain their overscroll so reaching the end never drags the page. */
+html.has-open-sheet:not(.has-inspector),
+html.has-open-sheet:not(.has-inspector) body {
+  overflow: hidden;
+}
+html { scrollbar-gutter: stable; }
+.bottom-sheet-panel, .bottom-sheet-panel * {
+  overscroll-behavior: contain;
 }
 
 .wallet-overview-card {

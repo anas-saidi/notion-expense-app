@@ -26,7 +26,7 @@ const SavingsWithdrawSheet = dynamic(() => import("./components/SavingsWithdrawS
 const ManageScreen = dynamic(() => import("./components/ManageScreen").then(m => m.ManageScreen));
 const AccountDetailsSheet = dynamic(() => import("./components/AccountDetailsSheet").then(m => m.AccountDetailsSheet));
 const RebalanceSheet = dynamic(() => import("./components/RebalanceSheet").then(m => m.RebalanceSheet));
-import { calculateMonthPlanCapacity, getPlanningSplit, type PlanAmounts } from "./components/month-plan-capacity";
+import { calculateMonthPlanCapacity, getPlanningSplit, planCost, type PlanAmounts } from "./components/month-plan-capacity";
 const MonthPlanSheet = dynamic(() => import("./components/MonthPlanSheet").then(m => m.MonthPlanSheet));
 const TransactionDetailsSheet = dynamic(() => import("./components/TransactionDetailsSheet").then(m => m.TransactionDetailsSheet));
 import { getCategoryAllocatedByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
@@ -796,6 +796,17 @@ export default function App() {
     }
   };
 
+  // Rebalance only moves money between categories, so it can't fix every "Short by". Joint short because of
+  // advances owed back is covered by contributions (the plan); a partner short because a savings account holds
+  // more assigned than it has is fixed on that account (balance check or undoing a deposit).
+  const shortfallAction = (() => {
+    if (budgetScope === "joint") return advanceReserve > 0.005 ? { label: "Plan", onClick: () => openMonthlyPlan() } : undefined;
+    const overAssignedSavings = accounts
+      .filter(a => /saving/i.test(a.label) && scopeFromAccountLabel(a.label) === budgetScope && (a.readyToAssign ?? 0) < -0.005)
+      .sort((a, b) => (a.readyToAssign ?? 0) - (b.readyToAssign ?? 0))[0];
+    return overAssignedSavings ? { label: "Review", onClick: () => setDetailsAccount(overAssignedSavings) } : undefined;
+  })();
+
   const openMonthlyPlan = () => {
     if (monthlySummary.contributionError) { showToast("Planning is paused until confirmed contributions are available.", 4000); return; }
     if (!monthStartPlannerMonth) return;
@@ -806,10 +817,13 @@ export default function App() {
       const capacity = { ...assignBalanceByScope };
       const normalize = (id: string) => id.replace(/-/g, "").toLowerCase();
       const catalog = new Map([...categories, ...frozenCategories].map(category => [normalize(category.id), category]));
-      for (const fund of currentMonthFunds ?? []) {
-        const category = catalog.get(normalize(fund.categoryId));
+      const savedByCategory = new Map<string, number>();
+      for (const fund of currentMonthFunds ?? []) if (!fund.reverse) savedByCategory.set(normalize(fund.categoryId), (savedByCategory.get(normalize(fund.categoryId)) ?? 0) + fund.planned);
+      // Add back only what the saved plan actually took (planCost), so the sheet deducts it once.
+      for (const [id, saved] of savedByCategory) {
+        const category = catalog.get(id);
         const owner = category && getCategoryScope(category, accounts);
-        if (owner && !fund.reverse) capacity[owner] += fund.planned;
+        if (owner) capacity[owner] += category.available == null ? saved : planCost(saved, category.available - saved);
       }
       setCurrentPlanCapacity(capacity);
     } else setCurrentPlanCapacity(null);
@@ -1000,7 +1014,7 @@ export default function App() {
     setErrorMsg("");
     const isEditing = Boolean(editingTransactionId);
     try {
-      const payload = { name, amount: evalExpr(amount), accountId, categoryId, date, ...(transactionType === "Income" ? { incomeUse: isJointIncomeAccount(selectedAccount?.label ?? "") ? incomeUse : "contributions" } : {}), ...(!isEditing && transactionType === "Expense" ? { repeat, ...(recurringBillId ? { billId: recurringBillId } : {}) } : {}) };
+      const payload = { name, amount: evalExpr(amount), accountId, categoryId, date, ...(transactionType === "Income" ? { incomeUse: isJointIncomeAccount(selectedAccount?.label ?? "") ? incomeUse : "contributions" } : {}), ...(!isEditing && transactionType === "Expense" ? { repeat, ...(recurringBillId ? { billId: recurringBillId } : {}) } : {}), ...(saveAsAdvance ? { advance: true } : overspending ? { overspend: true } : {}) };
       const endpoint = isEditing ? "/api/transactions" : transactionType === "Income" ? "/api/monthly-income" : "/api/expense";
       const res = await fetch(endpoint, {
         method: isEditing ? "PATCH" : "POST",
@@ -1092,7 +1106,16 @@ export default function App() {
   const originalInCategory = isEditingTransaction && editingOriginal?.categoryId === selectedCat?.id ? editingOriginal!.amount : 0;
   const billShortfall = transactionType === "Expense" && selectedCat?.available != null && reservedForCategory > 0
     ? Math.max(0, reservedForCategory - (selectedCat.available + originalInCategory - parsedAmount)) : 0;
-  const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && accountId && (transactionType === "Income" || categoryId) && status === "idle" && !categoryUnfunded && !categoryOverBudget);
+  // A personal account paying a joint category is an advance: Joint owes it back, so an empty category
+  // doesn't block it. The category goes below zero until Joint covers it (design.md, "Advances").
+  const payerScope = selectedAccount && !/saving/i.test(selectedAccount.label) ? scopeFromAccountLabel(selectedAccount.label) : null;
+  const advanceEligible = transactionType === "Expense" && !!selectedCat && !isSavingsCategory(selectedCat)
+    && getCategoryScope(selectedCat, accounts) === "joint" && (payerScope === "anas" || payerScope === "salma");
+  // Spending that doesn't fit is still real: it saves once confirmed and the category goes below zero (design.md, "Overspending").
+  const overspending = categoryUnfunded || categoryOverBudget;
+  const saveAsAdvance = advanceEligible && overspending;
+  const belowZero = overspending ? Math.max(0, parsedAmount - originalInCategory - (selectedCat?.available ?? 0)) : 0;
+  const canSubmit = Boolean(amount && parsedAmount > 0 && name.trim() && accountId && (transactionType === "Income" || categoryId) && status === "idle");
   const suggestedCategory = suggestedCatId ? categories.find((c) => c.id === suggestedCatId) : undefined;
 
   return (
@@ -1143,6 +1166,16 @@ export default function App() {
         contributionsReady={!monthLoading && !monthError && !monthlySummary.contributionError}
         open={showMonthStartPlanner}
         onClose={() => setShowMonthStartPlanner(false)}
+        // Over-assignment is money already committed, not this plan: it's fixed on the account that holds
+        // more assigned than it has (a balance check, or undoing a savings deposit), so open that account.
+        onOpenOverAssigned={partner => {
+          const account = accounts
+            .filter(a => scopeFromAccountLabel(a.label) === partner && (a.readyToAssign ?? 0) < 0)
+            .sort((a, b) => (a.readyToAssign ?? 0) - (b.readyToAssign ?? 0))[0];
+          if (!account) return;
+          setShowMonthStartPlanner(false);
+          setDetailsAccount(account);
+        }}
         onSaved={() => {
           refreshBudgetData("Plan saved");
           void fetchNextMonthFunds().catch(() => {});
@@ -1220,6 +1253,7 @@ export default function App() {
           budgetScope={budgetScope}
           onOpenCategoryDetails={openCategoryDetails}
           onOpenRebalance={() => setShowRebalance(true)}
+          shortfallAction={shortfallAction}
           onReviveCategory={reviveCategory}
           onMoveContribution={() => {
             const sourceNeedle = budgetScope === "anas" ? "hubb" : "wife";
@@ -1322,6 +1356,8 @@ export default function App() {
         categoryUnfunded={categoryUnfunded}
         categoryOverBudget={categoryOverBudget}
         categoryShortfall={budgetGate.shortfall}
+        advanceBelowZero={saveAsAdvance ? belowZero : undefined}
+        overspendBelowZero={overspending && !saveAsAdvance ? belowZero : undefined}
         billShortfall={billShortfall}
         billsUnavailable={Boolean(billsError)}
         canSubmit={canSubmit}
