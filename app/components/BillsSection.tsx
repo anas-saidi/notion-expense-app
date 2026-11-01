@@ -4,7 +4,7 @@ import { sameText } from "./ui/TransactionRow";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Account, BudgetScope, Category } from "./app-types";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData, type BillOccurrence, type BillRepeat } from "@/lib/bills";
-import { categoryMatchesScope, expenseBudgetGate, fmtDate, monthBounds, parseAmount } from "./app-utils";
+import { categoryMatchesScope, expenseBudgetGate, fmt, fmtDate, monthBounds, parseAmount } from "./app-utils";
 import { CardHeader, CardHeaderAction } from "./ui/CardHeader";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ScreenChip } from "./ui/ScreenChip";
@@ -18,6 +18,7 @@ import { DatePicker, MonthPicker } from "./DatePicker";
 import { PickerPopover } from "./PickerPopover";
 import { AccountOptionList, CategoryOptionList } from "./TransactionPickers";
 import { useAppHaptics } from "./ui/useAppHaptics";
+import { Fact, Summary, joinClauses } from "./ui/Summary";
 import "./bills.css";
 
 type Props = { data: BillsData | null; loading: boolean; error: string | null; categories: Category[]; accounts: Account[]; scope: BudgetScope; onRetry: () => void; onChanged: () => Promise<void> };
@@ -42,6 +43,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const [showMore, setShowMore] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const [search, setSearch] = useState("");
+  const [day, setDay] = useState<string | null>(null);
   const categoryRef = useRef<HTMLButtonElement>(null); const accountRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (busy.current) return;
@@ -55,7 +57,8 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const cutoff = activeMonth ? monthBounds(`${activeMonth}-01`).end : "";
   const currentCutoff = currentMonth ? monthBounds(`${currentMonth}-01`).end : "";
   const currentDue = scoped.filter(o => (o.state === "Due" || o.state === "Overdue") && o.dueDate <= currentCutoff);
-  const shown = scoped.filter(o => filter === "Paid" ? o.state === "Paid" && o.payments.some(p => p.date.slice(0, 7) === activeMonth)
+  const monthBills = scoped.filter(o => o.dueDate.slice(0, 7) === activeMonth);
+  const shown = day ? monthBills.filter(o => o.dueDate === day) : scoped.filter(o => filter === "Paid" ? o.state === "Paid" && o.payments.some(p => p.date.slice(0, 7) === activeMonth)
     : filter === "Skipped" ? o.state === "Skipped" && o.period === activeMonth
     : (o.state === "Due" || o.state === "Overdue") && (activeMonth === currentMonth ? o.dueDate <= cutoff : o.dueDate.slice(0, 7) === activeMonth));
   const reservations = earmarkedByCategory(scoped, currentCutoff);
@@ -68,6 +71,15 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
     return (bill.state === "Due" || bill.state === "Overdue") && bill.dueDate <= currentCutoff && available != null && available < (reservations[normalizedId(bill.categoryId)] ?? 0);
   };
   const enabled = !saving && !savedPendingRefresh && !loading && !error;
+  const categoryOf = (bill: BillOccurrence) => categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId));
+  // Current month only: what's overdue, what's still due, and which bill comes next.
+  const overdue = currentDue.filter(o => o.state === "Overdue");
+  const next = currentDue.filter(o => o.state === "Due").sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+  const billsSummary = activeMonth !== currentMonth ? [] : [
+    overdue.length > 0 && <span key="overdue"><Fact>{overdue.length === 1 ? overdue[0].name : `${overdue.length} bills`}</Fact> {overdue.length === 1 ? "is" : "are"} <Fact tone="danger" onClick={() => { setDay(null); setFilter("Due"); }} label="Show due bills">overdue</Fact></span>,
+    currentDue.length > 0 && <span key="due"><Fact>{fmt(Math.round(currentDue.reduce((sum, o) => sum + o.amount, 0)))}</Fact> is still due this month</span>,
+    next && <span key="next"><Fact icon={<CategoryIcon icon={categoryOf(next)?.icon ?? null} categoryName={categoryOf(next)?.name} size={20} />}>{next.name}</Fact> {next.dueDate === data?.today ? "is due" : "is next, on"} <Fact onClick={() => details(next)} label={`${next.name}, view bill`}>{next.dueDate === data?.today ? "today" : fmtDate(next.dueDate)}</Fact></span>,
+  ].filter(Boolean);
 
   function move(next: View) { setShowMore(false); setView(next); setSaveError(""); setConfirm(null); setPicker(null); haptic("selection"); }
   function add() {
@@ -127,9 +139,12 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
         {saveError && <Banner role="alert" tone="danger" compact>{saveError}{savedPendingRefresh && <button type="button" className="bills-quiet-action" disabled={saving} onClick={retrySaved}>Refresh balances</button>}</Banner>}
         {loading ? <SkeletonRows /> : error ? <Banner role="alert" tone="danger" compact action={<button type="button" onClick={onRetry}>Retry</button>}>{error}</Banner> : <>
         {view === "list" && <>
-          <div className="bills-list-controls"><MonthPicker triggerClassName="composer-picker-chip" value={activeMonth} onChange={e => setMonth(e.target.value)} aria-label="Bill month" /><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div>
-          <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>
-          {shown.length ? shown.map(bill => <BillRow key={bill.id} bill={bill} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={filter === "Paid" ? activeMonth : undefined} />) : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}
+          <div className="bills-list-controls"><MonthPicker triggerClassName="composer-picker-chip" value={activeMonth} onChange={e => { setMonth(e.target.value); setDay(null); }} aria-label="Bill month" /><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div>
+          {billsSummary.length > 0 && <Summary>{joinClauses(billsSummary)}.</Summary>}
+          {activeMonth && <BillsCalendar month={activeMonth} today={data?.today ?? ""} bills={monthBills} categoryOf={categoryOf} selectedDay={day} onSelectDay={value => { setDay(day === value ? null : value); haptic("selection"); }} onOpenBill={details} />}
+          {day ? <div className="bills-day-heading"><span>{new Date(`${day}T12:00:00`).toLocaleDateString("en", { weekday: "long", day: "numeric", month: "long" })}</span><button type="button" className="bills-quiet-action" onClick={() => setDay(null)}>Show all</button></div>
+            : <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>}
+          {shown.length ? shown.map(bill => <BillRow key={bill.id} bill={bill} category={categoryOf(bill)} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={!day && filter === "Paid" ? activeMonth : undefined} hideDate={!!day} />) : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}
         </>}
         {view === "detail" && selected && <>
           <section className="bills-detail-summary"><div className="bills-detail-amount"><Money value={selected.amount} currency /></div>
@@ -192,7 +207,8 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
     </PickerPopover>
   </section>;
 }
-function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, needsFunding = false, compact = false }: { bill: BillOccurrence; category?: Category; onClick: () => void; onPay: () => void; onEdit: () => void; disabled: boolean; paidMonth?: string; needsFunding?: boolean; compact?: boolean }) {
+/** `hideDate`: the day heading above already names the date. */
+function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, needsFunding = false, compact = false, hideDate = false }: { bill: BillOccurrence; category?: Category; onClick: () => void; onPay: () => void; onEdit: () => void; disabled: boolean; paidMonth?: string; needsFunding?: boolean; compact?: boolean; hideDate?: boolean }) {
   const payment = bill.payments.find(p => !paidMonth || p.date.slice(0, 7) === paidMonth);
   const dateValue = payment?.date || bill.dueDate;
   const date = new Date(`${dateValue}T12:00:00`);
@@ -202,10 +218,39 @@ function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, 
   const status = bill.payments.length > 1 ? "Recorded twice" : bill.state === "Overdue" ? "Overdue" : needsFunding ? "Needs funding" : payment ? "Paid" : bill.state === "Skipped" ? "Skipped" : null;
   const showCategory = Boolean(category?.name) && !sameText(category!.name, bill.name);
   const row = <button type="button" className="bill-date-row" onClick={onClick} disabled={disabled} aria-label={`${bill.name}${category?.name ? `, ${category.name}` : ""}, ${payment ? "paid" : "due"} ${validDate ? date.toLocaleDateString("en", { day: "numeric", month: "long", year: "numeric" }) : "date unavailable"}, ${payment?.amount ?? bill.amount} MAD${status ? `, ${status}` : ""}, view bill`}>
-    <span className={`bill-date-tile${bill.state === "Overdue" ? " bill-date-overdue" : ""}`} aria-hidden="true"><span>{weekday}</span><strong>{day}</strong></span>
+    {!hideDate && <span className={`bill-date-tile${bill.state === "Overdue" ? " bill-date-overdue" : ""}`} aria-hidden="true"><span>{weekday}</span><strong>{day}</strong></span>}
     <span className="bill-date-copy"><span className="bill-date-title">{bill.name}</span>{(showCategory || status) && <span className="bill-date-context bill-date-metadata">{showCategory && <span>{category!.name}</span>}{status && <span className={["Overdue", "Needs funding", "Recorded twice"].includes(status) ? "bill-date-alert" : undefined}>{status}</span>}</span>}</span>
     <span className="bill-date-amount"><Money value={payment?.amount ?? bill.amount} /></span>
   </button>;
   if (bill.state !== "Due" && bill.state !== "Overdue") return row;
   return <SwipeToDelete flat surface={compact ? "var(--bill-row-surface, var(--bg))" : "var(--surface)"} disabled={disabled} actions={[{ label: "Pay due", icon: <ReceiptIcon size={17} />, onSelect: onPay }, { label: "Edit", icon: <EditIcon size={17} />, onSelect: onEdit }]}>{row}</SwipeToDelete>;
+}
+
+/** Month grid with each bill's category artwork on its due day (design.md, "Bills calendar"). Only inside All bills. */
+function BillsCalendar({ month, today, bills, categoryOf, selectedDay, onSelectDay, onOpenBill }: {
+  month: string; today: string; bills: BillOccurrence[]; categoryOf: (bill: BillOccurrence) => Category | undefined;
+  selectedDay: string | null; onSelectDay: (day: string) => void; onOpenBill: (bill: BillOccurrence) => void;
+}) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const days = new Date(year, monthNumber, 0).getDate();
+  const lead = (new Date(year, monthNumber - 1, 1).getDay() + 6) % 7; // Monday first
+  const label = new Date(year, monthNumber - 1, 1).toLocaleDateString("en", { month: "long" });
+  return <div className="bills-calendar" role="group" aria-label={`${label} bills by due day`}>
+    {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={i} className="bills-calendar-weekday" aria-hidden="true">{d}</span>)}
+    {Array.from({ length: lead }, (_, i) => <span key={`lead-${i}`} aria-hidden="true" />)}
+    {Array.from({ length: days }, (_, i) => {
+      const date = `${month}-${String(i + 1).padStart(2, "0")}`;
+      const onDay = bills.filter(b => b.dueDate === date);
+      if (!onDay.length) return <span key={date} className="bills-calendar-day" data-today={date === today || undefined} aria-hidden="true"><span className="bills-calendar-date">{i + 1}</span></span>;
+      // The day's most pressing state colours the cell: overdue, then due, then settled.
+      const state = onDay.some(b => b.state === "Overdue") ? "overdue" : onDay.some(b => b.state === "Due") ? "due" : "settled";
+      const first = onDay[0];
+      return <button key={date} type="button" className="bills-calendar-day" data-state={state} data-today={date === today || undefined} aria-pressed={selectedDay === date}
+        aria-label={`${new Date(`${date}T12:00:00`).toLocaleDateString("en", { day: "numeric", month: "long" })}: ${onDay.map(b => `${b.name}, ${b.amount} MAD, ${b.state.toLowerCase()}`).join("; ")}`}
+        onClick={() => onDay.length === 1 ? onOpenBill(first) : onSelectDay(date)}>
+        <span className="bills-calendar-art"><CategoryIcon icon={categoryOf(first)?.icon ?? null} categoryName={categoryOf(first)?.name} size={24} />{onDay.length > 1 && <span className="bills-calendar-more">+{onDay.length - 1}</span>}</span>
+        <span className="bills-calendar-date">{i + 1}</span>
+      </button>;
+    })}
+  </div>;
 }
