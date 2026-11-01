@@ -1,4 +1,6 @@
 "use client";
+import { PlanPartnerRemaining } from "./PlanPartnerRemaining";
+import { clearUnchangedPlanDraft, parsePlanDraft, planDraftKey, restorePlanDraft, type LocalPlanDraft } from "./month-plan-draft";
 import { MonthPlanReview } from "./MonthPlanReview";
 import { MonthPlanReceipt } from "./MonthPlanReceipt";
 import { createPlanReceipt, confirmPlanReceipt, persistMonthPlan, type PlanReceipt } from "./month-plan-receipt";
@@ -84,6 +86,7 @@ type MonthPlanSheetProps = {
   onClose: () => void;
   /** Called after a save so the app can refresh balances and the Home banner. */
   onSaved: () => void;
+  onDraftSaved: () => void;
   /** Called after a category is unfrozen so the app can refetch categories. */
   onCategoriesChanged: () => void;
   /** "YYYY-MM" of the month being planned (current month when still unfunded, otherwise next month). */
@@ -111,6 +114,7 @@ export function MonthPlanSheet({
   open,
   onClose,
   onSaved,
+  onDraftSaved,
   onCategoriesChanged,
   planningMonth,
   scope: openingScope,
@@ -149,6 +153,9 @@ export function MonthPlanSheet({
   const [loadError, setLoadError] = useState("");
   // Draft amounts by normalised category id; missing = the saved amount.
   const [draft, setDraft] = useState<Record<string, number>>({});
+  const draftKey = planDraftKey(personalScope, planningMonth);
+  const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const [draftNotice, setDraftNotice] = useState("");
   const [locallyFrozen, setLocallyFrozen] = useState<Category[]>([]);
   const [freezing, setFreezing] = useState<string | null>(null);
   const freezeLock = useRef(false);
@@ -167,6 +174,7 @@ export function MonthPlanSheet({
   const saveLock = useRef(false);
   const planPanel = useRef<HTMLDivElement>(null);
   const saveSession = useRef(0);
+  const planRead = useRef(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   // Once the hero number scrolls away, a compact bar keeps the jar and number in view.
@@ -188,6 +196,7 @@ export function MonthPlanSheet({
   }, [open, scrollRoot, heroTarget]);
 
   const loadPlan = async () => {
+    const request = ++planRead.current;
     setLoading(true);
     setLoadError("");
     try {
@@ -197,20 +206,36 @@ export function MonthPlanSheet({
         fetchApiJson<{ agreements: ContributionAgreement[] }>("/api/contribution-agreements"),
         planningThisMonth ? fetchMonthlyData(planningMonth) : Promise.resolve(null),
       ]);
+      if (request !== planRead.current) return;
       setSpentSoFar(sumByCategory(thisMonth?.summary?.spentByCategory ?? []));
       setAgreement(agreements.agreements.find(a => a.month === planningMonth));
-      setSaved(sumByCategory(funds.funds ?? []));
+      const savedAmounts = sumByCategory(funds.funds ?? []);
+      setSaved(savedAmounts);
+      try {
+        const raw = localStorage.getItem(draftKey);
+        const stored = parsePlanDraft(raw, planningMonth);
+        setHasLocalDraft(!!stored);
+        if (stored) {
+          const activeIds = new Set(categories.filter(c => !c.archived && !c.snoozed).map(c => normId(c.id)));
+          const restored = restorePlanDraft(stored, savedAmounts, activeIds);
+          setDraft(restored.amounts);
+          setExpressions(restored.expressions);
+          onScopeChange(stored.scope);
+          setDraftNotice(restored.changedSinceDraft ? "The saved plan changed since this draft. Review the amounts before saving." : restored.unavailable ? "Some draft categories are no longer available. Review the remaining amounts." : "");
+        } else if (raw) setDraftNotice("The browser draft could not be restored. Your saved plan is unchanged.");
+      } catch { setDraftNotice("Browser drafts are unavailable. Check this browser’s storage settings."); }
       setCurrentPlanned(sumByCategory(summary.summary?.assignedByCategory ?? []));
       setCurrentSpent(sumByCategory(summary.summary?.spentByCategory ?? []));
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Couldn't load the plan");
+      if (request === planRead.current) setLoadError(e instanceof Error ? e.message : "Couldn't load the plan");
     } finally {
-      setLoading(false);
+      if (request === planRead.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     saveSession.current += 1;
+    planRead.current += 1;
     setReceipt(null);
     if (!open) { setLoading(true); return; }
     onScopeChange(openingScope);
@@ -222,8 +247,10 @@ export function MonthPlanSheet({
     setHeroHidden(false);
     setCollapsed(new Set(["frozen"]));
     setSaveError("");
+    setHasLocalDraft(false);
+    setDraftNotice("");
     void loadPlan();
-  }, [open, planningMonth]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, planningMonth, personalScope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const amountFor = (cat: Category) => draft[normId(cat.id)] ?? saved.get(normId(cat.id)) ?? 0;
 
@@ -313,6 +340,9 @@ export function MonthPlanSheet({
   </Summary>;
 
   const capacityLabel = left < 0 ? "Over capacity" : "Unassigned";
+  const partnerRemaining = contributionsReady
+    ? <PlanPartnerRemaining scope={scope} left={capacity.left} />
+    : <SkeletonRegion label="Loading remaining amounts"><Skeleton style={{ width: 140, height: 14, marginBottom: 12 }} /><Skeleton style={{ height: 40 }} /></SkeletonRegion>;
 
   // After Joint's plan is saved, each partner sees what's left of their share, kept current by every transfer to
   // Joined and every Joint bill they pay from their own account (both already count as contributions). An advance
@@ -431,10 +461,35 @@ export function MonthPlanSheet({
     }
   };
 
+  const saveDraft = () => {
+    if (loading || saving || freezing || loadError) return;
+    try {
+      const entries = Object.fromEntries(activeCategories.flatMap(cat => {
+        const id = normId(cat.id), amount = amountFor(cat), base = saved.get(id) ?? 0;
+        return amount !== base || expressions[id] !== undefined ? [[id, { amount, base, ...(expressions[id] !== undefined ? { expression: expressions[id] } : {}) }]] : [];
+      }));
+      const local: LocalPlanDraft = { version: 1, month: planningMonth, scope, savedAt: new Date().toISOString(), entries };
+      localStorage.setItem(draftKey, JSON.stringify(local));
+      setHasLocalDraft(true);
+      onDraftSaved();
+      onClose();
+    } catch { setSaveError("Couldn’t save the draft in this browser. Check storage settings and try again."); }
+  };
+  const discardDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+      setDraft({}); setExpressions({}); setHasLocalDraft(false); setDraftNotice(""); setReviewing(false);
+    } catch { setSaveError("Couldn’t remove the draft from this browser."); }
+  };
+  const draftStatus = hasLocalDraft && <div className="plan-draft-status"><span>Browser draft restored</span><button type="button" className="plan-copy" disabled={saving || !!freezing} onClick={discardDraft}>Discard draft</button></div>;
+  const draftWarning = draftNotice && <Banner tone="warning" compact>{draftNotice}</Banner>;
+
   const save = async () => {
     if (!changed.length || loading || saveLock.current || freezing || loadError || capacityError || !contributionsReady) return;
     saveLock.current = true;
     const session = saveSession.current;
+    let storedDraft: string | null = null;
+    try { storedDraft = localStorage.getItem(draftKey); } catch { /* Saving the actual plan does not require browser storage. */ }
     const snapshot = createPlanReceipt(planningMonth, [...catalog.values()].flatMap(cat => {
       const owner = getCategoryScope(cat, accounts);
       return owner ? [{ id: cat.id, name: cat.name, scope: owner, amount: amountFor(cat) }] : [];
@@ -452,6 +507,7 @@ export function MonthPlanSheet({
         shares: split,
         expectedVersion: null,
       } : undefined);
+      try { clearUnchangedPlanDraft(localStorage, draftKey, storedDraft); } catch { /* Keep a confirmed save successful even if browser storage becomes unavailable. */ }
       onSaved();
       // A response from a dismissed editor must not replace a newly opened month's draft.
       if (session !== saveSession.current) return;
@@ -462,6 +518,8 @@ export function MonthPlanSheet({
       });
       setDraft({});
       setExpressions({});
+      setHasLocalDraft(false);
+      setDraftNotice("");
       setReviewing(false);
       if (result.agreement) setAgreement(result.agreement);
       setReceipt(confirmPlanReceipt(snapshot, result.agreement ?? agreement, result.warning));
@@ -557,6 +615,8 @@ export function MonthPlanSheet({
         </header>
         {loading ? <SkeletonRegion label="Loading monthly plan" style={{ padding: "0 var(--dialog-inset)" }}><SkeletonRows label="Loading planned categories" count={4} iconSize={44} /></SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <div className="plan-desktop-body">
           <main className="plan-desktop-main">
+            {draftStatus}
+            {draftWarning}
             {reviewing ? <>
               <MonthPlanReview items={changed.map(cat => ({
                 id: cat.id, name: cat.name, icon: cat.icon,
@@ -588,10 +648,11 @@ export function MonthPlanSheet({
           <aside className="plan-summary" aria-label="Household summary">
             <div className="plan-summary-content">
             <div className="plan-summary-balance"><span>{capacityLabel}</span><strong className={left < 0 ? "plan-negative" : ""}>{shownLeft < 0 && "−"}<Money value={Math.abs(shownLeft)} currency /></strong></div>
+            {partnerRemaining}
             {shortfallSummary}
             {/* The scope you're viewing already shows its total in the bar at the foot, so only the other scopes get a row. */}
             {(["joint", "anas", "salma"] as const).some(s => s !== scope && totals[s] > 0) && <dl className="plan-summary-lines">{(["joint", "anas", "salma"] as const).filter(s => s !== scope && totals[s] > 0).map(s => <div key={s} className="plan-summary-line"><dt>{BUDGET_SCOPE_LABELS[s]} planned</dt><dd>{fmt(Math.round(totals[s]))}</dd></div>)}</dl>}
-            {confirmingAgreement && <p className="contribution-note">Saving confirms {planLabel}'s contributions.</p>}
+            {confirmingAgreement && <p className="contribution-note">Saving the plan confirms {planLabel}'s contributions.</p>}
             {advanceRows}
             {insights}
             {(agreement || totals.joint > 0) && contributionAgreement}
@@ -600,6 +661,7 @@ export function MonthPlanSheet({
               {planCompare}
               {(saveError || invalidExpressions) && <Banner role="alert" tone="danger" compact>{saveError || "Complete the amount before reviewing."}</Banner>}
               {settleList}
+              {(hasLocalDraft || changed.length > 0 || Object.keys(expressions).length > 0) && <button type="button" className="plan-copy plan-save-draft" disabled={saving || !!freezing} onClick={saveDraft}>Save draft</button>}
               {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions || !contributionsReady} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : savedTotal > 0 && !settleList && <span role="status">Plan saved</span>}
             </div>
           </aside>
@@ -630,6 +692,8 @@ export function MonthPlanSheet({
           </button>
         </header>
 
+        {draftStatus}
+        {draftWarning}
         <div className="plan-mobile-scope"><GlobalBudgetScopePicker label="Monthly plan wallet" value={scope} onChange={onScopeChange} personalScope={personalScope} /></div>
         <div style={scrollAreaStyle}>
           {/* The compact bar floats over the list on a blur that thins out below it — no hard bottom edge. */}
@@ -754,13 +818,13 @@ export function MonthPlanSheet({
 
         <footer className="sheet-footer" style={footerStyle}>
           {!loading && !loadError && saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
+          {!loading && !loadError && partnerRemaining}
           {!loading && !loadError && shortfallSummary}
           {!loading && !loadError && settleList}
-          {!loading && hasCurrentPlan && (
-            <button type="button" onClick={copyCurrentPlan} disabled={loading || saving || !!freezing} style={copyLinkStyle}>
-              Copy last month's plan
-            </button>
-          )}
+          {!loading && !loadError && (hasCurrentPlan || hasLocalDraft || changed.length > 0) && <div className="plan-mobile-actions">
+            {hasCurrentPlan && <button type="button" onClick={copyCurrentPlan} disabled={saving || !!freezing} style={copyLinkStyle}>Copy last month</button>}
+            {(hasLocalDraft || changed.length > 0 || Object.keys(expressions).length > 0) && <button type="button" className="plan-copy plan-save-draft" disabled={saving || !!freezing} onClick={saveDraft}>Save draft</button>}
+          </div>}
           <div style={footerRowStyle} className="planner-footer-row">
             {/* A month's plan is a big commitment: slide to save, so a stray tap never does. */}
             {loading ? <SkeletonRegion label="Loading plan status"><Skeleton style={{ width: 140, height: 18 }} /></SkeletonRegion> : loadError ? null : changed.length || saving ? (

@@ -132,3 +132,20 @@
 [data-plan-scope="anas"] { --select-color:var(--partner-husband); --select-ink:var(--partner-husband-strong); --select-wash:color-mix(in srgb, var(--partner-husband) 13%, var(--surface)); --select-edge:color-mix(in srgb, var(--partner-husband) 34%, transparent); }
 [data-plan-scope="salma"] { --select-color:var(--partner-wife); --select-ink:var(--partner-wife-strong); --select-wash:color-mix(in srgb, var(--partner-wife) 13%, var(--surface)); --select-edge:color-mix(in srgb, var(--partner-wife) 34%, transparent); }
 .plan-mobile-scope { display:flex; justify-content:center; flex-shrink:0; padding-bottom:16px; }
+
+.plan-partner-remaining h3 { margin:0 0 8px; color:var(--muted); font-size:13px; line-height:20px; font-weight:500; }
+.plan-partner-remaining dl { display:grid; gap:8px; margin:0; }
+.plan-partner-remaining dl > div { display:flex; align-items:baseline; justify-content:space-between; gap:16px; font-size:14px; line-height:20px; }
+.plan-partner-remaining dt { color:var(--text2); }
+.plan-partner-remaining dd { margin:0; color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
+.plan-partner-remaining dd[data-short] { color:var(--danger); }
+.plan-partner-remaining .plan-remaining-short { font-size:12px; font-weight:400; }
+.plan-draft-status { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; color:var(--muted); font-size:13px; }
+.planner-wrap > .plan-draft-status { padding:0 24px; }
+.plan-save-draft { min-height:44px; width:100%; }
+.planner-wrap .plan-partner-remaining { width:100%; }
+
+.plan-mobile-actions { display:flex; align-items:center; gap:12px; }
+.plan-mobile-actions > button { flex:1; width:auto; }
+.planner-wrap .plan-partner-remaining dl { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.planner-wrap .plan-partner-remaining dl > div { display:grid; gap:4px; }

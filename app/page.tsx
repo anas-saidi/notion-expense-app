@@ -1208,6 +1208,7 @@ export default function App() {
           refreshBudgetData();
           void fetchNextMonthFunds().catch(() => {});
         }}
+        onDraftSaved={() => showToast("Plan draft saved in this browser", 2400)}
         onCategoriesChanged={() => {
           void fetchCategoryCatalog().catch(error => showToast(error.message));
         }}

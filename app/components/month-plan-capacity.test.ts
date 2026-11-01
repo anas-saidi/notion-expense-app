@@ -59,3 +59,10 @@ it("nets spending recorded before the plan out of what the plan costs", () => {
   expect(planCost(3800, 50)).toBe(3800); // category holds money: the full plan
   expect(planCost(3800, null)).toBe(3800); // balance unknown (or a future month): the full plan
 });
+
+
+it("shows each partner's remainder after personal allocations and their Joint share", () => {
+  const result = calculate({ joint: 1000, anas: 6000, salma: 4000 }, { joint: 3800, anas: 2000, salma: 500 }, split);
+  expect(result.left.anas).toBe(2180);
+  expect(result.left.salma).toBe(2520);
+});
