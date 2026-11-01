@@ -134,8 +134,11 @@ export function calculateContributionStatus({
   const agreedMonth = advances?.months.find(m => m.month === agreement?.month);
   const anasActual = agreedMonth?.contributed.anas ?? anasTransferred - debt.anasRepaid + anasDirectSpend;
   const salmaActual = agreedMonth?.contributed.salma ?? salmaTransferred - debt.salmaRepaid + salmaDirectSpend;
+  // Earlier advances are owed to their partner, not free Joined money (same as the plan sheet's reserve). Splitting
+  // them into the gap and then applying each partner's own advance keeps the split while the total still closes the gap.
+  const advanceCents = advances ? cents(advances.outstanding.anas) + cents(advances.outstanding.salma) : 0;
   // Unassigned income remains outside existing category commitments until allocated.
-  const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance - savingsReserve - (joinedAccount.unassignedIncome ?? 0) + debt.anas + debt.salma));
+  const gapCents = Math.max(0, cents(getCategoryAvailableByScope(categories, accounts).joint) - cents(joinedAccount.balance - savingsReserve - (joinedAccount.unassignedIncome ?? 0) + debt.anas + debt.salma) + advanceCents);
   const targetCents = cents(anasActual) + cents(salmaActual) + gapCents;
   // A partner already above their share owes zero; cap the other partner at
   // the household shortfall so paying dues never demands an implicit refund.

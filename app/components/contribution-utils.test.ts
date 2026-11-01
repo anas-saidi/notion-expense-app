@@ -160,3 +160,25 @@ it("does not recalculate agreed dues or show settled when the agreement read is 
     ...monthlySummary, contributionError: "Shared database unavailable", contributionAgreements: [],
   } })).toBeNull();
 });
+
+it("splits earlier advances into the gap so applying them keeps 65/35 and still closes it", () => {
+  const october = { month: "2026-10", original: { anas: 650, salma: 350 }, targets: { anas: 650, salma: 350 }, shares: { anas: .65, salma: .35 }, confirmedAt: "", updatedAt: "", version: "v1" };
+  const paid: Transaction[] = [
+    { ...transactions[0], id: "oa", amount: 1650, date: "2026-10-02" },
+    { ...transactions[1], id: "os", amount: 350, date: "2026-10-02" },
+  ];
+  const november = { ...monthlySummary, start: "2026-11-01", end: "2026-11-30", contributionAgreements: [october] };
+  const status = (current: Transaction[]) => calculateContributionStatus({
+    accounts, categories: [{ ...categories[0], available: 3000 }], transactions: current, debtTransactions: [...paid, ...current], monthlySummary: november,
+  })!;
+  // Joined holds 2000 against 3000 allocated: 1000 short. Anas's 1000 advance is his, so the split runs over 2000.
+  const before = status([]);
+  expect([before.anasDue, before.salmaDue]).toEqual([1300, 700]);
+  const applied: Transaction[] = [
+    { ...transactions[0], id: "off", amount: 1000, date: "2026-11-01", contributionRepaymentId: "offset:r1" },
+    { id: "rep", name: "Repayment", amount: 1000, date: "2026-11-01", category: null, accountId: null, type: "Transfer", fromAccountId: "joint", toAccountId: "anas", contributionRepaymentId: "r1" },
+  ];
+  const after = status(applied);
+  expect(after.advances?.outstanding).toEqual({ anas: 0, salma: 0 });
+  expect([after.anasDue, after.salmaDue]).toEqual([300, 700]);
+});

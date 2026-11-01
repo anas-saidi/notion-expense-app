@@ -9,12 +9,11 @@ import { contributionDue } from "./contribution-utils";
 import type { ContributionAgreement, ContributionLedger, Partner, PartnerAmounts } from "../../lib/contribution-agreements";
 import { money } from "../../lib/contribution-agreements";
 import { fmt, parseAmount, today } from "./app-utils";
-import { Fact } from "./ui/Summary";
 import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
 import { DatePicker, MonthPicker } from "./DatePicker";
-import { XIcon, ChevronRightIcon, ChevronDownIcon, ReceiptIcon } from "./ui/icons";
+import { XIcon, ChevronRightIcon, ChevronDownIcon } from "./ui/icons";
 import { SkeletonRows } from "./ui/Skeleton";
 import "./contributions.css";
 
@@ -25,7 +24,7 @@ export function ContributionEntry({ status, scope, onOpen }: { status: Contribut
   const owing = status?.advances?.outstanding;
   const amount = owing ? scope === "joint" ? money(owing.anas + owing.salma) : owing[scope] : 0;
   return <button type="button" className="contribution-entry" onClick={onOpen}>
-    <span><span className="contribution-entry-title">{amount > 0 ? scope === "joint" ? "Owed to you both" : "Joined owes you" : "Monthly contributions"}</span>
+    <span><span className="contribution-entry-title">{amount > 0 ? "Advances to apply" : "Monthly contributions"}</span>
       {amount <= 0 && <span className="contribution-entry-detail">{status?.agreement ? contributionMonthName(status.agreement.month) : "Review contributions"}</span>}</span>
     <span className="contribution-entry-value">{amount > 0 && <Money value={amount} />}<ChevronRightIcon size={16} /></span>
   </button>;
@@ -70,12 +69,10 @@ export function ContributionAgreementEditor({ month, agreement, proposed, shares
   </section>;
 }
 
-export function ContributionDetails({ open, month, scope, status, currentAdvances, cash, loading, error, onClose, onChanged, onRetry, onMonthChange, onOpenPlan, planMonthLabel }: {
-  open: boolean; month: string; scope: BudgetScope; status: ContributionStatus | null; cash: number | null; loading: boolean; error: boolean;
+export function ContributionDetails({ open, month, scope, status, currentAdvances, loading, error, onClose, onChanged, onRetry, onMonthChange }: {
+  open: boolean; month: string; scope: BudgetScope; status: ContributionStatus | null; loading: boolean; error: boolean;
   currentAdvances: ContributionLedger | null; onMonthChange: (month: string) => void;
   onClose: () => void; onChanged: () => void; onRetry: () => void;
-  /** Opens the month plan, whose Settle step nets each advance against that partner's contribution. */
-  onOpenPlan?: () => void; planMonthLabel?: string;
 }) {
   const [repaying, setRepaying] = useState<Partner | null>(null);
   const [amount, setAmount] = useState("");
@@ -85,14 +82,30 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
   const [uncertain, setUncertain] = useState(false);
   const [success, setSuccess] = useState("");
   const requestId = useRef("");
+  const [applying, setApplying] = useState<Partner | null>(null);
+  const applyIds = useRef<Partial<Record<Partner, string>>>({});
   useEffect(() => { if (open) { setRepaying(null); setSaveError(""); setSuccess(""); setUncertain(false); } }, [open, month]);
   const ledger = currentAdvances;
   const current = ledger?.months.find(m => m.month === month);
   const outstanding = ledger?.outstanding ?? { anas: 0, salma: 0 };
-  const totalOwed = money(outstanding.anas + outstanding.salma);
   const partners: Partner[] = scope === "joint" ? ["anas", "salma"] : [scope];
   const scopedOwed = money(partners.reduce((sum, partner) => sum + outstanding[partner], 0));
   const scopedDue = money(partners.reduce((sum, partner) => sum + (status ? contributionDue(status, partner) : 0), 0));
+  // An advance comes off this month's contribution: the offset is dated today, so only the current month can take it.
+  const canApply = month === today().slice(0, 7);
+  const applicable = (partner: Partner) => canApply && status ? money(Math.min(outstanding[partner], contributionDue(status, partner))) : 0;
+  const applyAdvance = async (partner: Partner) => {
+    if (applying || saving) return;
+    setApplying(partner); setSaveError(""); setSuccess("");
+    try {
+      applyIds.current[partner] ??= crypto.randomUUID();
+      const response = await fetch("/api/contribution-offsets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner, amount: applicable(partner), date: today(), requestId: applyIds.current[partner] }) });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Couldn't apply the advance.");
+      delete applyIds.current[partner];
+      setSuccess(`${person(partner)}'s advance applied`); onChanged();
+    } catch (e) { setSaveError(e instanceof Error ? e.message : "Couldn't apply the advance. Retry to finish it safely."); }
+    finally { setApplying(null); }
+  };
   const startRepayment = (partner: Partner) => { setRepaying(partner); setAmount(String(outstanding[partner])); setDate(today()); setSaveError(""); setSuccess(""); setUncertain(false); requestId.current = crypto.randomUUID(); };
   const repay = async () => {
     const value = parseAmount(amount);
@@ -116,12 +129,11 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
       <MonthPicker value={month} onChange={event => onMonthChange(event.target.value)} aria-label="Contribution month" />
       {loading ? <SkeletonRows label="Loading contributions" count={4} /> : error || !status ? <Banner tone="danger" role="alert" title="Contributions unavailable" action={<button className="contribution-text" type="button" onClick={onRetry}>Retry</button>} /> : <>
         <section className="contribution-overview" aria-label="Contribution summary">
-          {scopedOwed > 0 ? <><span>{scope === "joint" ? "Joined owes you both" : "Joined owes you"}</span><p className="contribution-hero-amount"><Money value={scopedOwed} currency /></p>
-            {scope === "joint" && <div className="contribution-split" role="img" aria-label={`Outstanding repayments: ${partners.filter(partner => outstanding[partner] > 0).map(partner => `${person(partner)} ${fmt(outstanding[partner])} MAD`).join(", ")}`}>
+          {scopedOwed > 0 ? <><span>Advances to apply</span><p className="contribution-hero-amount"><Money value={scopedOwed} currency /></p>
+            {scope === "joint" && <div className="contribution-split" role="img" aria-label={`Advances: ${partners.filter(partner => outstanding[partner] > 0).map(partner => `${person(partner)} ${fmt(outstanding[partner])} MAD`).join(", ")}`}>
               {partners.filter(partner => outstanding[partner] > 0).map(partner => <span key={partner} className="contribution-split-part" data-partner={partner} style={{ flexGrow: outstanding[partner] }} />)}
             </div>}
-            {/* Joined rarely has the cash to repay on its own; advances settle by netting against the next contributions. */}
-            {onOpenPlan && planMonthLabel ? <span className="contribution-note">Settled with <Fact onClick={onOpenPlan} label={`Open ${planMonthLabel}'s plan`}>{planMonthLabel}&rsquo;s plan</Fact></span> : <span className="contribution-note">Reserved until repaid</span>}</>
+            <span className="contribution-note">{partners.some(partner => applicable(partner) > 0) ? "Applying one takes it off what that person puts in. No money moves." : "Comes off the next month someone puts money in."}</span></>
             : scopedDue > 0 ? <><span>Due to Joined</span><p className="contribution-hero-amount"><Money value={scopedDue} currency /></p></>
             : <p className="contribution-all-settled">{status.agreement ? "All settled" : "No agreed amounts"}</p>}
         </section>
@@ -134,7 +146,6 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
             <div className="contribution-person-main">
               <div className="contribution-person-summary">
                 <span className="contribution-person-name"><strong>{person(partner)}</strong>{due > 0.005 ? <span>{fmt(due)} due to Joined</span> : !status.agreement ? <span>Not confirmed</span> : null}</span>
-                {outstanding[partner] > 0 && <strong className="contribution-person-amount"><Money value={outstanding[partner]} /></strong>}
               </div>
               <details className="contribution-breakdown">
                 <summary aria-label={`View breakdown for ${person(partner)}`}><span>View breakdown</span><ChevronDownIcon size={16} aria-hidden="true" /></summary>
@@ -144,10 +155,12 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
                 <div><dt>Contributed</dt><dd><Money value={actual} /></dd></div>
                 {current && <div><dt>Above original</dt><dd><Money value={current.aboveOriginal[partner]} /></dd></div>}
                 {current && current.repaid[partner] > 0 && <div><dt>Repaid</dt><dd><Money value={current.repaid[partner]} /></dd></div>}
+                {outstanding[partner] > 0 && <div><dt>Advance</dt><dd><Money value={outstanding[partner]} /></dd></div>}
               </dl>
+              {outstanding[partner] > 0 && <button className="contribution-text" type="button" disabled={saving || !!repaying || !!applying} onClick={() => startRepayment(partner)}>Joined paid {person(partner)} back in cash</button>}
               </details>
             </div>
-            {outstanding[partner] > 0 && <button className="contribution-text contribution-repay-shortcut" type="button" disabled={saving || !!repaying} aria-label={`Log repayment to ${person(partner)}`} title={`Log repayment to ${person(partner)}`} onClick={() => startRepayment(partner)}><ReceiptIcon size={20} aria-hidden="true" /></button>}
+            {applicable(partner) > 0 && <button className="contribution-primary" type="button" disabled={saving || !!repaying || !!applying} aria-label={`Apply ${fmt(applicable(partner))} MAD of ${person(partner)}'s advance to this month`} onClick={() => void applyAdvance(partner)}>{applying === partner ? "Applying…" : <>Apply <Money value={applicable(partner)} /></>}</button>}
           </section>;
         })}
         </div>
@@ -157,12 +170,6 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
           <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving} onClick={() => void repay()}>{saving ? "Recording…" : uncertain ? "Check repayment" : "Save repayment"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setRepaying(null)}>Cancel</button></div>
         </section>}
         {saveError && <Banner tone="danger" role="alert">{saveError}</Banner>}{success && <p role="status">{success}</p>}
-        {totalOwed > 0 && <details className="contribution-disclosure" key={`coverage-${month}`}>
-          <summary><span>Cash coverage</span>{cash != null && cash < totalOwed && <span className="contribution-coverage-shortfall">At least <Money value={money(totalOwed - cash)} /> short</span>}<ChevronDownIcon size={16} aria-hidden="true" /></summary>
-          <dl className="contribution-rows"><div><dt>Reserved for repayments</dt><dd><Money value={totalOwed} /></dd></div><div><dt>Recorded Joined cash</dt><dd>{cash == null ? "Unavailable" : <Money value={cash} />}</dd></div></dl>
-          <p className="contribution-note">Before other commitments.</p>
-          {(ledger?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0).length ?? 0) > 1 && <dl className="contribution-rows">{ledger?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0).map(m => <div key={m.month}><dt>{contributionMonthName(m.month)}</dt><dd><Money value={money(m.outstanding.anas + m.outstanding.salma)} /></dd></div>)}</dl>}
-        </details>}
         {status.agreement ? <details className="contribution-disclosure" key={`agreement-${month}`}><summary><span>Agreed amounts</span><ChevronDownIcon size={16} aria-hidden="true" /></summary>
           {agreementEditor}
         </details> : agreementEditor}

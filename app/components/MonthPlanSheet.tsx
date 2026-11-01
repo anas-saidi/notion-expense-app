@@ -345,35 +345,16 @@ export function MonthPlanSheet({
     : <SkeletonRegion label="Loading remaining amounts"><Skeleton style={{ width: 140, height: 14, marginBottom: 12 }} /><Skeleton style={{ height: 40 }} /></SkeletonRegion>;
 
   // After Joint's plan is saved, each partner sees what's left of their share, kept current by every transfer to
-  // Joined and every Joint bill they pay from their own account (both already count as contributions). An advance
-  // Joined owes them is applied with one tap: it counts toward this month's share and clears the debt, moving no cash.
-  const [applying, setApplying] = useState<"anas" | "salma" | null>(null);
-  const [applyError, setApplyError] = useState("");
-  const applyIds = useRef<Record<string, string>>({});
+  // Joined and every Joint bill they pay from their own account. Advances are applied from Contributions.
   const monthLedger = advances?.months.find((m) => m.month === planningMonth);
   const contributionRows = scope !== "joint" || !agreement || changed.length > 0 ? [] : (["anas", "salma"] as const).flatMap((partner) => {
     const left = Math.max(0, Math.round((agreement.targets[partner] - (monthLedger?.contributed[partner] ?? 0)) * 100) / 100);
-    const owed = Math.round((advances?.outstanding[partner] ?? 0) * 100) / 100;
-    return left >= 0.5 ? [{ partner, left, apply: Math.min(owed, left) }] : [];
+    return left >= 0.5 ? [{ partner, left }] : [];
   });
-  const applyAdvance = async ({ partner, apply }: (typeof contributionRows)[number]) => {
-    if (applying) return;
-    setApplying(partner); setApplyError("");
-    try {
-      applyIds.current[partner] ??= crypto.randomUUID();
-      const response = await fetch("/api/contribution-offsets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner, amount: apply, date: today(), requestId: applyIds.current[partner] }) });
-      if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't apply the advance.");
-      delete applyIds.current[partner];
-      onSaved();
-    } catch (error) { setApplyError(error instanceof Error ? error.message : "Couldn't apply the advance. Retry to finish it safely."); }
-    finally { setApplying(null); }
-  };
   const settleList = contributionRows.length > 0 && <div className="plan-settle">
     {contributionRows.map((row) => <div key={row.partner} className="plan-settle-row">
       <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact>{fmt(Math.round(row.left))}</Fact> left to put in</Summary>
-      {row.apply >= 0.5 && <button type="button" className="plan-copy" disabled={!!applying} onClick={() => void applyAdvance(row)} aria-label={`Apply ${fmt(row.apply)} MAD of ${name(row.partner)}'s advance to ${planLabel}`}>{applying === row.partner ? "Applying…" : `Apply ${fmt(Math.round(row.apply))}`}</button>}
     </div>)}
-    {applyError && <Banner role="alert" tone="danger" compact>{applyError}</Banner>}
   </div>;
   const personalRemaining = {
     anas: Math.max(0, planningCapacity.anas - costs.anas),
@@ -551,10 +532,10 @@ export function MonthPlanSheet({
   const invalidExpressions = Object.values(expressions).some((text) => text.trim() !== "" && parseAmount(text) === null);
   const advanceMonths = advances?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0) ?? [];
   const contributionReservation = advanceReserve > 0 ? <section className="contribution-agreement" aria-label="Advances reserved before new allocations">
-    <dl className="contribution-rows">{advanceMonths.map(m => <div key={m.month}><dt>Repay {contributionMonthName(m.month)} advances</dt><dd><Money value={Math.round(m.outstanding.anas + m.outstanding.salma)} /></dd></div>)}{advanceMonths.length !== 1 && <div className="contribution-emphasis"><dt>Reserved for repayments</dt><dd><Money value={Math.round(advanceReserve)} /></dd></div>}</dl>
+    <dl className="contribution-rows">{advanceMonths.map(m => <div key={m.month}><dt>{contributionMonthName(m.month)} advances</dt><dd><Money value={Math.round(m.outstanding.anas + m.outstanding.salma)} /></dd></div>)}{advanceMonths.length !== 1 && <div className="contribution-emphasis"><dt>Advances to apply</dt><dd><Money value={Math.round(advanceReserve)} /></dd></div>}</dl>
   </section> : null;
   // Desktop: the advance is a row you can act on (opens Contributions, who's owed what and the repayments).
-  const advanceRows = advanceReserve > 0 && <div className="plan-gaps">{advanceMonths.map(m => <button key={m.month} type="button" className="plan-gap" disabled={!onOpenContributions} onClick={onOpenContributions} aria-label={`${monthName(m.month)} advances owed back, ${fmt(Math.round(m.outstanding.anas + m.outstanding.salma))} MAD. Open contributions.`}>
+  const advanceRows = advanceReserve > 0 && <div className="plan-gaps">{advanceMonths.map(m => <button key={m.month} type="button" className="plan-gap" disabled={!onOpenContributions} onClick={onOpenContributions} aria-label={`${monthName(m.month)} advances to apply, ${fmt(Math.round(m.outstanding.anas + m.outstanding.salma))} MAD. Open contributions.`}>
     <span className="plan-gap-name">{monthName(m.month)} advances</span><span className="plan-gap-value">{fmt(Math.round(m.outstanding.anas + m.outstanding.salma))}</span>
   </button>)}</div>;
   const contributionAgreement = <ContributionAgreementEditor month={planningMonth} agreement={agreement} proposed={{ anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }} shares={split} disabled={loading || saving || changed.length > 0 || !!loadError || !!capacityError || !contributionsReady || totals.joint <= 0} onSaved={() => { void loadPlan(); onSaved(); }} />;
