@@ -1,5 +1,7 @@
 "use client";
 
+import "./sheet-layout.css";
+
 import {
   type CSSProperties,
   type ReactNode,
@@ -27,7 +29,9 @@ type BottomSheetProps = {
   label?: string;
   labelledBy?: string;
   panelRef?: RefObject<HTMLDivElement>;
-  maxWidth?: string;
+  size?: "compact" | "standard" | "account" | "planning";
+  /** Content-sized by default; editors and long lists can request a bounded workspace. */
+  desktopHeight?: "content" | "fill";
   maxHeight?: string;
   zIndex?: number;
   showHandle?: boolean;
@@ -67,7 +71,8 @@ export function BottomSheet({
   label,
   labelledBy,
   panelRef,
-  maxWidth = "520px",
+  size = "standard",
+  desktopHeight = "content",
   maxHeight,
   zIndex = 70,
   showHandle = true,
@@ -85,6 +90,7 @@ export function BottomSheet({
   draggable = true,
   desktopInspector = false,
 }: BottomSheetProps) {
+  const maxWidth = `var(--dialog-width-${size})`;
   const [mounted, setMounted] = useState(false);
   const localPanelRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -131,8 +137,13 @@ export function BottomSheet({
 
   useEffect(() => {
     if (!open) return;
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const panel = panelRef?.current ?? localPanelRef.current;
+    const active = document.activeElement;
+    // The first pass can precede portal mounting. Keep its opener rather than
+    // replacing it with a descendant or body during the mounted-state pass.
+    if (active instanceof HTMLElement && active !== document.body && !panel?.contains(active)) {
+      returnFocusRef.current = active;
+    }
     if (!panel) return;
 
     openPanels.push(panel);
@@ -167,7 +178,10 @@ export function BottomSheet({
       if (index !== -1) openPanels.splice(index, 1);
       cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
-      returnFocusRef.current?.focus();
+      const opener = returnFocusRef.current;
+      requestAnimationFrame(() => {
+        if (opener?.isConnected) opener.focus({ preventScroll: true });
+      });
     };
   }, [open, panelRef, mounted, isDesktop, isInspector]);
 
@@ -271,10 +285,10 @@ export function BottomSheet({
                   x: "-50%",
                   y: "-50%",
                   width: `min(${maxWidth}, calc(100vw - 48px))`,
-                  height: detent === "default"
-                    ? `min(760px, ${maxHeight ?? "calc(100dvh - 80px)"})`
+                  height: desktopHeight === "fill"
+                    ? `min(760px, ${maxHeight ?? "calc(100dvh - 48px)"})`
                     : "auto",
-                  maxHeight: `min(${maxHeight ?? "calc(100dvh - 80px)"}, calc(100dvh - 48px))`,
+                  maxHeight: `min(${maxHeight ?? "calc(100dvh - 48px)"}, calc(100dvh - 48px))`,
                   borderRadius: "var(--radius-sheet)",
                   background: "var(--surface)",
                   zIndex,
@@ -308,6 +322,7 @@ export function BottomSheet({
         <div
           ref={panelRef ?? localPanelRef}
           className="bottom-sheet-panel"
+          data-size={size}
           data-presentation={isInspector ? "inspector" : isDesktop ? "dialog" : "sheet"}
           role={isInspector ? "complementary" : isDesktop ? "dialog" : "region"}
           aria-modal={isDesktop && !isInspector ? "true" : undefined}
@@ -315,16 +330,16 @@ export function BottomSheet({
           aria-labelledby={labelledBy}
           tabIndex={-1}
           style={{
-            flex: usesContentDetent ? "0 1 auto" : 1,
+            flex: (isDesktop && desktopHeight === "content") || usesContentDetent ? "0 1 auto" : 1,
             minHeight: 0,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
             boxShadow: isDesktop && !isInspector
-              ? "0 20px 56px rgba(20, 24, 22, 0.16)"
+              ? "var(--elevation-sheet)"
               : "none",
             ...panelStyle,
-            ...(isDesktop ? { borderRadius: desktopFullscreen || isInspector ? 0 : "var(--radius-sheet)", maxHeight: "100%", minHeight: 0 } : {}),
+            ...(isDesktop ? { background: "var(--surface)", borderRadius: desktopFullscreen || isInspector ? 0 : "var(--radius-sheet)", maxHeight: "100%", minHeight: 0 } : {}),
           }}
         >
           {showHandle && !isDesktop && (
@@ -350,7 +365,7 @@ export function BottomSheet({
 
           <div
             style={{
-              flex: usesContentDetent ? "0 1 auto" : 1,
+              flex: (isDesktop && desktopHeight === "content") || usesContentDetent ? "0 1 auto" : 1,
               minHeight: 0,
               overflow: "auto",
               ...contentStyle,

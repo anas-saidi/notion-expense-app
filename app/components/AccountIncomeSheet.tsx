@@ -1,4 +1,6 @@
 "use client";
+import { SheetBody, SheetHeader } from "./ui/SheetLayout";
+
 import { IncomeUseControl } from "./IncomeUseControl";
 import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { DatePicker } from "./DatePicker";
@@ -8,6 +10,8 @@ import type { Account } from "./app-types";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
 import { BanknoteIcon, CheckIcon, XIcon } from "./ui/icons";
+import { CategoryIcon } from "./ui/CategoryIcon";
+import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
 import { parseAmount, today } from "./app-utils";
 
@@ -73,16 +77,16 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
       open={open}
       onClose={onClose}
       label={`Add income to ${account.label}`}
-      maxWidth="520px"
+      size="standard"
       detent="content"
       maxHeight="calc(100dvh - 20px)"
       panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
     >
-      <div style={innerStyle}>
-        <header style={headerStyle}>
+      <SheetBody style={innerStyle}>
+        <SheetHeader style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <div style={accountIconStyle}>{account.icon}</div>
+            <div style={accountIconStyle}><CategoryIcon icon={accountIconSource(account.type)} size={28} /></div>
             <div style={{ minWidth: 0 }}>
               <div style={eyebrowStyle}>Account income</div>
               <h2 style={titleStyle}>{account.label}</h2>
@@ -91,7 +95,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
           <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
             <XIcon size={18} />
           </button>
-        </header>
+        </SheetHeader>
 
         <div style={{ minHeight: 0, overflowY: "auto", display: "grid", gap: 16 }}>
         <section style={balanceCardStyle}>
@@ -136,7 +140,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
           {status === "idle" && <BanknoteIcon size={16} strokeWidth={2.3} />}
           {status === "saving" ? "Adding..." : status === "success" ? "Added" : "Add income"}
         </button>
-      </div>
+      </SheetBody>
     </BottomSheet>
   );
 }
@@ -178,8 +182,7 @@ const accountIconStyle: CSSProperties = {
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: 12,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+
   color: "var(--muted)",
 };
 

@@ -12,7 +12,7 @@ describe("budget jar", () => {
       [cat("rent", "🏠", { available: 3500 }), cat("food", "🍽️", { available: 900 }), cat("phone", "📱", { available: 50 })],
       "anas",
     );
-    expect(items.map(i => i.glyph)).toEqual(["🏠", "🍽️", "📱"]);
+    expect(items.map(i => i.glyph)).toEqual(["/category-icons/house.webp", "/category-icons/bag-of-groceries.webp", "/category-icons/smartphone.webp"]);
     expect(items[0].radius).toBeGreaterThan(items[1].radius);
     expect(items[2].radius).toBeGreaterThanOrEqual(0.13);
     expect(items[0].radius).toBeLessThanOrEqual(0.34);
@@ -30,7 +30,7 @@ describe("budget jar", () => {
       ],
       "anas",
     );
-    expect(items.map(i => i.glyph)).toEqual(["😎"]);
+    expect(items.map(i => i.glyph)).toEqual(["/category-icons/laptop.webp"]);
   });
 
   it("keeps an item's id when its share changes, so it resizes in place instead of leaving", () => {
@@ -65,7 +65,7 @@ describe("allocationJarItems", () => {
 
   it("shows only assigned categories, sized by their share of the pool", () => {
     const items = allocationJarItems([row("rent", "🏠", 3000), row("food", "🍽️", 1000), row("gym", "🏋️", 0)], 6000);
-    expect(items.map(i => i.glyph)).toEqual(["🏠", "🍽️"]);
+    expect(items.map(i => i.glyph)).toEqual(["/category-icons/house.webp", "/category-icons/bag-of-groceries.webp"]);
     expect(items[0].radius).toBeGreaterThan(items[1].radius);
   });
 
@@ -91,10 +91,10 @@ describe("spending jar", () => {
       ...Array.from({ length: 14 }, (_, i) => ({ id: `small${i}`, icon: null, share: 0.3 / 14 })),
     ];
     const items = spendingJarItems(rows);
-    expect(items[0].glyph).toBe("🏠");
+    expect(items[0].glyph).toBe("/category-icons/house.webp");
     expect(items[0].radius).toBeGreaterThan(items[1].radius);
     expect(items.some(i => i.id === "none")).toBe(false);
     expect(items).toHaveLength(12);
-    expect(items[items.length - 1]).toMatchObject({ glyph: "🧾", radius: 0.13 });
+    expect(items[items.length - 1]).toMatchObject({ glyph: "/category-icons/receipt.webp", radius: 0.13 });
   });
 });

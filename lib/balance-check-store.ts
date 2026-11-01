@@ -1,3 +1,6 @@
+import { NotionBalanceCheckStore } from "./notion-finance-stores";
+import { notionLedgerConfigured } from "./notion-ledger";
+import { assertSharedDatabaseEnabled } from "./database-mode";
 import { Pool } from "pg";
 import type { BalanceCheck } from "./balance-checks";
 import type { SqlDriver } from "./mirror/store";
@@ -35,6 +38,8 @@ export class BalanceCheckStore {
 }
 const globalChecks = globalThis as typeof globalThis & { financeBalanceCheckPool?: Pool };
 export function balanceCheckStore() {
+  if (notionLedgerConfigured()) return new NotionBalanceCheckStore();
+  assertSharedDatabaseEnabled();
   if (!process.env.DATABASE_URL) throw Object.assign(new Error("Balance checks need the shared database connection."), { status: 503 });
   const pool = globalChecks.financeBalanceCheckPool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 2, connectionTimeoutMillis: 3000, idleTimeoutMillis: 30000, statement_timeout: 10000 });
   return new BalanceCheckStore(pool);

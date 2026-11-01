@@ -13,7 +13,7 @@ export function SavingsFundingTargetPicker({ value, onChange, disabled }: { valu
   const options = [["separate", "Separate savings"], ["shared", "Shared contribution"]] as const;
   return <div ref={anchor} style={{ position: "relative" }}>
     <button type="button" disabled={disabled} style={pickerChipStyle} aria-haspopup="dialog" aria-expanded={open} aria-label={`Savings target: ${options.find(([target]) => target === value)![1]}`} onClick={() => setOpen(!open)}>Target</button>
-    <PickerPopover open={open} onClose={() => setOpen(false)} anchorRef={anchor} title="Savings target" zIndex={180} width="min(280px, calc(100vw - 32px))">
+    <PickerPopover open={open} onClose={() => setOpen(false)} anchorRef={anchor} title="Savings target" zIndex={180} size="menu">
       <div className="picker-options">{options.map(([target, label]) => <button type="button" className="picker-option" key={target} aria-pressed={value === target} onClick={() => { if (value !== target) haptic("selection"); onChange(target); setOpen(false); anchor.current?.querySelector("button")?.focus(); }}>{label}</button>)}</div>
     </PickerPopover>
   </div>;

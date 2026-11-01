@@ -197,7 +197,7 @@ export function AllocationFlow({
 
   const innerContent = (
     <>
-        <header style={sheetHeaderStyle}>
+        <header className="sheet-header" style={sheetHeaderStyle}>
           <h2 style={sheetTitleStyle}>{title}</h2>
           <button onClick={onCancel} aria-label="Close" style={closeButtonStyle}>
             <XIcon size={14} />
@@ -278,7 +278,7 @@ export function AllocationFlow({
               const isActive = item.categoryId === activeItem?.categoryId;
               return (
                 <button key={item.categoryId} type="button" onClick={() => setActiveCategoryId(item.categoryId)} style={{ ...(isActive ? categoryPillActiveStyle : categoryPillStyle) }} aria-pressed={isActive}>
-                  <CategoryIcon icon={item.icon} size={17} style={categoryIconStyle(isActive)} />
+                  <CategoryIcon icon={item.icon} categoryName={item.name} size={17} style={categoryIconStyle(isActive)} />
                   <span style={categoryNameStyle}>{item.name}</span>
                   {/* Rebalancing: each category's live available, so you can see where money is without tapping. */}
                   {rebalanceMode && Math.round(item.amount) !== 0 && (
@@ -338,7 +338,7 @@ export function AllocationFlow({
       </BlurScrollArea>
 
       {activeItem && (
-        <div aria-label="Budget control" style={slimBarPanelStyle}>
+        <div className="sheet-footer sheet-inset" aria-label="Budget control" style={slimBarPanelStyle}>
           <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
           {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
           {confirming && (
@@ -360,7 +360,7 @@ export function AllocationFlow({
   );
 
   return (
-    <BottomSheet open={open} onClose={onCancel} showHandle label={title} detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
+    <BottomSheet open={open} onClose={onCancel} showHandle label={title} desktopHeight="fill" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
       {innerContent}
     </BottomSheet>
   );
@@ -377,9 +377,9 @@ function GroupPicker({ groups, activeGroup, onSelect }: { groups: AllocationGrou
 
 const sheetPanelStyle: CSSProperties = { background: "var(--surface)", borderRadius: "24px 24px 0 0", boxShadow: "var(--elevation-float)" };
 const sheetContentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
-const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "16px 20px 14px", flexShrink: 0 };
+const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "var(--dialog-body-padding, 16px 20px 14px)", flexShrink: 0 };
 const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text2)" };
-const sheetScrollStyle: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", padding: "8px 12px 12px", display: "grid", alignContent: "start", gap: 12 };
+const sheetScrollStyle: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", padding: "var(--dialog-body-padding, 8px 12px 12px)", display: "grid", alignContent: "start", gap: 12 };
 const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
 const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
@@ -429,8 +429,7 @@ const heroPoolWrapStyle: CSSProperties = {
 const heroPoolLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 const heroPoolNumberStyle: CSSProperties = {

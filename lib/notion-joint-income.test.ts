@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mirrorReadContext } from "./mirror/context";
 import { notionFetchJson, queryDatabaseAll } from "./notion-api";
 import { assertJointIncomeAccount, incomeUseProperties, jointFreeIncomeReserve } from "./notion-joint-income";
 import { PROP_INCOME_BASELINE, PROP_INCOME_UNASSIGNED } from "./joint-income";
@@ -44,5 +45,40 @@ describe("persisted free income", () => {
     await expect(assertJointIncomeAccount("token", "joint")).resolves.toBeUndefined();
     vi.mocked(notionFetchJson).mockResolvedValueOnce({ status: 200, data: account("Hubby Account") });
     await expect(assertJointIncomeAccount("token", "anas")).rejects.toThrow("joint spending");
+  });
+});
+
+describe("Notion-only display cache", () => {
+  const displayRead = <T,>(fn: () => Promise<T>) => mirrorReadContext.run({ enabled: true, sources: new Set(), syncedAt: [], databases: new Map() }, fn);
+  // One reserve read = the unassigned incomes query, then the all-time funds query.
+  const nextReserve = (account: string, assigned: number) => vi.mocked(queryDatabaseAll)
+    .mockResolvedValueOnce([{ ...income("2026-10", 500, 1000), properties: { ...income("2026-10", 500, 1000).properties, Account: { relation: [{ id: account }] } } }])
+    .mockResolvedValueOnce([{ properties: { Planned: { number: assigned } } }]);
+  afterEach(() => { delete process.env.FINANCE_NOTION_ONLY; vi.restoreAllMocks(); });
+
+  it("serves the last value and refreshes it in the background once stale", async () => {
+    process.env.FINANCE_NOTION_ONLY = "true";
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    nextReserve("cached", 1100);
+    expect(await displayRead(() => jointFreeIncomeReserve("token", "cached"))).toBe(400);
+    expect(await displayRead(() => jointFreeIncomeReserve("token", "cached"))).toBe(400);
+    expect(queryDatabaseAll).toHaveBeenCalledTimes(2);
+
+    now.mockReturnValue(1_000_000 + 31_000);
+    nextReserve("cached", 1300);
+    expect(await displayRead(() => jointFreeIncomeReserve("token", "cached"))).toBe(400);
+    await vi.waitFor(() => expect(queryDatabaseAll).toHaveBeenCalledTimes(4));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await displayRead(() => jointFreeIncomeReserve("token", "cached"))).toBe(200);
+  });
+
+  it("stays live for writes and when the shared database is on", async () => {
+    process.env.FINANCE_NOTION_ONLY = "true";
+    nextReserve("live", 1100); nextReserve("live", 1300);
+    expect(await jointFreeIncomeReserve("token", "live")).toBe(400);
+    expect(await jointFreeIncomeReserve("token", "live")).toBe(200);
+    delete process.env.FINANCE_NOTION_ONLY;
+    nextReserve("live", 1400);
+    expect(await displayRead(() => jointFreeIncomeReserve("token", "live"))).toBe(100);
   });
 });

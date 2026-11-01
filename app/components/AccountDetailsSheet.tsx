@@ -1,4 +1,7 @@
 "use client";
+import { accountIconSource, categoryIconSource } from "../../lib/category-icons";
+
+import { SheetBody, SheetHeader } from "./ui/SheetLayout";
 
 import { money, type BalanceCheckView } from "../../lib/balance-checks";
 import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
@@ -31,6 +34,7 @@ import {
 type AccountDetailsSheetProps = {
   contributions?: ReactNode;
   open: boolean;
+  savedCountForReview?: number;
   startBalanceCheck?: boolean;
   balanceCheck?: BalanceCheckView;
   onBalanceCheckChanged?: () => Promise<void>;
@@ -65,6 +69,7 @@ function fmtMonth(m: string) {
 export function AccountDetailsSheet({
   contributions,
   open,
+  savedCountForReview,
   startBalanceCheck = false,
   balanceCheck,
   onBalanceCheckChanged,
@@ -116,7 +121,7 @@ export function AccountDetailsSheet({
       setShowReconcile(startBalanceCheck);
       setCheckVersion(balanceCheck?.version ?? null);
       setCheckMessage(null);
-      setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : "");
+      setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : savedCountForReview != null ? String(savedCountForReview) : "");
       setReconcileStatus("idle");
       setReconcileError("");
       setAddedTxns([]);
@@ -429,7 +434,7 @@ export function AccountDetailsSheet({
       onClose={handleClose}
       label={`${account.label} details`}
       detent="content"
-      maxWidth="900px"
+      size="account"
       desktopViewportCentered
       snapPoints={[0, 0.88]}
       initialSnap={1}
@@ -440,18 +445,18 @@ export function AccountDetailsSheet({
       <div className="account-desktop-layout" style={innerStyle}>
 
         {/* Header */}
-        <header className="account-desktop-header" style={headerStyle}>
+        <SheetHeader className="account-desktop-header" style={headerStyle}>
           <div style={acctIdentityStyle}>
-            <div style={iconCircleStyle}>{account.icon}</div>
+            <div style={iconCircleStyle}><CategoryIcon icon={accountIconSource(account.type)} size={30} /></div>
             <div>
-              <p style={acctNameStyle}>{account.label}</p>
+              <h2 style={acctNameStyle}>{account.label}</h2>
               {account.type && <p style={acctTypeStyle}>{account.type}</p>}
             </div>
           </div>
           <button onClick={handleClose} aria-label="Close" style={closeStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
-        </header>
+        </SheetHeader>
 
         <div className="account-desktop-overview">
         {/* Balance hero */}
@@ -622,21 +627,21 @@ export function AccountDetailsSheet({
             ariaLabel="Check balance"
             bg="color-mix(in srgb, var(--surface2) 54%, var(--surface))"
             ink="var(--text2)"
-            onClick={() => { setCheckVersion(balanceCheck?.version ?? null); setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : ""); setCheckMessage(null); setShowReconcile(true); }}
+            onClick={() => { setCheckVersion(balanceCheck?.version ?? null); setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : savedCountForReview != null ? String(savedCountForReview) : ""); setCheckMessage(null); setShowReconcile(true); }}
           />
         </div>
 
         {/* Reconcile form */}
         {showReconcile && (
-          <BottomSheet open onClose={closeReconcile} label="Check balance" detent="content" layered maxWidth="500px" zIndex={140} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
-          <div style={reconcilePanelStyle}>
-            <header style={reconcileHeaderStyle}>
+          <BottomSheet open onClose={closeReconcile} label="Check balance" detent="content" layered size="standard" zIndex={140} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+          <SheetBody style={reconcilePanelStyle}>
+            <SheetHeader style={reconcileHeaderStyle}>
               <div style={{ display: "grid", gap: 5 }}>
                 <h2 style={reconcileTitleStyle}>Check {account.label}</h2>
                 {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
               </div>
               <button type="button" className="sheet-close-button" onClick={closeReconcile} aria-label="Close reconciliation"><XIcon size={18} /></button>
-            </header>
+            </SheetHeader>
             <div style={reconcileRowStyle}>
               <label style={reconcileFieldStyle}>
                 <span style={reconcileLabelStyle}>App balance</span>
@@ -731,7 +736,7 @@ export function AccountDetailsSheet({
                     >
                       <option value="">Category…</option>
                       {activeCategories.map(c => (
-                        <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>
+                        <option key={c.id} value={c.id} data-icon={categoryIconSource(c.icon, c.name)}>{c.name}</option>
                       ))}
                     </ChoicePicker>
                   )}
@@ -786,7 +791,7 @@ export function AccountDetailsSheet({
             <button type="button" onClick={() => void changeCheck("save")}
               disabled={!Number.isFinite(parsedActual) || checkSaving || txnSaving || reconcileStatus === "saving"}
               style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)", opacity: checkSaving || !Number.isFinite(parsedActual) ? 0.42 : 1 }}>
-              {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : "Save for later"}
+              {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : savedCountForReview != null ? "Confirm balance" : "Save for later"}
             </button>
             {checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0 && <button type="button"
               onClick={() => void changeCheck("close")} disabled={checkSaving || txnSaving || reconcileStatus === "saving"}
@@ -826,7 +831,7 @@ export function AccountDetailsSheet({
                difference !== null ? `Reconcile remaining ${difference > 0 ? "+" : ""}${fmt(Math.round(difference * 100) / 100)}` :
                "Reconcile ledger"}
             </button>
-          </div>
+          </SheetBody>
           </BottomSheet>
         )}
 
@@ -841,7 +846,7 @@ export function AccountDetailsSheet({
                 return (
                   <div key={cat.id} style={catRowStyle}>
                     <div style={catIconWrapStyle}>
-                      <CategoryIcon icon={cat.icon} size={15} />
+                      <CategoryIcon icon={cat.icon} categoryName={cat.name} size={15} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 4 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -899,7 +904,7 @@ export function AccountDetailsSheet({
                         tone={isIncome ? "income" : isTransferIn || isTransferOut ? "transfer" : "expense"}
                         prefix={prefix}
                         date={t.date ? fmtDate(t.date) : undefined}
-                        icon={isIncome ? <BanknoteIcon size={15} /> : isTransferIn || isTransferOut ? <TransferIcon size={15} /> : <CategoryIcon icon={cat?.icon ?? null} size={20} />}
+                        icon={isIncome ? <BanknoteIcon size={15} /> : isTransferIn || isTransferOut ? <TransferIcon size={15} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={20} />}
                       />
                     );
                   })}
@@ -990,8 +995,7 @@ const acctTypeStyle: CSSProperties = {
   marginTop: 2,
   fontSize: 12,
   color: "var(--muted)",
-  letterSpacing: 0.3,
-  textTransform: "uppercase",
+  
   fontWeight: 600,
 };
 
@@ -1085,8 +1089,7 @@ const chartFooterStyle: CSSProperties = {
 const heroLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 
@@ -1200,8 +1203,7 @@ const reconcileLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
   color: "var(--muted)",
-  letterSpacing: 0.3,
-  textTransform: "uppercase",
+  
 };
 
 const reconcileReadonlyStyle: CSSProperties = {
@@ -1266,7 +1268,6 @@ const differenceBandStyle = (diff: number): CSSProperties => ({
 const differenceLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  textTransform: "uppercase",
   letterSpacing: 0.4,
   opacity: 0.7,
 };
@@ -1440,8 +1441,7 @@ const sectionStyle: CSSProperties = {
 const sectionLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  letterSpacing: 0.7,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 

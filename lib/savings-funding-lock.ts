@@ -1,9 +1,13 @@
+import { notionLedgerConfigured, withNotionWrite } from "./notion-ledger";
+import { assertSharedDatabaseEnabled } from "./database-mode";
 import { Pool } from "pg";
 import { createHash } from "node:crypto";
 const state = globalThis as typeof globalThis & { savingsFundingPool?: Pool };
 
 /** Serialize the same operation across Vercel instances, not just one process. */
 export async function withSavingsFundingLock<T>(key: string, action: () => Promise<T>): Promise<T> {
+  if (notionLedgerConfigured()) return withNotionWrite("household-mutation", action);
+  assertSharedDatabaseEnabled();
   if (!process.env.DATABASE_URL) {
     if (process.env.NODE_ENV === "production") throw Object.assign(new Error("Savings funding needs the server database connection. Nothing was changed."), { status: 503 });
     return action();

@@ -1,9 +1,11 @@
 "use client";
+import { sameText } from "./ui/TransactionRow";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Account, BudgetScope, Category } from "./app-types";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData, type BillOccurrence, type BillRepeat } from "@/lib/bills";
 import { categoryMatchesScope, expenseBudgetGate, fmtDate, monthBounds, parseAmount } from "./app-utils";
+import { CardHeader, CardHeaderAction } from "./ui/CardHeader";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
@@ -109,16 +111,16 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const formReady = expected > 0 && date && (view === "pay" ? !!selected && !!paymentAccount && !gate.unfunded && !gate.overBudget : !!name.trim() && !!category && !category.snoozed && !category.archived && categoryMatchesScope(category, scope, accounts));
 
   return <section className="bills-section" aria-label="Due bills">
-    <div className="bills-section-heading"><h2 className="section-label">Due bills</h2><div className="bills-heading-actions"><button type="button" className="bills-quiet-action" disabled={!enabled} onClick={() => { setOpen(true); move("list"); }}>All bills <ChevronRightIcon size={16} /></button></div></div>
+    <CardHeader className="bills-section-heading" title="Due bills" titleClassName="section-label" action={<CardHeaderAction className="bills-quiet-action" disabled={!enabled} onClick={() => { setOpen(true); move("list"); }}>All bills</CardHeaderAction>} />
     {loading ? <SkeletonRows count={2} /> : error ? <Banner role="alert" tone="danger" compact action={<button type="button" onClick={onRetry}>Retry</button>}>{error}</Banner>
       : <>
         {currentDue.length ? <>
           {currentDue.slice(0, 3).map(bill => <BillRow key={bill.id} bill={bill} needsFunding={needsFunding(bill)} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}
         </> : <p className="bills-muted">No bills due.</p>}
       </>}
-    <BottomSheet open={open} onClose={() => { if (!saving) { setOpen(false); setPicker(null); setShowMore(false); } }} label={view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Record payment" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"} maxWidth="520px" contentStyle={{ paddingTop: 0 }}>
-      <div className={`bills-sheet${view === "detail" ? " bills-sheet-detail" : ""}`}>
-        <header className="bills-sheet-header">
+    <BottomSheet open={open} onClose={() => { if (!saving) { setOpen(false); setPicker(null); setShowMore(false); } }} label={view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Record payment" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"} size="standard" contentStyle={{ paddingTop: 0 }}>
+      <div className={`sheet-body bills-sheet${view === "detail" ? " bills-sheet-detail" : ""}`}>
+        <header className="sheet-header bills-sheet-header">
           <div className="bills-header-title">{(view === "pay" || view === "edit") && <button type="button" className="bills-icon-action" aria-label="Back to bill" disabled={saving || savedPendingRefresh} onClick={() => move("detail")}><ChevronLeftIcon size={20} /></button>}<h2>{view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Record payment" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"}</h2></div>
           <button type="button" aria-label="Close bills" disabled={saving} className="bills-icon-action sheet-close-button" onClick={() => { setOpen(false); setPicker(null); setShowMore(false); }}><XIcon size={20} /></button>
         </header>
@@ -136,7 +138,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
             {selected.state === "Due" || selected.state === "Overdue" ? <><button type="button" className="pressable bills-toolbar-action bills-toolbar-primary" disabled={!enabled} onClick={() => prepare("pay")}><ReceiptIcon size={17} />Pay due</button><button type="button" className="pressable bills-toolbar-action bills-toolbar-secondary" disabled={!enabled} onClick={() => prepare("edit")}><EditIcon size={17} />Edit</button></> : selected.state === "Skipped" ? <button type="button" className="pressable bills-toolbar-action bills-toolbar-primary" disabled={!enabled} onClick={() => mutate("PATCH", { action: "restore", billId: selected.billId, period: selected.period })}>Restore</button> : null}
             <button type="button" ref={moreRef} className="pressable bills-toolbar-action bills-toolbar-more" aria-label="More bill actions" aria-haspopup="dialog" aria-expanded={showMore} disabled={!enabled} onClick={() => setShowMore(!showMore)}><MoreIcon size={18} />More</button>
           </div>
-          <dl className="bills-detail-context"><div><dt>Category</dt><dd className="bills-category-value"><CategoryIcon icon={selectedCategory?.icon ?? null} size={22} /><span>{selectedCategory?.name ?? "Unavailable"}</span></dd></div>{selected.repeat !== "None" && <div><dt>Repeats</dt><dd>{selected.repeat}</dd></div>}{selected.state === "Paid" || selected.state === "Skipped" ? <div><dt>Status</dt><dd>{selected.state}</dd></div> : null}</dl>
+          <dl className="bills-detail-context"><div><dt>Category</dt><dd className="bills-category-value"><CategoryIcon icon={selectedCategory?.icon ?? null} categoryName={selectedCategory?.name} size={22} /><span>{selectedCategory?.name ?? "Unavailable"}</span></dd></div>{selected.repeat !== "None" && <div><dt>Repeats</dt><dd>{selected.repeat}</dd></div>}{selected.state === "Paid" || selected.state === "Skipped" ? <div><dt>Status</dt><dd>{selected.state}</dd></div> : null}</dl>
           {selected.payments.length > 1 && <Banner tone="danger">Payment recorded twice. Review each expense below.</Banner>}
           {selected.state === "Paid" ? selected.payments.map(payment => <div key={payment.id} className="bills-payment"><p><Money value={payment.amount} /></p><p className="bills-muted">Paid {fmtDate(payment.date)}</p><a href={`https://www.notion.so/${normalizedId(payment.id)}`} target="_blank" rel="noreferrer">View expense in Notion</a><button type="button" className="bills-quiet-action" disabled={!enabled} onClick={() => setConfirm(payment.id)}>Undo payment</button></div>)
             : null}
@@ -174,17 +176,17 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
         </>}
       </div>
     </BottomSheet>
-    <PickerPopover open={showMore && open && view === "detail"} anchorRef={moreRef} title="Bill actions" onClose={() => setShowMore(false)} align="right" zIndex={180} width="min(280px, calc(100vw - 32px))">
+    <PickerPopover open={showMore && open && view === "detail"} anchorRef={moreRef} title="Bill actions" onClose={() => setShowMore(false)} align="right" zIndex={180} size="menu">
       <div className="picker-options">
         {selected && (selected.state === "Due" || selected.state === "Overdue") && <button type="button" className="picker-option" disabled={!enabled} onClick={() => { setShowMore(false); setConfirm("skip"); }}>Skip occurrence</button>}
         {selected && selected.repeat !== "None" && !data?.schedules.find(s => s.id === selected.billId)?.metadata.end && <button type="button" className="picker-option" disabled={!enabled} onClick={() => { setShowMore(false); setConfirm("stop"); }}>Stop repeating</button>}
         {selected && data?.schedules.some(s => s.id === selected.billId) && <button type="button" className="picker-option" style={{ color: "var(--danger)" }} disabled={!enabled} onClick={() => { setShowMore(false); setConfirm("delete"); }}>Delete schedule</button>}
       </div>
     </PickerPopover>
-    <PickerPopover open={picker === "category" && open} anchorRef={categoryRef} title="Choose category" onClose={() => setPicker(null)} zIndex={180} width="min(340px, calc(100vw - 32px))">
+    <PickerPopover open={picker === "category" && open} anchorRef={categoryRef} title="Choose category" onClose={() => setPicker(null)} zIndex={180} size="choice">
       <CategoryOptionList categories={categories.filter(c => !c.snoozed && !c.archived && categoryMatchesScope(c, scope, accounts) && c.name.toLowerCase().includes(search.toLowerCase()))} selectedId={categoryId} search={search} onSearchChange={setSearch} onSelect={c => { setCategoryId(c.id); setPicker(null); }} />
     </PickerPopover>
-    <PickerPopover open={picker === "account" && open} anchorRef={accountRef} title="Choose account" onClose={() => setPicker(null)} zIndex={180} width="min(340px, calc(100vw - 32px))">
+    <PickerPopover open={picker === "account" && open} anchorRef={accountRef} title="Choose account" onClose={() => setPicker(null)} zIndex={180} size="choice">
       {view !== "pay" && <button type="button" className="bills-quiet-action" onClick={() => { setAccountId(""); setPicker(null); }}>No suggested account</button>}
       <AccountOptionList accounts={accounts} selectedId={accountId} onSelect={id => { setAccountId(id); setPicker(null); }} />
     </PickerPopover>
@@ -198,9 +200,10 @@ function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, 
   const weekday = validDate ? date.toLocaleDateString("en", { weekday: "short" }) : "—";
   const day = validDate ? date.getDate() : "—";
   const status = bill.payments.length > 1 ? "Recorded twice" : bill.state === "Overdue" ? "Overdue" : needsFunding ? "Needs funding" : payment ? "Paid" : bill.state === "Skipped" ? "Skipped" : null;
+  const showCategory = Boolean(category?.name) && !sameText(category!.name, bill.name);
   const row = <button type="button" className="bill-date-row" onClick={onClick} disabled={disabled} aria-label={`${bill.name}${category?.name ? `, ${category.name}` : ""}, ${payment ? "paid" : "due"} ${validDate ? date.toLocaleDateString("en", { day: "numeric", month: "long", year: "numeric" }) : "date unavailable"}, ${payment?.amount ?? bill.amount} MAD${status ? `, ${status}` : ""}, view bill`}>
     <span className={`bill-date-tile${bill.state === "Overdue" ? " bill-date-overdue" : ""}`} aria-hidden="true"><span>{weekday}</span><strong>{day}</strong></span>
-    <span className="bill-date-copy"><span className="bill-date-title">{bill.name}</span>{(category?.name || status) && <span className="bill-date-context bill-date-metadata">{category?.name && <span>{category.name}</span>}{status && <span className={["Overdue", "Needs funding", "Recorded twice"].includes(status) ? "bill-date-alert" : undefined}>{status}</span>}</span>}</span>
+    <span className="bill-date-copy"><span className="bill-date-title">{bill.name}</span>{(showCategory || status) && <span className="bill-date-context bill-date-metadata">{showCategory && <span>{category!.name}</span>}{status && <span className={["Overdue", "Needs funding", "Recorded twice"].includes(status) ? "bill-date-alert" : undefined}>{status}</span>}</span>}</span>
     <span className="bill-date-amount"><Money value={payment?.amount ?? bill.amount} /></span>
   </button>;
   if (bill.state !== "Due" && bill.state !== "Overdue") return row;

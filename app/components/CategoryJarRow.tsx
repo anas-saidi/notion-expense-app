@@ -1,4 +1,5 @@
 "use client";
+import { categoryIconSource } from "../../lib/category-icons";
 
 import type { CSSProperties } from "react";
 import type { BudgetScope, Category } from "./app-types";
@@ -30,7 +31,7 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, o
   const amountColor = state === "over" ? "var(--status-over)" : low ? "var(--status-low)" : state === "normal" ? "var(--text2)" : "var(--muted)";
   return (
     <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, ${fmt(Math.round(amount))} MAD${line ? `, ${line.text}` : state === "empty" ? ", all spent" : state === "unfunded" ? ", not funded" : ""}`}>
-      <CategoryJar scope={scope} level={level} state={state} low={low} icon={cat.icon} />
+      <CategoryJar scope={scope} level={level} state={state} low={low} icon={categoryIconSource(cat.icon, cat.name)} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {/* "X spent" repeats the desktop Spent column, so it hides there. */}
@@ -65,7 +66,7 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   const level = goal > 0 ? pct : saved > 0 ? 0.5 : 0;
   return (
     <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}`}>
-      <CategoryJar scope={scope} level={level} state={saved > 0 ? "normal" : "unfunded"} kind="savings" icon={cat.icon} />
+      <CategoryJar scope={scope} level={level} state={saved > 0 ? "normal" : "unfunded"} kind="savings" icon={categoryIconSource(cat.icon, cat.name)} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {line && <span style={{ ...lineStyle, color: reached ? "var(--status-good)" : "var(--muted)", fontWeight: reached ? 600 : 500 }}>{line}</span>}

@@ -1,5 +1,7 @@
 "use client";
 
+import "./ui/sheet-layout.css";
+
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
@@ -8,7 +10,7 @@ type PickerPopoverProps = {
   onClose?: () => void;
   open: boolean;
   children: ReactNode;
-  width?: string;
+  size?: "menu" | "choice" | "calendar";
   align?: "left" | "right";
   placement?: "top" | "bottom";
   zIndex?: number;
@@ -22,13 +24,14 @@ export function PickerPopover({
   title = "Choose an option",
   onClose,
   children,
-  width = "min(296px, calc(100vw - 56px))",
+  size = "choice",
   align = "left",
   placement = "bottom",
   zIndex = 80,
   anchorRef,
   showHeader = false,
 }: PickerPopoverProps) {
+  const width = `min(var(--popover-width-${size}), calc(100vw - 32px))`;
   const popoverRef = useRef<HTMLDivElement>(null);
   // Placement direction is locked on first open so the popover doesn't jump
   // while the list re-renders (filtering changes popover height).

@@ -1,10 +1,15 @@
+import { databaseUnavailableFailure } from "../../../lib/database-errors";
 import { NextRequest, NextResponse } from "next/server";
 import { contributionStore } from "../../../lib/contribution-store";
 import { mirrorScope } from "../../../lib/mirror/store";
 import { validMonth, cents } from "../../../lib/contribution-agreements";
 
 export const dynamic = "force-dynamic";
-const fail = (error: unknown) => NextResponse.json({ error: error instanceof Error ? error.message : "Could not load contribution agreements." }, { status: (error as { status?: number }).status ?? 500 });
+const fail = (error: unknown) => {
+  const unavailable = databaseUnavailableFailure(error);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+  return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load contribution agreements." }, { status: (error as { status?: number }).status ?? 500 });
+};
 export async function GET() {
   try {
     const token = process.env.NOTION_TOKEN;

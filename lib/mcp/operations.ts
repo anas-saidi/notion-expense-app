@@ -1,3 +1,6 @@
+import { NotionOperations } from "../notion-finance-stores";
+import { notionLedgerConfigured } from "../notion-ledger";
+import { assertSharedDatabaseEnabled } from "../database-mode";
 import { createHash } from "node:crypto";
 import { Pool } from "pg";
 import type { SqlDriver } from "../mirror/store";
@@ -14,7 +17,7 @@ export type OperationResult = { [key: string]: unknown };
 export class McpOperations {
   private ready?: Promise<unknown>;
   constructor(private db: SqlDriver) {}
-  async once(scope: string, requestId: string, tool: string, input: unknown, run: () => Promise<OperationResult>): Promise<OperationResult> {
+  async once(scope: string, requestId: string, tool: string, input: unknown, run: () => Promise<OperationResult>, _createdAt?: string): Promise<OperationResult> {
     this.ready ??= this.db.query(MCP_OPERATIONS_DDL).catch(error => { this.ready = undefined; throw error; });
     await this.ready;
     const fingerprint = createHash("sha256").update(JSON.stringify({ tool, input })).digest("hex");
@@ -39,6 +42,8 @@ export class McpOperations {
 }
 const shared = globalThis as typeof globalThis & { financeMcpOperations?: McpOperations };
 export function mcpOperations() {
+  if (notionLedgerConfigured()) return new NotionOperations();
+  assertSharedDatabaseEnabled();
   if (!process.env.DATABASE_URL) throw new Error("Financial operation tracking is unavailable; nothing was written.");
   return shared.financeMcpOperations ??= new McpOperations(new Pool({ connectionString: process.env.DATABASE_URL, max: 2, connectionTimeoutMillis: 5000, idleTimeoutMillis: 10000, statement_timeout: 10000 }));
 }

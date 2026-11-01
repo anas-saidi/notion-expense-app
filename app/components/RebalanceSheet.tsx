@@ -1,4 +1,5 @@
 "use client";
+import { categoryIconSource } from "../../lib/category-icons";
 import "./finance-ai.css";
 import { ReallocationAssistant } from "./ReallocationAssistant";
 
@@ -195,7 +196,7 @@ export function RebalanceSheet({
           return {
             categoryId: f.id,
             name: cat.name,
-            icon: cat.icon,
+            icon: categoryIconSource(cat.icon, cat.name),
             amount,
             spent: spentByCategory.get(f.id) ?? 0,
             available: amount,      // keeps rangeMin = 0 always
@@ -428,8 +429,7 @@ const flowWrapStyle: CSSProperties = {
 const flowHeadStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  letterSpacing: 1.2,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 

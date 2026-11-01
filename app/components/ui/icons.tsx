@@ -9,6 +9,7 @@
 import {
   Target,
   Pencil,
+  PenLine,
   Search,
   Calendar,
   CalendarRange,
@@ -72,15 +73,8 @@ export const ScaleIcon        = (p: LucideProps) => <Scale             size={S} 
 export const EditIcon         = (p: LucideProps) => <Pencil            size={S} {...p} />;
 export const ShuffleIcon      = (p: LucideProps) => <Shuffle           size={S} {...p} />;
 export const DeleteIcon       = (p: LucideProps) => <Delete        size={S} {...p} />;
-/**
- * Type it: write transactions in plain words. A filled four-point star rather
- * than Lucide's outline sparkles; it takes the text colour like the other icons.
- */
-export const SparklesIcon = ({ size = S, color = "currentColor", strokeWidth: _strokeWidth, absoluteStrokeWidth: _absolute, ...rest }: LucideProps) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={color} {...rest}>
-    <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
-  </svg>
-);
+/** Type it: write transactions in plain words, so a pen writing a line. */
+export const WriteIcon = (p: LucideProps) => <PenLine size={S} {...p} />;
 export const MoreIcon         = (p: LucideProps) => <MoreHorizontal size={S} {...p} />;
 export const ReceiptIcon      = (p: LucideProps) => <ReceiptText    size={S} {...p} />;
 export const WalletIcon       = (p: LucideProps) => <WalletCards    size={S} {...p} />;

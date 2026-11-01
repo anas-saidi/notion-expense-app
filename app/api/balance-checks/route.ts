@@ -1,4 +1,4 @@
-import { databaseQuotaFailure } from "../../../lib/database-errors";
+import { databaseUnavailableFailure } from "../../../lib/database-errors";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readAccountResponse } from "../../../lib/notion-accounts";
@@ -12,7 +12,7 @@ import { mapTransactionPage } from "../../../lib/transaction-page";
 
 export const dynamic = "force-dynamic";
 const fail = (error: unknown) => {
-  const quota = databaseQuotaFailure(error);
+  const quota = databaseUnavailableFailure(error);
   if (quota) return NextResponse.json(quota, { status: 503 });
   return NextResponse.json({ error: error instanceof Error ? error.message : "Balance checks unavailable." }, { status: (error as { status?: number }).status ?? 500 });
 };
@@ -36,7 +36,8 @@ async function handleGET() {
     const { token, scope, store } = connection();
     const checks = await store.list(scope);
     const entries = checks.length ? await transactions(token) : [];
-    return NextResponse.json({ checks: checks.map(check => checkView(check, entries)) }, { headers: { "Cache-Control": "private, no-store" } });
+    const reviewCounts = "reviewCounts" in store ? await store.reviewCounts(scope) : [];
+    return NextResponse.json({ checks: checks.map(check => checkView(check, entries)), reviewCounts, recoveryPending: reviewCounts.length > 0 }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return fail(error); }
 }
 export const GET = withMirrorReads(handleGET);

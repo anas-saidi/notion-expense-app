@@ -8,7 +8,7 @@ import { MonthPicker } from "./DatePicker";
 import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { AlertTriangleIcon, CalendarIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
+import { AlertTriangleIcon, CalendarIcon, ChevronDownIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
 import { SearchField } from "./ui/SearchField";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner, bannerActionStyle } from "./ui/Banner";
@@ -31,6 +31,8 @@ type Props = {
   frozenCategories: Category[];
   accounts: Account[];
   readyToAssignByScope: Record<BudgetScope, number>;
+  /** Joint's unassigned money after what it owes back to partners (same figure Home uses). */
+  jointUnassigned?: number;
   /** Signed: what's left once categories and dues are covered; negative = accounts fall short. */
   assignBalanceByScope?: Record<BudgetScope, number>;
   contributionRemainingByScope: Record<BudgetScope, number>;
@@ -66,6 +68,7 @@ export function CategoriesScreen({
   frozenCategories,
   accounts,
   readyToAssignByScope,
+  jointUnassigned,
   assignBalanceByScope,
   contributionRemainingByScope,
   monthlySummary,
@@ -90,6 +93,8 @@ export function CategoriesScreen({
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Sections start open; Frozen starts closed (same as the plan sheet).
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(["Frozen"]));
+  // Sections whose empty jars are listed one by one instead of folded into a single line.
+  const [showEmpty, setShowEmpty] = useState<Set<string>>(() => new Set());
   const toggleSection = (label: string) => setCollapsed((prev) => {
     const next = new Set(prev);
     if (next.has(label)) next.delete(label);
@@ -177,11 +182,11 @@ export function CategoriesScreen({
     () => getCategoryAvailableByScope(monthCategories, accounts)[budgetScope],
     [monthCategories, accounts, budgetScope],
   );
-  // Joint's unassigned money is the joint account's own ready-to-assign, not the
-  // partners' personal balances. Negative means over-assigned (covered by contributions).
+  // Joint's unassigned money is the joint account's own ready-to-assign minus what it owes back
+  // to partners, not their personal balances. Negative means over-assigned (covered by contributions).
   const leftToAllocate = useMemo(
-    () => budgetScope === "joint" ? Math.max(0, getJointAccountUnassigned(accounts)) : readyToAssignByScope[budgetScope] ?? 0,
-    [accounts, readyToAssignByScope, budgetScope],
+    () => budgetScope === "joint" ? Math.max(0, jointUnassigned ?? getJointAccountUnassigned(accounts)) : readyToAssignByScope[budgetScope] ?? 0,
+    [accounts, jointUnassigned, readyToAssignByScope, budgetScope],
   );
   const contributionRemaining = contributionRemainingByScope[budgetScope] ?? 0;
   // What the accounts can't cover: categories funded plus dues, beyond what's actually there.
@@ -217,7 +222,7 @@ export function CategoriesScreen({
     <span role="status" style={{ minHeight: MASCOT_HERO_SIZE, display: "grid", placeItems: "center", color: "var(--text2)", fontSize: 12 }}>Monthly details unavailable</span>
   ) : (
     <MascotSpill size={MASCOT_HERO_SIZE} label={jarDetails} details={jarDetails} onOpenChange={setJarOpen}>
-      <MascotHero variant="pool" scope={budgetScope} level={poolLevel} warn={poolWarn} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={leftToAllocate} />
+      <MascotHero variant="pool" scope={budgetScope} level={poolLevel} warn={poolWarn} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={monthlySummary.contributionError ? undefined : leftToAllocate} />
     </MascotSpill>
   );
   const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
@@ -250,18 +255,20 @@ export function CategoriesScreen({
             : null
         : <>
             <div className="budget-overview-context">
-            <section className="budget-desktop-overview" aria-label={`${fmt(Math.round(availableInCategories))} MAD allocated in categories${Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
+            <section className="budget-desktop-overview" aria-label={`${fmt(Math.round(availableInCategories))} MAD allocated in categories${!monthlySummary.contributionError && Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
               {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
                   emojis stay tucked away until the jar is tapped; then every category that still
                   has money drops in, sized by its share of Available. */}
+              <div className="budget-summary-mascot">
               {!loading && !monthError && budgetScope === "joint" && contribStatus ? (
                 <JointFamily contribStatus={contribStatus}>{budgetJar}</JointFamily>
               ) : (
                 <div style={{ marginBottom: 4 }}>{budgetJar}</div>
               )}
+              </div>
               {/* Not money to assign: what's still in categories after spending. */}
-              <span style={budgetHealthLabelStyle}>Allocated</span>
-              <span style={budgetHealthAmountStyle}>
+              <span className="budget-summary-label" style={budgetHealthLabelStyle}>Allocated</span>
+              <span className="budget-summary-amount" style={budgetHealthAmountStyle}>
                 <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
                 <Currency />
               </span>
@@ -270,7 +277,7 @@ export function CategoriesScreen({
             {/* One banner at a time, the most urgent first: accounts falling short, categories
                 running low, unassigned money, then what's still due to Joint. Nothing to act on, no banner. */}
             <div className="budget-overview-notices">
-            {shortBy > 0 ? (
+            {loading ? null : shortBy > 0 ? (
               <Banner
                 desktopInline
                 tone="danger"
@@ -290,7 +297,7 @@ export function CategoriesScreen({
               >
                 {runningLow.length === 1 ? runwayLabel(firstLow.daysCovered) : `${firstLow.category.name} runs out first`}
               </Banner>
-            ) : Math.round(leftToAllocate) > 0 ? (
+            ) : !monthlySummary.contributionError && Math.round(leftToAllocate) > 0 ? (
               <Banner
                 tone="accent"
                 icon={<FundIcon size={18} strokeWidth={2.2} />}
@@ -314,8 +321,10 @@ export function CategoriesScreen({
               />
             ) : null}
 
+            {monthlySummary.contributionError && <Banner tone="neutral" compact>Confirmed contributions and repayment reserves unavailable</Banner>}
             </div>
             </div>
+            <div className="budget-category-workspace">
             <div className="budget-desktop-controls" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <MonthPicker
                 value={homeMonth}
@@ -326,9 +335,10 @@ export function CategoriesScreen({
               />
               {/* Next month's plan sits with the month it follows. */}
               {planMonth && onOpenPlan && !past && (
-                <button type="button" className="composer-picker-chip" onClick={onOpenPlan} style={planChipStyle}>
+                <button type="button" className="composer-picker-chip" disabled={!!monthlySummary.contributionError} title={monthlySummary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`} style={planChipStyle}>
                   <CalendarIcon size={16} aria-hidden="true" />
-                  Plan {new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}
+                  {/* The month picker beside it already names this month. */}
+                  {planMonth === homeMonth ? "Plan" : `Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}
                 </button>
               )}
             </div>
@@ -351,9 +361,24 @@ export function CategoriesScreen({
                       <div className="budget-table-head" aria-hidden="true">
                         <span>Category</span><span>Budgeted</span><span>Spent</span><span>Available</span>
                       </div>
-                      {group.rows.map(({ cat, planned, spent, savings, status, runway }) => savings
-                        ? <SavingsJarRow key={cat.id} cat={cat} scope={budgetScope} available={cat.available ?? 0} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />
-                        : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} runwayDays={runway?.daysCovered} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />)}
+                      {(() => {
+                        // A run of identical empty jars says nothing row by row, so two or more fold into one line.
+                        const empty = group.rows.filter(row => !row.savings && (row.status.state === "empty" || row.status.state === "unfunded"));
+                        const fold = empty.length >= 2 && !search.trim() && !showEmpty.has(group.label);
+                        const rows = fold ? group.rows.filter(row => !empty.includes(row)) : group.rows;
+                        return <>
+                          {rows.map(({ cat, planned, spent, savings, status, runway }) => savings
+                            ? <SavingsJarRow key={cat.id} cat={cat} scope={budgetScope} available={cat.available ?? 0} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />
+                            : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} runwayDays={runway?.daysCovered} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />)}
+                          {fold && (
+                            <button type="button" onClick={() => setShowEmpty(prev => new Set(prev).add(group.label))} style={emptyFoldStyle} aria-label={`Show ${empty.length} empty categories: ${empty.map(row => row.cat.name).join(", ")}`}>
+                              <span style={emptyFoldIconsStyle} aria-hidden="true">{empty.slice(0, 4).map(row => <CategoryIcon key={row.cat.id} icon={row.cat.icon} categoryName={row.cat.name} size={20} style={{ opacity: 0.55 }} />)}</span>
+                              <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>{empty.length} empty</span>
+                              <ChevronDownIcon size={16} aria-hidden="true" />
+                            </button>
+                          )}
+                        </>;
+                      })()}
                       {onOpenNewCategory && (
                         <button type="button" onClick={() => onOpenNewCategory(group.label === "Savings" ? "Saving" : group.label)} style={addRowStyle}>
                           <PlusIcon size={16} aria-hidden="true" />
@@ -374,7 +399,7 @@ export function CategoriesScreen({
                     {frozenCategories.map((cat) => (
                       <SwipeToDelete key={cat.id} variant="restore" deleteLabel={`Restore ${cat.name}`} onDelete={() => { onReviveCategory(cat); return true; }}>
                         <button type="button" onClick={() => onOpenCategoryDetails(cat)} style={frozenRowStyle} aria-label={cat.name}>
-                          <CategoryIcon icon={cat.icon} size={24} style={{ opacity: 0.5, flexShrink: 0 }} />
+                          <CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} style={{ opacity: 0.5, flexShrink: 0 }} />
                           <span style={frozenNameStyle}>{cat.name}</span>
                           <ChevronRightIcon size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
                         </button>
@@ -384,6 +409,7 @@ export function CategoriesScreen({
                 )}
               </section>
             )}
+            </div>
           </>
       }
 
@@ -421,8 +447,7 @@ const budgetHealthLabelStyle: CSSProperties = {
   fontSize: 12,
   lineHeight: 1,
   fontWeight: 700,
-  letterSpacing: 0.7,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 
@@ -447,6 +472,8 @@ const sectionStyle: CSSProperties = { display: "grid", gap: 4, minWidth: 0 };
 const listSurfaceStyle: CSSProperties = { display: "grid", padding: "4px 0", borderRadius: "var(--radius-card)", background: "var(--surface)", border: "1px solid color-mix(in srgb, var(--border) 60%, transparent)" };
 
 
+const emptyFoldStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 56, padding: "0 16px 0 24px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
+const emptyFoldIconsStyle: CSSProperties = { display: "inline-flex", gap: 4, flexShrink: 0 };
 const addRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, minHeight: 48, padding: "0 16px 0 24px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
 
 const planChipStyle: CSSProperties = {

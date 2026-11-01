@@ -1,4 +1,5 @@
 "use client";
+import { categoryIconSource } from "../../../lib/category-icons";
 import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MascotEngine, SCALE, VIEWBOX_HALF, type CoinFrame, type MascotFrame, type MascotTarget, type PhysicsMode } from "./engine";
 import { BEAD_SCALE, COIN_R, dustSpecks, type CoinOwner } from "./coins";
@@ -402,7 +403,7 @@ function ItemGlyph({ x, y, rot, opacity, dust, glyph, itemRadius = COIN_R, glyph
   const radius = itemRadius * SCALE * (1 - 0.35 * dust);
   return (
     <g transform={`translate(${x} ${y}) rotate(${rot})`} opacity={dust > 0 ? 1 - dust : opacity}>
-      <text fontSize={(2 * radius) / EMOJI_FILL} textAnchor="middle" dominantBaseline="central" filter={glyphFilter}>{glyph}</text>
+      <image href={categoryIconSource(glyph)} x={-radius} y={-radius} width={2 * radius} height={2 * radius} preserveAspectRatio="xMidYMid meet" />
     </g>
   );
 }

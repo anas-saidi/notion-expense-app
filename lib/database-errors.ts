@@ -8,3 +8,13 @@ export function databaseQuotaFailure(error: unknown) {
     retryable: false,
   } as const;
 }
+
+/** Explicit recovery mode is also non-retryable until its configuration changes. */
+export function databaseUnavailableFailure(error: unknown) {
+  const quota = databaseQuotaFailure(error);
+  if (quota) return quota;
+  const failure = error as { code?: string; message?: string } | null;
+  return failure?.code === "DATABASE_NOTION_ONLY"
+    ? { error: failure.message ?? "Shared database unavailable.", code: failure.code, retryable: false as const }
+    : null;
+}

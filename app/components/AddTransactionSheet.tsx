@@ -1,5 +1,7 @@
 "use client";
 
+import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
+
 import { IncomeUseControl } from "./IncomeUseControl";
 import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { useState, useEffect, useRef, type CSSProperties, type RefObject } from "react";
@@ -16,7 +18,7 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { PickerPopover } from "./PickerPopover";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { DateCalendar, DatePickerTrigger } from "./DatePicker";
-import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, SparklesIcon, XIcon } from "./ui/icons";
+import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, WriteIcon, XIcon } from "./ui/icons";
 import { AccountOptionList, CategoryOptionList, pickerIconStyle, pickerChipIconStyle, pickerChipLabelStyle, pickerChipStyle } from "./TransactionPickers";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
@@ -44,6 +46,8 @@ type AddTransactionSheetProps = {
   amountAfterBalance: number | null;
   actualAfterSpending?: number | null;
   balanceCheckUnavailable?: boolean;
+  /** Unavailable until the server is reconfigured; refreshing won't help. */
+  balanceCheckPaused?: boolean;
   balanceCheckedAt?: string;
   parsedAmount: number;
   categoryUnfunded: boolean;
@@ -210,7 +214,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       open={props.open}
       onClose={() => { if (!typedBusy) props.onClose(); }}
       label={isEditMode ? "Edit transaction" : "Add transaction"}
-      maxWidth="500px"
+      size="standard" desktopHeight="fill"
       mobileFullWidth
       detent="default"
       backdropStrength={0.12}
@@ -218,22 +222,22 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       panelStyle={panelStyle}
       contentStyle={{ paddingTop: 0, overflow: "hidden" }}
     >
-      <div ref={sheetContentRef} style={{ ...sheetInnerStyle, ...(entryMode === "type" ? { padding: "12px max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom))" } : {}), overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget || props.actualAfterSpending != null || props.balanceCheckUnavailable) ? "auto" : "hidden" }}>
+      <div className="sheet-body" ref={sheetContentRef} style={{ ...sheetInnerStyle, ...(entryMode === "type" ? { padding: "12px max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom))" } : {}), overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget || props.actualAfterSpending != null || props.balanceCheckUnavailable) ? "auto" : "hidden" }}>
 
         {/* ── Header ── */}
-        <header style={topBarStyle}>
+        <SheetHeader style={topBarStyle}>
           {entryMode === "type" && !isEditMode ? <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div ref={props.dateRef}>
               <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} className="typed-date-trigger" ariaLabel="Choose default date" onClick={props.onToggleDatePicker} style={{ ...pickerChipStyle, border: 0, paddingLeft: 0, fontSize: 20 }} showChevron={false} />
-              <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="left" placement="bottom" width="min(304px, calc(100vw - 32px))" zIndex={140} anchorRef={props.dateRef}>
+              <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="left" placement="bottom" size="calendar" zIndex={140} anchorRef={props.dateRef}>
                 <DateCalendar value={props.date} onChange={props.onSelectDate} />
               </PickerPopover>
             </div>
-          </div> : <div style={eyebrowStyle}>{isEditMode ? (isIncome ? "Edit income" : "Edit expense") : "New transaction"}</div>}
+          </div> : <h2 style={dialogTitleStyle}>{isEditMode ? (isIncome ? "Edit income" : "Edit expense") : "New transaction"}</h2>}
           <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
-        </header>
+        </SheetHeader>
 
         {!isEditMode && entryMode === "form" && (
           <div role="tablist" aria-label="Transaction type" style={typeSwitcherStyle}>
@@ -267,7 +271,6 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             aria-label="Amount"
             inputMode="decimal"
             autoComplete="off"
-            autoFocus
             ref={amountInputRef}
             onFocus={() => setAmountFocused(true)}
             onBlur={() => setAmountFocused(false)}
@@ -292,7 +295,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           Estimated actual after: <Money value={props.actualAfterSpending} />
           <span style={{ display: "block", marginTop: 4 }}>Checked {fmtDate(props.balanceCheckedAt.slice(0, 10))}</span>
         </p>}
-        {props.balanceCheckUnavailable && <Banner tone="warning" compact>Actual-funds checks unavailable. Refresh before spending.</Banner>}
+        {props.balanceCheckUnavailable && <Banner tone="warning" compact>{props.balanceCheckPaused ? "Actual-funds checks are paused while the shared database is off." : "Actual-funds checks unavailable. Refresh before spending."}</Banner>}
 
         {/* ── Form fields ── */}
         <section style={formSectionStyle}>
@@ -341,7 +344,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 <span style={pickerChipLabelStyle}>{props.selectedAccount?.label ?? ""}</span>
               </button>
 
-              <PickerPopover open={props.showAccountPicker} title="Account" onClose={props.onCloseAccountPicker} align="left" placement="top" width="min(292px, calc(100vw - 28px))" zIndex={140} anchorRef={props.accountRef}>
+              <PickerPopover open={props.showAccountPicker} title="Account" onClose={props.onCloseAccountPicker} align="left" placement="top" size="choice" zIndex={140} anchorRef={props.accountRef}>
                 <AccountOptionList id="account-picker" accounts={props.filteredAccounts} selectedId={props.selectedAccount?.id} onSelect={props.onSelectAccount} />
               </PickerPopover>
             </div>
@@ -360,11 +363,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   color: props.selectedCat || props.showCatPicker ? "var(--text2)" : "var(--muted)",
                 }}
               >
-                <span style={pickerChipIconStyle}>{props.selectedCat?.icon ?? "#"}</span>
+                <span style={pickerChipIconStyle}><CategoryIcon icon={props.selectedCat?.icon} categoryName={props.selectedCat?.name} size={24} /></span>
                 <span style={pickerChipLabelStyle}>{props.selectedCat?.name ?? "Category"}</span>
               </button>
 
-              <PickerPopover open={props.showCatPicker} title="Category" onClose={props.onCloseCatPicker} align="left" placement="top" width="min(300px, calc(100vw - 28px))" zIndex={140} anchorRef={props.catRef}>
+              <PickerPopover open={props.showCatPicker} title="Category" onClose={props.onCloseCatPicker} align="left" placement="top" size="choice" zIndex={140} anchorRef={props.catRef}>
                 <CategoryOptionList id="category-picker" categories={props.filteredCats} selectedId={props.selectedCat?.id} lastUsedId={props.lastUsedCatId} onSelect={props.onSelectCategory} search={props.catSearch} onSearchChange={props.onCatSearchChange} />
               </PickerPopover>
             </div>}
@@ -375,11 +378,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             <div style={datePickerSlotStyle} ref={props.dateRef}>
               <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} ariaLabel="Choose date" onClick={props.onToggleDatePicker} style={pickerChipStyle} className="composer-picker-chip" showChevron={false} />
 
-              <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="right" placement="top" width="min(304px, calc(100vw - 32px))" zIndex={140} anchorRef={props.dateRef}>
+              <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="right" placement="top" size="calendar" zIndex={140} anchorRef={props.dateRef}>
                 <div id="date-picker"><DateCalendar value={props.date} onChange={props.onSelectDate} /></div>
               </PickerPopover>
             </div>
-            {!isEditMode && props.onSaveTyped && <button type="button" aria-label="Type it" aria-pressed={false} title="Type it" disabled={props.status === "saving"} onClick={() => { setEntryMode("type"); setShowKeypad(false); props.onCloseDatePicker(); props.onCloseCatPicker(); props.onCloseAccountPicker(); }} style={entryModeButtonStyle}><SparklesIcon size={20} aria-hidden="true" /></button>}
+            {!isEditMode && props.onSaveTyped && <button type="button" aria-label="Type it" aria-pressed={false} title="Type it" disabled={props.status === "saving"} onClick={() => { setEntryMode("type"); setShowKeypad(false); props.onCloseDatePicker(); props.onCloseCatPicker(); props.onCloseAccountPicker(); }} style={entryModeButtonStyle}><WriteIcon size={20} aria-hidden="true" /></button>}
             </div>
           </div>
 
@@ -390,7 +393,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             <div style={{ display: "grid", gap: 10 }}>
               {props.suggestedCategory && props.suggestedCategory.id !== props.selectedCat?.id && (
                 <button onClick={() => props.onSelectCategory(props.suggestedCategory!)} style={{ minHeight: 44, padding: "0 2px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, justifySelf: "start" }}>
-                  <span style={{ fontSize: 14, opacity: 0.85 }}>{props.suggestedCategory.icon ?? "#"}</span>
+                  <span style={{ fontSize: 14, opacity: 0.85 }}><CategoryIcon icon={props.suggestedCategory.icon} categoryName={props.suggestedCategory.name} size={20} /></span>
                   <span>Suggested: <strong style={{ fontWeight: 600 }}>{props.suggestedCategory.name}</strong></span>
                 </button>
               )}
@@ -420,7 +423,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                           }
                         </button>
 
-                        <PickerPopover open={showFundPicker} title="Source category" onClose={() => setShowFundPicker(false)} align="left" placement="top" width="min(260px, calc(100vw - 28px))" zIndex={150} anchorRef={fundPickerRef}>
+                        <PickerPopover open={showFundPicker} title="Source category" onClose={() => setShowFundPicker(false)} align="left" placement="top" size="choice" zIndex={150} anchorRef={fundPickerRef}>
                           <div role="listbox" aria-label="Source categories" style={{ maxHeight: 220, overflowY: "auto", padding: 6, boxSizing: "border-box" }}>
                             <div style={{ display: "grid", gap: 2 }}>
                               {sourceCandidates.map(cat => {
@@ -444,7 +447,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                     className="picker-option"
                                     style={fundPickerRowStyle}
                                   >
-                                    <div style={{ ...pickerIconStyle, fontSize: 13, width: 28, height: 28, borderRadius: 8 }}>{cat.icon ?? "#"}</div>
+                                    <div style={{ ...pickerIconStyle, fontSize: 13, width: 28, height: 28, borderRadius: 8 }}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} /></div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
                                       {isPartial && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>partial</div>}
@@ -540,7 +543,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       tone={isRecentIncome ? "income" : "expense"}
                       prefix={isRecentIncome ? "+" : "−"}
                       date={transaction.date ? fmtDate(transaction.date) : undefined}
-                      icon={isRecentIncome ? <BanknoteIcon size={13} /> : <CategoryIcon icon={recentCategory?.icon ?? null} size={22} />}
+                      icon={isRecentIncome ? <BanknoteIcon size={13} /> : <CategoryIcon icon={recentCategory?.icon ?? null} categoryName={recentCategory?.name} size={22} />}
                     />
                   );
                 })}
@@ -549,7 +552,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           )}
 
           {/* Edit actions / Save button */}
-          <div style={footerActionsStyle}>
+          <SheetFooter style={footerActionsStyle}>
           {isEditMode && props.onDelete && (
             <button
               type="button"
@@ -606,7 +609,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               !isIncome && (props.billShortfall ?? 0) > 0 ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
             )}
           </button>
-          </div>
+          </SheetFooter>
 
         </section>
         </div>}
@@ -619,17 +622,17 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           label="Confirm delete expense"
           detent="content"
           layered
-          maxWidth="440px"
+          size="compact"
           zIndex={150}
           panelStyle={confirmPanelStyle}
         >
-          <div style={confirmContentStyle}>
+          <SheetBody style={confirmContentStyle}>
             <div style={confirmIconStyle}><DeleteIcon size={20} /></div>
             <div style={{ display: "grid", gap: 6 }}>
               <h2 style={confirmTitleStyle}>Delete this expense?</h2>
               <p style={confirmCopyStyle}>It will be removed from activity and budget totals. You can undo immediately afterward.</p>
             </div>
-            <div style={confirmActionsStyle}>
+            <SheetFooter style={confirmActionsStyle}>
               <button type="button" onClick={() => setConfirmingDelete(false)} disabled={deleting} style={cancelDeleteStyle}>Cancel</button>
               <button
                 type="button"
@@ -649,8 +652,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               >
                 {deleting ? "Deleting…" : "Delete expense"}
               </button>
-            </div>
-          </div>
+            </SheetFooter>
+          </SheetBody>
         </BottomSheet>
       )}
     </BottomSheet>
@@ -764,11 +767,11 @@ const typeSwitcherStyle: CSSProperties = {
   background: "var(--surface2)",
 };
 
-const eyebrowStyle: CSSProperties = {
+const dialogTitleStyle: CSSProperties = {
+  margin: 0,
   fontFamily: "var(--font-body)",
   fontSize: 12,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+  fontWeight: 400,
   color: "var(--muted)",
 };
 
@@ -831,8 +834,7 @@ const recentHeaderStyle: CSSProperties = {
   color: "var(--muted)",
   fontSize: 11,
   fontWeight: 700,
-  letterSpacing: 0.7,
-  textTransform: "uppercase",
+  
 };
 
 const recentListStyle: CSSProperties = {

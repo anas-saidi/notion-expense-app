@@ -1,4 +1,7 @@
 "use client";
+import { categoryIconSource } from "../../lib/category-icons";
+
+import { SheetBody, SheetHeader } from "./ui/SheetLayout";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Category } from "./app-types";
@@ -79,17 +82,17 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
   };
 
   return (
-    <BottomSheet open={!!savings} onClose={onClose} label="Take out of savings" maxWidth="480px" panelStyle={sheetStyle} zIndex={120}>
-      <div style={innerStyle}>
-        <header style={headerStyle}>
+    <BottomSheet open={!!savings} onClose={onClose} label="Take out of savings" size="standard" panelStyle={sheetStyle} zIndex={120}>
+      <SheetBody style={innerStyle}>
+        <SheetHeader style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <CategoryIcon icon={savings?.icon} style={{ fontSize: 28, flexShrink: 0 }} />
+            <CategoryIcon icon={savings?.icon} categoryName={savings?.name} style={{ fontSize: 28, flexShrink: 0 }} />
             <h2 style={titleStyle}>Take from {savings?.name ?? "savings"}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
-        </header>
+        </SheetHeader>
 
         <div style={hintStyle}>
           <span>In savings</span>
@@ -118,7 +121,7 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
           <ChoicePicker aria-label="Category to move the money to" value={toId} onChange={(event) => setToId(event.target.value)}>
             <option value="" disabled>Choose a category</option>
             {destinations.map((category) => (
-              <option key={category.id} value={category.id}>{category.icon} {category.name}</option>
+              <option key={category.id} value={category.id} data-icon={categoryIconSource(category.icon, category.name)}>{category.name}</option>
             ))}
           </ChoicePicker>
         </label>
@@ -137,7 +140,7 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
         <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48, cursor: canSubmit ? "pointer" : "not-allowed" }}>
           {status === "saving" ? "Moving…" : confirming ? "Confirm" : "Take out"}
         </button>
-      </div>
+      </SheetBody>
     </BottomSheet>
   );
 }

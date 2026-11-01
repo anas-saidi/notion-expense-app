@@ -160,8 +160,7 @@ export function AppShell({
       />
 
       <div className="app-nav-wrap">
-        <BottomNav tab={tab} onTabChange={onTabChange} desktopActions={<>
-          {showAddButton && <button type="button" className="desktop-nav-action desktop-nav-add" onClick={() => { haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></button>}
+        <BottomNav tab={tab} onTabChange={onTabChange} desktopPrimaryAction={showAddButton && <button type="button" className="desktop-nav-action desktop-nav-add" onClick={event => { event.currentTarget.focus(); haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></button>} desktopActions={<>
           {tab !== "home" && <button type="button" className="desktop-nav-action" onClick={tab === "budget" ? onBudgetSearch : onReflectSearch} aria-label={tab === "budget" ? "Search categories" : "Search activity"}><SearchIcon size={20} /><span>{tab === "budget" ? "Search categories" : "Search activity"}</span></button>}
           {onBudgetRebalance && <button type="button" className="desktop-nav-action" onClick={onBudgetRebalance} aria-label="Rebalance"><ShuffleIcon size={20} /><span>Rebalance</span></button>}
           {onCheckBalances && <button type="button" className="desktop-nav-action" disabled={!canCheckBalances} onClick={onCheckBalances} aria-label="Check balances"><ScaleIcon size={20} /><span>Check balances</span></button>}

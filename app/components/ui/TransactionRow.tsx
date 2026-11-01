@@ -17,6 +17,9 @@ type TransactionRowProps = {
   amountColor?: string;
 };
 
+/** A subtitle that only repeats the title ("Rent" in Rent) says nothing new. */
+export const sameText = (a: ReactNode, b: ReactNode) => typeof a === "string" && typeof b === "string" && a.trim().toLowerCase() === b.trim().toLowerCase();
+
 export function TransactionRow({
   title,
   subtitle,
@@ -34,7 +37,7 @@ export function TransactionRow({
       <span style={iconStyle(tone)} aria-hidden="true">{icon}</span>
       <span style={copyStyle}>
         <span className="tx-row-title" style={titleStyle}>{title}</span>
-        {subtitle && <span style={subtitleStyle}>{subtitle}</span>}
+        {subtitle && !sameText(subtitle, title) && <span style={subtitleStyle}>{subtitle}</span>}
       </span>
       <span style={valueStackStyle}>
         <span style={{ ...amountStyle(tone), ...(amountColor ? { color: amountColor } : {}) }}>

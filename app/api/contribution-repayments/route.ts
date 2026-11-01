@@ -1,3 +1,4 @@
+import { notionLedgerConfigured } from "../../../lib/notion-ledger";
 import { NextRequest, NextResponse } from "next/server";
 import { contributionPool } from "../../../lib/contribution-store";
 import { mirrorScope } from "../../../lib/mirror/store";
@@ -17,10 +18,10 @@ async function handlePOST(request: NextRequest) {
   if (!token) return NextResponse.json({ error: "Finance connection unavailable." }, { status: 503 });
   let client;
   try {
-    client = await contributionPool().connect();
+    if (!notionLedgerConfigured()) client = await contributionPool().connect();
     // One household repayment at a time, including across server instances.
     // Its request identifier lives on the Notion transfer for safe retry.
-    await client.query("SELECT pg_advisory_lock(hashtextextended($1,0))", [mirrorScope(token) + ":repayment"]);
+    if (client) await client.query("SELECT pg_advisory_lock(hashtextextended($1,0))", [mirrorScope(token) + ":repayment"]);
     const db = process.env.NOTION_TRANSACTIONS_DB ?? "1926a2be-8922-80be-968a-efa6e6dace95";
     const { data: schema } = await notionFetchJson<any>(token, `/databases/${db}`);
     if (!schema.properties?.[REPAYMENT_PROPERTY]) await notionFetchJson(token, `/databases/${db}`, { method: "PATCH", body: { properties: { [REPAYMENT_PROPERTY]: { rich_text: {} } } } });

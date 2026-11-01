@@ -13,6 +13,7 @@ export async function planningContext(request: NextRequest) {
     readMonthly(new NextRequest(new URL(`/api/monthly-summary?month=${month}&includeTransactions=true&includeJointDebt=true`, request.url)))]);
   for (const response of responses) if (!response.ok) throw new Error("Could not verify planning capacity. Refresh and try again.");
   const [accountData, categoryData, monthly] = await Promise.all(responses.map(response => response.json()));
+  if (monthly.summary.contributionError) throw new Error("Planning capacity is unavailable until confirmed contributions and repayment reserves can be read.");
   const accounts: Account[] = accountData.accounts, categories: Category[] = categoryData.categories.filter((category: Category) => !category.archived);
   if (accounts.some(a => !a.type?.toLowerCase().includes("saving") && a.readyToAssign == null)) throw new Error("An account's available planning balance is unknown.");
   const contribution = calculateContributionStatus({ accounts, categories, transactions: monthly.transactions, debtTransactions: monthly.jointDebtTransactions, debtCategories: categoryData.categories, monthlySummary: monthly.summary });

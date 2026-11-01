@@ -212,3 +212,7 @@ On a supported iPhone/card, create a personal automation in Shortcuts → Automa
 Direct access to financial history is separately governed by FinanceKit. Apple's requirements include approved managed entitlements, an organization developer account, supported financial products/regions and App Store distribution criteria. This personal sideloaded app does not claim access to Wallet card history. See [Wallet transaction triggers](https://support.apple.com/en-euro/guide/shortcuts/apd65c67538a/ios) and [FinanceKit requirements](https://developer.apple.com/financekit/).
 
 Daily check-in verification: all 31 native unit tests and three UI journeys pass, including independent daily reminder enable/disable. App Intents metadata extraction succeeds for `LogTransactionsIntent`. Siri utterance recognition and Wallet card automation remain phone-only checks.
+
+## Notion operation receipts
+
+Native submissions now carry the draft’s original `createdAt` timestamp. Keep it and the request ID unchanged on retries. The server stores receipts in Notion when configured. Pre-cutover queued actions remain blocked until their inaccessible legacy receipts can be reconciled; do not assign new IDs/times to bypass that protection. This request change was syntax-checked; the native app must be rebuilt to send the new field.

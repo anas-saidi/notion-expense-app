@@ -1,3 +1,4 @@
+import { notionLedgerConfigured } from "./notion-ledger";
 import { NextRequest } from "next/server";
 import { readAccountResponse } from "./notion-accounts";
 import { queryDatabaseAll } from "./notion-api";
@@ -33,7 +34,7 @@ export async function readContributionContext(token: string, month: string, thro
 /** Additional allocations from existing Joined cash cannot consume advances.
  * Monthly plans can request new contributions through their capacity check. */
 export async function assertAdvanceReservation(token: string, accountId: string | null, categoryId: string, increase: number) {
-  if (increase <= 0 || !process.env.DATABASE_URL) return;
+  if (increase <= 0 || (!notionLedgerConfigured() && !process.env.DATABASE_URL)) return;
   if (!(await contributionStore().list(mirrorScope(token))).length) return;
   const context = await readContributionContext(token, billToday().slice(0, 7));
   const sourceId = accountId ?? context.categories.find(c => normalizeId(c.id) === normalizeId(categoryId))?.defaultAccount;

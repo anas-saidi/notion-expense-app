@@ -1,3 +1,4 @@
+import { notionOnlyMode } from "../database-mode";
 import { compileMirrorQuery } from "./sql-query";
 import { Pool } from "pg";
 import { createHash, randomUUID } from "node:crypto";
@@ -46,7 +47,7 @@ const globalStore = globalThis as typeof globalThis & { financeMirrorPool?: Pool
 // Notion recomputes balance rollups/formulas several seconds after a write. Reads stay
 // live during this window; importing sooner publishes pre-write balances as current.
 export const WRITE_SETTLE_MS = 15_000;
-export function mirrorConfigured() { return !!process.env.DATABASE_URL; }
+export function mirrorConfigured() { return !notionOnlyMode() && !!process.env.DATABASE_URL; }
 export function mirrorStore(): MirrorStore | null {
   if (!mirrorConfigured()) return null;
   if (!globalStore.financeMirrorPool) {

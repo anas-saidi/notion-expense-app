@@ -1,11 +1,15 @@
 "use client";
 
+import { SheetHeader } from "./ui/SheetLayout";
+
 import { useMemo, type CSSProperties } from "react";
 import type { Account, BudgetScope } from "./app-types";
 import { assignableOf, scopeFromAccountLabel } from "./app-utils";
 import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { XIcon } from "./ui/icons";
+import { CategoryIcon } from "./ui/CategoryIcon";
+import { accountIconSource } from "../../lib/category-icons";
 
 type ManageScreenProps = {
   accounts: Account[];
@@ -32,17 +36,17 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
       open
       onClose={onClose}
       label="Accounts"
-      maxWidth="480px"
+      size="standard"
       panelStyle={sheetStyle}
       contentStyle={sheetContentStyle}
     >
-    <main className="manage-screen" style={screenStyle}>
-      <header style={headerStyle}>
+    <main className="manage-screen sheet-body" style={screenStyle}>
+      <SheetHeader style={headerStyle}>
         <h1 style={titleStyle}>Accounts</h1>
         <button className="sheet-close-button" type="button" onClick={onClose} aria-label="Close accounts" style={closeStyle}>
           <XIcon size={18} />
         </button>
-      </header>
+      </SheetHeader>
 
       <section aria-label="Account totals" style={heroStyle}>
         <span style={heroLabelStyle}>Total balance</span>
@@ -74,7 +78,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
                 className="tx-row transaction-row manage-account-row"
                 style={accountRowStyle}
               >
-                <span style={accountIconStyle} aria-hidden="true">{account.icon}</span>
+                <CategoryIcon icon={accountIconSource(account.type)} size={24} />
                 <span style={accountCopyStyle}>
                   <span style={rowTitleStyle}>{account.label}</span>
                   <span style={rowMetaStyle}>{account.type ?? "Account"}</span>
@@ -113,7 +117,7 @@ const headerStyle: CSSProperties = { display: "flex", alignItems: "center", just
 const titleStyle: CSSProperties = { margin: 0, fontFamily: "var(--font-display)", fontSize: 24, lineHeight: 1.1, fontWeight: 750, letterSpacing: "-0.025em", color: "var(--text)" };
 const closeStyle: CSSProperties = { width: 44, height: 44, border: "none", borderRadius: "50%", background: "var(--surface2)", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const heroStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 10, padding: "16px 0 8px", textAlign: "center" };
-const heroLabelStyle: CSSProperties = { fontSize: 12, lineHeight: 1, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: "var(--muted)" };
+const heroLabelStyle: CSSProperties = { fontSize: 12, lineHeight: 1, fontWeight: 700, color: "var(--muted)" };
 const heroAmountStyle: CSSProperties = { display: "inline-flex", justifyContent: "center", fontFamily: "var(--font-body)", fontSize: "clamp(44px, 13vw, 64px)", lineHeight: 0.96, fontWeight: 500, letterSpacing: "-0.035em", color: "var(--text)", whiteSpace: "nowrap" };
 
 const readyMetricStyle = (negative: boolean): CSSProperties => ({
@@ -130,7 +134,6 @@ const listStyle: CSSProperties = { display: "grid" };
 
 // Mirrors ui/TransactionRow so account rows read like every other list in the app.
 const accountRowStyle: CSSProperties = { width: "100%", minHeight: 64, padding: "10px 2px", border: 0, background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer" };
-const accountIconStyle: CSSProperties = { width: 24, height: 24, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 20, lineHeight: 1 };
 const accountCopyStyle: CSSProperties = { flex: 1, minWidth: 0, display: "grid", gap: 3 };
 const rowTitleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, lineHeight: 1.2, fontWeight: 500, color: "var(--text2)" };
 const rowMetaStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.2, color: "var(--muted)" };

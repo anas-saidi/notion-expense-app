@@ -6,6 +6,7 @@ import { contributionDue } from "./contribution-utils";
 import { Currency, Money } from "./Money";
 import { fmt } from "./app-utils";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
+import { CardHeader } from "./ui/CardHeader";
 import { MascotHero, MASCOT_HERO_SIZE } from "./mascot/MascotHero";
 import { monthProgress, pace } from "./category-status";
 import { Mascot } from "./mascot/Mascot";
@@ -26,6 +27,8 @@ type WalletCardSwitcherProps = {
   categories?: Category[];
   /** Money spent beyond what categories had (Available below zero), this month only. */
   overspent?: number;
+  /** Account obligations displayed directly beneath its balance. */
+  balanceDetail?: ReactNode;
 };
 
 const HOME_POOL_SIZE = MASCOT_HERO_SIZE;
@@ -45,7 +48,7 @@ const CUDDLE_PULL_EXTRA = { anas: 8, salma: 10 } as const;
 /** How far each partner leans in (degrees): a tipped squircle reads as falling, so Anas leans less. */
 const CUDDLE_LEAN = { anas: 4, salma: 8 } as const;
 
-export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = false, monthlyError = false, categoryAvailableByScope, balanceByScope, contribStatus, categories = [], overspent: overspentProp = 0 }: WalletCardSwitcherProps) {
+export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = false, monthlyError = false, categoryAvailableByScope, balanceByScope, contribStatus, categories = [], overspent: overspentProp = 0, balanceDetail }: WalletCardSwitcherProps) {
   const currentSummary = monthlySummary;
   // Hero number: real account balance by scope (from Notion accounts database)
   const balance   = balanceByScope != null ? balanceByScope[value] : null;
@@ -117,16 +120,18 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
 
           </div>
           <div className="wallet-number-group" style={numberGroupStyle}>
-            <span style={labelStyle}>Balance</span>
+            <CardHeader className="wallet-balance-heading" title="Balance" titleStyle={labelStyle} />
             <div style={amountRowStyle} aria-label="Balance">
               <span style={bigNumberStyle(isOver)}><AnimatedCounter value={balance ?? 0} /></span>
               <Currency />
             </div>
+            {balanceDetail && <div className="wallet-balance-detail">{balanceDetail}</div>}
           </div>
         </div>
       </section>
 
-      {!monthlyLoading && !monthlyError && isJoint && !contribStatus && (
+      {/* A contribution read error is already shown in Home's contributions slot. */}
+      {!monthlyLoading && !monthlyError && !monthlySummary.contributionError && isJoint && !contribStatus && (
         <p style={contribUnavailableStyle} role="note">
           Contributions unavailable: set both partners' split percentages (totalling 100%) and check the joint balance and category balances.
         </p>

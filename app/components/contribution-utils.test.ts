@@ -154,3 +154,9 @@ describe("savings deposits and purchases", () => {
     expect(calculateContributionStatus({ accounts, categories: [{ ...savings, available: null }], transactions: [], monthlySummary })).toBeNull();
   });
 });
+
+it("does not recalculate agreed dues or show settled when the agreement read is unavailable", () => {
+  expect(calculateContributionStatus({ accounts, categories, transactions, monthlySummary: {
+    ...monthlySummary, contributionError: "Shared database unavailable", contributionAgreements: [],
+  } })).toBeNull();
+});

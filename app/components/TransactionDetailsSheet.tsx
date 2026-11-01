@@ -1,9 +1,12 @@
 "use client";
 
+import { SheetBody, SheetHeader } from "./ui/SheetLayout";
+
 import { UndoSavingsDeposit } from "./UndoSavingsDeposit";
 import type { Account, Category, Transaction } from "./app-types";
 import { fmtDate } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
+import { XIcon } from "./ui/icons";
 import { Money } from "./Money";
 
 type Props = {
@@ -28,22 +31,23 @@ export function TransactionDetailsSheet({ transaction, accounts, categories, onC
       : accountName(transaction.accountId);
 
   return (
-    <BottomSheet open onClose={onClose} label={`${type} details`} detent="default" snapPoints={[0, 0.62, 1]} initialSnap={1} maxWidth="500px" panelStyle={{ background: "var(--surface)", overflowY: "auto" }}>
-      <div style={{ padding: "8px 20px 28px", display: "grid", gap: 20 }}>
-        <header>
-          <p className="section-label" style={{ marginBottom: 8 }}>{type}</p>
-          <h2 style={{ fontSize: 24, lineHeight: 1.15 }}>{transaction.name || type}</h2>
-          <strong style={{ display: "block", marginTop: 12, fontSize: 32, fontVariantNumeric: "tabular-nums" }}><Money value={transaction.amount} currency animated animateOnMount /></strong>
-        </header>
+    <BottomSheet open onClose={onClose} label={`${type} details`} detent="default" snapPoints={[0, 0.62, 1]} initialSnap={1} size="standard" panelStyle={{ background: "var(--surface)", overflowY: "auto" }}>
+      <SheetBody style={{ padding: "8px 20px 28px", display: "grid", gap: 20 }}>
+        <SheetHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.15 }}>{transaction.name || type}</h2>
+          <button type="button" className="sheet-close-button" aria-label="Close transaction details" onClick={onClose}><XIcon size={20} /></button>
+        </SheetHeader>
+        <strong style={{ display: "block", fontSize: 32, fontVariantNumeric: "tabular-nums" }}><Money value={transaction.amount} currency animated animateOnMount /></strong>
         <dl style={{ display: "grid", gap: 12, margin: 0 }}>
+          <Detail label="Type" value={type} />
           <Detail label="Date" value={fmtDate(transaction.date)} />
           {type === "Expense" ? <><Detail label="Category" value={categoryName(transaction.category)} /><Detail label="Account" value={accountName(transaction.accountId)} /></> : <Detail label="Flow" value={relationships} />}
         </dl>
         {type === "Transfer" ? <UndoSavingsDeposit key={transaction.id} operationId={transaction.savingsFundingOperation} transactionId={transaction.id} onUndone={onUndone} /> : <p style={{ margin: 0, padding: 14, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", fontSize: 14, lineHeight: 1.45 }}>
           {type === "Expense" ? "Expense details." : `Editing ${type.toLowerCase()} transactions is not available here. The original type and relationships are protected.`}
         </p>}
-        <button type="button" onClick={onClose} className="pressable" style={{ minHeight: 48, borderRadius: "var(--radius-control)", border: "1px solid var(--border2)", background: "var(--surface)", color: "var(--text)", fontWeight: 700 }}>Close</button>
-      </div>
+
+      </SheetBody>
     </BottomSheet>
   );
 }

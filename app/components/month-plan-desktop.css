@@ -94,3 +94,7 @@
 @media (min-width:1000px) and (max-width:1199px) {
   .plan-table-head { padding-inline:32px; }
 }
+
+@media (min-width:900px) {
+  .plan-desktop-header { padding:var(--dialog-inset); }
+}

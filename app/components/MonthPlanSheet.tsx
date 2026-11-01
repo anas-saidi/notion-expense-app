@@ -1,4 +1,5 @@
 "use client";
+import { categoryIconSource } from "../../lib/category-icons";
 
 import { HeroSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
 
@@ -267,7 +268,7 @@ export function MonthPlanSheet({
 
   const jarItems = useMemo(
     () => allocationJarItems(
-      scopeCategories.map((c) => ({ categoryId: c.id, icon: c.icon, amount: amountFor(c) })),
+      scopeCategories.map((c) => ({ categoryId: c.id, icon: categoryIconSource(c.icon, c.name), amount: amountFor(c) })),
       Math.max(notAssigned, plannedTotal),
     ),
     [scopeCategories, draft, saved, notAssigned, plannedTotal], // eslint-disable-line react-hooks/exhaustive-deps
@@ -413,9 +414,9 @@ export function MonthPlanSheet({
     ...budgetGroups,
   ];
   if (desktop) return (
-    <BottomSheet open={open} onClose={onClose} label={`Plan ${planLabel}`} desktopViewportCentered maxWidth="1200px" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
+    <BottomSheet open={open} onClose={onClose} label={`Plan ${planLabel}`} desktopViewportCentered size="planning" desktopHeight="fill" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
       <div className="plan-desktop">
-        <header className="plan-desktop-header">
+        <header className="sheet-header plan-desktop-header">
           <h1 className="plan-desktop-title">Plan {planLabel}</h1>
           <GlobalBudgetScopePicker value={scope} onChange={onScopeChange} personalScope={personalScope} />
           <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close"><XIcon size={20} /></button>
@@ -434,7 +435,7 @@ export function MonthPlanSheet({
                   const id = normId(cat.id);
                   const changedRow = amountFor(cat) !== (saved.get(id) ?? 0);
                   return <div className="plan-table-row" role="row" key={id}>
-                    <div className="plan-category" role="cell"><span className="plan-category-icon"><CategoryIcon icon={cat.icon} size={20} /></span><span>{cat.name}</span></div>
+                    <div className="plan-category" role="cell"><span className="plan-category-icon"><CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} /></span><span>{cat.name}</span></div>
                     <span role="cell">{fmt(currentPlanned.get(id) ?? 0)}</span><span role="cell">{fmt(currentSpent.get(id) ?? 0)}</span>
                     <div role="cell"><input className="field-input plan-amount" data-changed={changedRow || undefined} type="text" inputMode="decimal" aria-label={`${planLabel} plan for ${cat.name}${changedRow ? ", changed" : ""}`} aria-invalid={expressions[id] != null && expressions[id].trim() !== "" && parseAmount(expressions[id]) === null} value={expressions[id] ?? (amountFor(cat) ? String(amountFor(cat)) : "")} placeholder="0" disabled={saving || !!freezing} onFocus={e => e.currentTarget.select()} onChange={e => { const text = e.target.value.replace(/[^\d+\-*/, .()]/g, ""); setExpressions(prev => ({ ...prev, [id]: text })); const value = text.trim() ? parseAmount(text) : 0; if (value !== null) setAmount(cat, value); }} onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { const inputs = Array.from(e.currentTarget.closest(".plan-table")?.querySelectorAll<HTMLInputElement>("input:not(:disabled)") ?? []); const next = inputs[inputs.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)]; if (next) { e.preventDefault(); next.focus(); } else if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } } }} /></div>
                     <button type="button" className="plan-freeze" disabled={saving || !!freezing} onClick={() => void freeze(cat)} aria-label={`Freeze ${cat.name} and clear its ${planLabel} allocation`} title={`Freeze ${cat.name}`}><FreezeIcon size={17} aria-hidden="true" /></button>
@@ -442,7 +443,7 @@ export function MonthPlanSheet({
                 })}</div>)}
               </div>
               {!scopeCategories.length && <div style={emptyStyle}>No active {BUDGET_SCOPE_LABELS[scope]} categories.</div>}
-              {frozenInScope.length > 0 && <section className="plan-frozen"><SectionToggle id="desktop-plan-frozen" label="Frozen" count={frozenInScope.length} open={!collapsed.has("frozen")} onToggle={() => toggleSection("frozen")} />{!collapsed.has("frozen") && frozenInScope.map(cat => <div key={cat.id} style={frozenRowStyle}><CategoryIcon icon={cat.icon} size={20} /><span style={frozenNameStyle}>{cat.name}</span><button type="button" onClick={() => void unfreeze(cat)} disabled={!!unfreezing || !!freezing || saving} style={unfreezeButtonStyle}>{unfreezing === cat.id ? "…" : "Unfreeze"}</button></div>)}</section>}
+              {frozenInScope.length > 0 && <section className="plan-frozen"><SectionToggle id="desktop-plan-frozen" label="Frozen" count={frozenInScope.length} open={!collapsed.has("frozen")} onToggle={() => toggleSection("frozen")} />{!collapsed.has("frozen") && frozenInScope.map(cat => <div key={cat.id} style={frozenRowStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} /><span style={frozenNameStyle}>{cat.name}</span><button type="button" onClick={() => void unfreeze(cat)} disabled={!!unfreezing || !!freezing || saving} style={unfreezeButtonStyle}>{unfreezing === cat.id ? "…" : "Unfreeze"}</button></div>)}</section>}
             </>}
           </main>
           <aside className="plan-summary" aria-label="Household summary">
@@ -481,7 +482,7 @@ export function MonthPlanSheet({
       contentStyle={contentStyle}
     >
       <div style={innerStyle} className="planner-wrap">
-        <header style={headerStyle}>
+        <header className="sheet-header" style={headerStyle}>
           <div>
             <h1 style={titleStyle}>Plan {planLabel}</h1>
           </div>
@@ -594,7 +595,7 @@ export function MonthPlanSheet({
                 <div style={listStyle}>
                   {frozenInScope.map((cat) => (
                     <div key={cat.id} style={frozenRowStyle}>
-                      <CategoryIcon icon={cat.icon} size={20} style={{ opacity: 0.5, flexShrink: 0 }} />
+                      <CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} style={{ opacity: 0.5, flexShrink: 0 }} />
                       <span style={frozenNameStyle}>{cat.name}</span>
                       <button type="button" onClick={() => void unfreeze(cat)} disabled={!!unfreezing || !!freezing || saving} style={unfreezeButtonStyle}>
                         {unfreezing === cat.id ? "…" : "Unfreeze"}
@@ -611,7 +612,7 @@ export function MonthPlanSheet({
           <ProgressiveBlur position="bottom" height={28} maxBlur={4} tint={SHEET_BG} visible={rowsBelow} reduceMotion={!!reduceMotion} />
         </div>
 
-        <footer style={footerStyle}>
+        <footer className="sheet-footer" style={footerStyle}>
           {!loading && !loadError && (saveError || capacityError) && <Banner role="alert" tone="danger" compact>{saveError || capacityError}</Banner>}
           {!loading && hasCurrentPlan && (
             <button type="button" onClick={copyCurrentPlan} disabled={loading || saving || !!freezing} style={copyLinkStyle}>
@@ -713,7 +714,7 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
       onClick={(e) => { if (e.target === e.currentTarget || !(e.target as HTMLElement).closest("button, input")) inputRef.current?.focus(); }}
     >
       <div style={rowTopStyle}>
-        <div style={rowIconStyle}><CategoryIcon icon={cat.icon} size={18} /></div>
+        <div style={rowIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={18} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={rowNameStyle} title={cat.name}>{cat.name}</div>
           {details.map((detail, i) => <div key={i} style={rowMetaStyle}>{detail}</div>)}
@@ -836,8 +837,7 @@ const stickyBarStyle: CSSProperties = {
 const stickyLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 
@@ -882,8 +882,7 @@ const heroStyle: CSSProperties = {
 const heroLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  letterSpacing: 0.6,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 

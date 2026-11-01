@@ -42,7 +42,7 @@
 .bills-sheet-detail .sheet-close-button { background: transparent; color: var(--muted); padding: 0; }
 .bills-detail-summary { display: grid; justify-items: center; gap: 8px; padding: 4px 0 2px; }
 
-.bills-section-heading > h2.section-label { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--muted); }
+.bills-section-heading > h2.section-label { font-size: 12px; line-height: 16px; font-weight: 700; color: var(--muted); }
 .bills-heading-actions { display: flex; align-items: center; gap: 4px; }
 .bills-heading-actions button { min-width: 44px; color: var(--text2); }
 

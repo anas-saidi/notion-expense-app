@@ -1,5 +1,7 @@
 # Financial read mirror
 
+Current local configuration uses durable Notion Finance Records with no active PostgreSQL connection. See [Notion storage and recovery](notion-finance-records.md). The mirror and temporary read-only recovery mode below describe the optional legacy path.
+
 The app reads an atomic Postgres snapshot of Notion while mutations and budget
 validation continue to use live Notion. It is a read mirror, not a new authority
 for writes. Neon Free is the selected hosted option; the `pg` adapter also works
@@ -103,3 +105,27 @@ A PostgreSQL `53000` error explicitly reporting an exceeded quota is a provider 
 The mirror can fall back to live Notion, but contribution agreements and unresolved balance checks are authoritative PostgreSQL records. Do not replace their read failures with empty agreements, zero debt, settled statuses or fabricated local records. Restoring the existing provider’s access preserves those records; migration requires copying the authoritative tables as well as any mirror data.
 
 For Neon, inspect the project usage and billing period in the console. Compute/network allowance exhaustion may require waiting for the billing-period reset or changing plan; storage limits do not reset monthly. A database connection error alone does not identify the exhausted resource or reset time. See [Neon quota guidance](https://neon.com/faqs/free-plan-limits-and-quotas) and [billing management](https://neon.com/docs/introduction/manage-billing).
+
+## Free direct-Notion recovery mode
+
+Set server-only `FINANCE_NOTION_ONLY=true` and restart the server. This mode was used temporarily during the 31 October 2026 quota incident, before durable records were restored to Notion. It preserves `DATABASE_URL` and all existing records, makes no billing changes, and opens no PostgreSQL pools. The mirror, sync status checks and automatic imports are disabled. All database pool factories check the mode before opening or reusing a connection, including balance checks, contribution records, savings locks and operation tracking.
+
+Notion display reads retain pacing, pagination and transient-failure handling. Monthly summary reads isolate contribution-agreement failure: valid assignments, spending and transactions return HTTP 200 with `summary.contributionError`, without a `contributionAgreements` field. A successful empty agreement read remains distinct from an unavailable read. The web and native contribution calculations return unknown rather than recalculating agreed targets. Planning and repayment capacity stay unavailable when repayment reserves cannot be verified.
+
+| Read group | Authority | Direct mode |
+| --- | --- | --- |
+| Account ledger balances, categories, frozen/archived categories, work/income fields | Notion Accounts / Categories | Available |
+| Activity, expenses, income and transfers | Notion Transactions | Available |
+| Due bills and recurring schedules | Notion Transactions | Available |
+| Pending items | Notion Pending | Available |
+| Monthly spending, assignments and saved plan amounts | Notion Transactions / Funds | Available |
+| Confirmed contribution agreements and revision history | PostgreSQL only | Explicitly unavailable |
+| Unresolved actual-balance counts | PostgreSQL only | Explicitly unavailable |
+| Planning capacity after dues and repayment reserves | Notion plus PostgreSQL obligations | Unavailable while agreements cannot be read |
+| Save fences, cross-instance savings locks and operation receipts | PostgreSQL | Dependent saves paused before writing |
+
+The same underlying readers power web, native snapshots/resources, MCP reports and Shortcut options. Authentication remains independent. Notion cannot return financial records that were never stored there; complete database independence requires an explicit migration of agreements and pending checks after those authoritative records are accessible. Do not manufacture a migration from inferred targets or conversation values.
+
+Recovery is intentionally conservative about writes: `withMirrorMutation` refuses to bypass its existing durable invalidation fence, and database-dependent locks/receipts refuse to run. Some independent Notion actions can retain their existing behavior, but this recovery mode is not a promise that all saves work offline from PostgreSQL. Once access is restored, disable the flag and restart to resume ordinary shared-database operation.
+
+Verification: live localhost Accounts, Categories and October monthly summary returned 200 with `X-Finance-Data-Source: notion`; the summary retained valid totals while explicitly flagging unavailable contributions. Balance checks and agreements returned non-retryable `DATABASE_NOTION_ONLY`, and sync returned configured=false. Tests assert that direct mode never constructs a PostgreSQL pool or executes a protected mutation; partial-read and contribution tests protect unknown-vs-zero behavior.

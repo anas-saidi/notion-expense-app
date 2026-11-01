@@ -1,4 +1,5 @@
 "use client";
+import { categoryIconSource } from "../../../lib/category-icons";
 
 import { useId, type CSSProperties } from "react";
 import type { BudgetScope } from "../app-types";
@@ -56,7 +57,7 @@ export function CategoryJar({ scope, level, state = "normal", kind = "budget", l
   const glass = state === "over" || state === "empty" ? "var(--status-over-liquid)" : state === "unfunded" ? "var(--status-low-liquid)" : liquid;
   const glassOpacity = state === "over" ? 0.75 : state === "empty" ? 0.45 : state === "unfunded" ? 0.55 : 0.18;
   const glyph = icon?.trim() || "🧾";
-  const glyphSize = (bottom - top) * 0.54;
+  const glyphSize = (bottom - top) * 0.68;
   // Baseline: floating (a little of it under the surface), clamped between resting on
   // the bottom and staying inside the rim when the jar is full.
   const resting = bottom - glyphSize * 0.16;
@@ -77,16 +78,7 @@ export function CategoryJar({ scope, level, state = "normal", kind = "budget", l
           {shown > 0 && (
             <rect x={-60} y={surface} width={120} height={bottom - surface + 4} style={{ fill: liquid }} />
           )}
-          <text
-            x={0}
-            y={baseline}
-            textAnchor="middle"
-            fontSize={glyphSize}
-            opacity={state === "unfunded" ? 0.6 : 1}
-            style={{ filter: "drop-shadow(0 0 1px var(--mascot-sticker, transparent))" }}
-          >
-            {glyph}
-          </text>
+          <image href={categoryIconSource(glyph)} x={-glyphSize / 2} y={baseline - glyphSize * 0.82} width={glyphSize} height={glyphSize} preserveAspectRatio="xMidYMid meet" />
         </g>
         <path d={body} fill="none" stroke="var(--mascot-edge, var(--border))" strokeWidth={1.6} />
       </svg>

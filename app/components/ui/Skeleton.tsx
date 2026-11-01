@@ -31,9 +31,10 @@ export function SkeletonRows({ label = "Loading activity", count = 3, iconSize =
   </SkeletonRegion>;
 }
 
-export function AppLoadingSkeleton() {
+export function AppLoadingSkeleton({ recovery }: { recovery?: ReactNode } = {}) {
   return <div className="app-shell-root" style={{ minHeight: "100dvh", background: "var(--bg)" }}>
     <div className="app-content">
+      {recovery}
       <SkeletonRegion label="Loading your finances">
         <div className="app-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Skeleton style={{ width: 138, height: 44, borderRadius: 24 }} />

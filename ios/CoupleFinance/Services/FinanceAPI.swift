@@ -35,10 +35,10 @@ struct FinanceAPI: FinanceTransport {
     }
 
     func submit(_ draft: TransactionDraft) async throws {
-        struct Operation: Encodable { let requestId: UUID; let operation: String; let input: NativeInput }
+        struct Operation: Encodable { let requestId: UUID; let createdAt: String; let operation: String; let input: NativeInput }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let body = try encoder.encode(Operation(requestId: draft.id, operation: draft.operation, input: draft.input))
+        let body = try encoder.encode(Operation(requestId: draft.id, createdAt: draft.createdAt.ISO8601Format(), operation: draft.operation, input: draft.input))
         _ = try await request(url: baseURL.appending(path: "api/native/operations"), body: body, wifiOnly: true)
     }
 

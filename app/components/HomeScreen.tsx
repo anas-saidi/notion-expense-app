@@ -1,20 +1,25 @@
+import { CardHeader, CardHeaderAction } from "./ui/CardHeader";
 import { SkeletonRows } from "./ui/Skeleton";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
-import type { BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
+import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BanknoteIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
 import { TransactionRow } from "./ui/TransactionRow";
-import { Banner } from "./ui/Banner";
+import { Fact, Summary, joinClauses } from "./ui/Summary";
+import { accountIconSource } from "../../lib/category-icons";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
-import { runningLowCategories, runwayLabel } from "./category-runway";
+import { runningLowCategories } from "./category-runway";
 import { DesktopMonthBudget, DesktopTopSpending } from "./DesktopHomeOverview";
 
 type HomeScreenProps = {
   contributions?: ReactNode;
   billsSection?: ReactNode;
   balanceChecks?: ReactNode;
+  /** Balance checks waiting for review; they lead the summary sentence. */
+  balanceReviews?: { key: string; account: Account; counted: number }[];
+  onReviewBalance?: (account: Account) => void;
   categories: Category[];
   monthlyLoading?: boolean;
   monthlyError?: boolean;
@@ -47,6 +52,8 @@ export function HomeScreen({
   contributions,
   billsSection,
   balanceChecks,
+  balanceReviews = [],
+  onReviewBalance,
   categories,
   monthlyLoading = false,
   monthlyError = false,
@@ -119,7 +126,8 @@ export function HomeScreen({
   const firstLow = runningLow[0];
 
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
-  const showJointUnassignedPrompt = !firstLow && isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
+  // Waits for the month: until advances load, Joint's money owed back to partners isn't subtracted yet.
+  const showJointUnassignedPrompt = !monthlyLoading && !monthlySummary.contributionError && !firstLow && isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
 
   // Month-end planning alert: show 2 days before month end until plan is locked
   const { daysUntilMonthEnd, nextMonthLabel: planningNextMonthLabel } = useMemo(() => {
@@ -147,9 +155,24 @@ export function HomeScreen({
     : 0;
   const showMonthEndAlert = !firstLow && !secondaryLoading && !monthlyLoading && !monthlyError && planningReady && isCurrentMonth && (planningCurrentMonth || daysUntilMonthEnd <= 2) && !allScopesPlanned;
   const showPlanningPrompt = showMonthEndAlert && readyToAssign > 0;
-  const planningTiming = planningCurrentMonth ? "This month is not planned yet" : daysUntilMonthEnd <= 0
-    ? "Last day of the month"
-    : `${daysUntilMonthEnd} day${daysUntilMonthEnd === 1 ? "" : "s"} left`;
+
+  // ponytail: first three facts in priority order; Budget still lists every running-low category.
+  const summaryClauses = [
+    ...balanceReviews.map(({ key, account, counted }) => {
+      const off = account.balance == null ? null : Math.abs(counted - account.balance);
+      const review = onReviewBalance && (() => onReviewBalance(account));
+      const reviewLabel = `Review balance check for ${account.label}`;
+      return <span key={key}><Fact icon={<CategoryIcon icon={accountIconSource(account.type)} size={20} />}>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact> your count</>}</span>;
+    }),
+    firstLow && (runningLow.length === 1
+      ? <span key="low"><Fact icon={<CategoryIcon icon={firstLow.category.icon} categoryName={firstLow.category.name} size={20} />}>{firstLow.category.name}</Fact> <Fact tone={firstLow.daysCovered < 1 ? "danger" : "warning"} onClick={onOpenAssign} label={`Rebalance ${firstLow.category.name}`}>runs out {firstLow.daysCovered < 1 ? "today" : `in about ${Math.round(firstLow.daysCovered)} days`}</Fact></span>
+      : <span key="low"><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenAssign} label="Rebalance running low categories">running low</Fact></span>),
+    showPlanningPrompt && <span key="plan"><Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</Fact> is waiting to be planned for <Fact>{planningLabel}</Fact></span>,
+    showJointUnassignedPrompt && !showMonthEndAlert && <span key="unassigned"><Fact onClick={onOpenAssign} label="Assign unassigned money">{fmt(Math.round(jointUnassigned ?? 0))}</Fact> is <Fact>unassigned</Fact></span>,
+    showMonthEndAlert && !showPlanningPrompt && <span key="month-end">{plannedCount > 0
+      ? <><Fact onClick={onOpenPlan} label={`Resume planning ${planningLabel}`}>{plannedCount} of 3 budgets</Fact> are ready for <Fact>{planningLabel}</Fact></>
+      : <><Fact>{planningLabel}</Fact> <Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>isn&rsquo;t planned</Fact> yet</>}</span>,
+  ].filter(Boolean).slice(0, 3);
 
   return (
     <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
@@ -168,71 +191,19 @@ export function HomeScreen({
           contribStatus={contribStatus}
           categories={categories}
           overspent={overspentInCategories}
+          balanceDetail={contributions}
         />
       </div>
 
 
-      {contributions}
-      <div className="home-balance-notices">{balanceChecks}</div>
+      <div className="home-balance-notices">
+        {summaryClauses.length > 0 && <Summary style={{ marginBottom: 12 }}>{joinClauses(summaryClauses)}.</Summary>}
+        {balanceChecks}
+      </div>
       </div>
       <div className="home-budget-context">
-      <DesktopMonthBudget summary={monthlySummary} available={categoryAvailableByScope[budgetScope]} month={homeMonth} loading={monthlyLoading} error={monthlyError} onOpenPlan={onOpenPlan} />
-      <div className="home-attention">
-
-      {firstLow && onOpenAssign && (
-        <Banner
-          tone="warning"
-          style={{ marginBottom: 16 }}
-          title={runningLow.length === 1 ? `${firstLow.category.name} is running low` : `${runningLow.length} categories running low`}
-          action={<button type="button" onClick={onOpenAssign} style={bannerActionButtonStyle}>Rebalance</button>}
-        >
-          {runningLow.length === 1 ? runwayLabel(firstLow.daysCovered) : `${firstLow.category.name} runs out first`}
-        </Banner>
-      )}
-
-      {/* Zone 2: Ready to assign */}
-      {showPlanningPrompt && (
-        <Banner
-          className="home-planning-reminder"
-          tone="accent"
-          style={{ marginBottom: 16 }}
-          title={`Plan ${planningLabel}`}
-          action={(
-            <span style={assignRightStyle}>
-              <span style={assignAmountStyle}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</span>
-              <button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>Plan →</button>
-            </span>
-          )}
-        >
-          {planningTiming}
-        </Banner>
-      )}
-
-      {/* Zone 2a: Joint account has unassigned money */}
-      {showJointUnassignedPrompt && !showMonthEndAlert && (
-        <Banner
-          className="home-planning-reminder"
-          tone="accent"
-          style={{ marginBottom: 16 }}
-          title={`${fmt(Math.round(jointUnassigned ?? 0))} unassigned`}
-          action={<button type="button" onClick={onOpenAssign} style={bannerActionButtonStyle}>Assign</button>}
-        />
-      )}
-
-      {/* Zone 2.5a: Month-end planning alert */}
-      {showMonthEndAlert && !showPlanningPrompt && (
-        <Banner
-          className="home-planning-reminder"
-          tone="accent"
-          style={{ marginBottom: 16 }}
-          title={plannedCount > 0 ? `${plannedCount}/3 budgets ready for ${planningLabel}` : `Plan ${planningLabel}`}
-          action={<button type="button" onClick={onOpenPlan} style={bannerActionButtonStyle}>{plannedCount > 0 ? "Resume →" : "Plan →"}</button>}
-        >
-          {planningTiming}
-        </Banner>
-      )}
-
-      </div>
+      <DesktopMonthBudget summary={monthlySummary} month={homeMonth} loading={monthlyLoading} error={monthlyError} showPlanAction={!showPlanningPrompt && !showMonthEndAlert} onOpenPlan={onOpenPlan} />
+      {(showPlanningPrompt || showMonthEndAlert) && <button className="desktop-planning-action" type="button" disabled={!!monthlySummary.contributionError} onClick={onOpenPlan}>{plannedCount > 0 ? "Resume" : "Plan"} {planningLabel}<ChevronRightIcon size={16} aria-hidden="true" /></button>}
       </div>
       </div>
       <div className="home-desktop-panels">
@@ -265,22 +236,13 @@ export function HomeScreen({
       )}
 
       </div>
-      <DesktopTopSpending summary={monthlySummary} categories={categories} loading={monthlyLoading} error={monthlyError} />
       <div className="home-content" style={contentStyle}>
 
         {/* Zone 6: Recent transactions */}
-        {secondaryLoading && recentTxns.length === 0 && <SkeletonRows label="Loading recent activity" count={4} />}
-        {recentTxns.length > 0 && (
-          <section aria-label="Recent transactions">
-            <div className="home-section-hdr home-recent-header" style={sectionHeaderStyle}>
-              <span className="section-label" style={sectionLabelStyle}>Recent</span>
-              {onOpenHistory && (
-                <button className="home-recent-action" type="button" onClick={onOpenHistory} style={seeAllBtnStyle} aria-label="View all transactions">
-                  All activity <ChevronRightIcon size={12} style={{ verticalAlign: "middle" }} />
-                </button>
-              )}
-            </div>
-            {recentDays.map((day) => (
+        <section aria-label="Recent activity">
+            <CardHeader className="home-section-hdr home-recent-header" title="Recent activity" titleClassName="section-label" titleStyle={sectionLabelStyle} style={sectionHeaderStyle}
+              action={onOpenHistory ? <CardHeaderAction className="home-recent-action" onClick={onOpenHistory} style={seeAllBtnStyle} aria-label="View all transactions">All activity</CardHeaderAction> : undefined} />
+            {secondaryLoading && recentTxns.length === 0 ? <SkeletonRows label="Loading recent activity" count={4} /> : recentTxns.length === 0 ? <p className="desktop-empty">No recent activity.</p> : recentDays.map((day) => (
             <div key={day.label} role="group" aria-label={day.label} style={recentDayStyle}>
             <span style={recentDayLabelStyle}>{day.label}</span>
             <div className="home-txn-list" style={recentListStyle}>
@@ -301,7 +263,7 @@ export function HomeScreen({
                     amount={txn.amount}
                     tone={amountTone}
                     prefix={amountPrefix}
-                    icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} size={22} />}
+                    icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={22} />}
                     onClick={onClickTransaction ? () => onClickTransaction(txn) : undefined}
                   />
                 );
@@ -310,9 +272,9 @@ export function HomeScreen({
             </div>
             ))}
           </section>
-        )}
 
       </div>
+      <DesktopTopSpending summary={monthlySummary} categories={categories} loading={monthlyLoading} error={monthlyError} />
       </div>
     </div>
   );
@@ -344,8 +306,7 @@ const sectionHeaderStyle: CSSProperties = {
 const sectionLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  letterSpacing: 0.7,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 
@@ -373,31 +334,8 @@ const cardsRailStyle: CSSProperties = {
 
 /* Ready to assign row */
 
-const assignRightStyle: CSSProperties = {
-  flexShrink: 0,
-  display: "grid",
-  justifyItems: "end",
-  gap: 3,
-};
 
-const assignAmountStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-  color: "var(--text)",
-};
 
-const bannerActionButtonStyle: CSSProperties = {
-  minHeight: 44,
-  margin: "-10px -8px -10px 0",
-  padding: "0 8px",
-  border: "none",
-  borderRadius: 10,
-  background: "transparent",
-  color: "var(--text2)",
-  fontSize: 12,
-  fontWeight: 650,
-  cursor: "pointer",
-};
 
 /* Upcoming bills strip */
 

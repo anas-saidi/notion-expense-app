@@ -53,8 +53,7 @@ const eyebrow: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: 11,
   fontWeight: 500,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
   marginBottom: 8,
 };

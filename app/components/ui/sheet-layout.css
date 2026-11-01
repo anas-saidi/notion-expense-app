@@ -1,0 +1,50 @@
+/* Widths describe tasks, not individual screens. Pickers keep their anchored sizing. */
+:root {
+  --popover-width-menu: 280px;
+  --popover-width-choice: 320px;
+  --popover-width-calendar: 304px;
+  --dialog-width-compact: 440px;
+  --dialog-width-standard: 520px;
+  --dialog-width-account: 900px;
+  --dialog-width-planning: 1200px;
+  --dialog-inset: 24px;
+  --dialog-section-gap: 24px;
+  --dialog-control-gap: 12px;
+  --dialog-title-size: 20px;
+  --dialog-title-line: 28px;
+}
+.sheet-body { min-width:0; box-sizing:border-box; }
+.sheet-header { min-width:0; flex-shrink:0; }
+.sheet-header h1,.sheet-header h2 { overflow-wrap:anywhere; }
+.sheet-footer { min-width:0; flex-shrink:0; }
+
+@media (min-width:900px) {
+  .bottom-sheet-panel[data-presentation="dialog"] {
+    --dialog-body-padding: var(--dialog-inset);
+  }
+  /* Override legacy inline chrome during migration; task-specific content stays intact. */
+  .bottom-sheet-panel[data-presentation="dialog"] .sheet-body {
+    padding:var(--dialog-body-padding) !important;
+    gap:var(--dialog-section-gap) !important;
+  }
+  .bottom-sheet-panel[data-presentation="dialog"] .sheet-header {
+    align-items:center !important;
+    gap:var(--dialog-control-gap) !important;
+    min-height:44px;
+  }
+  .bottom-sheet-panel[data-presentation="dialog"] .sheet-header h1,
+  .bottom-sheet-panel[data-presentation="dialog"] .sheet-header h2 {
+    margin:0 !important;
+    font-size:var(--dialog-title-size) !important;
+    line-height:var(--dialog-title-line) !important;
+    font-weight:600 !important;
+    letter-spacing:normal !important;
+    color:var(--text);
+  }
+  .bottom-sheet-panel[data-presentation="dialog"] .sheet-inset {
+    padding:var(--dialog-inset) !important;
+  }
+  .bottom-sheet-panel[data-presentation="dialog"] .sheet-footer {
+    gap:var(--dialog-control-gap) !important;
+  }
+}

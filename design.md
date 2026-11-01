@@ -1,14 +1,25 @@
 # Couple Finance App — Design System
 
-## Product idea
+## Concept: glass jars that hold money
 
-This is a shared financial home for two people. It should make the household position understandable at a glance, support calm decisions, and preserve each partner's context without turning money into a competition.
+This is a shared financial home for two people, built around one idea: **money lives in glass jars.** Every pool of money is a jar. The level is how much is in it, and the shape is whose it is (Anas's squircle, Salma's egg, and the midpoint of the two for Joint). Spending drains a jar, saving fills one, and Rebalance pours money from one jar into another. Nobody is competing; it's one household's set of jars.
+
+The concept comes first, and patterns come second. When a screen needs a decision, ask what the jar idea says before asking which generic component fits:
+
+- **Colour comes from liquid.** Blue and pink belong to the people and appear as liquid, washes and that person's selection. Interface chrome stays ink and neutral. Joint never gets a blended third hue, because blue and pink mix into lavender, a generic purple that means nothing here.
+- **Levels before labels.** Wherever a share of money is shown (budget used, a goal reached, contributions paid), prefer a level (a jar, a waterline, a fill) over a percentage chip or a badge. The exact number is still stated in text or in the accessible label.
+- **Glass, not cards.** Depth comes from the jars themselves. Pages are flat white; surfaces exist only where touch needs them (sheets, the nav, the Add button). Notices sit flat on the page; only a blocking alert gets a tinted surface.
+- **Quiet type.** Section labels are sentence-case and muted, never small tracked-out capitals. Size, weight and colour carry hierarchy; the main number is the one loud thing.
+- **No borrowed AI vocabulary.** No sparkle glyphs, gradient chrome, glow or decorative purple. An action's icon describes what it does (Type it is a pen writing a line).
+- **Nothing repeats for its own sake.** A run of identical items (empty jars, zero rows) folds into one line that names them.
+
+The detailed jar rules live in `mascot-design-system.md` and in the **Mascot hero**, **Jar metaphor** and **Category jar** entries below.
 
 The primary object on Home is the wallet overview. One financial number owns the screen at a time; supporting context follows underneath in descending importance.
 
 ## External mobile design references
 
-- [Mobbin Design Glossary](https://mobbin.com/glossary) is the shared vocabulary and pattern reference for mobile components. Before introducing or substantially changing a component, identify its actual interaction model in the glossary (for example card, stacked list, tile, banner, chip, bottom sheet, or segmented control) and apply that pattern's usage guidance.
+- [Mobbin Design Glossary](https://mobbin.com/glossary) is a reference for *behavior*: use it to name a component's interaction model (stacked list, bottom sheet, segmented control, and so on) and to check usability guidance. It is not where the look comes from: the concept above decides how things look, and a Mobbin pattern that fights the concept loses.
 - Mobbin is a reference, not a replacement design system. This document, the app's semantic tokens, accessibility requirements, and established product hierarchy take precedence when examples conflict.
 - Prefer the least visually heavy component that matches the behavior. Do not use cards for simple repeated rows, tiles for navigation, banners for ordinary content, or dialogs when a bottom sheet is sufficient.
 
@@ -49,17 +60,17 @@ Partner summaries are context and navigation, not a leaderboard. Selecting one s
 - `--surface2`: quiet controls, tracks, and secondary regions.
 - `--text`, `--text2`, `--muted`: three-level text hierarchy. Normal text must maintain at least 4.5:1 contrast.
 - `--accent`: ink (near-black in light mode, near-white in dark) for primary action fills, paired with `--accent-ink` text. Colour is left to the mascots and the wallet; actions stay calm next to them.
-- `--select-color`, `--select-wash`, `--select-edge`, `--select-ink`: selection and data fills follow the wallet (`html[data-scope]`, set from the app-wide mode): Anas's blue, Salma's pink, or Joint's blue-pink blend. Selected rows, chips, tabs and toggles use the wash with the ink; progress bars, charts and sliders use the colour, so "selected" also says whose money it is. `--accent-foreground` is an alias of `--select-ink`.
+- `--select-color`, `--select-wash`, `--select-edge`, `--select-ink`: selection and data fills follow the wallet (`html[data-scope]`, set from the app-wide mode): Anas's blue, Salma's pink, or ink for Joint (never a blue-pink blend, which reads as lavender). Selected rows, chips, tabs and toggles use the wash with the ink; progress bars, charts and sliders use the colour, so "selected" also says whose money it is. `--accent-foreground` is an alias of `--select-ink`.
 - `--budget-used`: neutral text tone for normal budget consumption; retain amber caution and red overspending states. Spending is consumption, not a completion goal.
 - `--summary-accent`: purple, reserved for the narrative Summary label and its analytical identity; it is not a general action color.
-- Partner blue and pink identify people. Through the `--select-*` tokens they also mark what is selected and fill data inside that person's wallet (Joint blends both); they are never used for actions, which stay ink.
+- Partner blue and pink identify people. Through the `--select-*` tokens they also mark what is selected and fill data inside that person's wallet (Joint uses neutral ink); they are never used for actions, which stay ink.
 - Danger, warning, success, information, transfer, and income colors are semantic and must not be repurposed decoratively. Green (`--success`, `--action-income`, a soft sage that sits with the pastel mascots) means money in or kept: income, "Saved", positive available. Never selection, never an action.
 
 Never tint the entire light canvas. Depth comes from surfaces and restrained elevation.
 
 ### Typography
 
-Use Instrument Sans with system sans-serif fallback and tabular numerals for financial values.
+Use SF Pro Rounded through the native `ui-rounded` stack (`--font-body`), with tabular numerals for financial values.
 
 The whole product is in one currency, so the currency mark appears only where it's needed: on a screen's or sheet's main number (once) and inside amount inputs. Rows, chips, subtotals, sentences, banners, chart labels and tooltips show the bare number. Accessible labels always say the currency. Wherever it does appear it is the one shared mark (`Currency` / `<Money currency>` in `Money.tsx`): same baseline, after the number (`199.516 MAD`, never `MAD 199.516`), regular weight, muted, at most 12px (`min(0.7em, 12px)`), and never tinted by the amount's state, so it never competes with the number.
 
@@ -91,7 +102,7 @@ Use the 4-point scale: `4, 8, 12, 16, 24, 32`. Screen sections use 16 or 24 poin
 
 ### Icons
 
-Lucide is the structural icon family. Use 16, 20, or 24px icons with consistent strokes. One exception: Type it uses a filled four-point star (`SparklesIcon`), the one filled glyph, reserved for plain-language entry. Category or account emoji may appear only when they are user-authored data, inside a consistent badge, and never as the only accessible label.
+Lucide is the structural icon family. Use 16, 20, or 24px icons with consistent strokes. Type it uses Lucide's pen-line (`WriteIcon`): it says "write it in words", not "AI". No sparkle glyphs. Category visuals use the curated Thiings artwork through CategoryIcon and the shared category image resolver. Account emoji remain user-authored data, never the only accessible label.
 
 ### Motion
 
@@ -119,6 +130,7 @@ Use motion to explain state or preserve spatial continuity.
 | Search field | `app/components/ui/SearchField.tsx` | Owns disclosed contextual search, clear behavior, focus, and accessible labeling. |
 | Swipe action | `app/components/ui/SwipeToDelete.tsx` | Adds reversible swipe behavior while retaining a keyboard-operable action. |
 | Mascot hero | `app/components/mascot/MascotHero.tsx` | The screen's hero mascot: a clear jar at the same size and importance as the main number, centred with it. Variants: `pool` (liquid level) and `split` (category emojis). Decorative; the same facts are always stated in text. |
+| Summary sentence | `app/components/ui/Summary.tsx` | The app's narrative voice for summaries; see **Summary sentence** below. |
 
 New features must compose these primitives before introducing a new visual implementation. Extract a new primitive only after the same interaction appears at least three times; one-off arrangements belong to their owning screen.
 
@@ -142,10 +154,10 @@ New features must compose these primitives before introducing a new visual imple
 - **Composer fit:** the default transaction state must fit between the persistent header and the bottom safe area without scrolling at the reference phone height. Use border-box sizing and let the amount hero absorb height differences; preserve 44-point keypad and control targets. Exceptional feedback or keyboard-constrained states may scroll rather than clip content.
 - **Sheet overflow:** task sheets use a fixed header and fixed primary-action dock with one independently scrolling content region between them. Dynamic banners, previews, and validation feedback must shrink or scroll that middle region; they must never move the primary or confirmation action below the viewport. Keep the bottom-sheet presentation through the 640-point app content rail and switch to a centered desktop dialog only at the wider tablet breakpoint.
 - **Transaction type control:** Expense and Income are mutually exclusive modes, so the composer presents them as one labeled segmented control. The selected segment uses the raised primary surface; semantic red/green is confined to its directional icon.
-- **Type it composer:** An accessible 44-point sparkle-icon (`SparklesIcon`: write it in plain words, the app works it out) [button](https://mobbin.com/glossary/button) beside the form’s date picker opens a quiet writing canvas in the existing `BottomSheet`; the canvas keeps the date and Close control without a duplicate mode toggle. No mode segments, Expense/Income selector, boxed input, or separate preview list in this mode. The sheet’s body is the entry surface: borderless, auto-growing native text fields form a [stacked list](https://mobbin.com/glossary/stacked-list), one transaction per line, with the signed parsed amount aligned right in the shared signed-amount colours (red expense, green income) and one quiet row of composer picker chips below: the category (suggested from past transactions, never silently defaulted), the account only on the line being edited or when it differs from the default, and the date as plain text only when it differs from the canvas date. The chips open the same anchored account and category pickers as the form (`TransactionPickers.tsx`). Enter creates a new line and multiline paste preserves lines. The text determines each line’s type (ordinary purchases are expenses; income wording or a plus sign means income), so one draft may contain both. Keep the selected default date and a way back to the form at the top; keep the net amount and compact Save action in a fixed dock. Preserve drafts and reviewed choices, validate combined expenses per category, save sequentially, and remove each confirmed row from the persisted draft while retaining unsaved lines. Inherit theme tokens, with 22px writing text and no decoration from the reference app.
+- **Type it composer:** An accessible 44-point pen-line icon (`WriteIcon`: write it in plain words, the app works it out) [button](https://mobbin.com/glossary/button) beside the form’s date picker opens a quiet writing canvas in the existing `BottomSheet`; the canvas keeps the date and Close control without a duplicate mode toggle. No mode segments, Expense/Income selector, boxed input, or separate preview list in this mode. The sheet’s body is the entry surface: borderless, auto-growing native text fields form a [stacked list](https://mobbin.com/glossary/stacked-list), one transaction per line, with the signed parsed amount aligned right in the shared signed-amount colours (red expense, green income) and one quiet row of composer picker chips below: the category (suggested from past transactions, never silently defaulted), the account only on the line being edited or when it differs from the default, and the date as plain text only when it differs from the canvas date. The chips open the same anchored account and category pickers as the form (`TransactionPickers.tsx`). Enter creates a new line and multiline paste preserves lines. The text determines each line’s type (ordinary purchases are expenses; income wording or a plus sign means income), so one draft may contain both. Keep the selected default date and a way back to the form at the top; keep the net amount and compact Save action in a fixed dock. Preserve drafts and reviewed choices, validate combined expenses per category, save sequentially, and remove each confirmed row from the persisted draft while retaining unsaved lines. Inherit theme tokens, with 22px writing text and no decoration from the reference app.
 - **Composer picker chip:** account, category, and date use one quiet outlined pill family with a leading icon and concise label. Account and category form a left-aligned context group; date stays independently right-aligned. Chips size to content, wrap without distributing evenly on narrow screens, and retain a 44-point target. The pill treatment already communicates interaction, so composer picker chips omit redundant disclosure chevrons.
 - **Allocation flow:** Rebalance and planning share the sheet shell, slider behavior, category controls, feedback, and inherited scope context.
-- **Section heading:** 12px label with an optional 44-point trailing action.
+- **Section heading:** 12px sentence-case muted label (no uppercase, no letter-spacing) with an optional 44-point trailing action.
 - **Category detail sheet:** compose the shared bottom-sheet shell, identity header, one dominant Available amount, Planned and Spent as quiet supporting metrics, a compact action toolbar directly below the summary, a subtle month-filter trigger beside Activity, and shared transaction rows. The header contains identity and dismissal only. The toolbar uses one three-column geometry: high-emphasis Expense, outlined Fund, and low-emphasis Freeze; all controls keep visible labels and equal height. Expense reuses the transaction composer’s red upward-arrow language. Show the budget progress rail only after spending begins and always pair it with an explicit percentage label; an empty rail reads as a divider and must be omitted. Currency is owned by `Money` and must never be repeated by a surrounding stat component.
 - **Period filter:** use one compact outlined calendar-trigger displaying the active period and open the shared themed month grid for non-linear selection. When the active period is supporting metadata beside a section heading, use the same quiet pill geometry at a 44-point target. Previous/next steppers belong on primary time-series screens where sequential browsing is the core task; do not spend an entire section-header row on them inside a detail sheet.
 - **Date picker:** every day- and month-granularity field uses the shared `DatePicker`/`MonthPicker` trigger: calendar icon, concise localized value, and a 44px minimum target. Compact contextual filters and composer pickers share the quiet outlined pill treatment; full-width form fields use the standard control radius. A chevron appears only when it adds disclosure information. The picker body may reflect its granularity, but equivalent trigger contexts must not change between forms, planning, and detail filters.
@@ -153,6 +165,21 @@ New features must compose these primitives before introducing a new visual imple
 - **Calendar picker:** day selection shows one compact month grid with previous/next navigation; month selection shows a compact twelve-month grid with previous/next year navigation. Both use the same anchored surface, selection treatment, and current-period status. Do not duplicate `Today` or `Yesterday` shortcuts when those dates are already visible and selectable in the grid. Mark the actual current date or month independently from the selected value using the existing green status-badge color pair; if the current period is selected, use the deeper green selected treatment.
 - **Picker option list:** keep option rows fully visible within the scrolling viewport; never leave a partial row trapped behind a fixed search region. Search stays attached to the bottom edge only when the dataset warrants it.
 - **Scroll edges:** wherever content scrolls under a bar, the edge is a progressive blur (`ProgressiveBlur` in `app/components/ui/ProgressiveBlur.tsx`), never a hairline border or a hard clip. Stacked `backdrop-filter` bands ramp the blur radius down while a tint of the surface behind eases out, so the bar and the content meet without a visible line. The tint is always the surface the bar actually sits on: `--bg` for the app shell, `--surface` for sheets (`.bottom-sheet-panel` forces it in both themes). An edge shows only while content is hidden past it (`useScrollEdges`) and slides rather than fades, because opacity on an ancestor stops the blur. Where it's used: the app header (a 32px ramp below it once scrolled), the floating nav (content fades out behind the pill on mobile; the desktop sidebar has none), sheet scroll lists via `BlurScrollArea` (28px, 4px max blur, top and bottom), and the plan sheet's floating compact bar (see below).
+
+## Summary sentence
+
+Where a screen needs to say what matters right now, it says it in one sentence instead of stacking banners. `Summary` renders the sentence and `Fact` marks each fact inside it.
+
+- Connecting words are muted; each fact is in full ink at semibold. A fact is what you'd remember after one glance: the name *and* its number or state ("**Groceries** runs out **today**", "is **516 off** your count"). The tappable fact is the problem to resolve, the number or state ("**516 off**" opens the review, "**runs out today**" opens Rebalance); the name stays plain bold with its icon. Amounts in a sentence are rounded to whole numbers. The sentence is 20px (`--summary-size`) at 1.25 line height, so it never competes with the screen's main number, tabular numerals, sentence-case. Connecting words are a lighter muted grey at 500; facts are 700, so the weight gap does the work.
+- A fact may carry one inline icon: the category or account artwork from `CategoryIcon`, sized to 1.1em so it reads as part of the word. No other icon family inside a sentence.
+- A fact that opens something is a real button: its icon and weight are the cue (an underline appears only on pointer hover), it has an invisible 8px hit extension around it (44px total, without opening up the line spacing), a pressed opacity and a focus ring, and an accessible label naming what it opens. Facts that open nothing stay plain bold.
+- At most three facts, joined as "a, b and c" (`joinClauses`), ranked by urgency. Everything left out still lives on its own screen.
+- Colour (`tone`) goes on the number or state only, never on the name or connecting words, and only when it carries meaning: `danger` for money already wrong (over budget, runs out today), `warning` for attention soon (count off, running low), `success` for good news (count matches, within budget). Opportunities such as unassigned money or planning stay in ink.
+- Never repeat the screen's main number in the sentence, never put buttons or tinted backgrounds inside it, and never join phrases with a middle dot.
+- On Home the sentence exists only when something needs action or is an exception (a balance that is off). When nothing does, there is no sentence at all: no calm filler line. Reflect is the exception: its sentence is a recap of the period, so it always shows when there is spending.
+- Where it's used: Home under the wallet (balance checks, running low, planning, unassigned money; it replaces those banners), and Reflect under the Spent number (the biggest category and over-budget categories for the period).
+- Errors that need a Retry stay banners.
+- A sentence never restates something already on the same screen. On Reflect the list shows each category's share, so the recap names how concentrated spending was ("your **top 3 categories** took **51%**") instead of the top row again.
 
 ## Transaction list pattern
 
@@ -193,6 +220,15 @@ Use a **standard stacked list** for transaction history and recent activity on m
 - **Accounts and Settings:** use the same title, spacing, control, and surface primitives as the app shell and sheets. Settings is a flat preference list: section labels and 24–32px whitespace create grouping, with no row dividers or enclosing borders. Appearance uses a 44-point animated sun/moon icon button beside a quiet System button; navigation rows remain transparent and full-width.
 - **Add Transaction:** keypad-led amount entry, centered description input without a redundant visible label, picker chips in a stable position, and one clear save action.
 
+## Say it once per screen
+
+Each piece of information appears once on a screen. When two elements would show the same fact, keep the one closest to where it's acted on and drop the other.
+
+- A row's subtitle is hidden when it only repeats the title (a bill or transaction named "Rent" in the Rent category); `sameText` in `TransactionRow.tsx` decides.
+- A control next to the month picker doesn't name the same month again (Budget's plan chip reads "Plan" for the shown month, "Plan December" only for another month; its accessible label always names the month).
+- Colour plus a text label for the same state (a red overdue date and "Overdue") is not a repeat: the label is what makes the colour accessible.
+- Actions are not information: a persistent header action (Rebalance) and a contextual one in a notice may coexist.
+
 ## Product character
 
 - Calm, direct, and shared.
@@ -218,7 +254,7 @@ Use a **standard stacked list** for transaction history and recent activity on m
 
 ## Pickers
 
-Use one anchored popover surface for single-choice controls, including accounts, categories, and funding sources. Show a title, close action, selected state, and readable 44-point minimum rows. Long lists include search. Dates use the shared month calendar and Today/Yesterday shortcuts. Do not pin menus over the bottom keypad. Expense and Income use accessible icon-only controls in semantic red and green. Disabled submit buttons are neutral; enabled primary fills retain lime with dark text.
+Use one anchored popover surface for single-choice controls, including accounts, categories, and funding sources. Show a title, close action, selected state, and readable 44-point minimum rows. Long lists include search. Dates use the shared month calendar. Do not pin menus over the bottom keypad. Expense and Income use accessible icon-only controls in semantic red and green. Disabled submit buttons are neutral; enabled primary fills use ink (`--accent`) with `--accent-ink` text.
 
 - **Wallet supporting metrics:** use plain text rows, following the [Mobbin card guidance](https://mobbin.com/glossary/card) for minimal content. Monthly assignments follow funding accounts; spending follows categories regardless of payer. Contribution credit includes transfers and direct joint-category payments. A confirmed monthly contribution agreement establishes the target; contributions above its current agreed amounts are repayable advances. Months without an agreement retain the live funding estimate and do not establish reimbursement debt.
 
@@ -345,7 +381,7 @@ Linked savings transfers expose **Undo deposit** in transaction details. The sam
 - The agreement, ledger and cash answer different questions. The agreement preserves intent; contributions and repayments rebuild from transactions; the recorded account balance remains live. Never replace recorded cash with an amount supplied in conversation.
 - The first shared-plan save explicitly confirms the proposed contributions. Personal-only planning does not confirm a zero shared target. Later category-plan saves preserve the agreement; **Change agreed amounts** is a separate explicit action. Revisions preserve original amounts and confirmation time. Existing plans without an agreement offer **Set monthly contributions**.
 - Home and account details use one flat, 44-point disclosure row: **Joined owes you** in personal scope or **Owed to you both** in Joint. Its value opens the existing modal bottom-sheet shell. The Home jar still represents contribution progress; ordinary repayment values do not become badges or another hero.
-- The contribution sheet uses the shared MonthPicker, plain label/value rows, Money, semantic tokens, and the existing font and spacing system. Original contribution, contributed and above-original remain visible after **Settled**. Current outstanding repayments remain distinct from historical excess.
+- The contribution sheet uses the shared MonthPicker, plain label/value rows, Money, semantic tokens, and the existing font and spacing system. Original contribution, contributed and above-original remain accessible after the contribution is paid, through the partner row’s disclosure. Current outstanding repayments remain distinct from historical excess.
 - Pattern evidence: [Mobbin stacked list](https://mobbin.com/glossary/stacked-list) supports concise single-column financial rows without per-row cards; [Mobbin bottom sheet](https://mobbin.com/glossary/bottom-sheet) supports this focused contextual review and repayment action. These patterns inherit our existing components.
 - **Reserved for repayments** is an obligation, not cash or an expense. Deduct it once from Joined's unassigned planning capacity, preserving negative capacity so new funding covers the shortfall first. Planning lists the originating month and total reserved before new allocations. Cash shortfalls are explicitly based on recorded cash and exclude other commitments.
 - **Record repayment** records a transfer only after money has moved. The transfer pays the oldest outstanding advance for that person first, reduces cash normally, and never reduces the new month's contribution. Partial repayments and transaction deletion/restoration rebuild outstanding amounts. An over-repayment caused by subsequent corrections is an actionable warning, never a negative debt.
@@ -360,7 +396,7 @@ Linked savings transfers expose **Undo deposit** in transaction details. The sam
 - Keep the global scope picker in the header. The desktop heading names scope and destination. The header aligns exactly with the page content, without mobile negative side margins, and leaves a 32px gap before every destination. The rail holds Home, Budget and Reflect. Its Actions group holds Add transaction, contextual Search, Rebalance, balance checks and Settings. Add transaction is the primary ink-filled action. Every icon keeps its accessible name, 44px target, active state, focus ring and hover/focus label.
 - Home leads with the existing wallet balance and jar family inside a wide cash surface. The contribution disclosure stays with that balance. A quieter adjacent surface shows monthly spending, assignments and live category availability. Cash and budget values never substitute for one another.
 - Unresolved balance counts, repayment obligations, low funds and planning actions remain visible before lower-priority activity. The discrepancy is not dismissed or reconciled by changing the layout.
-- At 1200px and wider, Bills, Top spending and Recent activity form three columns. At intermediate desktop widths, omit the secondary spending breakdown and use two columns. Lists stay flat inside each section; no per-transaction or per-bill cards. Long names wrap, values retain tabular numerals, empty/error states remain explicit, and the DOM follows the visual reading order.
+- Home uses one shared page grid. At 1200px and wider, Balance spans the two left tracks, with Due bills then Recent activity beneath it. Monthly budget spans the two right tracks, with Top spending directly underneath. The lower-left pair ends at the same edge as Balance; the right-side cards share both edges. Cash verification and urgent bill actions lead, recent activity supports checking changes, and monthly planning stays beside its spending insights. At intermediate desktop widths, omit Top spending and align Bills/Recent directly with the two top columns. Lists stay flat inside each section; no per-transaction or per-bill cards. Long names wrap, values retain tabular numerals, empty/error states remain explicit, and the DOM follows the visual reading order.
 - Below 900px, the desktop-only sections, title, add action and brand are hidden; the established mobile scope header, jar overview and bottom navigation keep their existing arrangement. Docked inspectors collapse the remaining content rather than overlapping it; modal centers include the frame offset and rail width.
 
 ### Desktop consistency and contextual tasks
@@ -374,3 +410,104 @@ Linked savings transfers expose **Undo deposit** in transaction details. The sam
 
 - **Shared desktop notice variant:** Banner defaults non-blocking information, warnings and success notices to its unboxed desktop variant from 900px. Blocking alerts, errors and destructive confirmations retain a surfaced banner; explicit `desktopInline` overrides describe exceptions such as Budget’s contextual shortfall and a local balance-check read failure. Preserve roles, message content and recovery actions. Mobile keeps the established filled treatment and reading order. Home’s saved discrepancy remains visible during read failures, with a local Retry action; this never resolves or writes a financial difference.
 - User-confirmed direction (31 October 2026): account-specific warnings should be compact rows within the balance card, and similar desktop notices should follow the same contextual treatment. Implementation checked with TypeScript and production build; browser host remains unavailable, so rendered verification is pending.
+
+- **Saved balance counts awaiting review:** show an account-local “Confirm balance” row with “Saved count” and the amount. Review opens the existing balance-check form with that value as an editable draft; only explicit confirmation creates an active count. This is a normal review state, not a refresh error: omit Retry, technical storage/migration copy and alert announcements. Keep unconfirmed values out of actual-funds estimates.
+
+- **Contribution review hierarchy:** lead with the scoped amount Joined still owes and one reserved-until-repaid note. Keep partner names, repayment amounts and Log repayment actions visible in compact flat rows. Expand a partner row for Original, Contributed, Above original and Repaid. Cash coverage shows an actionable shortfall even while collapsed; its ledger cash, reservation and multi-month breakdown are disclosed. Agreed amounts uses a separate disclosure when an agreement exists; first-time setup stays visible. Avoid repeating an outstanding amount as an above-original figure, a reserved total and a monthly total on the initial view. Follow [Mobbin accordion guidance](https://mobbin.com/glossary/accordion): disclose supporting detail, keep critical amounts, failures and actions visible.
+
+- **Repayment split:** in Joint contribution review, place one horizontal stacked bar under the owed total, using the existing husband blue and wife pink tokens. Segment widths follow outstanding repayment amounts, not contribution percentages. Matching marks identify partner rows; amounts are shown once beside names with their record actions. The static bar has a text equivalent, no axes, percentages or extra legend, and disappears when nothing is owed. Personal scope keeps its own amount without a redundant one-part chart.
+
+- **Repayment wording:** omit the redundant paid-contribution status when the target is fulfilled. Keep positive dues and unconfirmed amounts visible. “Log repayment…” opens an editable amount/date form; “Save repayment” records money already transferred from Joined. The opening action never saves immediately or executes a bank transfer.
+
+- **Dashboard grid states:** flatten only structural Home wrappers on desktop so the same tracks govern both rows. Stretch the two overview cards to the first row’s height, while lower cards keep content-driven heights. At phone widths retain the existing single reading flow; with a docked inspector reset every card to one column. DOM and focus order follow the desktop row order: Balance, Monthly budget, Due bills, Recent activity, Top spending.
+
+- **Repayment shortcut:** use the existing Lucide receipt icon in a 44px circular action beside each partner, retaining “Log repayment to [name]” as the accessible name and hover tooltip. Keep the action beside its amount on mobile too; its form explains the returned-money entry and explicit save.
+
+- **Contribution breakdown access:** partner names and outstanding amounts are static text. A separate **View breakdown** disclosure beneath each row opens the supporting contribution history. Do not make the financial value itself an expand control; repayment retains its separate receipt action.
+
+
+## Shared dialog anatomy and size families
+
+- Desktop dialogs use named sizes from `ui/BottomSheet`: **compact** 440px for confirmations and short choices, **standard** 520px for ordinary forms, contribution review, settings and detail lists. Account review uses **account** 900px and the monthly planning workspace uses **planning** 1200px. Avoid per-screen widths between these families.
+- Ordinary desktop dialogs follow content height. Use `desktopHeight="fill"` explicitly for the transaction composer, category activity, long Reflect lists and planning workspaces that require a bounded scrolling region. All remain within a 24px viewport inset. Mobile detents, safe areas and docked inspectors keep their existing behavior.
+- `SheetBody`, `SheetHeader`, and `SheetFooter` in `ui/SheetLayout` share desktop chrome: 24px body inset and section gap, 20px/28px semibold title, 44px close target, 12px action gap. Class-based forms use the same anatomy classes without adding wrappers. Split workspaces apply the same inset to their header and controls. Task content, amounts and nested form spacing remain distinct from chrome.
+- Anchored `PickerPopover` remains a separate interaction, with named **menu** 280px, **choice** 320px and **calendar** 304px widths. All use a 16px viewport gutter and retain trigger anchoring, keyboard navigation and calendar anatomy. They do not inherit modal dialog headers or padding.
+- Pattern evidence: the existing Mobbin Dialog and Bottom Sheet glossary entries support the responsive shell and task-dependent workspace exceptions. Code-level verification covers types and the production build; rendered desktop/mobile comparison is still required when browser access is available.
+
+- **Home planning action:** when the monthly planning reminder is visible, it owns the planning action. Hide the duplicate action in the monthly budget header; restore that header action when no planning reminder is shown. Both use the existing planning destination.
+
+- **Home monthly budget density:** the month heading supplies time context; use Spent, Assigned, Available, and Above assigned. Accessible labels preserve that Available means category funds and Above assigned compares spending with assignments. This panel uses `Money subtleDecimals` to show exact cents smaller and muted, without rounding values or adding a gap before the decimal separator. Other money displays retain their existing treatment.
+
+- **Semantic amount colors:** smaller decimals inherit the warning/danger color for colored financial amounts. Reserve muted gray decimals for neutral amounts; never split a warning amount between red whole units and gray cents. `Money` supports this through `--money-decimal-color`.
+
+- **Desktop mascot captions:** Home reserves 96px on each side of the mascot family for bounded side captions, growing to 112px with the larger composition. Never rely on overflow into the neighboring budget card. The balance card uses its own available width to choose a stacked composition below 620px or a larger side-by-side mascot group above it. Phone mascot geometry stays unchanged.
+
+- **Monthly budget comparison:** replace the solid warning line and repeated fact rows with one horizontal spending-versus-assignment bar. Above assignment, the neutral segment equals assigned funds and the red segment equals the excess, scaled against total spending; labels directly below show Assigned and Above assigned. Below assignment, neutral spending fills the assignment track proportionally. Zero values render an empty track. Keep live category availability on a separate quieter line because it is not the arithmetic remainder of these monthly totals. The accessible chart label states exact amounts without relying on color.
+
+- **Compact desktop monthly context:** title the card October spending (using its actual month) and omit the redundant Spent label. Put the assigned amount with an inline assigned label beneath the neutral boundary, and a signed red excess beneath the red segment; the accessible definition retains Above assigned. Show only Available for category availability, with its full accessible label. Replace desktop planning banners with a single Plan/Resume [month] action; phone reminders and unrelated funding warnings retain their information.
+
+- **Spending total status:** the Home monthly spending total uses danger color, including smaller decimals, only when spending exceeds monthly assignments. Within assignments, the total remains neutral. The bar and signed excess preserve the same status without relying on color alone.
+
+- **Home card surfaces:** monthly spending uses the same `--surface` and `--elevation-card` as Balance and the lower cards, in both themes. Separate the sections through layout rather than a gray fill. Outstanding repayments remain with Balance because they are carried account obligations, not extra monthly spending.
+
+- **Desktop primary action placement:** Add transaction occupies its own primary action slot immediately below the rail brand and before Home/Budget/Reflect. Search, Rebalance, balance checks and Settings stay in the lower utility group. The DOM and keyboard order match the visual order; mobile navigation remains unchanged.
+- **Repayment visibility:** a positive repayment obligation remains visible as one compact label/value row with no redundant month subtitle. Do not hide the outstanding amount behind a mascot tap; its breakdown and month remain in Contributions.
+
+- **Dashboard card headers:** Due bills, Recent activity, Top spending and the monthly spending card reuse `ui/CardHeader`. Desktop titles are 16px/24px semibold and share a 44px header baseline. Header navigation uses `CardHeaderAction`: muted 13px text, 16px Lucide chevron, 4px gap, 44px target, consistent hover/pressed/disabled/focus states. Preserve descriptive labels such as All bills and All activity. Mobile sections retain their existing typography through the same component.
+
+- **Balance obligation placement:** Home nests the Contributions entry directly beneath the balance in its number group. On desktop it is a compact, content-width action: muted 13px label beside a 15px amount and chevron, with 12px separation from the main balance. It no longer spans the card as a detached full-width row. Keep balance-check notices in their separate account action area. The same Contributions destination and financial data are retained.
+
+- **Home summary alignment:** Balance uses the same CardHeader as monthly spending, giving both a shared 44px heading row and 16px gap before their amounts. Left-align the balance heading, amount/currency and repayment action as one group at every desktop width. Place that group first in the narrow desktop composition; keep mascots adjacent when the balance card is wide enough. Spending content follows fixed section gaps rather than distributing spare height between its numbers.
+
+- **Monthly spending scope:** do not display live category Available balances in the monthly spending card. Its figures are only spending, monthly assignments and their excess. Category balances remain in Budget; they are not new-month funding, cash, or capacity after repayment reserves.
+
+- **Monthly context vertical rhythm:** the spending section must not flex-grow to consume the card height. Keep its heading, amount and comparison together, with 16px section gaps and 8px from bar to its labels. Contextual warnings follow after 16px; any spare height from matching the Balance card stays below the content rather than between financial figures and actions.
+
+- **Spending card height:** top-align the monthly spending card and let its content determine its height. Do not stretch it to match Balance; preserve the shared grid column edges and lower-row alignment without padding the card with empty space.
+
+
+## Desktop dashboard row contract
+
+- Supersedes the earlier content-height exception: use one equal-height summary row and one equal-height detail row. Both summary cards stretch to the row's content-driven height with a shared 320px minimum. Keep content grouped at the top; do not distribute spare height between values.
+- Due bills, Recent activity and Top spending use a shared 420px desktop detail height. Show the existing three due bills, five recent transactions and four spending categories; longer content scrolls within the panel, with its header/action retained. Preserve the full All bills and All activity destinations.
+- Loading and empty states occupy the same panel footprint. The separate legacy Upcoming bills rail is omitted on desktop when the due-bills panel is present. Below 900px the existing content-height phone layout remains in use.
+- Basis: Anas's supplied Delibix desktop reference establishes aligned two-card and three-card rows. This is a product composition choice, not a claim that every dashboard needs equal cards. Fresh Mobbin search was blocked by its paid-plan requirement; Pinterest candidates have not been visually reviewed.
+
+
+## Desktop Budget workspace composition
+
+- At 1100px and wider, Budget uses a content-height left summary and a larger right category workspace, roughly one-third to two-thirds. Summary and category controls align at the top; do not stretch the summary down the category list.
+- Center the existing mascot family above Allocated and its larger amount. Use Home's semantic surface, shared card radius/elevation, 24px inset/gutters, muted 13px secondary label and 48–64px regular-weight number with the shared currency mark. Amount semantics and the existing mascot tap behavior stay intact.
+- Stack contextual notices below the summary, with the relevant action on its own nearby 44px row. Month/planning controls, loading/error states and all active/frozen category groups belong to the wider workspace. Search stays above both columns.
+- From 900–1099px and with a docked inspector, stack the summary and category workspace. Below 900px the workspace wrapper is display:contents, preserving the existing mobile flow. Home's equal-height overview row remains specific to its dashboard; Budget's unequal columns support its different primary task.
+
+- In the narrow Budget summary, partner tap captions appear beneath their jars within the card, reserving room only while open. The category workspace adjusts its shared numeric-column width to its own available width so labels and values keep the same tracks.
+
+
+## Interface craft verification
+
+- Use the single [Interface Craft skill](/Users/anassaidi/.codex/skills/interface-craft/SKILL.md) for a bounded audit and repair pass. Its rule IDs provide review references; this document remains the product's visual authority. Article font lists, a single radius and decorative animation are not requirements.
+- `--warning-ink` owns readable warning text independently of the brighter warning fill. Light uses #8a5700; dark uses #f2c14e. Banner uses that token for both flat and surfaced warnings. Calculated contrast on the current light surface is 6.10:1 flat and 5.88:1 tinted; dark is 10.64:1 flat and 9.56:1 tinted. Recheck if those surfaces change.
+- The form-mode transaction composer uses a semantic h2 so shared desktop dialog typography applies (20px/28px, semibold). Its phone title retains its existing size. Typed entry retains its date control.
+- CardHeaderAction has a minimum 44px target in both dimensions, including short Plan actions.
+- Test-run evidence and remaining gaps: [desktop review](docs/interface-craft-review-2026-11-01.md). Desktop light rendering, title semantics, Tab/Shift-Tab between Close and Expense, and Escape dismissal were inspected. Escape returned accessibility focus to the page rather than the trigger; this remains unresolved. Dark palette contrast was calculated; dark and phone rendering remain unverified.
+
+
+### Interface craft follow-up
+
+- **IC-08 dialog focus:** the shared sheet retains the external opener across portal mounting, returns focus on the next animation frame, and ignores body or panel descendants when capturing it. The transaction amount no longer competes with the shell through autofocus. Desktop sidebar Add and Reflect's contextual action focus their trigger before opening. Closing should return to that exact trigger; Enter should reopen it.
+- **IC-11 slow reads:** after 10 seconds of pending financial reads, show a quiet status with a 44px Retry loading action. Keep verified balances visible. Retry aborts pending read requests and clears coalesced promises before starting fresh reads; it does not cancel or repeat mutations. Existing request generations protect against older responses, and superseded initial loads do not overwrite the new load's status. Preserve the existing 30-second ordinary and 180-second fully paginated monthly timeouts.
+- **IC-07 scope discovery:** from 900px, show Anas, Joint and Salma beside the existing mascots, with a neutral selected surface and stronger label weight. Phone remains mascot-only. This is an explicit desktop exception to earlier icon-only scope guidance, authorized by the follow-up request.
+- **IC-01, IC-11 Reflect recovery:** a genuinely empty spending view offers Add expense beside its empty-state message, opening the existing expense form. Filtered no-results retains Reset filters instead. It inherits the active scope and keeps the viewed period while the transaction date remains the form's editable date.
+
+
+## Category artwork: Thiings first pass
+
+- Web category displays use bundled transparent Thiings illustrations, 256px WebP assets in public/category-icons. Lucide remains the structural icon family; the jar shapes, liquid status colors and ownership mascots remain unchanged. Images do not replace financial status labels.
+- lib/category-icons.ts owns normalized category-name matches, legacy emoji aliases and the neutral receipt image fallback. All 91 records in the reviewed category catalog have deliberate name mappings, including frozen and archived records. Images sharing a category name may share an asset; no identifier is inferred from money or account ownership.
+- CategoryIcon owns image sizing, decorative/accessibility behavior and image-error fallback. Its explicit account variant keeps existing account emoji. Category images also render in SVG jars, including animated spending/planning contents, without changing their sizes by amount or physics.
+- Budget row artwork occupies 68% of the jar's usable height and stays fully opaque; the jar's background/liquid communicates empty and unfunded states. This keeps the more detailed images readable.
+- Transactions, category pickers, details, allocation/planning, savings and spending breakdowns share the same resolver. ChoicePicker supports an image as option metadata while keeping its text searchable.
+- New/edit category forms preview artwork matched to the entered name. Manual image selection is not implemented in this pass. The underlying Notion emoji stays unchanged, including on ordinary metadata edits; no Notion page icons or financial records were migrated. The native Swift app is outside this web presentation pass.
+- Provenance and selected source URLs live in public/category-icons/attribution.json. These 56 assets total 621,084 bytes. Free personal/non-commercial use requires visible attribution, provided by the Category images by Thiings link in Settings. A commercial release requires the appropriate Thiings license.
+- Verification and the proposed persistent picker flow: docs/thiings-category-icons.md.

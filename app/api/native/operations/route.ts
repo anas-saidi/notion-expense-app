@@ -38,14 +38,14 @@ export async function POST(request: NextRequest) {
     const result = await mcpOperations().once("native-v1", body.requestId, body.operation, body.input, async () => {
       if (body.operation === "rebalance") {
         if (!Number.isFinite(body.input.amount) || body.input.amount <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(body.input.date ?? "") || typeof body.input.fromCategoryId !== "string" || typeof body.input.toCategoryId !== "string") throw new Error("Choose two categories, a valid date, and a positive amount");
-        return validatedWrite("rebalance_budget", { ...body.input, requestId: body.requestId });
+        return validatedWrite("rebalance_budget", { ...body.input, requestId: body.requestId, createdAt: body.createdAt });
       }
       const handler = handlers[body.operation as Exclude<keyof typeof handlers, "rebalance">];
       const response = await handler(new NextRequest(request.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body.input) }));
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not save");
       return data;
-    });
+    }, body.createdAt);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Check activity before trying again." }, { status: 409, headers: { "Cache-Control": "no-store" } });

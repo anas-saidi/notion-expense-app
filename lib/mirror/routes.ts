@@ -1,3 +1,5 @@
+import { notionLedgerConfigured, withNotionWrite } from "../notion-ledger";
+import { notionOnlyMode } from "../database-mode";
 import { NextResponse } from "next/server";
 import { mirrorReadContext } from "./context";
 import { mirrorScope, mirrorStore } from "./store";
@@ -20,6 +22,11 @@ export function withMirrorReads<T extends Handler>(handler: T): T {
 /** Fence the snapshot before ANY write, including legacy raw-fetch handlers. */
 export function withMirrorMutation<T extends Handler>(handler: T): T {
   return (async (...args: Parameters<T>) => {
+    if (notionLedgerConfigured()) {
+      try { return await mirrorReadContext.run({ enabled: false, sources: new Set(), syncedAt: [], databases: new Map() }, () => withNotionWrite("household-mutation", () => handler(...args))); }
+      catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Could not save. Review activity before retrying." }, { status: (error as { status?: number }).status ?? 500 }); }
+    }
+    if (notionOnlyMode()) return NextResponse.json({ error: "Saving is paused while the shared database is unavailable. Nothing was changed." }, { status: 503 });
     const token = process.env.NOTION_TOKEN;
     const store = mirrorStore();
     if (!token || !store) return handler(...args);

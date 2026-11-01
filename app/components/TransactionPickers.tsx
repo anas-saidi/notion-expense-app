@@ -1,4 +1,5 @@
 "use client";
+import { CategoryIcon } from "./ui/CategoryIcon";
 
 import type { CSSProperties } from "react";
 import type { Account, Category } from "./app-types";
@@ -63,7 +64,7 @@ export function CategoryOptionList({ id, categories, selectedId, lastUsedId, onS
             const meta = [cat.type[0] ?? null, cat.id === lastUsedId ? "Last used" : null].filter(Boolean).join(" / ");
             return (
               <button className="picker-option" aria-pressed={selected} key={cat.id} onClick={() => { if (!selected) haptic("selection"); onSelect(cat); }} style={optionRowStyle(selected)}>
-                <div style={pickerIconStyle}>{cat.icon ?? "#"}</div>
+                <div style={pickerIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={28} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: selected ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
                   {meta && <div style={pickerMetaStyle}>{meta}</div>}

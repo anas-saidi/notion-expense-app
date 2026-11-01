@@ -1,5 +1,7 @@
 "use client";
 
+import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
+
 import { UndoSavingsDeposit } from "./UndoSavingsDeposit";
 import { SkeletonRows } from "./ui/Skeleton";
 
@@ -148,7 +150,7 @@ export function CategoryDetailsSheet({
       open={open}
       onClose={onClose}
       label={`${category.name} details`}
-      maxWidth="520px"
+      size="standard" desktopHeight="fill"
       // Standard main sheet: from under the header to the bottom edge, like Accounts
       // and Settings. A shorter custom height left the page exposed (and scrollable) below it.
       detent="default"
@@ -156,12 +158,12 @@ export function CategoryDetailsSheet({
       panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0 }}
     >
-      <div style={sheetInnerStyle}>
+      <SheetBody style={sheetInnerStyle}>
 
         {/* ── Header ── */}
-        <header style={topBarStyle}>
+        <SheetHeader style={topBarStyle}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <CategoryIcon icon={category.icon} style={{ fontSize: 26, flexShrink: 0 }} />
+            <CategoryIcon icon={category.icon} categoryName={category.name} style={{ fontSize: 26, flexShrink: 0 }} />
             <h2 style={titleStyle}>{details?.name ?? category.name}</h2>
           </div>
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
@@ -169,7 +171,7 @@ export function CategoryDetailsSheet({
               <XIcon strokeWidth={2.2} />
             </button>
           </div>
-        </header>
+        </SheetHeader>
 
         {/* ── Budget summary ── */}
         <section style={statsWrapStyle}>
@@ -252,7 +254,7 @@ export function CategoryDetailsSheet({
           </>}
           <div ref={moreActionsRef} style={{ position: "relative", minWidth: 0 }}>
             <ActionBtn icon={<MoreIcon size={18} />} label="More" ariaLabel="More category actions" bg="transparent" ink="var(--muted)" border="1px solid transparent" onClick={() => setShowMoreActions(true)} />
-            <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} width="min(280px, calc(100vw - 32px))">
+            <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} size="menu">
               <div className="picker-options">
                 {onEdit && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onEdit(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><EditIcon size={17} />Edit</span></button>}
                 <button type="button" className="picker-option" disabled={loading || isPastMonth(activeMonth)} onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ScaleIcon size={17} />Adjust available</span></button>
@@ -297,7 +299,7 @@ export function CategoryDetailsSheet({
                     icon={item.kind === "funded"
                       ? <FundIcon size={14} />
                       : item.kind === "expense"
-                        ? <CategoryIcon icon={category.icon} size={20} />
+                        ? <CategoryIcon icon={category.icon} categoryName={category.name} size={20} />
                         : <TransferIcon size={14} />}
                     onClick={item.kind === "funded" ? item.savingsFundingOperation ? () => setUndoingDeposit(item) : !item.readOnly ? () => setEditingFund({ ...item, categoryAvailable: available }) : undefined : undefined}
                   />
@@ -306,10 +308,10 @@ export function CategoryDetailsSheet({
             </div>
           )}
         </section>
-      </div>
+      </SheetBody>
       <BottomSheet open={undoingDeposit !== null} onClose={() => setUndoingDeposit(null)} label="Savings deposit" detent="content" layered zIndex={150}>
-        {undoingDeposit && <div style={{ padding: 24, display: "grid", gap: 16 }}>
-          <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}><h2 style={{ fontSize: 20 }}>{undoingDeposit.title}</h2><button type="button" aria-label="Close deposit details" onClick={() => setUndoingDeposit(null)} className="sheet-close-button"><XIcon /></button></header>
+        {undoingDeposit && <div className="sheet-body" style={{ padding: 24, display: "grid", gap: 16 }}>
+          <SheetHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}><h2 style={{ fontSize: 20 }}>{undoingDeposit.title}</h2><button type="button" aria-label="Close deposit details" onClick={() => setUndoingDeposit(null)} className="sheet-close-button"><XIcon /></button></SheetHeader>
           <strong style={{ fontSize: 28, fontVariantNumeric: "tabular-nums" }}><Money value={undoingDeposit.amount} currency /></strong>
           <UndoSavingsDeposit key={undoingDeposit.savingsFundingOperation} operationId={undoingDeposit.savingsFundingOperation!} onUndone={async () => { setUndoingDeposit(null); setRefreshKey(value => value + 1); try { await onTransactionsChanged?.(); } catch { setError("Deposit undone. Refresh to update balances."); } }} />
         </div>}
@@ -332,15 +334,15 @@ export function CategoryDetailsSheet({
         onClose={() => setAdjustingAvailable(false)}
         onChanged={async () => { setRefreshKey((value) => value + 1); await onTransactionsChanged?.(); }}
       />
-      <BottomSheet open={confirmingFreeze} onClose={() => setConfirmingFreeze(false)} label="Confirm freeze category" detent="content" layered maxWidth="440px" zIndex={150} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
-        <div style={confirmWrapStyle}>
+      <BottomSheet open={confirmingFreeze} onClose={() => setConfirmingFreeze(false)} label="Confirm freeze category" detent="content" layered size="compact" zIndex={150} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+        <SheetBody style={confirmWrapStyle}>
           <span style={confirmIconStyle}><FreezeIcon size={20} /></span>
           <div style={{ display: "grid", gap: 6 }}><h2 style={confirmTitleStyle}>Freeze {category.name}?</h2><p style={confirmCopyStyle}>Moves to Frozen. Balance and activity are kept.</p></div>
-          <div style={confirmActionsStyle}>
+          <SheetFooter style={confirmActionsStyle}>
             <button type="button" onClick={() => setConfirmingFreeze(false)} style={confirmCancelStyle}>Cancel</button>
             <button type="button" onClick={() => { setConfirmingFreeze(false); onFreeze?.(); }} style={confirmFreezeStyle}>Freeze category</button>
-          </div>
-        </div>
+          </SheetFooter>
+        </SheetBody>
       </BottomSheet>
     </BottomSheet>
   );
@@ -512,8 +514,7 @@ const progressLabelStyle: CSSProperties = {
 const statLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 
@@ -580,8 +581,7 @@ const actionIconStyle: CSSProperties = {
 const sectionLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  letterSpacing: 0.7,
-  textTransform: "uppercase",
+  
   color: "var(--muted)",
 };
 

@@ -3,16 +3,18 @@ import { runwayWindow } from "./components/category-runway";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
-import { fetchApiJson, fetchMonthlyData, invalidateFinancialReads, loadHomeData, type MonthlyData } from "@/lib/app-data";
+import { fetchApiJson, fetchMonthlyData, invalidateFinancialReads, restartFinancialReads, loadHomeData, type MonthlyData } from "@/lib/app-data";
 import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { BillsSection } from "./components/BillsSection";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
 import { useBalanceChecks } from "./components/useBalanceChecks";
-import { BalanceCheckAccounts, PendingBalanceChecks } from "./components/BalanceChecks";
+import { BalanceCheckAccounts, PendingBalanceChecks, balanceChecksToReview } from "./components/BalanceChecks";
 import { accountKey, checkedFundsAfter } from "../lib/balance-checks";
 import { HomeScreen } from "./components/HomeScreen";
+import { LoadingRecovery } from "./components/ui/LoadingRecovery";
+
 const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen), { loading: () => <SkeletonRegion label="Loading Reflect"><Skeleton style={{ height: 220, marginBottom: 16 }} /><SkeletonRows /></SkeletonRegion> });
 import { CategoriesScreen } from "./components/CategoriesScreen";
 const AddTransactionSheet = dynamic(() => import("./components/AddTransactionSheet").then(m => m.AddTransactionSheet));
@@ -198,7 +200,6 @@ export default function App() {
   const [suggestedCatId, setSuggestedCatId] = useState<string | null>(null);
   const initialAcctApplied = useRef(false);
   const initialCatApplied = useRef(false);
-  const initialLoadStarted = useRef(false);
   const initialLoadComplete = useRef(false);
   const coreReady = useRef(false);
   const rebalanceReturnToAdd = useRef(false);
@@ -353,6 +354,7 @@ export default function App() {
       setBudgetTransactions(activity?.transactions ?? []);
       setMonthlySummary({
         contributionAgreements: data.summary.contributionAgreements,
+        contributionError: data.summary.contributionError,
         start,
         end,
         totalAssigned: data.summary?.totalAssigned ?? 0,
@@ -417,9 +419,8 @@ export default function App() {
 
 
   useEffect(() => {
-    if (initialLoadStarted.current && loadAttempt === 0) return;
-    initialLoadStarted.current = true;
 
+    let cancelled = false;
     const loadLiveData = async () => {
       try {
         setLoading(!coreReady.current);
@@ -429,17 +430,20 @@ export default function App() {
         setSecondaryLoading(true);
         const results = await loadHomeData({
           essentials: [fetchCategoryCatalog, fetchAccounts],
-          onReady: () => { coreReady.current = true; initialLoadComplete.current = true; setLoading(false); },
+          onReady: () => { if (cancelled) return; coreReady.current = true; initialLoadComplete.current = true; setLoading(false); },
           secondary: [fetchTransactions, fetchPending, fetchBills, () => fetchMonthlySummary(homeMonth), fetchNextMonthFunds],
         });
+        if (cancelled) return;
         const failure = results.find(result => result.status === "rejected");
         setRefreshError(failure?.status === "rejected" && failure.reason instanceof Error ? failure.reason.message : null);
         setRefreshState(failure ? "stale" : "idle");
       } catch (error) {
+        if (cancelled) return;
         console.error("[app] Failed to load live data:", error);
         if (coreReady.current) { setRefreshState("stale"); setRefreshError(error instanceof Error ? error.message : null); }
         else setLoadError(error instanceof Error ? error.message : "Could not load financial data");
       } finally {
+        if (cancelled) return;
         initialLoadComplete.current = coreReady.current;
         setSecondaryLoading(false);
         setLoading(false);
@@ -447,6 +451,7 @@ export default function App() {
     };
 
     void loadLiveData();
+    return () => { cancelled = true; };
   }, [loadAttempt]);
 
   useEffect(() => {
@@ -792,6 +797,7 @@ export default function App() {
   };
 
   const openMonthlyPlan = () => {
+    if (monthlySummary.contributionError) { showToast("Planning is paused until confirmed contributions are available.", 4000); return; }
     if (!monthStartPlannerMonth) return;
     setOpenedPlanningMonth(monthStartPlannerMonth);
     // Saving this month's first allocations updates live balances. Keep the
@@ -1052,8 +1058,15 @@ export default function App() {
     } finally { transactionSaveBusy.current = false; }
   };
 
+  const retryLoading = () => {
+    restartFinancialReads();
+    setLoadAttempt(value => value + 1);
+    if (tab === "history") void fetchHistoryTransactions(historyStartMonth, historyMonth).catch(() => {});
+  };
+  const recovery = <LoadingRecovery loading={loading || secondaryLoading || monthLoading || billsLoading || (tab === "history" && historyLoading)} onRetry={retryLoading} />;
+
   // Not yet mounted: server and first client render must match — show a neutral shell
-  if (!mounted || loading) return <AppLoadingSkeleton />;
+  if (!mounted || loading) return <AppLoadingSkeleton recovery={recovery} />;
 
   if (loadError) {
     return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 20, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 22 }}>Could not load your finances</h1><p style={{ margin: "10px 0 18px", color: "var(--text2)" }}>No balances were replaced. Check the connection and try again.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ minHeight: 48, padding: "0 18px", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>Retry</button></section></main>;
@@ -1109,6 +1122,7 @@ export default function App() {
       onSync={() => { void syncFromNotion(); }}
       showAddButton={!showManageScreen}
     >
+      {recovery}
       {refreshState !== "idle" && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
           {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>{refreshError ?? "Could not refresh"}</span> <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
@@ -1126,7 +1140,7 @@ export default function App() {
       <DeferredMount active={showMonthStartPlanner}>      <MonthPlanSheet
         advanceReserve={advanceReserve}
         advances={currentAdvances}
-        contributionsReady={!monthLoading && !monthError}
+        contributionsReady={!monthLoading && !monthError && !monthlySummary.contributionError}
         open={showMonthStartPlanner}
         onClose={() => setShowMonthStartPlanner(false)}
         onSaved={() => {
@@ -1148,13 +1162,15 @@ export default function App() {
 
       {tab === "home" && (
         <HomeScreen
-          contributions={!monthLoading && !monthError && <ContributionEntry status={contribStatus} scope={budgetScope} onOpen={() => setShowContributions(true)} />}
-          balanceChecks={<PendingBalanceChecks onRetry={() => void balanceChecks.refresh()} checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} onReview={account => { setStartBalanceCheck(true); setDetailsAccount(account); }} />}
+          contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : <ContributionEntry status={contribStatus} scope={budgetScope} onOpen={() => setShowContributions(true)} />)}
+          balanceReviews={balanceChecksToReview(balanceChecks.checks, balanceChecks.reviewCounts, accounts, budgetScope)}
+          onReviewBalance={account => { setStartBalanceCheck(true); setDetailsAccount(account); }}
+          balanceChecks={<PendingBalanceChecks reviewCounts={balanceChecks.reviewCounts} onRetry={() => void balanceChecks.refresh()} checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} paused={balanceChecks.paused} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} />}
           billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={checkedAccounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
           monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
           monthlyError={monthError}
           secondaryLoading={secondaryLoading}
-          planningReady={currentMonthFunds !== null && (monthStartPlannerMonth === calendarMonth || planningReady)}
+          planningReady={!monthlySummary.contributionError && currentMonthFunds !== null && (monthStartPlannerMonth === calendarMonth || planningReady)}
           planningMonth={monthStartPlannerMonth ?? undefined}
           categories={homeCategories}
           onOpenPlan={openMonthlyPlan}
@@ -1185,6 +1201,7 @@ export default function App() {
           frozenCategories={frozenCategories}
           accounts={accounts}
           readyToAssignByScope={readyToAssignByScope}
+          jointUnassigned={jointUnassigned}
           assignBalanceByScope={assignBalanceByScope}
           contributionRemainingByScope={contributionRemainingByScope}
           monthlySummary={monthlySummary}
@@ -1240,6 +1257,11 @@ export default function App() {
           error={historyError}
           onRetry={() => { void fetchHistoryTransactions(historyStartMonth, historyMonth).catch(() => {}); }}
           transactionsLoading={historyLoading}
+          onAddExpense={() => {
+            setEditingTransactionId(null);
+            setTransactionType("Expense");
+            setShowAddModal(true);
+          }}
           onClickTransaction={editTransaction}
           onDeleteTransaction={deleteTransaction}
         />
@@ -1293,7 +1315,8 @@ export default function App() {
         displayedBalance={displayedBalance}
         amountAfterBalance={amountAfterBalance}
         actualAfterSpending={actualAfterSpending}
-        balanceCheckUnavailable={!!balanceChecks.error}
+        balanceCheckUnavailable={!!balanceChecks.error || balanceChecks.reviewCounts.some(count => count.accountId === accountKey(accountId))}
+        balanceCheckPaused={balanceChecks.paused}
         balanceCheckedAt={selectedBalanceCheck?.checkedAt}
         parsedAmount={parsedAmount}
         categoryUnfunded={categoryUnfunded}
@@ -1466,12 +1489,13 @@ export default function App() {
 
       <BalanceCheckAccounts open={showBalanceAccounts} accounts={accounts} onClose={() => setShowBalanceAccounts(false)} onSelect={account => { setShowBalanceAccounts(false); setStartBalanceCheck(true); setDetailsAccount(account); }} />
 
-      <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} cash={accounts.find(a => !/saving/i.test(a.label) && /joined|joint/i.test(a.label))?.balance ?? null} loading={monthLoading} error={monthError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
+      <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} cash={accounts.find(a => !/saving/i.test(a.label) && /joined|joint/i.test(a.label))?.balance ?? null} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
 
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
-        contributions={!monthLoading && !monthError && detailsAccount && !/saving/i.test(detailsAccount.label) && <ContributionEntry status={contribStatus} scope={scopeFromAccountLabel(detailsAccount.label) ?? budgetScope} onOpen={() => { setDetailsAccount(null); setShowContributions(true); }} />}
+        contributions={!monthLoading && !monthError && !monthlySummary.contributionError && detailsAccount && !/saving/i.test(detailsAccount.label) && <ContributionEntry status={contribStatus} scope={scopeFromAccountLabel(detailsAccount.label) ?? budgetScope} onOpen={() => { setDetailsAccount(null); setShowContributions(true); }} />}
         open={detailsAccount !== null}
         startBalanceCheck={startBalanceCheck}
+        savedCountForReview={balanceChecks.reviewCounts.find(count => count.accountId === accountKey(detailsAccount?.id ?? ""))?.actualBalance}
         balanceCheck={balanceChecks.checks.find(check => check.accountId === accountKey(detailsAccount?.id ?? ""))}
         onBalanceCheckChanged={balanceChecks.refresh}
         account={detailsAccount && (displayAccounts.find((a) => a.id === detailsAccount.id) ?? detailsAccount)}

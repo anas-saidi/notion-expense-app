@@ -48,6 +48,7 @@ export function calculateContributionStatus({
   debtCategories?: Category[];
   monthlySummary: MonthlySummary;
 }): ContributionStatus | null {
+  if (monthlySummary.contributionError) return null;
   const joinedAccount = accounts.find((account) =>
     !account.label.toLowerCase().includes("saving") && account.label.toLowerCase().includes("joined"),
   );

@@ -111,7 +111,7 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
                           amount={txn.amount}
                           tone={isIncome ? "income" : isTransfer ? "transfer" : "expense"}
                           prefix={prefix}
-                          icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} size={22} />}
+                          icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={22} />}
                           onClick={() => onClickTransaction(txn)}
                         />
                       </SwipeToDelete>
@@ -134,8 +134,7 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
   );
 }
 const sectionDividerLabelStyle: CSSProperties = {
-  fontSize: 12, fontWeight: 700, letterSpacing: 0.7,
-  textTransform: "uppercase", color: "var(--muted)",
+  fontSize: 12, fontWeight: 700, letterSpacing: 0.7, color: "var(--muted)",
 };
 
 const groupHeaderStyle: CSSProperties = {
@@ -144,8 +143,7 @@ const groupHeaderStyle: CSSProperties = {
 };
 
 const groupLabelStyle: CSSProperties = {
-  fontSize: 12, fontWeight: 700, letterSpacing: 0.7,
-  textTransform: "uppercase", color: "var(--muted)",
+  fontSize: 12, fontWeight: 700, letterSpacing: 0.7, color: "var(--muted)",
 };
 
 const groupSubtotalStyle: CSSProperties = {

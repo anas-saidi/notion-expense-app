@@ -43,5 +43,5 @@ const toggleStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
 };
 const countStyle: CSSProperties = { fontWeight: 600, color: "var(--muted)", marginLeft: 2 };
-const titleStyle: CSSProperties = { margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--text2)" };
+const titleStyle: CSSProperties = { margin: 0, fontSize: 12, fontWeight: 700, color: "var(--text2)" };
 const totalStyle: CSSProperties = { fontSize: 13, fontWeight: 600, color: "var(--muted)", fontVariantNumeric: "tabular-nums" };

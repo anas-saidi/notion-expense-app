@@ -21,3 +21,8 @@
 - Cards: 12–18px radius according to depth, with layered box shadows rather than borders.
 - Text: `var(--text)` for primary, `var(--muted)` for secondary, and `var(--strong)` for icons.
 - Dividers: 1px `var(--track)`, never a visible border color.
+
+
+## Repeatable interface review
+
+For an app design review or an unslop pass, use [Interface Craft](/Users/anassaidi/.codex/skills/interface-craft/SKILL.md). Read this project's design.md and tokens first. Cite the skill's rule IDs, distinguish observed from inferred defects, and verify the rendered primary flow. Keep design.md as the product specification; record unresolved checks without claiming acceptance.

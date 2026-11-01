@@ -1,0 +1,345 @@
+{
+  "provider": "Thiings",
+  "website": "https://www.thiings.co/things",
+  "terms": "https://www.thiings.co/terms",
+  "license": "Free personal, non-commercial use with visible attribution; commercial use requires a suitable paid license.",
+  "retrieved": "2026-11-01",
+  "assets": [
+    {
+      "id": "credit-card",
+      "title": "Credit Card",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-9nQCcLCnsq0z5FBQJRWw7uEbPcwrC5.png",
+      "file": "/category-icons/credit-card.webp"
+    },
+    {
+      "id": "bank",
+      "title": "Bank",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-IiMitsVHDCFJDFZnsGOFBFJg3Jhsbp.png",
+      "file": "/category-icons/bank.webp"
+    },
+    {
+      "id": "lipstick",
+      "title": "Lipstick",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-9R2YsI8ol6X4qXKeVXyZ0c5SGqJPYS.png",
+      "file": "/category-icons/lipstick.webp"
+    },
+    {
+      "id": "bed",
+      "title": "Bed",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-fCUCZIbOMwyFIEPHpSaknMVdlzdBWV.png",
+      "file": "/category-icons/bed.webp"
+    },
+    {
+      "id": "bedsheet",
+      "title": "Bedsheet",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-9Z4IR40fpxFiyYZOb4WCacvLda5xKi.png",
+      "file": "/category-icons/bedsheet.webp"
+    },
+    {
+      "id": "baby-1",
+      "title": "Baby",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-xkg59o8axxWv8UTDtz9eMDiXnfdRJn.png",
+      "file": "/category-icons/baby-1.webp"
+    },
+    {
+      "id": "baby-feeding-bottle",
+      "title": "Baby feeding bottle",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-OGmaUYElcQxL0MXidTpKtrdWi3UztG.png",
+      "file": "/category-icons/baby-feeding-bottle.webp"
+    },
+    {
+      "id": "book",
+      "title": "Book",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-QhvfavmoGfPmREwwvl4XtqTIORARDz.png",
+      "file": "/category-icons/book.webp"
+    },
+    {
+      "id": "car",
+      "title": "Car",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-BUdFzT6W46HCgNoa5ncDJwdfqXzfqq.png",
+      "file": "/category-icons/car.webp"
+    },
+    {
+      "id": "cat",
+      "title": "Cat",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-X5oYX1FDDLVSQ1aPCSIaOBkmCQGhDP.png",
+      "file": "/category-icons/cat.webp"
+    },
+    {
+      "id": "food-donation",
+      "title": "Food Donation",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-YtKPDZ0YPWYRihKsl6D1C8hxRzTVzY.png",
+      "file": "/category-icons/food-donation.webp"
+    },
+    {
+      "id": "heart",
+      "title": "Heart",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-RQtOXVb8LaWRBM1vFtlMCggGMulrKV.png",
+      "file": "/category-icons/heart.webp"
+    },
+    {
+      "id": "tooth",
+      "title": "Tooth",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-CO4KOn0XgL7vM3OGalhMPXtGIlprSl.png",
+      "file": "/category-icons/tooth.webp"
+    },
+    {
+      "id": "dishwasher",
+      "title": "Dishwasher",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-MIkMxp3ekWHJ2EVH8mnYAK41e6vnMf.png",
+      "file": "/category-icons/dishwasher.webp"
+    },
+    {
+      "id": "plate",
+      "title": "Plate",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-Swa13h7uaHX7OPgB0ss940lRzX433D.png",
+      "file": "/category-icons/plate.webp"
+    },
+    {
+      "id": "sheep",
+      "title": "Sheep",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-tIxGcVKuutdicL6bBwbwpXLpWSrKyo.png",
+      "file": "/category-icons/sheep.webp"
+    },
+    {
+      "id": "sports-first-aid-kit",
+      "title": "Sports First Aid Kit",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-oqB8LbMz51dtfHzu1yVE0MY8IBS91N.png",
+      "file": "/category-icons/sports-first-aid-kit.webp"
+    },
+    {
+      "id": "gift-box",
+      "title": "Gift Box",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-VCxaluugoXxQ6G57uYpHSlGZL18bLp.png",
+      "file": "/category-icons/gift-box.webp"
+    },
+    {
+      "id": "engagement-ring-box",
+      "title": "Engagement Ring Box",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-XJBSqJgPSq5dFdNWgu2zuSeQgmPFmb.png",
+      "file": "/category-icons/engagement-ring-box.webp"
+    },
+    {
+      "id": "family",
+      "title": "Family",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-iSpZcrHmxvZHZPeIwv3rttJNK7TGqu.png",
+      "file": "/category-icons/family.webp"
+    },
+    {
+      "id": "airplane",
+      "title": "Airplane",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-v0LP91OBaZckcNrHRNpH4uXzImn4v5.png",
+      "file": "/category-icons/airplane.webp"
+    },
+    {
+      "id": "sofa",
+      "title": "Sofa",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-cRuokpRSq9ekpqqbJA3w5Tg4DWOyLv.png",
+      "file": "/category-icons/sofa.webp"
+    },
+    {
+      "id": "smartphone",
+      "title": "Smartphone",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-LxbDZUY1gzuzF4AEv0OHAqsSGpAng8.png",
+      "file": "/category-icons/smartphone.webp"
+    },
+    {
+      "id": "target",
+      "title": "Target",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-QUD9QBFZRZ2ZYM6AV1VO3hYmCbUAq1.png",
+      "file": "/category-icons/target.webp"
+    },
+    {
+      "id": "dumbbell",
+      "title": "Dumbbell",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-5RAX5kW85fgiRpM3VdHTeOZmSRx3wB.png",
+      "file": "/category-icons/dumbbell.webp"
+    },
+    {
+      "id": "artist-palette",
+      "title": "Artist Palette",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-WctLnuDk1OJ0wzB6A3ai0yTDzDJyOy.png",
+      "file": "/category-icons/artist-palette.webp"
+    },
+    {
+      "id": "house",
+      "title": "House",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-0OoMAJRtHLxXtHGKaC50y1kLqsAPFV.png",
+      "file": "/category-icons/house.webp"
+    },
+    {
+      "id": "diamond",
+      "title": "Diamond",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-JWrKzAbDTTpB1o29JJb88rMrUMXAqW.png",
+      "file": "/category-icons/diamond.webp"
+    },
+    {
+      "id": "laptop",
+      "title": "Laptop",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-UsyTZyMk2er8VfZu1T68Z4BbnfHYL1.png",
+      "file": "/category-icons/laptop.webp"
+    },
+    {
+      "id": "medicine-capsule",
+      "title": "Medicine Capsule",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-6YCD688sjOC1kmBZgegAoQNGOCBOuQ.png",
+      "file": "/category-icons/medicine-capsule.webp"
+    },
+    {
+      "id": "desktop-computer",
+      "title": "Desktop Computer",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-pri3DOVpzgeVvruiQZLb6NooNGyxyV.png",
+      "file": "/category-icons/desktop-computer.webp"
+    },
+    {
+      "id": "olive-oil",
+      "title": "Olive Oil",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-wAUZm788o4PsBgmD7JKahSJBCTJEk7.png",
+      "file": "/category-icons/olive-oil.webp"
+    },
+    {
+      "id": "piggy-bank",
+      "title": "Piggy bank",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-yXrodRQ1tufqDh2wXeFl82sDXZBv3c.png",
+      "file": "/category-icons/piggy-bank.webp"
+    },
+    {
+      "id": "game-controller",
+      "title": "Game Controller",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-w6RCw1smyKwJ3hQwyEVqK4CgiTpD0u.png",
+      "file": "/category-icons/game-controller.webp"
+    },
+    {
+      "id": "chef-hat",
+      "title": "Chef Hat",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-omHefG87QWSNWHLjj9kIIyiiTVrzGr.png",
+      "file": "/category-icons/chef-hat.webp"
+    },
+    {
+      "id": "shopping-bag",
+      "title": "Shopping bag",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-1kzlhXN3lasEQYBtwdeQrzzhBEwurX.png",
+      "file": "/category-icons/shopping-bag.webp"
+    },
+    {
+      "id": "popcorn-bucket",
+      "title": "Popcorn Bucket",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-I52nJsaGDSwuZS3iCW3QMYsKhcL345.png",
+      "file": "/category-icons/popcorn-bucket.webp"
+    },
+    {
+      "id": "motorcycle",
+      "title": "Motorcycle",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-eI6n4x6dT5zthnTccmRnV0GX7PJxmW.png",
+      "file": "/category-icons/motorcycle.webp"
+    },
+    {
+      "id": "train",
+      "title": "Train",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-B6HK6QalkOwIxTOxbj2guRpL5YQjAL.png",
+      "file": "/category-icons/train.webp"
+    },
+    {
+      "id": "suitcase",
+      "title": "Suitcase",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-SJxXSQiZvg2rhqvpw6hANLsmgfO4tX.png",
+      "file": "/category-icons/suitcase.webp"
+    },
+    {
+      "id": "palm",
+      "title": "Palm",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-NxHdwKHk8XSiiGdp98m32Op5wxDO9V.png",
+      "file": "/category-icons/palm.webp"
+    },
+    {
+      "id": "prayer-beads",
+      "title": "Prayer Beads",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-dV0XxxHpL1dR5Bcd4xUUoZplN8ueol.png",
+      "file": "/category-icons/prayer-beads.webp"
+    },
+    {
+      "id": "bread-white",
+      "title": "Bread",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-dewR6H4EEYmpOioLG3nrdbZveX2fzp.png",
+      "file": "/category-icons/bread-white.webp"
+    },
+    {
+      "id": "coins",
+      "title": "Coins",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-n9dmFV9wD0hKFc4BFPY2Mc7nByhtNY.png",
+      "file": "/category-icons/coins.webp"
+    },
+    {
+      "id": "receipt",
+      "title": "Receipt",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-DjLfCX0etcbaHeaobCUklhYQWOSXUF.png",
+      "file": "/category-icons/receipt.webp"
+    },
+    {
+      "id": "document",
+      "title": "Document",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-BjimxRD0gb4rZBjr9jbO9LYXmOZJao.png",
+      "file": "/category-icons/document.webp"
+    },
+    {
+      "id": "handshake",
+      "title": "Handshake",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-g0jWpKzDefUBkVrz5WRvIkWjsUYOer.png",
+      "file": "/category-icons/handshake.webp"
+    },
+    {
+      "id": "toolbox",
+      "title": "Toolbox",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-d7lf8LhduKgJMeGR7zKIrY9OCmpv0E.png",
+      "file": "/category-icons/toolbox.webp"
+    },
+    {
+      "id": "router",
+      "title": "Router",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-HSXnqaOUs8Hl1qCYBPXfDRrjEDY55k.png",
+      "file": "/category-icons/router.webp"
+    },
+    {
+      "id": "lightning-bolt",
+      "title": "Lightning Bolt",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-kEc3FuOo6TejgI0tivfA8qPm4YIWfV.png",
+      "file": "/category-icons/lightning-bolt.webp"
+    },
+    {
+      "id": "candy",
+      "title": "Candy",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-j129H0KfxMbyWWWYBQnQfHJ8wIUeQg.png",
+      "file": "/category-icons/candy.webp"
+    },
+    {
+      "id": "t-shirt",
+      "title": "T-Shirt",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-ScKZwuDUTUPRm5ljOa5KSKzyJB3BNB.png",
+      "file": "/category-icons/t-shirt.webp"
+    },
+    {
+      "id": "perfume-bottle",
+      "title": "Perfume Bottle",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-USYWgntKCcn9OMx7jLXrlx2zKxF9gA.png",
+      "file": "/category-icons/perfume-bottle.webp"
+    },
+    {
+      "id": "balloon",
+      "title": "Balloon",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-SLW4v3ZRvj7Si9YqPiWqBSY3K1J03w.png",
+      "file": "/category-icons/balloon.webp"
+    },
+    {
+      "id": "bag-of-groceries",
+      "title": "Bag of Groceries",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-DXDecT3Ip0rCJy8HyeBzAE9HvaqWDl.png",
+      "file": "/category-icons/bag-of-groceries.webp"
+    },
+    {
+      "id": "television",
+      "title": "Television",
+      "source": "https://lftz25oez4aqbxpq.public.blob.vercel-storage.com/image-ob5X6P6AiLzXqRjJXCOedM4RaJ3Joa.png",
+      "file": "/category-icons/television.webp"
+    }
+  ]
+}

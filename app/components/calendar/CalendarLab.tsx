@@ -154,9 +154,9 @@ export function CalendarLab() {
         Each month piles up its three biggest categories. A bigger emoji means more was spent there.
       </p>
 
-      <BottomSheet open={Boolean(open)} onClose={() => setOpenKey(null)} label={open ? monthLabel(open.month.key, "long") : "Month"} maxWidth="480px" contentStyle={sheetContentStyle}>
+      <BottomSheet open={Boolean(open)} onClose={() => setOpenKey(null)} label={open ? monthLabel(open.month.key, "long") : "Month"} size="standard" contentStyle={sheetContentStyle}>
         {open && <>
-          <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <header className="sheet-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{monthLabel(open.month.key, "long")}</h2>
             <button type="button" aria-label="Close" onClick={() => setOpenKey(null)} style={iconButtonStyle}><XIcon size={20} /></button>
           </header>
@@ -208,4 +208,4 @@ const monthButtonStyle = (future: boolean): CSSProperties => ({
 });
 const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 52 };
 const emojiStyle: CSSProperties = { width: 32, display: "inline-flex", justifyContent: "center", fontSize: 22, flexShrink: 0 };
-const sheetContentStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 16, padding: "16px 20px max(20px, env(safe-area-inset-bottom))", boxSizing: "border-box" };
+const sheetContentStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 16, padding: "var(--dialog-body-padding, 16px 20px max(20px, env(safe-area-inset-bottom)))", boxSizing: "border-box" };

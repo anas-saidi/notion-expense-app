@@ -36,7 +36,7 @@ describe("native operations boundary", () => {
     mocks.expense.mockResolvedValue(NextResponse.json({ success: true, id: "created" }));
     const response = await POST(request({ requestId, operation: "expense", input }));
     expect(response.status).toBe(200);
-    expect(mocks.once).toHaveBeenCalledWith("native-v1", requestId, "expense", input, expect.any(Function));
+    expect(mocks.once).toHaveBeenCalledWith("native-v1", requestId, "expense", input, expect.any(Function), undefined);
     expect(await mocks.expense.mock.calls[0][0].json()).toEqual(input);
   });
   it("reports ambiguous failures without bypassing the operation ledger", async () => {
@@ -65,4 +65,11 @@ it("lets an interrupted savings deposit resume through its own durable operation
 it("rejects a changed savings operation identity before writing", async () => {
   const response = await POST(request({ requestId, operation: "savingsDeposit", input: { operationId: "different" } }));
   expect(response.status).toBe(400); expect(mocks.savingsDeposit).not.toHaveBeenCalled();
+});
+
+it("preserves the original draft creation time for the Notion receipt cutover", async () => {
+  const createdAt = "2026-10-31T20:00:00Z";
+  const input = { accountId: "a", categoryId: "c", amount: 12, date: "2026-10-31", name: "Coffee" };
+  await POST(request({ requestId, createdAt, operation: "expense", input }));
+  expect(mocks.once).toHaveBeenCalledWith("native-v1", requestId, "expense", input, expect.any(Function), createdAt);
 });

@@ -1,3 +1,4 @@
+import { notionLedgerConfigured } from "../../../../lib/notion-ledger";
 import { FUNDING_OPERATION, readText } from "../../../../lib/savings-funding";
 import { withMirrorMutation } from "../../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
@@ -158,7 +159,7 @@ async function handlePOST(req: NextRequest) {
       }
     }
     const savedFunds = [];
-    if (process.env.DATABASE_URL && (await contributionStore().list(mirrorScope(token))).length) {
+    if ((notionLedgerConfigured() || process.env.DATABASE_URL) && (await contributionStore().list(mirrorScope(token))).length) {
       const url = new URL(req.url); url.searchParams.set("month", String(body.month));
       const { capacity, split, categories } = await planningContext(new NextRequest(url));
       const proposed = new Map<string, number>();

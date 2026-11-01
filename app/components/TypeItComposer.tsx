@@ -1,4 +1,6 @@
 "use client";
+import { CategoryIcon } from "./ui/CategoryIcon";
+import { accountIconSource } from "../../lib/category-icons";
 import "./finance-ai.css";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -247,11 +249,11 @@ export function TypeItComposer(props: Props) {
             </div>
             {transaction && <div style={metaRowStyle}>
               {!income && <button type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "category"} aria-label={`Category for line ${index + 1}: ${row?.category?.name ?? "none"}`} onClick={event => openPicker(event, index, "category")} style={{ ...pickerChipStyle, color: row?.category ? "var(--text2)" : "var(--muted)" }}>
-                <span style={pickerChipIconStyle}>{row?.category?.icon ?? "#"}</span>
+                <span style={pickerChipIconStyle}><CategoryIcon icon={row?.category?.icon} categoryName={row?.category?.name} size={24} /></span>
                 <span style={pickerChipLabelStyle}>{row?.category?.name ?? "Category"}</span>
               </button>}
               {(activeLine === index || row?.account?.id !== props.defaultAccountId) && <button type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "account"} aria-label={`Account for line ${index + 1}: ${row?.account?.label ?? "none"}`} onClick={event => openPicker(event, index, "account")} style={{ ...pickerChipStyle, color: "var(--muted)" }}>
-                <span style={pickerChipIconStyle}>{row?.account?.icon ?? "$"}</span>
+                <span style={pickerChipIconStyle}><CategoryIcon icon={accountIconSource(row?.account?.type)} size={24} /></span>
                 <span style={pickerChipLabelStyle}>{row?.account?.label ?? "Account"}</span>
               </button>}
               {transaction.date !== props.defaultDate && <span style={dateNoteStyle}>{dayLabel(transaction.date)}</span>}
@@ -282,7 +284,7 @@ export function TypeItComposer(props: Props) {
         {busy ? `Saving ${progress}/${rows.length}…` : <><CheckIcon size={16} />Save {rows.length}</>}
       </button>
     </div>}
-    <PickerPopover open={picker !== null} title={picker?.kind === "account" ? "Account" : "Category"} onClose={() => setPicker(null)} align="left" placement="bottom" width={picker?.kind === "account" ? "min(292px, calc(100vw - 28px))" : "min(300px, calc(100vw - 28px))"} zIndex={140} anchorRef={pickerAnchor}>
+    <PickerPopover open={picker !== null} title={picker?.kind === "account" ? "Account" : "Category"} onClose={() => setPicker(null)} align="left" placement="bottom" size="choice" zIndex={140} anchorRef={pickerAnchor}>
       {picker?.kind === "account" && <AccountOptionList accounts={props.accounts} selectedId={pickerRow?.account?.id} onSelect={accountId => choose(picker.line, { accountId })} />}
       {picker?.kind === "category" && <CategoryOptionList categories={filterCategories(props.categories, catSearch)} selectedId={pickerRow?.category?.id} onSelect={category => choose(picker.line, { categoryId: category.id })} search={catSearch} onSearchChange={setCatSearch} />}
     </PickerPopover>

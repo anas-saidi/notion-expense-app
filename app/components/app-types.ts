@@ -79,6 +79,8 @@ export type MonthlyCategoryTotal = {
 };
 
 export type MonthlySummary = {
+  /** Independent database failure; Notion monthly totals can still be valid. */
+  contributionError?: string;
   contributionAgreements?: import("../../lib/contribution-agreements").ContributionAgreement[];
   month?: string | null;
   start: string;

@@ -1,4 +1,6 @@
 "use client";
+import { SheetHeader } from "./ui/SheetLayout";
+
 import { useEffect, useState } from "react";
 import type { BudgetScope } from "./app-types";
 import { calculateWorkRate, readWorkConfig, saveWorkConfig, useWorkRates, type PayInput, type PayFrequency } from "./work-time";
@@ -36,13 +38,13 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
   const calculatedRate = calculateWorkRate(people);
   const updatePerson = (index: number, patch: Partial<PayInput>) => { setPeople(current => current.map((person, i) => i === index ? { ...person, ...patch } : person)); setError(null); };
   const scopeName = (scope: BudgetScope) => scope === "joint" ? "Joint" : scope === "anas" ? "Anas" : "Salma";
-  return <BottomSheet open={open} onClose={onClose} label={editingScope ? "Work & income" : "Settings"} maxWidth="480px" panelStyle={{ background: "var(--bg)", borderRadius: "var(--radius-sheet)" }}>
-    {editingScope ? <form onSubmit={event => { event.preventDefault(); save(); }} style={sheetContentStyle}>
-      <header style={headerStyle}>
+  return <BottomSheet open={open} onClose={onClose} label={editingScope ? "Work & income" : "Settings"} size="standard" panelStyle={{ background: "var(--bg)", borderRadius: "var(--radius-sheet)" }}>
+    {editingScope ? <form className="sheet-body" onSubmit={event => { event.preventDefault(); save(); }} style={sheetContentStyle}>
+      <SheetHeader style={headerStyle}>
         {!workScope && <button type="button" className="sheet-close-button" aria-label="Back to Settings" onClick={finishEditing}><ChevronLeftIcon size={20} /></button>}
         <h2 style={titleStyle}>Work & income</h2>
         <button type="button" className="sheet-close-button" aria-label="Close work and income" onClick={onClose}><XIcon size={20} /></button>
-      </header>
+      </SheetHeader>
       <div style={{ display: "grid", gap: 16 }}>
         {method === "salary" ? <>
           {people.map((person, index) => <fieldset key={index} style={{ border: 0, margin: 0, padding: 0, display: "grid", gap: 12, minWidth: 0 }}>
@@ -70,11 +72,11 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
         {rates[editingScope] !== undefined && <button type="button" onClick={() => save(true)} style={{ ...navigationRowStyle, justifyContent: "center", fontSize: 14 }}>Remove rate</button>}
       </div>
     </form> :
-    <div style={sheetContentStyle}>
-      <header style={headerStyle}>
+    <div className="sheet-body" style={sheetContentStyle}>
+      <SheetHeader style={headerStyle}>
         <h2 style={titleStyle}>Settings</h2>
         <button type="button" className="settings-close-button sheet-close-button" aria-label="Close settings" onClick={onClose}><XIcon size={20} /></button>
-      </header>
+      </SheetHeader>
       <section aria-label="Preferences" style={sectionStyle}>
         <h3 style={sectionTitleStyle}>Preferences</h3>
         <div style={settingRowStyle}>
@@ -95,6 +97,10 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
           <ChevronRightIcon size={18} aria-hidden="true" />
         </span>
       </button>
+      <section aria-label="Artwork" style={sectionStyle}>
+        <h3 style={sectionTitleStyle}>Artwork</h3>
+        <a href="https://www.thiings.co/things" target="_blank" rel="noreferrer" style={{ ...navigationRowStyle, color:"var(--text2)", minHeight:44 }}>Category images by Thiings <ChevronRightIcon size={18} aria-hidden="true" /></a>
+      </section>
       {onSync && <section aria-label="Notion sync" style={sectionStyle}>
         <h3 style={sectionTitleStyle}>Notion sync</h3>
         <div style={settingRowStyle}>

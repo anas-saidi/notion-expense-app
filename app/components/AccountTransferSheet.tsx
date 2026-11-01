@@ -1,4 +1,6 @@
 "use client";
+import { SheetBody, SheetHeader } from "./ui/SheetLayout";
+
 import { DatePicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
 
@@ -8,6 +10,8 @@ import { parseAmount, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
 import { CheckIcon, TransferIcon, XIcon } from "./ui/icons";
+import { CategoryIcon } from "./ui/CategoryIcon";
+import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
 
 type AccountTransferSheetProps = {
@@ -100,14 +104,14 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
       open={open}
       onClose={onClose}
       label="Move money between accounts"
-      maxWidth="520px"
+      size="standard"
       detent="content"
       maxHeight="calc(100dvh - 20px)"
       panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0 }}
     >
-      <div style={innerStyle}>
-        <header style={headerStyle}>
+      <SheetBody style={innerStyle}>
+        <SheetHeader style={headerStyle}>
           <div>
             <div style={eyebrowStyle}>Account transfer</div>
             <h2 style={titleStyle}>Move money</h2>
@@ -115,7 +119,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
           <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
             <XIcon size={18} />
           </button>
-        </header>
+        </SheetHeader>
 
         <section style={balanceGridStyle}>
           <BalanceTile label="From" account={fromAccount} nextBalance={fromAccount?.balance != null && parsedAmount > 0 ? fromAccount.balance - parsedAmount : null} />
@@ -188,7 +192,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
           {status === "idle" && <TransferIcon size={16} strokeWidth={2.3} />}
           {status === "saving" ? "Moving..." : status === "success" ? "Moved" : "Move money"}
         </button>
-      </div>
+      </SheetBody>
     </BottomSheet>
   );
 }
@@ -197,7 +201,7 @@ function BalanceTile({ label, account, nextBalance }: { label: string; account: 
   return (
     <div style={balanceTileStyle}>
       <span style={eyebrowStyle}>{label}</span>
-      <strong style={balanceAccountStyle}>{account ? `${account.icon} ${account.label}` : "Choose account"}</strong>
+      <strong style={balanceAccountStyle}>{account ? <><CategoryIcon icon={accountIconSource(account.type)} size={18} /> {account.label}</> : "Choose account"}</strong>
       <span style={balanceAmountStyle}>
         {nextBalance !== null ? <Money value={nextBalance} /> : account?.balance != null ? <Money value={account.balance} /> : "TBD"}
       </span>
@@ -227,8 +231,7 @@ const headerStyle: CSSProperties = {
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: 12,
-  letterSpacing: 0.5,
-  textTransform: "uppercase",
+
   color: "var(--muted)",
 };
 

@@ -10,6 +10,7 @@ export type BalanceCheck = {
   /** Transactions already reflected in the physical count. */
   knownTransactionIds: string[];
 };
+export type BalanceCountReview = { accountId: string; actualBalance: number; reportedDay?: string };
 export type BalanceCheckView = Omit<BalanceCheck, "knownTransactionIds"> & { estimatedActual: number };
 export const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 export const accountKey = (id: string) => id.replace(/-/g, "").toLowerCase();

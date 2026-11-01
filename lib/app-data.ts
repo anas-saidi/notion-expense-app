@@ -3,17 +3,20 @@ import type { MonthlySummary, Transaction } from "../app/components/app-types";
 import { monthBounds } from "../app/components/app-utils";
 
 const inFlight = new Map<string, Promise<unknown>>();
+const controllers = new Set<AbortController>();
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /** Share concurrent reads only; completed financial responses are never cached. */
 export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
   const existing = inFlight.get(url);
   if (existing) return existing as Promise<T>;
+  const controller = new AbortController();
+  controllers.add(controller);
   const request = (async () => {
     for (let attempt = 0; ; attempt += 1) {
       // An expired mirror needs a fully paginated ledger read. Let that finish
       // instead of launching repeated history reads after 30-second aborts.
-      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(url.includes("includeJointDebt=true") ? 180000 : 30000) });
+      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(url.includes("includeJointDebt=true") ? 180000 : 30000)]) });
       const data = await response.json();
       if (response.ok) {
         if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("finance-data-source", { detail: {
@@ -24,13 +27,14 @@ export function fetchApiJson<T>(url: string, retries = 2): Promise<T> {
       if (data.retryable !== false && (response.status === 429 || response.status >= 500) && attempt < retries) {
         const retryAfter = Number(response.headers.get("Retry-After"));
         await wait(retryAfter > 0 ? retryAfter * 1000 : 900 * (attempt + 1));
+        controller.signal.throwIfAborted();
         continue;
       }
       throw new Error(data.error || `Request failed with status ${response.status}`);
     }
   })();
   inFlight.set(url, request);
-  const clean = () => { if (inFlight.get(url) === request) inFlight.delete(url); };
+  const clean = () => { controllers.delete(controller); if (inFlight.get(url) === request) inFlight.delete(url); };
   void request.then(clean, clean);
   return request;
 }
@@ -43,6 +47,13 @@ export function fetchMonthlyData(startMonth: string, endMonth = startMonth, incl
   const start = monthBounds(`${startMonth}-01`).start;
   const end = monthBounds(`${endMonth}-01`).end;
   return fetchApiJson<MonthlyData>(`/api/monthly-summary?start=${start}&end=${end}&includeTransactions=true${includeJointDebt ? "&includeJointDebt=true" : ""}`);
+}
+
+/** Explicit user recovery cancels pending GETs so retry cannot rejoin a stalled read. */
+export function restartFinancialReads() {
+  inFlight.clear();
+  for (const controller of controllers) controller.abort();
+  controllers.clear();
 }
 
 /** Financial essentials first; failures in a secondary section cannot hide Home. */

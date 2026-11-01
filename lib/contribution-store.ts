@@ -1,3 +1,6 @@
+import { NotionContributionStore } from "./notion-finance-stores";
+import { notionLedgerConfigured } from "./notion-ledger";
+import { assertSharedDatabaseEnabled } from "./database-mode";
 import { Pool } from "pg";
 import { randomUUID } from "node:crypto";
 import type { SqlDriver } from "./mirror/store";
@@ -42,7 +45,8 @@ export class ContributionStore {
 }
 const state = globalThis as typeof globalThis & { financeContributionPool?: Pool };
 export function contributionPool() {
+  assertSharedDatabaseEnabled();
   if (!process.env.DATABASE_URL) throw Object.assign(new Error("Contribution agreements need the shared database connection."), { status: 503 });
   return state.financeContributionPool ??= new Pool({ connectionString: process.env.DATABASE_URL, max: 2, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30000, statement_timeout: 15000 });
 }
-export const contributionStore = () => new ContributionStore(contributionPool());
+export const contributionStore = () => notionLedgerConfigured() ? new NotionContributionStore() : new ContributionStore(contributionPool());

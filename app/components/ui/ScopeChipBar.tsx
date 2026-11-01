@@ -11,7 +11,7 @@ const PICKER_MASCOT_SIZE = 30;
 
 /**
  * Joint and both partners, each shown as its own mascot, so the mode reads the same
- * way as the jars on screen; no text, the selected one is tinted in its colour.
+ * way as the jars on screen, with visible names on desktop.
  * Joint sits between the two partners.
  */
 export function GlobalBudgetScopePicker({

@@ -1,13 +1,14 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import type { BalanceCheck } from "../../../lib/balance-checks";
-const state = vi.hoisted(() => ({ checks: [] as BalanceCheck[], balance: 2000, pages: [] as any[], rejectSave: false, readError: null as Error | null }));
+const state = vi.hoisted(() => ({ checks: [] as BalanceCheck[], balance: 2000, pages: [] as any[], rejectSave: false, readError: null as Error | null, reviewCounts: [] as {accountId: string; actualBalance: number}[] }));
 vi.mock("../../../lib/notion-accounts", () => ({ readAccountResponse: async () => Response.json({ accounts: [{ id: "a".repeat(32), balance: state.balance }] }) }));
 vi.mock("../../../lib/notion-api", () => ({ queryDatabaseAll: async () => state.pages }));
 vi.mock("../../../lib/mirror/routes", () => ({ withMirrorReads: (fn: unknown) => fn }));
 vi.mock("../../../lib/mirror/store", () => ({ mirrorScope: () => "household" }));
 vi.mock("../../../lib/balance-check-store", () => ({ balanceCheckStore: () => ({
   list: async () => { if (state.readError) throw state.readError; return state.checks; },
+  reviewCounts: async () => state.reviewCounts,
   save: async (_: string, check: BalanceCheck) => { if (state.rejectSave) return false; state.checks = [check]; return true; },
   close: async () => { state.checks = []; return true; },
 }) }));
@@ -15,7 +16,7 @@ import { GET, POST } from "./route";
 const accountId = "a".repeat(32);
 const post = (body: object) => POST(new NextRequest("http://localhost/api/balance-checks", { method: "POST", body: JSON.stringify({ accountId, ...body }) }));
 beforeEach(() => {
-  vi.stubEnv("NOTION_TOKEN", "test-token"); state.checks = []; state.balance = 2000; state.pages = []; state.rejectSave = false; state.readError = null;
+  vi.stubEnv("NOTION_TOKEN", "test-token"); state.checks = []; state.balance = 2000; state.pages = []; state.rejectSave = false; state.readError = null; state.reviewCounts = [];
 });
 it("records a pending actual count without a Notion write and returns a sanitized view", async () => {
   expect((await post({ action: "save", actualBalance: 1650, expectedVersion: null })).status).toBe(200);
@@ -64,4 +65,15 @@ it("reports quota exhaustion as unavailable rather than an empty set of balance 
   const data = await response.json();
   expect(data).toMatchObject({ code: "DATABASE_QUOTA_EXCEEDED", retryable: false });
   expect(data).not.toHaveProperty("checks");
+});
+
+it("returns saved counts as review data rather than a failed refresh or an actual-funds estimate", async () => {
+  state.reviewCounts = [{ accountId, actualBalance: 494 }];
+  const response = await GET();
+  const data = await response.json();
+  expect(response.status).toBe(200);
+  expect(data.checks).toEqual([]);
+  expect(data.reviewCounts).toEqual([{ accountId, actualBalance: 494 }]);
+  expect(data).not.toHaveProperty("error");
+  expect(data).not.toHaveProperty("recoveryWarning");
 });

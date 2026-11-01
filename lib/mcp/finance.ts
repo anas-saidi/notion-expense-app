@@ -71,7 +71,7 @@ function activeCategory(all: Category[], id: string) {
 export async function write(tool: "record_expense" | "record_income" | "rebalance_budget", input: Record<string, any>) {
   const token = process.env.NOTION_TOKEN;
   if (!token) throw new Error("Finance data is not configured");
-  const { requestId, ...values } = input;
+  const { requestId, createdAt, ...values } = input;
   return mcpOperations().once(mirrorScope(token), requestId, tool, values, async () => {
     // Writes and every preflight stay outside mirror read contexts.
     return mirrorReadContext.run({ enabled: false, sources: new Set(), syncedAt: [], databases: new Map() }, async () => {
@@ -99,5 +99,5 @@ export async function write(tool: "record_expense" | "record_income" | "rebalanc
       if (Math.round(input.amount * 100) > Math.round(free * 100)) throw new Error("Insufficient free category funds after unpaid bill reservations");
       return json(await writeRebalance(req("/api/transfer", values)));
     });
-  });
+  }, createdAt);
 }

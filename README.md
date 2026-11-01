@@ -115,7 +115,13 @@ Open [http://localhost:3000](http://localhost:3000). You'll be redirected to `/l
 
 > **Tip:** If you get a "redirect_uri mismatch" error from Notion, double-check that `http://localhost:3000/api/auth/callback` is saved in your Notion integration's redirect URIs list.
 
-## Faster reads with a synchronized database
+## Durable finance records in Notion
+
+The local app stores contribution agreements, balance checks, revision history and operation receipts in Notion Finance Records. Set `NOTION_FINANCE_RECORDS_DB` using `scripts/setup-notion-records.mjs`. No `DATABASE_URL` is required. Financial writes require one app server with `NOTION_SINGLE_WRITER=true`; uncoordinated serverless writers are blocked.
+
+See [Notion storage and recovery](docs/notion-finance-records.md) for setup, the recovered October baseline, balance-count review and later import of unavailable legacy history.
+
+## Optional legacy synchronized database
 
 Use the **Neon Free** plan and copy its pooled Postgres connection string into
 `DATABASE_URL` in `.env.local` and Vercel. Keep it server-only. The mirror tables

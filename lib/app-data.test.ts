@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { fetchApiJson, fetchMonthlyData, loadHomeData } from "./app-data";
+import { fetchApiJson, fetchMonthlyData, loadHomeData, restartFinancialReads } from "./app-data";
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 it("coalesces simultaneous reads but fetches a fresh response on the next refresh", async () => {
@@ -78,4 +78,34 @@ it("still retries a transient service failure", async () => {
   await vi.runAllTimersAsync();
   expect(await request).toEqual({ balance: 30 });
   expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+
+it("manual recovery aborts a stalled read and a retry gets a fresh response", async () => {
+  let oldSignal!: AbortSignal;
+  const fetcher = vi.fn().mockImplementationOnce((_url, options) => {
+    oldSignal = options.signal;
+    return new Promise((_resolve, reject) => oldSignal.addEventListener("abort", () => reject(oldSignal.reason), { once: true }));
+  }).mockResolvedValueOnce(Response.json({ balance: 42 }));
+  vi.stubGlobal("fetch", fetcher);
+  const old = fetchApiJson("/api/stalled-recovery");
+  const rejected = expect(old).rejects.toMatchObject({ name: "AbortError" });
+  restartFinancialReads();
+  const fresh = fetchApiJson("/api/stalled-recovery");
+  await rejected;
+  expect(oldSignal.aborted).toBe(true);
+  expect(await fresh).toEqual({ balance: 42 });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it("manual recovery prevents an abandoned transient read from retrying after backoff", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "Busy" }, { status: 503 })));
+  const old = fetchApiJson("/api/backoff-recovery");
+  const rejected = expect(old).rejects.toMatchObject({ name: "AbortError" });
+  await vi.advanceTimersByTimeAsync(0);
+  restartFinancialReads();
+  await vi.runAllTimersAsync();
+  await rejected;
+  expect(fetch).toHaveBeenCalledTimes(1);
 });

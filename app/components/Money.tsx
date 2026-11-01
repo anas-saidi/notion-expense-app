@@ -10,6 +10,8 @@ type MoneyProps = {
    * appears only on a screen's main number and in amount inputs.
    */
   currency?: boolean;
+  /** De-emphasize cents while preserving the exact formatted amount. Static amounts only. */
+  subtleDecimals?: boolean;
   animated?: boolean;
   animateOnMount?: boolean;
 };
@@ -18,16 +20,21 @@ export function Money({
   value,
   absolute = false,
   currency = false,
+  subtleDecimals = false,
   animated = false,
   animateOnMount = false,
 }: MoneyProps) {
   const displayValue = absolute ? Math.abs(value) : value;
+  const formatted = fmt(displayValue);
+  const decimalIndex = formatted.lastIndexOf(",");
 
   return (
     <span style={moneyWrapStyle}>
       {animated
         ? <AnimatedCounter value={displayValue} animateOnMount={animateOnMount} />
-        : <span>{fmt(displayValue)}</span>}
+        : subtleDecimals && decimalIndex >= 0
+          ? <span>{formatted.slice(0, decimalIndex)}<span style={decimalStyle}>{formatted.slice(decimalIndex)}</span></span>
+          : <span>{formatted}</span>}
       {currency ? <Currency /> : <span style={srOnlyStyle}> {MONEY_CURRENCY}</span>}
     </span>
   );
@@ -62,3 +69,5 @@ const moneyWrapStyle: CSSProperties = {
   fontVariantNumeric: "tabular-nums",
   fontFeatureSettings: "\"tnum\"",
 };
+
+const decimalStyle: CSSProperties = { fontSize: "max(0.7em, 11px)", fontWeight: 400, color: "var(--money-decimal-color, var(--muted))" };

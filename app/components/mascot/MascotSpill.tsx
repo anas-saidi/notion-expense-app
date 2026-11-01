@@ -98,6 +98,7 @@ export function MascotSpill({ children, details, label, size, hintKey, initially
         {open && beside && (
           <motion.span
             key="details-beside"
+            className="mascot-spill-side-details"
             // Vertically centred on the jar, a small gap off its visible side; revealed from
             // the jar outwards (clip), drifting out from behind it and coming into focus.
             style={{

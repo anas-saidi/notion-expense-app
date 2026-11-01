@@ -1,3 +1,6 @@
+import { waitUntil } from "@vercel/functions";
+import { notionOnlyMode } from "./database-mode";
+import { mirrorReadContext } from "./mirror/context";
 import { notionFetchJson, queryDatabaseAll } from "./notion-api";
 import { PROP_INCOME_BASELINE, PROP_INCOME_UNASSIGNED, remainingUnassignedIncome } from "./joint-income";
 
@@ -28,7 +31,32 @@ export async function incomeUseProperties(token: string, accountId: string, unas
   };
 }
 
+// The reserve needs every Funds entry ever linked to the joint account (~8s live). In
+// Notion-only mode there's no snapshot to read it from and no saves can happen, so display
+// reads serve the last value and refresh it in the background.
+// ponytail: per-instance memory; an edit made directly in Notion shows one refresh late. Unused once the shared database is back.
+const RESERVE_FRESH_MS = 30_000;
+const reserveCache = new Map<string, { value: number; at: number; refreshing?: Promise<number> }>();
+
 export async function jointFreeIncomeReserve(token: string, accountId: string): Promise<number> {
+  if (!notionOnlyMode() || !mirrorReadContext.getStore()?.enabled) return readJointFreeIncomeReserve(token, accountId);
+  const cached = reserveCache.get(accountId);
+  const refresh = () => {
+    const refreshing = readJointFreeIncomeReserve(token, accountId);
+    reserveCache.set(accountId, { value: cached?.value ?? 0, at: cached?.at ?? 0, refreshing });
+    refreshing.then(
+      value => reserveCache.set(accountId, { value, at: Date.now() }),
+      () => cached ? reserveCache.set(accountId, cached) : reserveCache.delete(accountId),
+    );
+    return refreshing;
+  };
+  // No value yet: wait for the read already in flight (or start one) rather than serve a placeholder.
+  if (!cached?.at) return cached?.refreshing ?? refresh();
+  if (Date.now() - cached.at > RESERVE_FRESH_MS && !cached.refreshing) waitUntil(refresh().catch(() => undefined));
+  return cached.value;
+}
+
+async function readJointFreeIncomeReserve(token: string, accountId: string): Promise<number> {
   const pages = await queryDatabaseAll(token, TRANSACTIONS_DB, { filter: { and: [
     { property: "Type", select: { equals: "Income" } },
     { property: "Account", relation: { contains: accountId } },

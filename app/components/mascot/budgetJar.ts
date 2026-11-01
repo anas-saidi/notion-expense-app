@@ -1,3 +1,4 @@
+import { categoryIconSource } from "../../../lib/category-icons";
 import type { Account, BudgetScope, Category } from "../app-types";
 import { categoryMatchesScope } from "../app-utils";
 import { isSavingsCategory } from "../wallet-utils";
@@ -33,7 +34,7 @@ export function budgetJarItems(
     .sort((a, b) => b.weight - a.weight)
     .map(({ c, weight }) => {
       const radius = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, Math.sqrt(weight / total) * AREA_FACTOR));
-      return { id: c.id, glyph: c.icon?.trim() || "🧾", radius };
+      return { id: c.id, glyph: categoryIconSource(c.icon, c.name), radius };
     });
 }
 
@@ -62,7 +63,7 @@ export function topSpentJarItems(
     .map(([id, total]) => {
       const c = byId.get(id)!;
       const radius = Math.min(SPENT_MAX_RADIUS, Math.max(SPENT_MIN_RADIUS, Math.sqrt(Math.min(1, total / planned)) * AREA_FACTOR));
-      return { id: `spent:${id}`, glyph: c.icon?.trim() || "🧾", radius, name: c.name };
+      return { id: `spent:${id}`, glyph: categoryIconSource(c.icon, c.name), radius, name: c.name };
     });
 }
 
@@ -88,7 +89,7 @@ export function allocationJarItems(
     .sort((a, b) => b.amount - a.amount)
     .map(i => ({
       id: i.categoryId,
-      glyph: i.icon?.trim() || "🧾",
+      glyph: categoryIconSource(i.icon),
       radius: Math.min(ALLOCATION_MAX_RADIUS, Math.max(MIN_RADIUS, Math.sqrt(Math.min(1, i.amount / pool)) * AREA_FACTOR)),
     }));
 }
@@ -103,7 +104,7 @@ const SPENDING_MAX_ITEMS = 12;
  * in place, and only categories new to the period drop in.
  */
 export function spendingJarItems(
-  rows: Array<{ id: string; icon: string | null; share: number }>,
+  rows: Array<{ id: string; name?: string; icon: string | null; share: number }>,
 ): JarItem[] {
   return rows
     .filter(r => r.share > 0)
@@ -111,7 +112,7 @@ export function spendingJarItems(
     .slice(0, SPENDING_MAX_ITEMS)
     .map(r => ({
       id: r.id,
-      glyph: r.icon?.trim() || "🧾",
+      glyph: categoryIconSource(r.icon, r.name),
       radius: Math.min(ALLOCATION_MAX_RADIUS, Math.max(MIN_RADIUS, Math.sqrt(Math.min(1, r.share)) * AREA_FACTOR)),
     }));
 }

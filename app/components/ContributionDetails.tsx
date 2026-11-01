@@ -1,5 +1,7 @@
 "use client";
 
+import { SheetHeader } from "./ui/SheetLayout";
+
 import { useEffect, useRef, useState } from "react";
 import type { BudgetScope } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
@@ -11,7 +13,7 @@ import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
 import { DatePicker, MonthPicker } from "./DatePicker";
-import { XIcon, ChevronRightIcon } from "./ui/icons";
+import { XIcon, ChevronRightIcon, ChevronDownIcon, ReceiptIcon } from "./ui/icons";
 import { SkeletonRows } from "./ui/Skeleton";
 import "./contributions.css";
 
@@ -23,13 +25,13 @@ export function ContributionEntry({ status, scope, onOpen }: { status: Contribut
   const amount = owing ? scope === "joint" ? money(owing.anas + owing.salma) : owing[scope] : 0;
   return <button type="button" className="contribution-entry" onClick={onOpen}>
     <span><span className="contribution-entry-title">{amount > 0 ? scope === "joint" ? "Owed to you both" : "Joined owes you" : "Monthly contributions"}</span>
-      <span className="contribution-entry-detail">{status?.agreement ? contributionMonthName(status.agreement.month) : "Review contributions"}</span></span>
+      {amount <= 0 && <span className="contribution-entry-detail">{status?.agreement ? contributionMonthName(status.agreement.month) : "Review contributions"}</span>}</span>
     <span className="contribution-entry-value">{amount > 0 && <Money value={amount} />}<ChevronRightIcon size={16} /></span>
   </button>;
 }
 
-export function ContributionAgreementEditor({ month, agreement, proposed, shares, disabled = false, onSaved }: {
-  month: string; agreement?: ContributionAgreement; proposed: PartnerAmounts; shares: PartnerAmounts; disabled?: boolean; onSaved: () => void;
+export function ContributionAgreementEditor({ month, agreement, proposed, shares, disabled = false, showHeading = true, onSaved }: {
+  month: string; agreement?: ContributionAgreement; proposed: PartnerAmounts; shares: PartnerAmounts; disabled?: boolean; showHeading?: boolean; onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [anas, setAnas] = useState("");
@@ -51,7 +53,7 @@ export function ContributionAgreementEditor({ month, agreement, proposed, shares
     finally { setSaving(false); }
   };
   return <section className="contribution-agreement" aria-label="Monthly contribution agreement">
-    <h3>Agreed contributions</h3>
+    {showHeading && <h3>Agreed contributions</h3>}
     {editing ? <>
       <div className="contribution-fields">
         <label>Anas<input className="field-input" inputMode="decimal" value={anas} onChange={e => setAnas(e.target.value)} disabled={saving} /></label>
@@ -86,6 +88,8 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
   const outstanding = ledger?.outstanding ?? { anas: 0, salma: 0 };
   const totalOwed = money(outstanding.anas + outstanding.salma);
   const partners: Partner[] = scope === "joint" ? ["anas", "salma"] : [scope];
+  const scopedOwed = money(partners.reduce((sum, partner) => sum + outstanding[partner], 0));
+  const scopedDue = money(partners.reduce((sum, partner) => sum + (status ? contributionDue(status, partner) : 0), 0));
   const startRepayment = (partner: Partner) => { setRepaying(partner); setAmount(String(outstanding[partner])); setDate(today()); setSaveError(""); setSuccess(""); setUncertain(false); requestId.current = crypto.randomUUID(); };
   const repay = async () => {
     const value = parseAmount(amount);
@@ -100,41 +104,64 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
     } catch (e) { if (e instanceof TypeError) setUncertain(true); setSaveError(e instanceof Error ? e.message : "Could not verify the repayment. Retry with the same details to check it safely."); }
     finally { setSaving(false); }
   };
-  return <BottomSheet open={open} onClose={() => { if (!saving) onClose(); }} label="Monthly contributions" maxWidth="520px" detent="content">
-    <div className="contribution-sheet">
-      <header className="contribution-header"><h2>Contributions</h2><button type="button" className="contribution-close" aria-label="Close contributions" disabled={saving} onClick={onClose}><XIcon size={20} /></button></header>
+  const agreementEditor = status ? <ContributionAgreementEditor showHeading={!status.agreement} month={month} agreement={status.agreement}
+    proposed={{ anas: Math.max(0, money(status.anasPlan - status.anasPersonalDebt)), salma: Math.max(0, money(status.salmaPlan - status.salmaPersonalDebt)) }}
+    shares={status.agreement?.shares ?? { anas: .65, salma: .35 }} disabled={saving || !!repaying} onSaved={onChanged} /> : null;
+  return <BottomSheet open={open} onClose={() => { if (!saving) onClose(); }} label="Monthly contributions" size="standard" detent="content">
+    <div className="contribution-sheet sheet-body">
+      <SheetHeader className="contribution-header"><h2>Contributions</h2><button type="button" className="contribution-close" aria-label="Close contributions" disabled={saving} onClick={onClose}><XIcon size={20} /></button></SheetHeader>
       <MonthPicker value={month} onChange={event => onMonthChange(event.target.value)} aria-label="Contribution month" />
       {loading ? <SkeletonRows label="Loading contributions" count={4} /> : error || !status ? <Banner tone="danger" role="alert" title="Contributions unavailable" action={<button className="contribution-text" type="button" onClick={onRetry}>Retry</button>} /> : <>
+        <section className="contribution-overview" aria-label="Contribution summary">
+          {scopedOwed > 0 ? <><span>{scope === "joint" ? "Joined owes you both" : "Joined owes you"}</span><p className="contribution-hero-amount"><Money value={scopedOwed} currency /></p>
+            {scope === "joint" && <div className="contribution-split" role="img" aria-label={`Outstanding repayments: ${partners.filter(partner => outstanding[partner] > 0).map(partner => `${person(partner)} ${fmt(outstanding[partner])} MAD`).join(", ")}`}>
+              {partners.filter(partner => outstanding[partner] > 0).map(partner => <span key={partner} className="contribution-split-part" data-partner={partner} style={{ flexGrow: outstanding[partner] }} />)}
+            </div>}
+            <span className="contribution-note">Reserved until repaid</span></>
+            : scopedDue > 0 ? <><span>Due to Joined</span><p className="contribution-hero-amount"><Money value={scopedDue} currency /></p></>
+            : <p className="contribution-all-settled">{status.agreement ? "All settled" : "No agreed amounts"}</p>}
+        </section>
+        <div className="contribution-people">
         {partners.map(partner => {
           const actual = partner === "anas" ? status.anasActual : status.salmaActual;
           const target = status.agreement?.targets[partner];
           const due = contributionDue(status, partner);
-          return <section className="contribution-person" key={partner}>
-            <div className="contribution-person-heading"><h3>{person(partner)}</h3><span>{due > 0.005 ? `${fmt(due)} due` : "Settled"}</span></div>
-            <dl className="contribution-rows">
-              {status.agreement && <div><dt>Original contribution</dt><dd><Money value={status.agreement.original[partner]} /></dd></div>}
-              {target != null && target !== status.agreement?.original[partner] && <div><dt>Agreed contribution</dt><dd><Money value={target} /></dd></div>}
-              <div><dt>Contributed</dt><dd><Money value={actual} /></dd></div>
-              {current && <div><dt>Above original contribution</dt><dd><Money value={current.aboveOriginal[partner]} /></dd></div>}
-              {current && current.repaid[partner] > 0 && <div><dt>Repaid from this advance</dt><dd><Money value={current.repaid[partner]} /></dd></div>}
-              {outstanding[partner] > 0 && <div className="contribution-emphasis"><dt>Joined owes {scope === "joint" ? person(partner) : "you"}</dt><dd><Money value={outstanding[partner]} /></dd></div>}
-            </dl>
-            {outstanding[partner] > 0 && !repaying && <button className="contribution-text" type="button" onClick={() => startRepayment(partner)}>Record repayment to {person(partner)}</button>}
+          return <section className="contribution-person" data-partner={partner} key={`${month}-${partner}`} aria-label={`${person(partner)} contributions`}>
+            <div className="contribution-person-main">
+              <div className="contribution-person-summary">
+                <span className="contribution-person-name"><strong>{person(partner)}</strong>{due > 0.005 ? <span>{fmt(due)} due to Joined</span> : !status.agreement ? <span>Not confirmed</span> : null}</span>
+                {outstanding[partner] > 0 && <strong className="contribution-person-amount"><Money value={outstanding[partner]} /></strong>}
+              </div>
+              <details className="contribution-breakdown">
+                <summary aria-label={`View breakdown for ${person(partner)}`}><span>View breakdown</span><ChevronDownIcon size={16} aria-hidden="true" /></summary>
+              <dl className="contribution-rows">
+                {status.agreement && <div><dt>Original</dt><dd><Money value={status.agreement.original[partner]} /></dd></div>}
+                {target != null && target !== status.agreement?.original[partner] && <div><dt>Agreed</dt><dd><Money value={target} /></dd></div>}
+                <div><dt>Contributed</dt><dd><Money value={actual} /></dd></div>
+                {current && <div><dt>Above original</dt><dd><Money value={current.aboveOriginal[partner]} /></dd></div>}
+                {current && current.repaid[partner] > 0 && <div><dt>Repaid</dt><dd><Money value={current.repaid[partner]} /></dd></div>}
+              </dl>
+              </details>
+            </div>
+            {outstanding[partner] > 0 && <button className="contribution-text contribution-repay-shortcut" type="button" disabled={saving || !!repaying} aria-label={`Log repayment to ${person(partner)}`} title={`Log repayment to ${person(partner)}`} onClick={() => startRepayment(partner)}><ReceiptIcon size={20} aria-hidden="true" /></button>}
           </section>;
         })}
-        {totalOwed > 0 && <section className="contribution-reserve" aria-label="Repayment reservation"><h3>Reserved for repayments</h3><p className="contribution-total"><Money value={totalOwed} currency /></p>
-          <p className="contribution-note">Held back from new allocations until repaid.</p>
-          {cash != null && <dl className="contribution-rows"><div><dt>Recorded Joined cash</dt><dd><Money value={cash} /></dd></div></dl>}
-          {cash != null && cash < totalOwed && <p className="contribution-shortfall"><Money value={money(totalOwed - cash)} /> more needed before other commitments</p>}
-          <dl className="contribution-rows">{ledger?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0).map(m => <div key={m.month}><dt>{contributionMonthName(m.month)}</dt><dd><Money value={money(m.outstanding.anas + m.outstanding.salma)} /></dd></div>)}</dl>
-        </section>}
+        </div>
         {ledger && ledger.unappliedRepayments.anas + ledger.unappliedRepayments.salma > 0 && <Banner tone="warning" role="alert">A corrected agreement or transaction left a repayment above the advance. Review repayment activity.</Banner>}
-        {repaying && <section className="contribution-repay"><h3>Repay {person(repaying)}</h3><label>Amount<input className="field-input" inputMode="decimal" value={amount} disabled={saving || uncertain} onChange={e => { setAmount(e.target.value); requestId.current = crypto.randomUUID(); }} /></label>{uncertain || saving ? <span className="contribution-note">Repayment date: {date}</span> : <DatePicker value={date} max={today()} onChange={event => { setDate(event.target.value); requestId.current = crypto.randomUUID(); }} aria-label="Repayment date" />}
-          <p className="contribution-note">Record after moving the money from Joined to {person(repaying)}.</p>
-          <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving} onClick={() => void repay()}>{saving ? "Recording…" : uncertain ? "Check repayment" : "Record repayment"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setRepaying(null)}>Cancel</button></div>
+        {repaying && <section className="contribution-repay"><h3>Money returned to {person(repaying)}</h3><label>Amount returned<input autoFocus className="field-input" inputMode="decimal" value={amount} disabled={saving || uncertain} onChange={e => { setAmount(e.target.value); requestId.current = crypto.randomUUID(); }} /></label>{uncertain || saving ? <span className="contribution-note">Repayment date: {date}</span> : <DatePicker value={date} max={today()} onChange={event => { setDate(event.target.value); requestId.current = crypto.randomUUID(); }} aria-label="Date money was returned" />}
+          <p className="contribution-note">Log money already transferred from Joined to {person(repaying)}.</p>
+          <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving} onClick={() => void repay()}>{saving ? "Recording…" : uncertain ? "Check repayment" : "Save repayment"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setRepaying(null)}>Cancel</button></div>
         </section>}
         {saveError && <Banner tone="danger" role="alert">{saveError}</Banner>}{success && <p role="status">{success}</p>}
-        <ContributionAgreementEditor month={month} agreement={status.agreement} proposed={{ anas: Math.max(0, money(status.anasPlan - status.anasPersonalDebt)), salma: Math.max(0, money(status.salmaPlan - status.salmaPersonalDebt)) }} shares={status.agreement?.shares ?? { anas: .65, salma: .35 }} disabled={saving || !!repaying} onSaved={onChanged} />
+        {totalOwed > 0 && <details className="contribution-disclosure" key={`coverage-${month}`}>
+          <summary><span>Cash coverage</span>{cash != null && cash < totalOwed && <span className="contribution-coverage-shortfall">At least <Money value={money(totalOwed - cash)} /> short</span>}<ChevronDownIcon size={16} aria-hidden="true" /></summary>
+          <dl className="contribution-rows"><div><dt>Reserved for repayments</dt><dd><Money value={totalOwed} /></dd></div><div><dt>Recorded Joined cash</dt><dd>{cash == null ? "Unavailable" : <Money value={cash} />}</dd></div></dl>
+          <p className="contribution-note">Before other commitments.</p>
+          {(ledger?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0).length ?? 0) > 1 && <dl className="contribution-rows">{ledger?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0).map(m => <div key={m.month}><dt>{contributionMonthName(m.month)}</dt><dd><Money value={money(m.outstanding.anas + m.outstanding.salma)} /></dd></div>)}</dl>}
+        </details>}
+        {status.agreement ? <details className="contribution-disclosure" key={`agreement-${month}`}><summary><span>Agreed amounts</span><ChevronDownIcon size={16} aria-hidden="true" /></summary>
+          {agreementEditor}
+        </details> : agreementEditor}
       </>}
     </div>
   </BottomSheet>;

@@ -1,5 +1,7 @@
 "use client";
 
+import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
+
 import { useEffect, useState, type CSSProperties } from "react";
 import { Currency } from "./Money";
 import type { Account } from "./app-types";
@@ -93,15 +95,15 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
   };
 
   return (
-    <BottomSheet open onClose={onClose} label="Edit funding transaction" layered maxWidth="520px" zIndex={120} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
-      <div style={wrapStyle}>
-        <header style={headerStyle}>
+    <BottomSheet open onClose={onClose} label="Edit funding transaction" layered size="standard" zIndex={120} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+      <SheetBody style={wrapStyle}>
+        <SheetHeader style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={iconStyle}><FundIcon size={18} /></span>
             <h2 style={titleStyle}>Edit fund</h2>
           </div>
           <button type="button" className="sheet-close-button" onClick={onClose} aria-label="Close funding editor"><XIcon /></button>
-        </header>
+        </SheetHeader>
 
         <label style={fieldStyle}>
           <span style={labelStyle}>Amount</span>
@@ -122,20 +124,20 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
           <span style={labelStyle}>Funding source</span>
           <ChoicePicker value={accountId} onChange={(event) => setAccountId(event.target.value)} aria-label="Funding source" style={controlStyle}>
             <option value="" disabled>Choose account</option>
-            {accounts.map((account) => <option key={account.id} value={account.id}>{account.icon ? `${account.icon} ` : ""}{account.label}</option>)}
+            {accounts.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
           </ChoicePicker>
         </div>
 
         {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
         {confirmDelete && <Banner tone="danger" role="alert" compact>Delete this funding transaction? Budget totals will be recalculated.</Banner>}
 
-        <div style={actionsStyle}>
+        <SheetFooter style={actionsStyle}>
           <button type="button" onClick={remove} disabled={status !== "idle" || transaction.amount > transaction.categoryAvailable} title={transaction.amount > transaction.categoryAvailable ? "This fund has already been partially used and cannot be deleted" : undefined} style={{ ...secondaryButtonStyle, color: "var(--danger)" }}>
             <DeleteIcon size={17} />{status === "deleting" ? "Deleting…" : confirmDelete ? "Confirm delete" : "Delete"}
           </button>
           <button type="button" onClick={save} disabled={!valid || status !== "idle"} style={primaryButtonStyle}>{status === "saving" ? "Saving…" : "Save changes"}</button>
-        </div>
-      </div>
+        </SheetFooter>
+      </SheetBody>
     </BottomSheet>
   );
 }
@@ -145,7 +147,7 @@ const headerStyle: CSSProperties = { display: "flex", alignItems: "center", just
 const iconStyle: CSSProperties = { width: 36, height: 36, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--action-income)", background: "color-mix(in srgb, var(--action-income) 12%, var(--surface))" };
 const titleStyle: CSSProperties = { margin: "3px 0 0", fontSize: 20, lineHeight: 1.2 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 7 };
-const labelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" };
+const labelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 700, };
 const controlStyle: CSSProperties = { width: "100%", minHeight: 48, padding: "0 14px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text)", font: "inherit" };
 const amountFieldStyle: CSSProperties = { minHeight: 112, padding: "0 4px", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 };
 const amountInputStyle: CSSProperties = { width: "min(260px, 68vw)", height: 88, padding: 0, border: 0, outline: 0, background: "transparent", color: "var(--text)", textAlign: "right", font: "700 clamp(48px, 15vw, 72px)/1 var(--font, inherit)", fontVariantNumeric: "tabular-nums", boxSizing: "border-box" };

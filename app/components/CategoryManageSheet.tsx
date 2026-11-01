@@ -1,4 +1,6 @@
 "use client";
+import { SheetBody, SheetHeader } from "./ui/SheetLayout";
+
 import { SavingsFundingTargetPicker } from "./SavingsFundingTargetPicker";
 import type { SavingsFundingTarget } from "../../lib/savings-funding";
 import { SPENDING_PATTERNS, type SpendingPattern } from "../../lib/spending-pattern";
@@ -14,12 +16,6 @@ import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
-
-// Keep one emoji: typing or picking a new one replaces the previous icon.
-const lastGrapheme = (value: string) => {
-  const parts = [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(value.trim())];
-  return parts.at(-1)?.segment ?? "";
-};
 
 type CategoryManageSheetProps = {
   open: boolean;
@@ -230,17 +226,17 @@ export function CategoryManageSheet({
       open={open}
       onClose={onClose}
       label={title}
-      maxWidth="520px"
+      size="standard"
       detent="content"
       maxHeight="calc(100dvh - 20px)"
       panelStyle={sheetStyle}
       contentStyle={{ paddingTop: 0, overflow: "hidden", display: "flex", minHeight: 0 }}
       zIndex={zIndex}
     >
-      <div style={innerStyle}>
-        <header style={headerStyle}>
+      <SheetBody style={innerStyle}>
+        <SheetHeader style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <CategoryIcon icon={isMetadata ? icon : category?.icon} style={{ fontSize: 28, flexShrink: 0 }} />
+            <CategoryIcon icon={isMetadata ? icon : category?.icon} categoryName={isMetadata ? name : category?.name} style={{ fontSize: 28, flexShrink: 0 }} />
             <div style={{ minWidth: 0 }}>
               <h2 style={titleStyle}>{title}</h2>
             </div>
@@ -248,7 +244,7 @@ export function CategoryManageSheet({
           <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
-        </header>
+        </SheetHeader>
 
         <BlurScrollArea style={{ display: "grid", gap: 16, alignContent: "start", overflowY: "auto" }}>
         {isMetadata && (
@@ -264,10 +260,10 @@ export function CategoryManageSheet({
             </label>
 
             <div style={twoColStyle}>
-              <label style={fieldStyle}>
-                <span style={labelStyle}>Icon</span>
-                <input value={icon} onChange={(event) => setIcon(lastGrapheme(event.target.value))} placeholder="🧾" aria-label="Icon (one emoji)" className="field-input" />
-              </label>
+              <div style={fieldStyle}>
+                <span style={labelStyle}>Category image</span>
+                <CategoryIcon icon={icon} categoryName={name} size={44} decorative={false} label={`${name || "New category"} image`} />
+              </div>
               <label style={fieldStyle}>
                 <span style={labelStyle}>Type</span>
                 <ChoicePicker aria-label="Category type" value={categoryType} onChange={(event) => setCategoryType(event.target.value)}>
@@ -296,7 +292,7 @@ export function CategoryManageSheet({
             <ChoicePicker disabled={status === "saving" || pendingSavings} aria-label={isMetadata ? "Default account" : "Funding account"} value={accountId} onChange={(event) => setAccountId(event.target.value)}>
               <option value="" disabled>Choose account</option>
               {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.icon} {account.label}</option>
+                <option key={account.id} value={account.id}>{account.label}</option>
               ))}
             </ChoicePicker>
           </label>
@@ -352,7 +348,7 @@ export function CategoryManageSheet({
           {status === "idle" && (isEdit ? <CheckIcon size={16} /> : isCreate ? <PlusIcon size={16} strokeWidth={2.3} /> : <FundIcon size={16} strokeWidth={2.3} />)}
           {actionLabel}
         </button>
-      </div>
+      </SheetBody>
     </BottomSheet>
   );
 }

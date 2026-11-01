@@ -1,4 +1,4 @@
-import { databaseQuotaFailure } from "../../../lib/database-errors";
+import { databaseUnavailableFailure } from "../../../lib/database-errors";
 import { withMirrorReads } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { monthBounds } from "../../components/app-utils";
@@ -63,8 +63,17 @@ async function handleGET(req: NextRequest) {
   try {
     const includeJointDebt = searchParams.get("includeJointDebt") === "true";
     const includeTransactions = includeJointDebt || searchParams.get("includeTransactions") === "true";
-    const [agreements, funds, allTransactionPages] = await Promise.all([
-      includeJointDebt && process.env.DATABASE_URL ? contributionStore().list(mirrorScope(token)) : Promise.resolve([]),
+    // Database-only agreements must not take down the independent Notion report.
+    const agreementsRead = async () => {
+      if (!includeJointDebt) return { agreements: undefined, error: undefined };
+      try {
+        return { agreements: await contributionStore().list(mirrorScope(token)), error: undefined };
+      } catch (error) {
+        return { agreements: undefined, error: databaseUnavailableFailure(error)?.error ?? "Confirmed contributions are temporarily unavailable." };
+      }
+    };
+    const [contributions, funds, allTransactionPages] = await Promise.all([
+      agreementsRead(),
       queryDatabaseAll(token, FUNDS_DB, {
         filter: {
           and: [
@@ -116,7 +125,7 @@ async function handleGET(req: NextRequest) {
         })),
       } : {}),
       summary: {
-        ...(includeJointDebt ? { contributionAgreements: agreements } : {}),
+        ...(includeJointDebt ? { contributionAgreements: contributions.agreements, contributionError: contributions.error } : {}),
         month: month ?? null,
         start: rangeStart,
         end: rangeEnd,
@@ -127,7 +136,7 @@ async function handleGET(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    const quota = databaseQuotaFailure(err);
+    const quota = databaseUnavailableFailure(err);
     if (quota) return NextResponse.json(quota, { status: 503 });
     return NextResponse.json({ error: err.message || "Failed to load monthly summary" }, { status: err.status ?? 500 });
   }
