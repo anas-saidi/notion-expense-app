@@ -533,7 +533,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           {!showKeypad && !isEditMode && props.recentTransactions.length > 0 && (
             <section aria-label="Recent transactions" style={recentSectionStyle}>
               <div style={recentHeaderStyle}>Recent</div>
-              <div style={recentListStyle}>
+              <div className="row-list" style={recentListStyle}>
                 {props.recentTransactions.map((transaction) => {
                   const recentCategory = props.allCategories?.find((category) => category.id === transaction.category);
                   const isRecentIncome = transaction.type === "Income";

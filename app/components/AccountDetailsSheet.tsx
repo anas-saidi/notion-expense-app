@@ -893,7 +893,7 @@ export function AccountDetailsSheet({
               {shownTxns.length === 0 ? (
                 <p style={emptyStyle}>No activity{showAllActivity ? ` in ${fmtMonth(homeMonth)}` : ""}.</p>
               ) : (
-                <div style={{ display: "grid", gap: 6 }}>
+                <div className="row-list" style={{ display: "grid", gap: 6 }}>
                   {shownTxns.map(t => {
                     const cat = t.category ? categories.find(c => c.id === t.category) : null;
                     const isIncome = t.type === "Income";

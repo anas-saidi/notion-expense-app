@@ -279,7 +279,7 @@ export function CategoryDetailsSheet({
           )}
 
           {!loading && !error && (data?.timeline?.length ?? 0) > 0 && (
-            <div>
+            <div className="row-list">
               {data!.timeline.map((item) => {
                 const meta = [
                   eventKindLabel(item.kind),

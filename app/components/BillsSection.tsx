@@ -125,7 +125,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
     {loading ? <SkeletonRows count={2} /> : error ? <Banner role="alert" tone="danger" compact action={<button type="button" onClick={onRetry}>Retry</button>}>{error}</Banner>
       : <>
         {currentDue.length ? <>
-          {currentDue.slice(0, 3).map(bill => <BillRow key={bill.id} bill={bill} needsFunding={needsFunding(bill)} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}
+          <div className="row-list">{currentDue.slice(0, 3).map(bill => <BillRow key={bill.id} bill={bill} needsFunding={needsFunding(bill)} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}</div>
         </> : <p className="bills-muted">No bills due.</p>}
       </>}
     <BottomSheet open={open} onClose={() => { if (!saving) { setOpen(false); setPicker(null); setShowMore(false); } }} label={view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Record payment" : view === "edit" ? "Edit bill" : selected?.name ?? "Bill"} size="standard" contentStyle={{ paddingTop: 0 }}>
@@ -142,7 +142,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
           {activeMonth && <BillsCalendar month={activeMonth} today={data?.today ?? ""} bills={monthBills} categoryOf={categoryOf} selectedDay={day} onSelectDay={value => { setDay(day === value ? null : value); haptic("selection"); }} onOpenBill={details} />}
           {day ? <div className="bills-day-heading"><span>{new Date(`${day}T12:00:00`).toLocaleDateString("en", { weekday: "long", day: "numeric", month: "long" })}</span><button type="button" className="bills-quiet-action" onClick={() => setDay(null)}>Show all</button></div>
             : <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>}
-          {shown.length ? shown.map(bill => <BillRow key={bill.id} bill={bill} category={categoryOf(bill)} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={!day && filter === "Paid" ? activeMonth : undefined} hideDate={!!day} />) : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}
+          {shown.length ? <div className="row-list">{shown.map(bill => <BillRow key={bill.id} bill={bill} category={categoryOf(bill)} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={!day && filter === "Paid" ? activeMonth : undefined} hideDate={!!day} />)}</div> : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}
         </>}
         {view === "detail" && selected && <>
           <section className="bills-detail-summary"><div className="bills-detail-amount"><Money value={selected.amount} currency /></div>

@@ -84,3 +84,7 @@ button.bills-calendar-day[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var
 .bills-calendar-day[data-state="settled"] .bills-calendar-art { opacity: .4; }
 .bills-calendar-more { font-size: 12px; line-height: 16px; font-weight: 700; color: var(--text2); }
 .bills-day-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 600; }
+
+/* The date tile shares the row fill colour, so it lifts to the card surface while the row is filled. */
+.bill-date-row:active .bill-date-tile { background: var(--surface); }
+@media (hover: hover) { .bill-date-row:hover .bill-date-tile { background: var(--surface); } }

@@ -65,9 +65,7 @@ export function TransactionRow({
 const rowStyle: CSSProperties = {
   width: "100%",
   minHeight: 64,
-  padding: "10px 2px",
   border: 0,
-  background: "transparent",
   color: "inherit",
   font: "inherit",
   textAlign: "left",

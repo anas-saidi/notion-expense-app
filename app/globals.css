@@ -79,6 +79,8 @@
   --status-over: var(--danger);
   --status-over-liquid: #f1b0aa;
   --radius-control: 12px;
+  /* Hover and press fills on list rows reach this far past the row content. */
+  --row-bleed: 12px;
   --radius-card: 16px;
   --radius-sheet: 24px;
   --space-1: 4px;
@@ -289,6 +291,13 @@ button {
 @media (hover: hover) {
   button:not(:disabled):hover {
     transform: translateY(-1px);
+  }
+}
+
+/* Rows and list options sit beside their neighbours, so they answer hover with a fill instead of the lift. */
+@media (hover: hover) {
+  :is(.budget-row, .settings-navigation-row, .picker-option, .bill-date-row, .tx-row):not(:disabled):hover {
+    transform: none;
   }
 }
 
@@ -753,7 +762,7 @@ button:hover .rebalance-btn-icon {
   overflow: hidden;
   background: transparent;
   border-radius: 0;
-  padding: 12px 2px;
+  padding: 10px 2px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -771,12 +780,19 @@ button:hover .rebalance-btn-icon {
 .home-txn-list > .tx-row:last-child,
 .tx-group-list > *:last-child .tx-row { border-bottom-color: transparent; }
 
+/* A list of tappable rows bleeds into its container's padding, so a row's hover or press fill has room around
+   the content while the content stays aligned with the heading above. Rows drop their divider while filled. */
+.row-list { margin-inline: calc(-1 * var(--row-bleed)); }
+.row-list .tx-row, .row-list .bill-date-row { padding-inline: var(--row-bleed); border-radius: var(--radius-control); }
+.row-list button.tx-row:active { border-bottom-color: transparent; }
+
 @media (hover: hover) {
-  .tx-row:hover {
+  button.tx-row:not(:disabled):hover {
     transform: none;
     background: var(--surface2);
     box-shadow: none;
   }
+  .row-list button.tx-row:hover { border-bottom-color: transparent; }
 
   .ghost-card:hover {
     border-color: var(--select-edge) !important;
@@ -1690,6 +1706,7 @@ html[data-theme="dark"] .bottom-sheet-panel {
 .picker-options { padding: 8px; max-height: 320px; overflow: auto; }
 .picker-option { width: 100%; min-height: 48px !important; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px !important; border: 0; border-radius: var(--radius-control); background: transparent !important; box-shadow: none !important; color: var(--text); text-align: left; font-size: 15px; cursor: pointer; }
 .picker-option[aria-pressed="true"] { background: var(--select-wash) !important; color: var(--select-ink); }
+@media (hover: hover) { .picker-option:not(:disabled):not([aria-pressed="true"]):hover { background: var(--surface2) !important; } }
 .picker-option:disabled { opacity: .45; cursor: default; }
 .picker-search { width: calc(100% - 16px); margin: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface2); color: var(--text); }
 .date-calendar { padding: 8px; }

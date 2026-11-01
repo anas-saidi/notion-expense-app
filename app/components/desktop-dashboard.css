@@ -99,7 +99,7 @@
   .home-bills-panel > .bills-section { --bill-row-surface:var(--surface); }
   .home-bills-panel > .bills-section:empty { display:none; }
   .home-desktop-panels .home-txn-list { display:grid; grid-template-columns:minmax(0,1fr) !important; }
-  .home-desktop-panels .home-txn-row { padding:12px 0 !important; border-radius:0 !important; }
+  .home-desktop-panels .home-txn-row { padding:12px var(--row-bleed) !important; border-radius:var(--radius-control) !important; }
   .home-desktop-panels .tx-row-title { font-size:14px !important; }
   .home-desktop-panels .home-section-hdr { margin-bottom:16px !important; }
   .desktop-spending-list { display:grid; gap:24px; margin:16px 0 0; padding:0; list-style:none; }

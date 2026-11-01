@@ -95,7 +95,7 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
                   {/* A day with one transaction already shows its amount on the row. */}
                   {items.length > 1 && <span style={{ ...groupSubtotalStyle, display: "flex", gap: 12, flexWrap: "wrap" }}>{expenseTotal > 0 && <span>{fmt(expenseTotal)} spent</span>}{incomeTotal > 0 && <span>{fmt(incomeTotal)} income</span>}</span>}
                 </div>
-                <div className="tx-group-list" style={transactionGroupStyle}>
+                <div className="tx-group-list row-list" style={transactionGroupStyle}>
                   {items.map(txn => {
                     const cat      = categories.find(c => c.id === txn.category);
                     const fromCat  = categories.find(c => c.id === txn.fromCategoryId);
