@@ -1,4 +1,7 @@
 "use client";
+import { MonthPlanReview } from "./MonthPlanReview";
+import { MonthPlanReceipt } from "./MonthPlanReceipt";
+import { createPlanReceipt, confirmPlanReceipt, persistMonthPlan, type PlanReceipt } from "./month-plan-receipt";
 import { categoryIconSource } from "../../lib/category-icons";
 
 import { HeroSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
@@ -85,9 +88,8 @@ type MonthPlanSheetProps = {
   onCategoriesChanged: () => void;
   /** "YYYY-MM" of the month being planned (current month when still unfunded, otherwise next month). */
   planningMonth: string;
-  /** The app-wide mode: the sheet plans that wallet's categories. */
+  /** The opening wallet. Further wallet changes remain local to this planning session. */
   scope: BudgetScope;
-  onScopeChange: (scope: BudgetScope) => void;
   /** Opens the partner's over-assigned account, where the commitment behind a blocker can actually be fixed. */
   onOpenOverAssigned?: (partner: "anas" | "salma") => void;
   /** Opens Contributions, where each person's advance and its repayment live. */
@@ -111,8 +113,7 @@ export function MonthPlanSheet({
   onSaved,
   onCategoriesChanged,
   planningMonth,
-  scope,
-  onScopeChange,
+  scope: openingScope,
   onOpenOverAssigned,
   onOpenContributions,
   personalScope,
@@ -121,6 +122,7 @@ export function MonthPlanSheet({
   accounts,
   planningCapacity,
 }: MonthPlanSheetProps) {
+  const [scope, onScopeChange] = useState<BudgetScope>(openingScope);
   const reduceMotion = useReducedMotion();
   const [desktop, setDesktop] = useState(false);
   const [expressions, setExpressions] = useState<Record<string, string>>({});
@@ -161,6 +163,10 @@ export function MonthPlanSheet({
       else next.add(key);
       return next;
     });
+  const [receipt, setReceipt] = useState<PlanReceipt | null>(null);
+  const saveLock = useRef(false);
+  const planPanel = useRef<HTMLDivElement>(null);
+  const saveSession = useRef(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   // Once the hero number scrolls away, a compact bar keeps the jar and number in view.
@@ -204,7 +210,10 @@ export function MonthPlanSheet({
   };
 
   useEffect(() => {
+    saveSession.current += 1;
+    setReceipt(null);
     if (!open) { setLoading(true); return; }
+    onScopeChange(openingScope);
     setDraft({});
     setExpressions({});
     setReviewing(false);
@@ -423,22 +432,30 @@ export function MonthPlanSheet({
   };
 
   const save = async () => {
-    if (!changed.length || loading || saving || freezing || loadError || capacityError || !contributionsReady) return;
+    if (!changed.length || loading || saveLock.current || freezing || loadError || capacityError || !contributionsReady) return;
+    saveLock.current = true;
+    const session = saveSession.current;
+    const snapshot = createPlanReceipt(planningMonth, [...catalog.values()].flatMap(cat => {
+      const owner = getCategoryScope(cat, accounts);
+      return owner ? [{ id: cat.id, name: cat.name, scope: owner, amount: amountFor(cat) }] : [];
+    }));
     setSaving(true);
     setSaveError("");
     try {
-      const res = await fetch("/api/monthly-planning/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          month: planningMonth,
-          allowClear: true,
-          budgetItems: changed.map((c) => ({ categoryId: c.id, amount: amountFor(c), defaultAccount: c.defaultAccount ?? null })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't save the plan");
-      setSaved((prev) => {
+      const result = await persistMonthPlan({
+        month: planningMonth,
+        allowClear: true,
+        budgetItems: changed.map(c => ({ categoryId: c.id, amount: amountFor(c), defaultAccount: c.defaultAccount ?? null })),
+      }, confirmingAgreement ? {
+        month: planningMonth,
+        targets: { anas: capacity.due.anas + (monthLedger?.contributed.anas ?? 0), salma: capacity.due.salma + (monthLedger?.contributed.salma ?? 0) },
+        shares: split,
+        expectedVersion: null,
+      } : undefined);
+      onSaved();
+      // A response from a dismissed editor must not replace a newly opened month's draft.
+      if (session !== saveSession.current) return;
+      setSaved(prev => {
         const next = new Map(prev);
         for (const c of changed) next.set(normId(c.id), amountFor(c));
         return next;
@@ -446,17 +463,12 @@ export function MonthPlanSheet({
       setDraft({});
       setExpressions({});
       setReviewing(false);
-      onSaved();
-      if (confirmingAgreement) {
-        const response = await fetch("/api/contribution-agreements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month: planningMonth, targets: { anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }, shares: split, expectedVersion: null }) });
-        const result = await response.json();
-        if (!response.ok) throw new Error(`Plan saved. Contributions were not confirmed. ${result.error ?? "Use Set monthly contributions to retry."}`);
-        setAgreement(result.agreement);
-        onSaved();
-      }
+      if (result.agreement) setAgreement(result.agreement);
+      setReceipt(confirmPlanReceipt(snapshot, result.agreement ?? agreement, result.warning));
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Couldn't save the plan");
+      if (session === saveSession.current) setSaveError(e instanceof Error ? e.message : "Couldn't save the plan");
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   };
@@ -530,20 +542,30 @@ export function MonthPlanSheet({
     ...(savingsCategories.length ? [{ key: "savings", label: "Savings", items: savingsCategories }] : []),
     ...budgetGroups,
   ].map((group) => onlyOver ? { ...group, items: group.items.filter((cat) => overIds.has(normId(cat.id))) } : group).filter((group) => group.items.length > 0);
+  if (receipt) return (
+    <BottomSheet lockBackground panelRef={planPanel} open={open} onClose={onClose} label="Plan saved" size="standard" desktopViewportCentered contentStyle={{ overflow: "auto" }}>
+      <MonthPlanReceipt receipt={receipt} onDone={onClose} onReview={() => { setReceipt(null); requestAnimationFrame(() => planPanel.current?.focus({ preventScroll: true })); }} />
+    </BottomSheet>
+  );
   if (desktop) return (
-    <BottomSheet open={open} onClose={onClose} label={`Plan ${planLabel}`} desktopViewportCentered size="planning" desktopHeight="fill" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
-      <div className="plan-desktop">
+    <BottomSheet lockBackground panelRef={planPanel} open={open} onClose={onClose} label={`Plan ${planLabel}`} desktopViewportCentered size="planning" desktopHeight="fill" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
+      <div className="plan-desktop" data-plan-scope={scope}>
         <header className="sheet-header plan-desktop-header">
           <h1 className="plan-desktop-title">Plan {planLabel}</h1>
-          <GlobalBudgetScopePicker value={scope} onChange={onScopeChange} personalScope={personalScope} />
+          <GlobalBudgetScopePicker label="Monthly plan wallet" value={scope} onChange={onScopeChange} personalScope={personalScope} />
           <button type="button" className="plan-desktop-close" onClick={onClose} style={closeButtonStyle} aria-label="Close"><XIcon size={20} /></button>
         </header>
         {loading ? <SkeletonRegion label="Loading monthly plan" style={{ padding: "0 var(--dialog-inset)" }}><SkeletonRows label="Loading planned categories" count={4} iconSize={44} /></SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <div className="plan-desktop-body">
           <main className="plan-desktop-main">
             {reviewing ? <>
-              <div className="plan-desktop-heading"><h2>Review changes</h2><button type="button" onClick={() => setReviewing(false)}>Edit plan</button></div>
-              <div className="plan-review-head"><span>Category</span><span>Saved</span><span>New plan</span></div>
-              {changed.map(cat => <div className="plan-review-row" key={cat.id}><span>{cat.name} <small>{BUDGET_SCOPE_LABELS[getCategoryScope(cat, accounts) ?? scope]}</small></span><span>{fmt(saved.get(normId(cat.id)) ?? 0)}</span><strong>{fmt(amountFor(cat))}</strong></div>)}
+              <MonthPlanReview items={changed.map(cat => ({
+                id: cat.id, name: cat.name, icon: cat.icon,
+                owner: BUDGET_SCOPE_LABELS[getCategoryScope(cat, accounts) ?? scope],
+                before: saved.get(normId(cat.id)) ?? 0, after: amountFor(cat),
+              }))} onEdit={() => {
+                setReviewing(false);
+                requestAnimationFrame(() => (planPanel.current?.querySelector<HTMLInputElement>("input[data-changed]") ?? planPanel.current)?.focus());
+              }} />
             </> : <>
               <div className="plan-table" role="table" aria-label={`${BUDGET_SCOPE_LABELS[scope]} category plan`}>
                 <div className="plan-table-head" role="row"><span role="columnheader"><span className="sr-only">Category, </span>{desktopGroups[0]?.label}</span><span role="columnheader">Spent</span><span role="columnheader">Last plan</span><span role="columnheader" className="plan-column-action"><span className="sr-only">{planLabel} plan</span>{hasCurrentPlan && <button type="button" className="plan-copy" disabled={saving || !!freezing} onClick={copyCurrentPlan}>Copy last month</button>}</span></div>
@@ -588,6 +610,8 @@ export function MonthPlanSheet({
 
   return (
     <BottomSheet
+      lockBackground
+      panelRef={planPanel}
       open={open}
       onClose={onClose}
       showHandle
@@ -596,7 +620,7 @@ export function MonthPlanSheet({
       panelStyle={panelStyle}
       contentStyle={contentStyle}
     >
-      <div style={innerStyle} className="planner-wrap">
+      <div style={innerStyle} className="planner-wrap" data-plan-scope={scope}>
         <header className="sheet-header" style={headerStyle}>
           <div>
             <h1 style={titleStyle}>Plan {planLabel}</h1>
@@ -606,6 +630,7 @@ export function MonthPlanSheet({
           </button>
         </header>
 
+        <div className="plan-mobile-scope"><GlobalBudgetScopePicker label="Monthly plan wallet" value={scope} onChange={onScopeChange} personalScope={personalScope} /></div>
         <div style={scrollAreaStyle}>
           {/* The compact bar floats over the list on a blur that thins out below it — no hard bottom edge. */}
           <ProgressiveBlur

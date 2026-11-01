@@ -4,9 +4,9 @@ Ideas agreed in principle and parked for later. Built work lives in `design.md`;
 
 ## Month receipt (keepsake when a month closes)
 
-A text-only receipt for the month that just closed, which both partners sign.
+A text-only receipt for the month that just closed, which both partners sign. The saved-plan confirmation is now implemented separately (see design.md); this future receipt describes actual settled results.
 
-- **When:** the moment the last Settle line is marked sent for the new month's plan (old month's advances repaid, new plan funded). Saving the plan alone is too early. It slides up once with a short print animation (a plain fade under Reduce Motion).
+- **When:** the moment the last Settle line is marked sent for the new month's plan (old month's advances repaid, new plan funded). Saving a plan produces its own planned-allocation confirmation; it does not produce this settled-month receipt. It slides up once with a short print animation (a plain fade under Reduce Motion).
 - **Content, one screen:** month name; top four categories by spending, the rest folded into one line; total, planned and over/under; what each partner put in; advances repaid; two signature lines.
 - **Look:** monospace and a paper surface, both documented as a one-off exception in `design.md`. No category artwork: the Thiings licence doesn't cover a saved or shared image, and a real receipt is text anyway.
 - **Afterwards:** a closed month in Reflect gets a quiet "View receipt", so past months become a stack of receipts.

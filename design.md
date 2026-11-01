@@ -563,3 +563,24 @@ Linked savings transfers expose **Undo deposit** in transaction details. The sam
 - New/edit category forms preview artwork matched to the entered name. Manual image selection is not implemented in this pass. The underlying Notion emoji stays unchanged, including on ordinary metadata edits; no Notion page icons or financial records were migrated. The native Swift app is outside this web presentation pass.
 - Provenance and selected source URLs live in public/category-icons/attribution.json. These 56 assets total 621,084 bytes. Free personal/non-commercial use requires visible attribution, provided by the Category images by Thiings link in Settings. A commercial release requires the appropriate Thiings license.
 - Verification and the proposed persistent picker flow: docs/thiings-category-icons.md.
+
+
+## Saved-plan receipt
+
+- After Month plan successfully saves its allocations, replace the editor content with the Printed keepsake confirmation inside the same responsive BottomSheet. Done closes it; Back to plan returns to the saved editor without submitting again. Reopening the planner starts in the editor.
+- The receipt snapshots the submitted month's entire catalog across wallets, including unchanged saved/frozen allocations. Show the four largest positive planned categories, the remainder as one subtotal, exact total planned and each nonzero wallet's planned total. Clearing the final allocation produces a zero-total receipt. These are planned allocations, never spending, contributions paid or advances repaid.
+- Include an **Agreed contributions** section with Anas and Salma’s exact targets from the existing agreement or the newly confirmed server response. Snapshot these values independently of wallet allocations; Joint cash can cover part of the plan, so contributions need not equal the joint allocation. These are agreed targets, not amounts already paid. Failed confirmation never displays proposed targets as agreed.
+- The receipt is an intentional monospace/paper exception. Its private receipt-paper/ink/muted/rule tokens own the light and dark treatment; shared Money and primary controls preserve number precision, currency and interface conventions. It is text-only. The narrow paper and serrated edge express the accepted printed concept without adding category artwork.
+- Print once on each successful save with a 900ms transform through a clipped slot. Controls are usable immediately. Reduce Motion replaces travel with a 120ms fade. Compact spacing and conditional owner labels keep a single-wallet receipt within a typical phone viewport; longer mixed-wallet plans and warnings scroll.
+- Failed plan writes preserve the draft and existing error state without a receipt. A contribution-agreement failure after a successful plan write shows the receipt with an actionable warning; Set monthly contributions returns to the editor. A dismissed save cannot overwrite a newly opened month's draft. A ref lock prevents duplicate submission before React paints the busy state.
+- Focus enters Plan saved, Back to plan restores focus to the editor panel, and dismissal retains the original shared-sheet opener. No extra Plan saved toast competes with the confirmation.
+- This is an in-session save confirmation. Persistent settled-month receipts, signatures, history and export remain separate roadmap work. Verification: docs/month-plan-receipt-review.md.
+
+- **Month plan review:** the pre-save review uses MonthPlanReview with the editor's plan-table rows, 32px CategoryIcon, category typography (owner subtitles only when the review spans multiple wallets), tabular Money columns and the existing outlined Edit plan control with a 44px target. Review columns remain Saved/New plan; only the post-save receipt uses paper/monospace. Entering review focuses its heading; Edit plan restores the changed field or editor panel.
+
+
+## Month plan modal isolation
+
+- Opening Month plan copies the app-wide wallet into a local planning selection. Switching Joint/Anas/Salma inside the planner updates only that session; it never writes the page's scope, html[data-scope] or the saved app-wide preference. Reopening starts from the main page's current wallet. Drafts still survive wallet changes inside the same plan, and Save still submits changes across wallets.
+- Planner selection colors resolve under data-plan-scope on its own content, using existing ownership tokens. The picker is labeled Monthly plan wallet. Phone includes this local picker inside the sheet.
+- Month plan and its saved receipt opt into BottomSheet lockBackground. The full-viewport backdrop covers the phone header; the app-shell-root is inert until the last locking modal closes; Tab stays within the modal on desktop and phone. The page retains its existing scroll lock. Dismissal restores its original interactivity and focus. Other sheets retain their established presentation.

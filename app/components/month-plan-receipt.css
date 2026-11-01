@@ -1,0 +1,35 @@
+/* Intentional paper/monospace exception; shared controls retain the app system. */
+.plan-receipt-confirmation { --receipt-paper: #fffdf7; --receipt-ink: #282721; --receipt-muted: #69665d; --receipt-rule: #d5d0c5; display: grid; gap: 24px; padding: 32px 24px 24px; color: var(--text); }
+html[data-theme="dark"] .plan-receipt-confirmation { --receipt-paper: #292925; --receipt-ink: #f4f1e8; --receipt-muted: #c4c0b6; --receipt-rule: #57554e; }
+.plan-receipt-heading { text-align: center; }
+.plan-receipt-heading h2 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
+.plan-receipt-heading h2:focus { outline: none; }
+.plan-receipt-heading p { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.plan-receipt-printer { width: min(100%, 360px); margin: 0 auto; position: relative; }
+.plan-receipt-slot { height: 8px; background: var(--text); border-radius: 999px; }
+.plan-receipt-feed { overflow: hidden; padding: 0 12px 12px; margin-top: -4px; }
+.plan-receipt-paper { position: relative; padding: 24px 24px 32px; background: var(--receipt-paper); color: var(--receipt-ink); font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; clip-path: polygon(0 0,100% 0,100% calc(100% - 8px),98% 100%,96% calc(100% - 8px),94% 100%,92% calc(100% - 8px),90% 100%,88% calc(100% - 8px),86% 100%,84% calc(100% - 8px),82% 100%,80% calc(100% - 8px),78% 100%,76% calc(100% - 8px),74% 100%,72% calc(100% - 8px),70% 100%,68% calc(100% - 8px),66% 100%,64% calc(100% - 8px),62% 100%,60% calc(100% - 8px),58% 100%,56% calc(100% - 8px),54% 100%,52% calc(100% - 8px),50% 100%,48% calc(100% - 8px),46% 100%,44% calc(100% - 8px),42% 100%,40% calc(100% - 8px),38% 100%,36% calc(100% - 8px),34% 100%,32% calc(100% - 8px),30% 100%,28% calc(100% - 8px),26% 100%,24% calc(100% - 8px),22% 100%,20% calc(100% - 8px),18% 100%,16% calc(100% - 8px),14% 100%,12% calc(100% - 8px),10% 100%,8% calc(100% - 8px),6% 100%,4% calc(100% - 8px),2% 100%,0 calc(100% - 8px)); animation: plan-receipt-print 900ms cubic-bezier(.22,1,.36,1) both; }
+.plan-receipt-paper header { text-align: center; margin-bottom: 16px; }
+.plan-receipt-paper header p { margin: 0 0 4px; color: var(--receipt-muted); }
+.plan-receipt-paper h3 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 500; }
+.plan-receipt-lines { margin: 0; display: grid; gap: 8px; }
+.plan-receipt-lines > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.plan-receipt-lines dt { min-width: 0; overflow-wrap: anywhere; }
+.plan-receipt-lines dt small { display: block; font-size: 12px; color: var(--receipt-muted); }
+.plan-receipt-lines dd { margin: 0; flex-shrink: 0; }
+.plan-receipt-total { display: grid; gap: 4px; margin: 16px 0; padding-top: 16px; border-top: 1px dashed var(--receipt-rule); }
+.plan-receipt-total strong { font-size: clamp(24px, 6vw, 30px); font-weight: 500; }
+.plan-receipt-paper .plan-receipt-total { --muted: var(--receipt-muted); }
+.plan-receipt-wallets { padding-bottom: 16px; border-bottom: 1px dashed var(--receipt-rule); }
+.plan-receipt-paper footer { margin-top: 16px; text-align: center; color: var(--receipt-muted); }
+.plan-receipt-actions { display: grid; gap: 8px; }
+.plan-receipt-review { min-height: 44px; border: 0; background: transparent; color: var(--text2); border-radius: var(--radius-control); cursor: pointer; }
+.plan-receipt-review:hover { background: var(--surface2); }
+.plan-receipt-review:active { opacity: .7; }
+@keyframes plan-receipt-print { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .plan-receipt-paper { animation: plan-receipt-fade 120ms ease both; } }
+@keyframes plan-receipt-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 359px) { .plan-receipt-confirmation { padding-inline: 16px; } .plan-receipt-paper { padding-inline: 16px; } }
+
+.plan-receipt-contributions { margin-top: 16px; padding-bottom: 16px; border-bottom: 1px dashed var(--receipt-rule); }
+.plan-receipt-contributions h4 { margin: 0 0 8px; font: inherit; color: var(--receipt-muted); }

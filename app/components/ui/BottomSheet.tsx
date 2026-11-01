@@ -1,6 +1,7 @@
 "use client";
 
 import "./sheet-layout.css";
+import { lockModalBackground } from "./modal-background";
 
 import {
   type CSSProperties,
@@ -24,6 +25,8 @@ const openPanels: HTMLElement[] = [];
 
 type BottomSheetProps = {
   open: boolean;
+  /** Own the whole viewport, including the mobile header, while this modal is open. */
+  lockBackground?: boolean;
   onClose: () => void;
   children: ReactNode;
   label?: string;
@@ -66,6 +69,7 @@ type BottomSheetProps = {
 
 export function BottomSheet({
   open,
+  lockBackground = false,
   onClose,
   children,
   label,
@@ -159,7 +163,7 @@ export function BottomSheet({
       // Anchored pickers are portalled and own their keyboard loop.
       if (event.defaultPrevented || (event.target instanceof Element && event.target.closest("[data-picker-popover]"))) return;
       if (openPanels.at(-1) !== panel) return;
-      if (event.key === "Tab" && isDesktop && !isInspector) {
+      if (event.key === "Tab" && (isDesktop || lockBackground) && !isInspector) {
         const items = focusable();
         const first = items[0];
         const last = items.at(-1);
@@ -187,13 +191,19 @@ export function BottomSheet({
         if (opener?.isConnected) opener.focus({ preventScroll: true });
       });
     };
-  }, [open, panelRef, mounted, isDesktop, isInspector]);
+  }, [open, panelRef, mounted, isDesktop, isInspector, lockBackground]);
+
+  useEffect(() => {
+    if (!open || !mounted || !lockBackground || isInspector) return;
+    const app = document.querySelector<HTMLElement>(".app-shell-root");
+    if (app) return lockModalBackground(app);
+  }, [open, mounted, lockBackground, isInspector]);
 
   if (!mounted) return null;
 
   const usesContentDetent = detent === "content" && layered;
-  const preservesGlobalHeader = !isDesktop && !layered && !desktopFullscreen && !!document.querySelector(".app-header");
-  const resolvedBackdropTop = backdropTop ?? (preservesGlobalHeader ? MOBILE_SHEET_TOP : "0px");
+  const preservesGlobalHeader = !lockBackground && !isDesktop && !layered && !desktopFullscreen && !!document.querySelector(".app-header");
+  const resolvedBackdropTop = lockBackground ? "0px" : backdropTop ?? (preservesGlobalHeader ? MOBILE_SHEET_TOP : "0px");
   // Main mobile sheets sit below an interactive header. Keep their rounded
   // corners on the page canvas instead of exposing a gray rectangle behind them.
   const backdropOpacity = preservesGlobalHeader
@@ -328,8 +338,8 @@ export function BottomSheet({
           className="bottom-sheet-panel"
           data-size={size}
           data-presentation={isInspector ? "inspector" : isDesktop ? "dialog" : "sheet"}
-          role={isInspector ? "complementary" : isDesktop ? "dialog" : "region"}
-          aria-modal={isDesktop && !isInspector ? "true" : undefined}
+          role={isInspector ? "complementary" : isDesktop || lockBackground ? "dialog" : "region"}
+          aria-modal={(isDesktop || lockBackground) && !isInspector ? "true" : undefined}
           aria-label={label}
           aria-labelledby={labelledBy}
           tabIndex={-1}

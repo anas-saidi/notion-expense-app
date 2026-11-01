@@ -1207,7 +1207,7 @@ export default function App() {
           setDetailsAccount(account);
         }}
         onSaved={() => {
-          refreshBudgetData("Plan saved");
+          refreshBudgetData();
           void fetchNextMonthFunds().catch(() => {});
         }}
         onCategoriesChanged={() => {
@@ -1215,7 +1215,6 @@ export default function App() {
         }}
         planningMonth={openedPlanningMonth ?? monthStartPlannerMonth ?? calendarMonth}
         scope={budgetScope}
-        onScopeChange={setBudgetScope}
         personalScope={mode === "wife" ? "salma" : "anas"}
         categories={categories.filter((c) => !c.snoozed && !c.archived)}
         frozenCategories={frozenCategories}

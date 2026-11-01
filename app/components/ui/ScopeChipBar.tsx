@@ -18,7 +18,9 @@ export function GlobalBudgetScopePicker({
   value,
   onChange,
   personalScope,
+  label = "App-wide budget scope",
 }: {
+  label?: string;
   value: BudgetScope;
   onChange: (scope: BudgetScope) => void;
   personalScope: Exclude<BudgetScope, "joint">;
@@ -27,7 +29,7 @@ export function GlobalBudgetScopePicker({
   // Joint in the middle, between the two partners; the signed-in person on the left.
   const scopes: BudgetScope[] = [personalScope, "joint", personalScope === "anas" ? "salma" : "anas"];
   return (
-    <div className="global-scope-picker" role="tablist" aria-label="App-wide budget scope">
+    <div className="global-scope-picker" role="tablist" aria-label={label}>
       {scopes.map(scope => {
         const active = scope === value;
         return (

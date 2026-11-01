@@ -47,3 +47,8 @@ Persistent signature format and image export remain open roadmap decisions. Expo
 Two comparison directions were rendered at desktop and narrow widths. The mock uses clearly labeled illustrative amounts that add up: top four plus Other equals 24,860, against a 25,000 plan, leaving 140 under plan. Native browser checks confirmed example signing changes the displayed names/status, print replay enters a temporary busy state, and the variant control switches to Shared ledger. The preview is theme-aware and includes a reduced-motion branch; an operating-system Reduce Motion session was not exercised.
 
 No app feature, route, Notion record or roadmap commitment was changed.
+
+
+## Implementation follow-up
+
+Anas subsequently requested Printed keepsake immediately after saving in Month plan. That save confirmation is implemented with planned category amounts and wallet totals, without settlement or signature claims. The original closed-month/signature exploration above remains deferred. See design.md and docs/month-plan-receipt-review.md.

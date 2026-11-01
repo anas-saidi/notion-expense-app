@@ -81,11 +81,16 @@
 /* The shortfall sentence sits in a narrow panel or the phone footer, so it runs a size smaller. */
 .plan-shortfall { --summary-size:17px; }
 
-.plan-review-head, .plan-review-row { display:grid; grid-template-columns:minmax(0,1fr) 120px 120px; gap:16px; align-items:center; font-variant-numeric:tabular-nums; }
-.plan-review-head { color:var(--muted); font-size:12px; font-weight:600; padding:12px 0; }
-.plan-review-row { min-height:56px; border-bottom:1px solid var(--border); font-size:14px; }
-.plan-review-head > :not(:first-child), .plan-review-row > :not(:first-child) { text-align:right; }
-.plan-review-row small { display:block; color:var(--text2); }
+/* Review inherits the editor's category rows, grid inset and semantic controls. */
+.plan-review-head, .plan-review-row { grid-template-columns:minmax(0,1fr) 112px 112px; }
+.plan-review-row { font-size:14px; }
+.plan-review-row .plan-category-name > span { white-space:normal; overflow-wrap:anywhere; }
+.plan-review-before { color:var(--text2); }
+.plan-review-after { color:var(--text); font-weight:600; }
+.plan-review-edit { min-height:44px; }
+.plan-desktop-heading h2:focus { outline:none; }
+.plan-primary:hover:not(:disabled) { filter:brightness(.94); }
+.plan-primary:active:not(:disabled), .plan-copy:active:not(:disabled) { opacity:.8; }
 
 /* Keep the workspace usable before the viewport is wide enough for generous columns. */
 @media (min-width:1000px) and (max-width:1199px) {
@@ -117,3 +122,13 @@
 @media (prefers-reduced-motion:reduce) { .plan-compare-track > span { transition:none; } }
 .plan-compare-labels { display:flex; justify-content:space-between; gap:12px; color:var(--text2); font-size:13px; line-height:20px; font-variant-numeric:tabular-nums; }
 .plan-compare-labels strong { color:var(--text); font-weight:600; }
+
+@media (min-width:1000px) and (max-width:1199px) {
+  .plan-review-head, .plan-review-row { grid-template-columns:minmax(0,1fr) 80px 96px; }
+}
+
+/* Planner scope is local: never set html[data-scope] when reviewing another wallet. */
+[data-plan-scope="joint"] { --select-color:var(--text2); --select-ink:var(--text); --select-wash:var(--surface2); --select-edge:var(--border); }
+[data-plan-scope="anas"] { --select-color:var(--partner-husband); --select-ink:var(--partner-husband-strong); --select-wash:color-mix(in srgb, var(--partner-husband) 13%, var(--surface)); --select-edge:color-mix(in srgb, var(--partner-husband) 34%, transparent); }
+[data-plan-scope="salma"] { --select-color:var(--partner-wife); --select-ink:var(--partner-wife-strong); --select-wash:color-mix(in srgb, var(--partner-wife) 13%, var(--surface)); --select-edge:color-mix(in srgb, var(--partner-wife) 34%, transparent); }
+.plan-mobile-scope { display:flex; justify-content:center; flex-shrink:0; padding-bottom:16px; }
