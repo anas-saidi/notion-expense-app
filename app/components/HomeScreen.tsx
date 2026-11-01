@@ -139,8 +139,10 @@ export function HomeScreen({
   const firstLow = runningLow[0];
 
   const readyToAssign = readyToAssignByScope[budgetScope] ?? 0;
-  // Waits for the month: until advances load, Joint's money owed back to partners isn't subtracted yet.
-  const showJointUnassignedPrompt = !monthlyLoading && !monthlySummary.contributionError && !firstLow && isCurrentMonth && budgetScope === "joint" && (jointUnassigned ?? 0) > 0;
+  // Same figure Budget calls unassigned. Waits for the month: until advances load, Joint's money owed back to
+  // partners isn't subtracted yet, and a personal wallet's Joint due isn't kept back.
+  const unassigned = budgetScope === "joint" ? jointUnassigned ?? 0 : readyToAssign;
+  const showUnassignedPrompt = !monthlyLoading && !monthlySummary.contributionError && !firstLow && isCurrentMonth && Math.round(unassigned) > 0;
 
   // Month-end planning alert: show 2 days before month end until plan is locked
   const { daysUntilMonthEnd, nextMonthLabel: planningNextMonthLabel } = useMemo(() => {
@@ -187,7 +189,7 @@ export function HomeScreen({
       ? <span key="low"><Fact icon={<CategoryIcon icon={firstLow.category.icon} categoryName={firstLow.category.name} size={20} />}>{firstLow.category.name}</Fact> <Fact tone={firstLow.daysCovered < 1 ? "danger" : "warning"} onClick={onOpenAssign} label={`Rebalance ${firstLow.category.name}`}>runs out {firstLow.daysCovered < 1 ? "today" : `in about ${Math.round(firstLow.daysCovered)} days`}</Fact></span>
       : <span key="low"><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenAssign} label="Rebalance running low categories">running low</Fact></span>),
     showPlanningPrompt && <span key="plan"><Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</Fact> is waiting to be planned for <Fact>{planningLabel}</Fact></span>,
-    showJointUnassignedPrompt && !showMonthEndAlert && <span key="unassigned"><Fact onClick={onOpenAssign} label="Assign unassigned money">{fmt(Math.round(jointUnassigned ?? 0))}</Fact> is <Fact>unassigned</Fact></span>,
+    showUnassignedPrompt && !showMonthEndAlert && <span key="unassigned"><Fact onClick={onOpenAssign} label="Assign unassigned money">{fmt(Math.round(unassigned))}</Fact> is <Fact>unassigned</Fact></span>,
     showMonthEndAlert && !showPlanningPrompt && <span key="month-end">{plannedCount > 0
       ? <><Fact onClick={onOpenPlan} label={`Resume planning ${planningLabel}`}>{plannedCount} of 3 budgets</Fact> are ready for <Fact>{planningLabel}</Fact></>
       : <><Fact>{planningLabel}</Fact> <Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>isn&rsquo;t planned</Fact> yet</>}</span>,
