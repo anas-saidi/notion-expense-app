@@ -347,8 +347,8 @@ export function CategoriesScreen({
                 triggerClassName="composer-picker-chip"
                 showChevron={false}
               />
-              {/* Next month's plan sits with the month it follows. */}
-              {planMonth && onOpenPlan && !past && (
+              {/* Next month's plan sits with the month it follows, and only appears in the month's last week. */}
+              {planMonth && onOpenPlan && !past && (planMonth === homeMonth || nextMonthPlanningOpen()) && (
                 <button type="button" className="composer-picker-chip" disabled={!!monthlySummary.contributionError} title={monthlySummary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`} style={planChipStyle}>
                   <CalendarIcon size={16} aria-hidden="true" />
                   {/* The month picker beside it already names this month. */}
@@ -489,6 +489,12 @@ const listSurfaceStyle: CSSProperties = { display: "grid", padding: "4px 0", bor
 const emptyFoldStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 56, padding: "0 16px 0 24px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
 const emptyFoldIconsStyle: CSSProperties = { display: "inline-flex", gap: 4, flexShrink: 0 };
 const addRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, minHeight: 48, padding: "0 16px 0 24px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
+
+/** Once this month is planned, next month's planning opens in the last week, not straight after saving. */
+function nextMonthPlanningOpen() {
+  const [year, month, day] = today().split("-").map(Number);
+  return new Date(year, month, 0).getDate() - day < 7;
+}
 
 const planChipStyle: CSSProperties = {
   minHeight: 44,

@@ -1,4 +1,5 @@
-import type { BudgetScope } from "./app-types";
+import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
+import { getCategoryScope } from "./app-utils";
 import type { ContributionAgreement } from "../../lib/contribution-agreements";
 
 export type PlanReceiptItem = { id: string; name: string; scope: BudgetScope; amount: number };
@@ -22,6 +23,20 @@ export function createPlanReceipt(month: string, items: PlanReceiptItem[]): Plan
 /** Use the server-confirmed agreement, never infer contribution targets from wallet allocations. */
 export function confirmPlanReceipt(receipt: PlanReceipt, agreement?: ContributionAgreement, warning?: string): PlanReceipt {
   return { ...receipt, contributions: agreement?.month === receipt.month ? { ...agreement.targets } : undefined, warning };
+}
+
+/** Rebuilds a saved month's receipt from what is planned in it now, so any month with a plan can be viewed again. */
+export function savedPlanReceipt(month: string, summary: MonthlySummary, categories: Category[], accounts: Account[], only?: BudgetScope): PlanReceipt {
+  const normalize = (id: string) => id.replace(/-/g, "").toLowerCase();
+  const totals = new Map<string, number>();
+  for (const entry of summary.assignedByCategory) totals.set(normalize(entry.categoryId), (totals.get(normalize(entry.categoryId)) ?? 0) + entry.total);
+  const items = [...totals].flatMap(([id, amount]) => {
+    const category = categories.find(c => normalize(c.id) === id);
+    const scope = category && getCategoryScope(category, accounts);
+    return category && scope && (!only || scope === only) ? [{ id, name: category.name, scope, amount: Math.round(amount * 100) / 100 }] : [];
+  });
+  // Agreed contributions are Joint's: a personal receipt leaves them out.
+  return confirmPlanReceipt(createPlanReceipt(month, items), only && only !== "joint" ? undefined : summary.contributionAgreements?.find(a => a.month === month));
 }
 
 /** A contribution failure must never disguise a successfully saved plan as a failed save. */

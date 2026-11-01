@@ -29,6 +29,7 @@ const AccountDetailsSheet = dynamic(() => import("./components/AccountDetailsShe
 const RebalanceSheet = dynamic(() => import("./components/RebalanceSheet").then(m => m.RebalanceSheet));
 import { calculateMonthPlanCapacity, getPlanningSplit, planCost, type PlanAmounts } from "./components/month-plan-capacity";
 const MonthPlanSheet = dynamic(() => import("./components/MonthPlanSheet").then(m => m.MonthPlanSheet));
+const SavedPlanReceiptSheet = dynamic(() => import("./components/MonthPlanReceipt").then(m => m.SavedPlanReceiptSheet));
 const TransactionDetailsSheet = dynamic(() => import("./components/TransactionDetailsSheet").then(m => m.TransactionDetailsSheet));
 import { getCategoryAllocatedByScope, isSavingsCategory, scopeMonthlySummary } from "./components/wallet-utils";
 import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
@@ -67,6 +68,7 @@ const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
 
 export default function App() {
   const [showContributions, setShowContributions] = useState(false);
+  const [showPlanReceipt, setShowPlanReceipt] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [withdrawCategory, setWithdrawCategory] = useState<Category | null>(null);
@@ -1237,6 +1239,7 @@ export default function App() {
           planningMonth={monthStartPlannerMonth ?? undefined}
           categories={homeCategories}
           onOpenPlan={openMonthlyPlan}
+          onOpenReceipt={() => setShowPlanReceipt(true)}
           contribStatus={contribStatus}
           monthlySummary={scopedMonthlySummary}
           categoryAvailableByScope={categoryAvailableByScope}
@@ -1556,6 +1559,7 @@ export default function App() {
 
       <BalanceCheckAccounts open={showBalanceAccounts} accounts={accounts} onClose={() => setShowBalanceAccounts(false)} onSelect={account => { setShowBalanceAccounts(false); setStartBalanceCheck(true); setDetailsAccount(account); }} />
 
+      {showPlanReceipt && <SavedPlanReceiptSheet month={homeMonth} scope={budgetScope} summary={monthlySummary} categories={[...categories, ...frozenCategories]} accounts={accounts} onClose={() => setShowPlanReceipt(false)} />}
       <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
 
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet

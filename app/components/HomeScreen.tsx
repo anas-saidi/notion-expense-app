@@ -31,6 +31,7 @@ type HomeScreenProps = {
   planningReady?: boolean;
   planningMonth?: string;
   onOpenPlan: () => void;
+  onOpenReceipt?: () => void;
   onOpenHistory?: () => void;
   onClickTransaction?: (txn: Transaction) => void;
   contribStatus?: ContribStatus | null;
@@ -67,6 +68,7 @@ export function HomeScreen({
   planningReady = true,
   planningMonth,
   onOpenPlan,
+  onOpenReceipt,
   onOpenHistory,
   onClickTransaction,
   contribStatus,
@@ -219,7 +221,7 @@ export function HomeScreen({
       </div>
       </div>
       <div className="home-budget-context">
-      <DesktopMonthBudget summary={monthlySummary} month={homeMonth} loading={monthlyLoading} error={monthlyError} showPlanAction={!showPlanningPrompt && !showMonthEndAlert} onOpenPlan={onOpenPlan} />
+      <DesktopMonthBudget summary={monthlySummary} month={homeMonth} loading={monthlyLoading} error={monthlyError} showPlanAction={!showPlanningPrompt && !showMonthEndAlert} onOpenPlan={onOpenPlan} onOpenReceipt={onOpenReceipt} />
       {(showPlanningPrompt || showMonthEndAlert) && <button className="desktop-planning-action" type="button" disabled={!!monthlySummary.contributionError} onClick={onOpenPlan}>{plannedCount > 0 ? "Resume" : "Plan"} {planningLabel}<ChevronRightIcon size={16} aria-hidden="true" /></button>}
       </div>
       </div>
@@ -262,7 +264,7 @@ export function HomeScreen({
             {secondaryLoading && recentTxns.length === 0 ? <SkeletonRows label="Loading recent activity" count={4} /> : recentTxns.length === 0 ? <p className="desktop-empty">No recent activity.</p> : recentDays.map((day) => (
             <div key={day.label} role="group" aria-label={day.label} style={recentDayStyle}>
             <span style={recentDayLabelStyle}>{day.label}</span>
-            <div className="home-txn-list" style={recentListStyle}>
+            <div className="home-txn-list row-list" style={recentListStyle}>
               {day.txns.map((txn) => {
                 const cat      = categories.find(c => c.id === txn.category);
                 const fromCat  = categories.find(c => c.id === txn.fromCategoryId);

@@ -4,12 +4,13 @@ import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SkeletonRows } from "./ui/Skeleton";
 import { fmt } from "./app-utils";
+import { ReceiptIcon } from "./ui/icons";
 
-type Props = { summary: MonthlySummary; month: string; loading: boolean; error: boolean; showPlanAction?: boolean; onOpenPlan: () => void };
+type Props = { summary: MonthlySummary; month: string; loading: boolean; error: boolean; showPlanAction?: boolean; onOpenPlan: () => void; onOpenReceipt?: () => void };
 
 /** Desktop groups the existing monthly facts beside cash, without treating
  * assignments minus spending as a spendable account balance. */
-export function DesktopMonthBudget({ summary, month, loading, error, showPlanAction = true, onOpenPlan }: Props) {
+export function DesktopMonthBudget({ summary, month, loading, error, showPlanAction = true, onOpenPlan, onOpenReceipt }: Props) {
   const label = new Date(`${month}-01T12:00:00`).toLocaleDateString("en", { month: "long" });
   const assigned = summary.totalAssigned;
   const spent = summary.totalSpent;
@@ -19,7 +20,7 @@ export function DesktopMonthBudget({ summary, month, loading, error, showPlanAct
   const assignedWidth = comparisonTotal > 0 ? withinAssigned / comparisonTotal * 100 : 0;
   const overWidth = comparisonTotal > 0 ? over / comparisonTotal * 100 : 0;
   return <section className="desktop-month-budget" aria-label={`${label} spending`}>
-    <CardHeader className="desktop-panel-heading" title={`${label} spending`} action={showPlanAction ? <CardHeaderAction disabled={!!summary.contributionError} title={summary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label="Open monthly planning">Plan</CardHeaderAction> : undefined} />
+    <CardHeader className="desktop-panel-heading" title={`${label} spending`} action={loading || error ? undefined : assigned > 0 && onOpenReceipt ? <button type="button" className="card-header-action" onClick={onOpenReceipt} aria-label={`View ${label}'s plan receipt`} title={`${label} plan`}><ReceiptIcon size={18} aria-hidden="true" /></button> : showPlanAction ? <CardHeaderAction disabled={!!summary.contributionError} title={summary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label="Open monthly planning">Plan</CardHeaderAction> : undefined} />
     {/* An unplanned month with no spending has nothing to measure: one quiet line instead of a big 0, "0 assigned" and an empty bar. */}
     {loading ? <SkeletonRows label="Loading monthly budget" count={3} /> : error ? <p className="desktop-empty">Monthly budget unavailable. Refresh to try again.</p> : assigned <= 0 && spent <= 0 ? <p className="desktop-empty">Nothing planned or spent yet.</p> : <>
       <div className="desktop-budget-spent" data-over={over > 0 || undefined}><strong><Money value={spent} subtleDecimals /></strong></div>
