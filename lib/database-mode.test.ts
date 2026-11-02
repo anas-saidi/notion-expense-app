@@ -9,11 +9,14 @@ import { mcpOperations } from "./mcp/operations";
 import { withMirrorMutation, withMirrorReads } from "./mirror/routes";
 import { notionFetchJson } from "./notion-api";
 import { scheduleMirrorSync } from "./mirror/sync";
+import { coordinationPool } from "./financial-write-coordinator";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 it("direct Notion mode opens no database pools, including background sync and dependent writes", async () => {
   vi.stubEnv("FINANCE_NOTION_ONLY", "true");
   vi.stubEnv("DATABASE_URL", "postgres://must-not-connect");
+  vi.stubEnv("FINANCE_COORDINATION_DATABASE_URL", "postgres://must-not-connect-either");
+  expect(() => coordinationPool()).toThrow("not configured");
   expect(mirrorConfigured()).toBe(false);
   expect(mirrorStore()).toBeNull();
   expect(() => contributionPool()).toThrow("unavailable");

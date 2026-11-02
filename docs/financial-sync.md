@@ -1,11 +1,10 @@
 # Financial read mirror
 
-Current local configuration uses durable Notion Finance Records with no active PostgreSQL connection. See [Notion storage and recovery](notion-finance-records.md). The mirror and temporary read-only recovery mode below describe the optional legacy path.
+The Notion/Supabase path keeps durable financial records in Notion and uses Supabase PostgreSQL for the read mirror and coordinated saves. See [migration and recovery](notion-supabase-migration.md). The earlier Neon-backed authority and temporary direct-read recovery mode are historical configurations.
 
 The app reads an atomic Postgres snapshot of Notion while mutations and budget
 validation continue to use live Notion. It is a read mirror, not a new authority
-for writes. Neon Free is the selected hosted option; the `pg` adapter also works
-with other Postgres providers.
+for writes. The `pg` adapter works with Supabase and other Postgres providers.
 
 ## Enable
 

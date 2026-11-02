@@ -11,6 +11,7 @@ import { queryDatabaseAll } from "../../../lib/notion-api";
 import { mapTransactionPage } from "../../../lib/transaction-page";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 240;
 const fail = (error: unknown) => {
   const quota = databaseUnavailableFailure(error);
   if (quota) return NextResponse.json(quota, { status: 503 });

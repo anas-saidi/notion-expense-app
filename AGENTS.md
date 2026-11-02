@@ -30,3 +30,9 @@ For an app design review or an unslop pass, use [Interface Craft](/Users/anassai
 ## Readable product copy
 
 Use the writing principles recorded in design.md under Readable text. Front-load the useful fact, use parallel clauses for related states, and keep one name per financial concept. Preserve specific accessible action labels when visible copy is shortened.
+
+## Finance storage
+
+Notion owns editable financial records, including contribution agreements and balance checks. Supabase supplies the rebuildable read mirror, distributed write coordination and duplicate-operation claims. Keep coordination/idempotency records when rebuilding mirror rows. Read `docs/notion-supabase-migration.md` before storage changes.
+
+The installed Neon skills apply to legacy source inspection and recovery. Preserve the existing Neon project and credentials. Do not run Neon provisioning, config deployment or environment pulls as part of the Supabase migration; use existing credentials and explicit project IDs for read-only recovery.

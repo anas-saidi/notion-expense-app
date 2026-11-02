@@ -3,6 +3,7 @@ import { randomUUID, createHash } from "node:crypto";
 import type { BalanceCheck, BalanceCountReview } from "./balance-checks";
 import type { ContributionAgreement, PartnerAmounts } from "./contribution-agreements";
 import { currentLedgerRecord, NotionLedger, withNotionWrite } from "./notion-ledger";
+import { databaseCoordinationConfigured, coordinationPool } from "./financial-write-coordinator";
 
 async function assertRecordsRecovered(ledger: NotionLedger, scope: string) {
   const checkpoint = await ledger.current<any>(scope, "checkpoint", "postgres-cutover");
@@ -60,6 +61,15 @@ export class NotionBalanceCheckStore {
 export class NotionOperations {
   constructor(private ledger = new NotionLedger()) {}
   async once(scope: string, requestId: string, tool: string, input: unknown, run: () => Promise<Record<string, unknown>>, createdAt?: string) {
+    if (databaseCoordinationConfigured()) {
+      return withNotionWrite("household-mutation", async () => {
+        const { McpOperations } = await import("./mcp/operations");
+        return new McpOperations(coordinationPool()).once(scope, requestId, tool, input, () => this.onceInNotion(scope, requestId, tool, input, run, createdAt), createdAt);
+      });
+    }
+    return this.onceInNotion(scope, requestId, tool, input, run, createdAt);
+  }
+  private async onceInNotion(scope: string, requestId: string, tool: string, input: unknown, run: () => Promise<Record<string, unknown>>, createdAt?: string) {
     return withNotionWrite("household-mutation", async () => {
       const fingerprint = createHash("sha256").update(JSON.stringify({ tool, input })).digest("hex");
       const old = await this.ledger.current<any>(scope, "operation", requestId);

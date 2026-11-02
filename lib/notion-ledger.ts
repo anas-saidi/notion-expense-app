@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { notionFetchJson, queryDatabaseAll } from "./notion-api";
+import { databaseCoordinationConfigured, withDatabaseFinancialWrite, recordNotionWriteReceipt, notionWriteReceipts } from "./financial-write-coordinator";
 
 export type LedgerState = "active" | "closed" | "pending" | "completed" | "review";
 export type LedgerRecord<T = any> = { id: string; scope: string; kind: string; key: string; version: string; replaces: string | null; state: LedgerState; payload: T };
@@ -10,10 +11,12 @@ const queues = shared.financeNotionWrites ??= new Map();
 const written = shared.financeNotionWritten ??= new Map();
 export const notionLedgerConfigured = () => !!process.env.NOTION_FINANCE_RECORDS_DB;
 export function assertNotionSingleWriter() {
+  if (databaseCoordinationConfigured()) return;
   if (process.env.VERCEL || process.env.NOTION_SINGLE_WRITER !== "true") throw Object.assign(new Error("Notion financial writes require the configured single app server. Nothing was written."), { status: 503 });
 }
 /** Notion has no atomic CAS/locks. Never pretend a local queue coordinates serverless instances. */
 export async function withNotionWrite<T>(key: string, action: () => Promise<T>): Promise<T> {
+  if (databaseCoordinationConfigured()) return withDatabaseFinancialWrite(action);
   assertNotionSingleWriter();
   if (heldWrites.getStore()?.has(key)) return action();
   const held = new Set(heldWrites.getStore()); held.add(key);
@@ -63,14 +66,28 @@ export class NotionLedger {
       { property: "Scope", rich_text: { equals: scope } }, { property: "Kind", select: { equals: kind } },
       ...(key === undefined ? [] : [{ property: "Key", rich_text: { equals: key } }]),
     ] } });
+    // Notion query indexing may lag a successful create. Other Vercel workers
+    // recover acknowledged page identities from SQL, then read values in Notion.
+    const pageIds = new Set(pages.map(page => page.id));
+    for (const id of await notionWriteReceipts(this.databaseId, scope, kind, key)) {
+      if (pageIds.has(id)) continue;
+      const { data: page } = await notionFetchJson<any>(this.token, `/pages/${id}`);
+      if (page.archived || page.in_trash) continue;
+      const record = decodeLedgerPage<T>(page);
+      if (record.scope === scope && record.kind === kind && (key === undefined || record.key === key)) pages.push(page);
+    }
     const rows = pages.map(decodeLedgerPage<T>);
     const ids = new Set(rows.map(row => row.version));
     // Read-your-write overlay only after a successful live read, never an outage fallback.
-    for (const [cacheKey, row] of written) if (cacheKey.startsWith(`${this.databaseId}:`) && row.scope === scope && row.kind === kind && (key === undefined || row.key === key) && !ids.has(row.version)) rows.push(row);
+    if (!databaseCoordinationConfigured()) for (const [cacheKey, row] of written) if (cacheKey.startsWith(`${this.databaseId}:`) && row.scope === scope && row.kind === kind && (key === undefined || row.key === key) && !ids.has(row.version)) rows.push(row);
     return rows;
   }
   async current<T>(scope: string, kind: string, key: string) { return currentLedgerRecord(await this.list<T>(scope, kind, key)); }
   async append<T>(record: Omit<LedgerRecord<T>, "id">): Promise<LedgerRecord<T>> {
+    if (databaseCoordinationConfigured()) return withNotionWrite("household-mutation", () => this.appendCoordinated(record));
+    return this.appendCoordinated(record);
+  }
+  private async appendCoordinated<T>(record: Omit<LedgerRecord<T>, "id">): Promise<LedgerRecord<T>> {
     const projections: Record<string, unknown> = {};
     const payload = record.payload as any;
     if (record.kind === "agreement") { projections["Anas agreed"] = { number: payload.targets.anas }; projections["Salma agreed"] = { number: payload.targets.salma }; }
@@ -81,6 +98,7 @@ export class NotionLedger {
     } } });
     if (!data.id) throw new Error("Notion did not confirm the record. Review Finance Records before retrying.");
     const result = { ...record, id: data.id };
+    if (databaseCoordinationConfigured()) await recordNotionWriteReceipt(this.databaseId, result);
     if (written.size >= 1024) written.delete(written.keys().next().value!);
     written.set(this.cacheKey(result), result);
     return result;

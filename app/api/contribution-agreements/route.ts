@@ -3,20 +3,23 @@ import { databaseUnavailableFailure } from "../../../lib/database-errors";
 import { NextRequest, NextResponse } from "next/server";
 import { contributionStore } from "../../../lib/contribution-store";
 import { validMonth, cents } from "../../../lib/contribution-agreements";
+import { withMirrorReads } from "../../../lib/mirror/routes";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 240;
 const fail = (error: unknown) => {
   const unavailable = databaseUnavailableFailure(error);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
   return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load contribution agreements." }, { status: (error as { status?: number }).status ?? 500 });
 };
-export async function GET() {
+async function readAgreements() {
   try {
     const token = process.env.NOTION_TOKEN;
     if (!token) return NextResponse.json({ error: "Finance connection unavailable." }, { status: 503 });
     return NextResponse.json({ agreements: await contributionStore().list(contributionScope(token)) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return fail(error); }
 }
+export const GET = withMirrorReads(readAgreements);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);

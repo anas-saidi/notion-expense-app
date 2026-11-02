@@ -13,11 +13,11 @@ One database stores agreement revisions, actual-balance checks, operation receip
 
 ## Single-writer constraint
 
-Notion is not a replacement for PostgreSQL atomic locks. All protected writes run through one configured app process and a shared, reentrant queue. `NOTION_SINGLE_WRITER=true` is required; Vercel environments are explicitly refused. Do not enable this mode on multiple workers or concurrent deployments. Agreement/count revisions, expense/income/rebalance guards, savings operations and repayments share this queue.
+Notion is not a replacement for PostgreSQL atomic locks. Without `FINANCE_COORDINATION_DATABASE_URL`, protected writes require one app process, `NOTION_SINGLE_WRITER=true`, and a shared reentrant queue; Vercel writes are refused. With a Supabase session connection configured, protected writes use a household-wide PostgreSQL session lock, durable interrupted-save guard and page-identity receipts. This enables coordinated Vercel writes without pretending Notion supports compare-and-set. Agreement/count revisions, expense/income/rebalance guards, savings operations and repayments share this guard. See [migration and recovery](notion-supabase-migration.md).
 
 The local savings operation-ID recovery protocol and repayment IDs remain on their financial records. Notion operation receipts replace SQL receipts for MCP/native operations. Native submissions include the original draft creation time; MCP writes accept the same immutable `createdAt` metadata. Old queued actions whose SQL receipts cannot yet be checked are blocked by the durable recovery cutoff. This is intentional duplicate protection, not an invitation to generate a new ID/time for an uncertain old action.
 
-Production/serverless writes need an actual single writer or equivalent coordination before enabling. The implementation does not claim distributed compare-and-set or locks from Notion create/query operations.
+Production/serverless writes require the database coordinator. Its connection must support session state; transaction pooling is unsuitable. A lost worker or unconfirmed receipt leaves a durable guard for reconciliation rather than expiring an uncertain Notion side effect and automatically replaying it.
 
 ## Recovery performed on 31 October 2026
 

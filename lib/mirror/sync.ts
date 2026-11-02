@@ -42,7 +42,10 @@ export async function syncMirror(token: string) {
       const snapshot: MirrorSnapshot = {};
       // Full, paginated replacement also removes records archived or deleted
       // directly in Notion. Never publish a partially completed import.
-      for (const id of Object.values(mirrorDatabases())) {
+      // Finance Records joins the projection without changing mirrorScope's
+      // legacy database namespace (balance checks and recovery checkpoints use it).
+      const databaseIds = [...Object.values(mirrorDatabases()), ...(process.env.NOTION_FINANCE_RECORDS_DB ? [process.env.NOTION_FINANCE_RECORDS_DB] : [])];
+      for (const id of new Set(databaseIds)) {
         const { data: schema } = await notionFetchJson<any>(token, `/databases/${id}`);
         const pages = await queryDatabaseAll(token, id);
         snapshot[normalizeDatabaseId(id)] = { schema, pages };

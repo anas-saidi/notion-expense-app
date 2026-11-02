@@ -1,4 +1,5 @@
 import { mirrorResponse } from "./mirror/context";
+import { assertFinancialWriteConnection } from "./financial-write-coordinator";
 const NOTION_BASE_URL = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
 
@@ -80,6 +81,7 @@ export async function notionFetchJson<T>(
     let data: any;
     try {
       await scheduleRequest(token);
+      if (method !== "GET" && !path.endsWith("/query")) await assertFinancialWriteConnection();
       response = await fetch(`${NOTION_BASE_URL}${path}`, {
         method,
         headers: {

@@ -1,6 +1,7 @@
 import { notionOnlyMode } from "../database-mode";
 import { compileMirrorQuery } from "./sql-query";
 import { Pool } from "pg";
+import { databaseConnectionOptions } from "../database-tls";
 import { createHash, randomUUID } from "node:crypto";
 
 export const normalizeDatabaseId = (id: string) => id.replace(/-/g, "").toLowerCase();
@@ -51,7 +52,7 @@ export function mirrorConfigured() { return !notionOnlyMode() && !!process.env.D
 export function mirrorStore(): MirrorStore | null {
   if (!mirrorConfigured()) return null;
   if (!globalStore.financeMirrorPool) {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 5, idleTimeoutMillis: 60000, connectionTimeoutMillis: 3000, statement_timeout: 5000 });
+    const pool = new Pool({ ...databaseConnectionOptions(process.env.DATABASE_URL!), max: 2, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000, statement_timeout: 15000 });
     pool.on("error", () => console.error("Financial mirror database connection failed"));
     globalStore.financeMirrorPool = pool;
   }
