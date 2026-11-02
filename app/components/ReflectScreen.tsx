@@ -13,6 +13,7 @@ import { useWorkRates, workTime, hasMeaningfulWorkTime } from "./work-time";
 import { ReflectFlowChart } from "./ReflectFlowChart";
 import { ScreenChip } from "./ui/ScreenChip";
 import { ScreenToolbar } from "./ui/ScreenLayout";
+import { SCREEN_HERO_CHART_HEIGHT } from "./ui/hero-tokens";
 import { ScreenHero } from "./ui/ScreenHero";
 import { MASCOT_HERO_SIZE, MascotHero } from "./mascot/MascotHero";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -90,15 +91,14 @@ export function ReflectScreen(props: Props) {
   const overBudgetByCategory = new Map(budgetReady && excludedAccounts.length === 0 ? overBudget.map(row => [row.id, row] as const) : []);
 
   const overRows = budgetReady && excludedAccounts.length === 0 ? overBudget : [];
-  const factIcon = (row: ReflectCategory) => <CategoryIcon icon={row.icon} categoryName={row.name} size={20} />;
   // The current month is still running, so its recap speaks in the present.
   const ongoing = singleMonth && props.period.start === currentMonth;
   const recap = [
-    // The list below already shows each category's share, so the recap says what it doesn't: how concentrated spending was.
-    breakdown.spending.length > 3 && <span key="top">your <Fact>top 3 categories</Fact> {ongoing ? "have taken" : "took"} <Fact>{Math.round(breakdown.spending.slice(0, 3).reduce((sum, row) => sum + row.share, 0) * 100)}%</Fact> of it</span>,
-    overRows.length === 1 && <span key="over"><Fact icon={factIcon(overRows[0])}>{overRows[0].name}</Fact> {ongoing ? "is" : "went"} <Fact tone="danger" onClick={() => setSelectedId(overRows[0].id)} label={`${overRows[0].name} spending`}>{fmt(Math.round(overRows[0].overBudget))} over</Fact> budget</span>,
+    // Actionable exceptions lead; concentration and period health follow.
+    overRows.length === 1 && <span key="over"><Fact>{overRows[0].name}</Fact> {ongoing ? "is" : "went"} <Fact tone="danger" onClick={() => setSelectedId(overRows[0].id)} label={`${overRows[0].name} spending`}>{fmt(Math.round(overRows[0].overBudget))} over</Fact> budget</span>,
     overRows.length > 1 && <span key="over"><Fact>{overRows.length} categories</Fact> {ongoing ? "are" : "went"} <Fact tone="danger">over budget</Fact></span>,
-    budgetReady && excludedAccounts.length === 0 && overRows.length === 0 && <span key="within">every category <Fact tone="success">{ongoing ? "is within budget so far" : "stayed within budget"}</Fact></span>,
+    breakdown.spending.length > 3 && <span key="top">top 3 categories account for <Fact>{Math.round(breakdown.spending.slice(0, 3).reduce((sum, row) => sum + row.share, 0) * 100)}%</Fact> of spending</span>,
+    budgetReady && excludedAccounts.length === 0 && overRows.length === 0 && <span key="within">all categories <Fact tone="success">{ongoing ? "are within budget" : "stayed within budget"}</Fact></span>,
   ].filter(Boolean);
 
   const categoryRow = (row: ReflectCategory, index: number, inflow = false) => {
@@ -144,9 +144,11 @@ export function ReflectScreen(props: Props) {
 
   const heroVisual = <div className="reflect-hero-visual" data-view={props.view}>
     {viewControls}
-    {props.transactionsLoading ? <HeroSkeleton /> : props.view === "activity"
-      ? <section className="reflect-hero-chart" aria-label="Spending and money in over this period"><ReflectFlowChart points={flow} height={220} /></section>
-      : <button type="button" onClick={() => haptic("light")} aria-label="React to spending" style={jarButtonStyle}>
+    {props.view === "activity"
+      ? <section className="reflect-hero-chart" aria-label="Spending and money in over this period">{props.transactionsLoading
+        ? <SkeletonRegion label="Loading activity chart" style={{ height: SCREEN_HERO_CHART_HEIGHT, display: "grid", gridTemplateRows: "16px 1fr", gap: 16 }}><Skeleton style={{ width: "60%", height: 16, marginInline: "auto" }} /><Skeleton style={{ height: "100%", borderRadius: 8 }} /></SkeletonRegion>
+        : <ReflectFlowChart points={flow} height={SCREEN_HERO_CHART_HEIGHT} />}</section>
+      : props.transactionsLoading ? <HeroSkeleton /> : <button type="button" onClick={() => haptic("light")} aria-label="React to spending" style={jarButtonStyle}>
         <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={MASCOT_HERO_SIZE} />
       </button>}
   </div>;
@@ -158,7 +160,7 @@ export function ReflectScreen(props: Props) {
           mascot={heroVisual}
           label="Spent" showMetric={props.view === "spending"} loading={props.transactionsLoading} value={props.transactionsLoading || props.error ? null : breakdown.total}
           supporting={props.view === "spending" && !props.transactionsLoading && !props.error && hasMeaningfulWorkTime(breakdown.total, rate) ? <p>{workTime(breakdown.total, rate!)} of your {props.budgetScope === "joint" ? "combined work" : "work"}</p> : null}
-          summary={<div style={{ minHeight: "1.4em", fontSize: 18 }}>{props.transactionsLoading ? <Skeleton style={{ height: 26, width: "70%" }} /> : props.error ? null : props.view === "activity" ? activitySummary : recap.length > 0 ? <Summary>{joinClauses(recap)}.</Summary> : null}</div>}
+          summary={props.transactionsLoading ? <Skeleton style={{ height: "1.4em", width: "70%" }} /> : props.error ? null : props.view === "activity" ? activitySummary : recap.length > 0 ? <Summary>{joinClauses(recap)}.</Summary> : null}
         />
         {periodControls}
       </section>

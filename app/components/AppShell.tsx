@@ -117,31 +117,15 @@ export function AppShell({
           <ProgressiveBlur position="top" height={32} maxBlur={6} tint="var(--bg)" visible={scrolled} style={{ top: "100%", zIndex: -1 }} />
           <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
           <div className="app-header-actions">
-            {tab === "budget" ? (
-              <>
-                <button className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
-                  <SearchIcon size={18} />
-                </button>
-                <button className="app-top-action" type="button" onClick={onBudgetRebalance} aria-label="Rebalance budget" style={menuButtonStyle}>
-                  <ShuffleIcon size={18} />
-                </button>
-              </>
-            ) : tab === "history" ? (
-              <>
-                <button className="app-top-action" type="button" onClick={onReflectSearch} aria-label="Search activity" style={menuButtonStyle}>
-                  <SearchIcon size={18} />
-                </button>
-                {onSelectTheme && (
-                  <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
-                    <SettingsIcon size={18} />
-                  </button>
-                )}
-              </>
-            ) : onSelectTheme && (
-              <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
-                <SettingsIcon size={18} />
-              </button>
-            )}
+            {tab === "budget" && onBudgetSearch && <button className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
+              <SearchIcon size={18} />
+            </button>}
+            {tab === "history" && onReflectSearch && <button className="app-top-action" type="button" onClick={onReflectSearch} aria-label="Search activity" style={menuButtonStyle}>
+              <SearchIcon size={18} />
+            </button>}
+            {onSelectTheme && <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
+              <SettingsIcon size={18} />
+            </button>}
           </div>
         </header>
         {children}
@@ -263,10 +247,9 @@ const menuButtonStyle = {
   boxShadow: "none",
 };
 
-// Three columns so the mode picker sits at the true centre; actions hug the right edge.
+// Responsive column ownership lives in CSS; mobile scope left, actions right.
 const headerStyle = {
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
   alignItems: "center",
   gap: 8,
   marginBottom: 0,

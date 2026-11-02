@@ -48,7 +48,7 @@ export function ScreenLoadingSkeleton({ label = "Loading screen", toolbar = true
           <div className="screen-hero-label"><Skeleton style={{ width: 64, height: 20 }} /></div>
           <div className="screen-hero-value"><AmountSkeleton /></div>
         </div>
-        <div className="screen-hero-summary"><Skeleton style={{ width: "70%", height: 25 }} /></div>
+        <div className="screen-hero-summary"><Skeleton style={{ width: "70%", height: "1.4em" }} /></div>
       </div>
       {toolbar && <div className="screen-toolbar"><Skeleton style={{ width: 120, height: 44, borderRadius: 24 }} /></div>}
     </div>

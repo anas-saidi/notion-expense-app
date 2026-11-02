@@ -1,0 +1,19 @@
+/* Shared summary: readable secondary text, quiet facts, stronger actions/exceptions. */
+.summary { --summary-size:20px; margin:0; color:var(--text2); font-size:var(--summary-size); line-height:1.25; font-weight:400; letter-spacing:0; font-variant-numeric:tabular-nums; text-wrap:pretty; }
+/* Clauses are written mid-sentence; whichever comes first gets its capital here. */
+.summary::first-letter { text-transform:uppercase; }
+.summary-fact { display:inline; padding:0; border:0; background:none; color:var(--text); font:inherit; font-weight:500; }
+.summary-fact[data-action] { position:relative; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+@media (hover:hover) { .summary-fact[data-action]:hover { text-decoration:underline; text-decoration-thickness:2px; text-decoration-color:color-mix(in srgb, var(--text) 25%, transparent); text-underline-offset:5px; } }
+/* Extend inline actions without opening gaps in the sentence. */
+.summary-fact[data-action]::after { content:""; position:absolute; inset:-8px -4px; }
+.summary-fact[data-action]:active { opacity:.6; }
+.summary-fact[data-action]:focus-visible { outline:2px solid var(--text); outline-offset:2px; border-radius:6px; }
+.summary-fact[data-tone="danger"] { color:var(--danger); }
+.summary-fact[data-tone="warning"] { color:var(--warning-ink); }
+.summary-fact[data-tone="success"] { color:var(--success); }
+.summary-fact-icon { display:inline-flex; vertical-align:-.18em; margin-right:.2em; }
+.summary-fact-icon > * { width:1.1em !important; height:1.1em !important; }
+
+.summary-fact[data-tone] { font-weight:600; }
+@media (hover:hover) { .summary-fact[data-action]:hover { transform:none; } }

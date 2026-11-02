@@ -15,6 +15,8 @@
   justify-items: center;
   align-content: start;
   min-height: var(--hero-mascot-size);
+  width: 100%;
+  position: relative;
   min-width: 0;
   max-width: 100%;
   margin-bottom: -8px;
@@ -37,7 +39,9 @@
   letter-spacing: -.022em;
   font-variant-numeric: tabular-nums;
 }
-.screen-hero-value > span { display: inline-flex; justify-self: center; white-space: nowrap; max-width: none; }
+.screen-hero-value > span { display: inline-grid; grid-template-columns: var(--hero-currency-room, 0px) auto var(--hero-currency-room, 0px); align-items: baseline; justify-self: center; white-space: nowrap; max-width: none; }
+.screen-hero-digits { grid-column: 2; }
+.screen-hero-currency { grid-column: 3; justify-self: end; display: inline-flex; align-items: baseline; }
 .screen-hero-value[data-tone="danger"] { color: var(--danger); }
 .screen-hero-supporting { color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
 .screen-hero-supporting > p { margin: 0; }
@@ -65,13 +69,18 @@
 }
 
 /* Controls occupy the existing clear top of the visual frame, never a new row. */
-.screen-hero-mascot { width: 100%; position: relative; }
 .reflect-hero-visual { position: relative; display: grid; place-items: center; width: 100%; height: var(--hero-mascot-size); min-width: 0; }
 .reflect-hero-switch { position: absolute; top: 0; right: 0; z-index: 2; display: flex; gap: 8px; width: max-content; }
-.reflect-hero-chart { width: 100%; min-width: 0; box-sizing: border-box; padding: 80px 0 10px; height: 100%; }
+.reflect-hero-chart { width: 100%; min-width: 0; box-sizing: border-box; padding: var(--hero-chart-top) 0 12px; height: 100%; }
 
-.reflect-hero-visual[data-view="activity"] { height: 310px; }
+.reflect-hero-visual[data-view="activity"] { height: var(--hero-activity-size); }
 @media (max-width: 899px) {
   .screen-hero-summary .summary { text-align: center; }
   .screen-hero-summary .skeleton { margin-inline: auto; }
 }
+
+/* Hero taps reveal detail; the visual stays anchored to its shared frame. */
+@media (hover: hover) {
+  .screen-hero-mascot button:hover:not(:disabled) { transform: none; }
+}
+.screen-hero-mascot button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: var(--radius-control); }

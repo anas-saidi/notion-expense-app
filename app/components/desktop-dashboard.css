@@ -48,12 +48,10 @@
      account balance. The existing jar family stays inside the cash panel. */
   /* One page grid owns every card edge. Cash/actions read first; monthly
      planning and the spending breakdown share the supporting column. */
-  #panel-home { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:var(--desktop-panel-gap); align-items:start; }
+  #panel-home { display:grid; gap:var(--desktop-panel-gap); align-items:start; }
   #panel-home > .home-overview-grid, #panel-home > .home-desktop-panels { display:contents; }
-  .home-balance-panel { grid-column:1; grid-row:1; align-self:stretch; min-height:var(--desktop-summary-min-height); }
-  .home-budget-context { grid-column:2; grid-row:1; align-self:stretch; min-height:var(--desktop-summary-min-height); }
-  .home-bills-panel { grid-column:1; grid-row:2; }
-  .home-desktop-panels > .home-content { grid-column:2; grid-row:2; }
+  .home-balance-panel { align-self:stretch; min-height:var(--desktop-summary-min-height); }
+  .home-budget-context { align-self:stretch; min-height:var(--desktop-summary-min-height); }
   .home-balance-panel, .desktop-month-budget { display:flex; flex-direction:column; min-width:0; padding:var(--desktop-panel-padding); background:var(--surface); border-radius:var(--radius-card); box-shadow:var(--elevation-card); }
   .home-balance-panel > div { padding:0 !important; }
   .home-balance-panel .contribution-entry { margin-top:auto; padding:16px 0 0; }
@@ -101,15 +99,10 @@
 
 @media (min-width:1100px) {
   .app-content .app-header { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
-  #panel-home { grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); }
 }
 
 @media (min-width:1200px) {
-  #panel-home { grid-template-columns:repeat(2,minmax(0,1.45fr)) repeat(2,minmax(0,1fr)); }
-  .home-balance-panel { grid-column:1 / 3; }
-  .home-budget-context { grid-column:3 / 5; }
-  .home-desktop-panels > .home-content { grid-column:2; }
-  .desktop-top-spending { display:block; grid-column:3 / 5; grid-row:2; }
+  .desktop-top-spending { display:block; }
 }
 
 @media (min-width:1200px) {
@@ -126,11 +119,11 @@
 @media (min-width:900px) {
   #panel-home, #panel-budget, #panel-history { min-width:0; }
   #panel-budget { gap:24px !important; }
-  .budget-overview-context { display:grid; gap:12px; min-width:0; padding:var(--desktop-panel-padding); background:var(--surface); border-radius:var(--radius-card); box-shadow:var(--elevation-card); }
+  .budget-overview-context { display:grid; min-width:0; padding:var(--desktop-panel-padding); background:var(--surface); border-radius:var(--radius-card); box-shadow:var(--elevation-card); }
   .categories-main .budget-overview-context > .budget-desktop-overview { padding:0 !important; background:transparent !important; box-shadow:none; }
   #panel-history { grid-template-columns:minmax(0,1fr); }
   #panel-history > * { grid-column:1 / -1; min-width:0; }
-  .reflect-desktop-panels { display:grid; grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr); gap:var(--desktop-panel-gap); align-items:start; }
+  .reflect-desktop-panels { display:grid; gap:var(--desktop-panel-gap); align-items:start; }
   .reflect-period-toolbar { min-height:44px; }
   .reflect-desktop-overview, .reflect-desktop-categories { min-width:0; padding:var(--desktop-panel-padding); border-radius:var(--radius-card); background:var(--surface); box-shadow:var(--elevation-card); }
   .bottom-sheet-panel[data-presentation="dialog"] { scroll-padding:24px; }
@@ -145,9 +138,6 @@
   .app-nav-wrap .app-nav { gap:12px; padding-block:12px; }
   .app-nav .desktop-nav-brand { display:none; }
   .app-nav .app-nav-inner, .app-nav .desktop-nav-actions { gap:4px; }
-}
-@media (min-width:1200px) {
-  html.has-inspector .reflect-desktop-panels { grid-template-columns:minmax(0,1fr); }
 }
 
 /* Local status belongs to its financial object, not a page-wide alert strip.
@@ -205,14 +195,12 @@
 /* Budget pairs a focused account summary with the larger category workspace. */
 @media (min-width:900px) {
   .budget-category-workspace { display:grid; gap:var(--desktop-panel-gap); min-width:0; align-content:start; container-type:inline-size; --budget-col-width:clamp(80px,16cqi,112px); }
-  .budget-overview-context { align-self:start; gap:var(--desktop-panel-gap); }
+  .budget-overview-context { align-self:start; }
   /* Icon, message and action on one line: the action sits at the end instead of wrapping underneath. */
   .budget-category-workspace > .budget-desktop-controls { padding:0; min-height:44px; }
 }
 @media (min-width:1100px) {
-  #panel-budget { grid-template-columns:minmax(280px,1fr) minmax(0,2.2fr); align-items:start; column-gap:var(--desktop-panel-gap); }
-  #panel-budget > .budget-overview-context { grid-column:1; }
-  #panel-budget > .budget-category-workspace { grid-column:2; }
+  #panel-budget { align-items:start; column-gap:var(--desktop-panel-gap); }
   #panel-budget > :not(.budget-overview-context):not(.budget-category-workspace) { grid-column:1 / -1; }
 }
 @media (min-width:1200px) {

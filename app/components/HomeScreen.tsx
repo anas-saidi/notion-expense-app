@@ -7,7 +7,6 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { BanknoteIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
 import { TransactionRow } from "./ui/TransactionRow";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
-import { accountIconSource } from "../../lib/category-icons";
 import { BUDGET_SCOPE_LABELS, fmt, fmtDate, shiftDate, today, categoryMatchesScope } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { runningLowCategories } from "./category-runway";
@@ -175,20 +174,20 @@ export function HomeScreen({
 
   // ponytail: first three facts in priority order; Budget still lists every running-low category.
   const summaryClauses = [
-    savingsGap && <span key="savings-gap"><Fact icon={<CategoryIcon icon={accountIconSource(savingsGap.account.type)} size={20} />}>{savingsGap.account.label}</Fact> is <Fact tone="danger" onClick={savingsGap.onFix} label={savingsGap.source ? `Move money from ${savingsGap.source.label} to ${savingsGap.account.label}` : `Review ${savingsGap.account.label}`}>{fmt(savingsGap.gap)} short</Fact></span>,
+    savingsGap && <span key="savings-gap"><Fact>{savingsGap.account.label}</Fact> is <Fact tone="danger" onClick={savingsGap.onFix} label={savingsGap.source ? `Move money from ${savingsGap.source.label} to ${savingsGap.account.label}` : `Review ${savingsGap.account.label}`}>{fmt(savingsGap.gap)} short</Fact></span>,
     ...balanceReviews.map(({ key, account, counted }) => {
       const off = account.balance == null ? null : Math.abs(counted - account.balance);
       const review = onReviewBalance && (() => onReviewBalance(account));
       const reviewLabel = `Review balance check for ${account.label}`;
-      return <span key={key}><Fact icon={<CategoryIcon icon={accountIconSource(account.type)} size={20} />}>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact></>}</span>;
+      return <span key={key}><Fact>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact></>}</span>;
     }),
     ...(!monthlyLoading && !monthlyError && !monthlySummary.contributionError ? contributionLeft : []).map(({ partner, left }) => <span key={`left-${partner}`}><Fact>{partner === "anas" ? "Anas" : "Salma"}</Fact> has <Fact onClick={onOpenContributions} label={`Open monthly contributions: ${partner === "anas" ? "Anas" : "Salma"} has ${fmt(left)} MAD left to put in`}>{fmt(left)} due</Fact></span>),
     // Below zero is money already wrong, so it comes before what's about to run out. Opens Rebalance to cover it.
     overspentCategories.length > 0 && (overspentCategories.length === 1
-      ? <span key="overspent"><Fact icon={<CategoryIcon icon={overspentCategories[0].icon} categoryName={overspentCategories[0].name} size={20} />}>{overspentCategories[0].name}</Fact> is <Fact tone="danger" onClick={onOpenAssign} label={`Rebalance to cover ${overspentCategories[0].name}`}>{fmt(Math.ceil(-(overspentCategories[0].available ?? 0) - 0.005))} overspent</Fact></span>
+      ? <span key="overspent"><Fact>{overspentCategories[0].name}</Fact> is <Fact tone="danger" onClick={onOpenAssign} label={`Rebalance to cover ${overspentCategories[0].name}`}>{fmt(Math.ceil(-(overspentCategories[0].available ?? 0) - 0.005))} overspent</Fact></span>
       : <span key="overspent"><Fact>{overspentCategories.length} categories</Fact> are <Fact tone="danger" onClick={onOpenAssign} label="Rebalance to cover overspent categories">{fmt(Math.ceil(overspentInCategories - 0.005))} overspent</Fact></span>),
     firstLow && (runningLow.length === 1
-      ? <span key="low"><Fact icon={<CategoryIcon icon={firstLow.category.icon} categoryName={firstLow.category.name} size={20} />}>{firstLow.category.name}</Fact> <Fact tone={firstLow.daysCovered < 1 ? "danger" : "warning"} onClick={onOpenAssign} label={`Rebalance ${firstLow.category.name}`}>runs out {firstLow.daysCovered < 1 ? "today" : `in about ${Math.round(firstLow.daysCovered)} days`}</Fact></span>
+      ? <span key="low"><Fact>{firstLow.category.name}</Fact> <Fact tone={firstLow.daysCovered < 1 ? "danger" : "warning"} onClick={onOpenAssign} label={`Rebalance ${firstLow.category.name}`}>runs out {firstLow.daysCovered < 1 ? "today" : `in about ${Math.round(firstLow.daysCovered)} days`}</Fact></span>
       : <span key="low"><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenAssign} label="Rebalance running low categories">running low</Fact></span>),
     showPlanningPrompt && <span key="plan"><Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</Fact> is unplanned for <Fact>{planningLabel}</Fact></span>,
     showUnassignedPrompt && !showMonthEndAlert && <span key="unassigned"><Fact onClick={onOpenAssign} label="Assign unassigned money">{fmt(Math.round(unassigned))}</Fact> is <Fact>unassigned</Fact></span>,

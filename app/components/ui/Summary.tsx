@@ -1,10 +1,11 @@
 "use client";
 
+import "./summary.css";
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 
 /**
- * The app's narrative summary (design.md, "Summary sentence"): connecting words stay muted and
- * each fact is in full ink with a small inline icon. The tappable fact is the problem to resolve ("516 off"), not its name.
+ * The app's narrative summary (design.md, "Summary sentence"): connecting words use readable secondary text;
+ * actions and exceptions carry the strongest emphasis. The tappable fact is the problem to resolve ("516 off"), not its name.
  */
 export function Summary({ children, style, className = "" }: { children: ReactNode; style?: CSSProperties; className?: string }) {
   return <p className={`summary ${className}`.trim()} style={style}>{children}</p>;

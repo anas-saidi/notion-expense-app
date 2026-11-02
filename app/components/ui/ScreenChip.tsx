@@ -42,7 +42,7 @@ const chipStyle = (selected: boolean): CSSProperties => ({
   flexShrink: 0,
   display: "inline-flex",
   alignItems: "center",
-  gap: 7,
+  gap: 8,
   padding: "0 12px",
   borderRadius: 999,
   border: selected ? "1px solid transparent" : "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
@@ -51,7 +51,7 @@ const chipStyle = (selected: boolean): CSSProperties => ({
   fontFamily: "var(--font-body)",
   fontSize: 12,
   lineHeight: 1,
-  fontWeight: 700,
+  fontWeight: 600,
   cursor: "pointer",
 });
 
@@ -68,6 +68,6 @@ const badgeStyle = (selected: boolean, tone: "neutral" | "metric"): CSSPropertie
     : selected ? "color-mix(in srgb, var(--bg) 18%, transparent)" : "var(--surface2)",
   color: tone === "metric" && !selected ? "var(--select-ink)" : "inherit",
   fontSize: 11,
-  fontWeight: 650,
+  fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
 });

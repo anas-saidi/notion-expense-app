@@ -46,11 +46,10 @@ export function GlobalBudgetScopePicker({
               onChange(scope);
             }}
           >
-            {/* Only the selected jar is alive (blinks); the others rest still. Joint is the heart. */}
             <Mascot
-              target={{ scope, gap: 0, mood: active ? "happy" : "idle", outline: "partner", celebrate: scope === "joint" }}
+              target={{ scope, gap: 0, mood: "happy", outline: "partner", celebrate: scope === "joint" }}
               size={PICKER_MASCOT_SIZE}
-              calm={!active}
+              calm
               style={{ flexShrink: 0, margin: "-4px -3px" }}
             />
             <span className="global-scope-label">{GLOBAL_SCOPE_NAMES[scope]}</span>

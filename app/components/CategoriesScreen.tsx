@@ -10,7 +10,7 @@ import { MonthPicker } from "./DatePicker";
 import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon } from "./ui/icons";
+import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, ShuffleIcon, PlusIcon } from "./ui/icons";
 import { SearchField } from "./ui/SearchField";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned, today } from "./app-utils";
@@ -249,6 +249,7 @@ export function CategoriesScreen({
               />
             </section>
             <ScreenToolbar label="Budget period and planning" className="budget-desktop-controls">
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <MonthPicker
                 value={homeMonth}
                 aria-label="Filter planned and spent by month"
@@ -264,6 +265,8 @@ export function CategoriesScreen({
                   {planMonth === homeMonth ? "Plan" : `Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}
                 </button>
               )}
+              </div>
+              <button type="button" className="app-top-action budget-rebalance-control" onClick={onOpenRebalance} aria-label="Rebalance budget" title="Rebalance budget"><ShuffleIcon size={18} /></button>
             </ScreenToolbar>
             </div>
             <div className="budget-category-workspace screen-content">

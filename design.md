@@ -33,11 +33,11 @@ The primary object on Home is the wallet overview. One financial number owns the
 
 ## Global budget scope
 
-`Joint / Anas / Salma` is one app-wide context. It stays in the same top position across Home, Budget, and Insights, and changing it updates every destination.
+`Joint / Anas / Salma` is one app-wide context. It stays in the same top position across Home, Budget, and Reflect, and changing it updates every destination.
 
-- The picker has no enclosing rail, background, or border.
-- Each mode is an individual 44-point control. Unselected modes use a white surface and quiet shadow; the selected mode uses the high-contrast filled treatment.
-- Use recognizable vector people pictograms, never gender symbols or structural emoji.
+- The original three-mascot picker has one enclosing pill and sits at the left of the mobile header. Keep separate 44px minimum targets and full accessible names; personal modes flank Joint.
+- Picker mascots are static, with the original size/opacity selection treatment. No cuddling, overlap, captions or inner selected pill. Desktop retains visible names.
+- Preserve the established blue, heart and pink mascot artwork. Do not substitute gender symbols or decorative emoji.
 - Full-screen actions such as Rebalance inherit the global scope and show it as read-only context. They never introduce a second scope picker.
 - A setup flow may step through owners locally only when owner selection is required to complete that workflow.
 
@@ -62,7 +62,7 @@ Partner summaries are context and navigation, not a leaderboard. Selecting one s
 - `--accent`: ink (near-black in light mode, near-white in dark) for primary action fills, paired with `--accent-ink` text. Colour is left to the mascots and the wallet; actions stay calm next to them.
 - `--select-color`, `--select-wash`, `--select-edge`, `--select-ink`: selection and data fills follow the wallet (`html[data-scope]`, set from the app-wide mode): Anas's blue, Salma's pink, or ink for Joint (never a blue-pink blend, which reads as lavender). Selected rows, chips, tabs and toggles use the wash with the ink; progress bars, charts and sliders use the colour, so "selected" also says whose money it is. `--accent-foreground` is an alias of `--select-ink`.
 - `--budget-used`: neutral text tone for normal budget consumption; retain amber caution and red overspending states. Spending is consumption, not a completion goal.
-- `--summary-accent`: purple, reserved for the narrative Summary label and its analytical identity; it is not a general action color.
+- Summaries use `--text2` for readable connecting text and `--text` for facts. No decorative summary accent color.
 - Partner blue and pink identify people. Through the `--select-*` tokens they also mark what is selected and fill data inside that person's wallet (Joint uses neutral ink); they are never used for actions, which stay ink.
 - Danger, warning, success, information, transfer, and income colors are semantic and must not be repurposed decoratively. Green (`--success`, `--action-income`, a soft sage that sits with the pastel mascots) means money in or kept: income, "Saved", positive available. Never selection, never an action.
 
@@ -171,9 +171,9 @@ New features must compose these primitives before introducing a new visual imple
 
 Where a screen needs to say what matters right now, it says it in one sentence instead of stacking banners. `Summary` renders the sentence and `Fact` marks each fact inside it.
 
-- Connecting words are muted; each fact is in full ink at semibold. A fact is what you'd remember after one glance: the name *and* its number or state ("**Groceries** runs out **today**", "is **516 off** your count"). The tappable fact is the problem to resolve, the number or state ("**516 off**" opens the review, "**runs out today**" opens Rebalance); the name stays plain bold with its icon. Amounts in a sentence are rounded to whole numbers. The sentence is 20px (`--summary-size`) at 1.25 line height, so it never competes with the screen's main number, tabular numerals, sentence-case. Connecting words are a lighter muted grey at 500; facts are 700, so the weight gap does the work.
-- A fact may carry one inline icon: the category or account artwork from `CategoryIcon`, sized to 1.1em so it reads as part of the word. No other icon family inside a sentence.
-- A fact that opens something is a real button: its icon and weight are the cue (an underline appears only on pointer hover), it has an invisible 8px hit extension around it (44px total, without opening up the line spacing), a pressed opacity and a focus ring, and an accessible label naming what it opens. Facts that open nothing stay plain bold.
+- Summary styles live with the shared component in `app/components/ui/summary.css`. Connecting text uses `--text2`, weight 400, and zero tracking. Ordinary facts use `--text`, weight 500; actions and semantic exceptions use 600. Main-screen summaries remain 18px / 1.4, centered on mobile and left-aligned on desktop. Other summaries retain the shared 20px baseline unless their component specifies an established size.
+- Omit redundant account/category art inside Home and Reflect narrative sentences. Keep category artwork in rows and the established hero mascots.
+- Tappable facts remain real buttons, with the existing invisible hit extension, pressed feedback, keyboard focus ring and full accessible destination label. Pointer hover underlines an action without lifting it out of the sentence. State color belongs only to the relevant fact.
 - At most three facts, joined as "a, b and c" (`joinClauses`), ranked by urgency. Everything left out still lives on its own screen.
 - Colour (`tone`) goes on the number or state only, never on the name or connecting words, and only when it carries meaning: `danger` for money already wrong (over budget, runs out today), `warning` for attention soon (count off, running low), `success` for good news (count matches, within budget). Opportunities such as unassigned money or planning stay in ink.
 - Never repeat the screen's main number in the sentence, never put buttons or tinted backgrounds inside it, and never join phrases with a middle dot.
@@ -641,7 +641,7 @@ Home, Budget and Reflect use `ui/ScreenHero.tsx` and `ui/screen-hero.css`. This 
 | Actions | Separate shared slot beneath the summary, 12px between actions. Routine Budget notices use tappable summary facts; genuine errors retain their recovery control. |
 
 - Keep the order mascot → metric → summary → actions on narrow and wide screens. Desktop cards and workspace columns remain screen-specific; internal hero geometry does not change.
-- Reflect’s period picker and icon-only filter share one row below the summary. Spending/Activity uses `ScreenChip` controls at the top of the existing 250px visual frame. Activity omits the duplicate main amount and uses a 310px chart frame, with 80px above the 220px chart and 10px below it. Right-aligned view chips keep the same top position in both modes. Spending retains its 250px mascot and metric positions. Activity places a factual money-in-versus-spending summary directly under the chart. The same hero and control slots remain mounted through transaction loading, errors, empty results and view changes. The view chips use the clear top of the visual frame, without adding a row above the hero. Optional work-time text also follows the summary, so it cannot shift the summary baseline. Reflect and Budget place their controls in the shared `ScreenToolbar` after the hero and use the same calendar pill trigger (`composer-picker-chip`, no chevron); Reflect retains its range-selection dialog. The filter keeps an accessible label and active-state tint. Screen-specific tabs, work-time equivalents and supporting information remain optional slots or surrounding controls. Reserve two lines for the summary even when no notice exists; allow longer summaries to grow without clipping. Do not reserve empty action controls.
+- Reflect’s period picker and icon-only filter share one row below the summary. Spending/Activity uses `ScreenChip` controls at the top of the existing 250px visual frame. Activity omits the duplicate main amount and uses a 312px chart frame, with 80px above the 220px chart and 12px below it. Right-aligned view chips keep the same top position in both modes. Spending retains its 250px mascot and metric positions. Activity places a factual money-in-versus-spending summary directly under the chart. The same hero and control slots remain mounted through transaction loading, errors, empty results and view changes. The view chips use the clear top of the visual frame, without adding a row above the hero. Optional work-time text also follows the summary, so it cannot shift the summary baseline. Reflect and Budget place their controls in the shared `ScreenToolbar` after the hero and use the same calendar pill trigger (`composer-picker-chip`, no chevron); Reflect retains its range-selection dialog. The filter keeps an accessible label and active-state tint. Screen-specific tabs, work-time equivalents and supporting information remain optional slots or surrounding controls. Reserve two lines for the summary even when no notice exists; allow longer summaries to grow without clipping. Do not reserve empty action controls.
 - The number row reserves 1.2em height. Long values fit their container on mount, resize and font load. All heroes start at the real value; integer changes may use the existing counter, while decimal values preserve their exact formatting.
 - Keep the existing mascot illustration, data meaning, tap destinations, financial scope, warnings and loading/error behavior. This component standardizes presentation; it does not make cash, allocation and spending interchangeable.
 
@@ -662,3 +662,27 @@ Activity summary compares the last cumulative flow point, preserving cents. It h
 Joint category Fund uses **Add to plan** when a saved contribution agreement exists. Preview the extra allocation and contribution increases using the existing split; confirm both in one action. Keep a checkbox for funding with existing money without revising agreed amounts. Original agreements and actual contributions remain recorded. Pending additions retain their operation ID across retries and reloads. See docs/plan-additions.md for recovery behavior.
 
 On mobile, the scope picker anchors the header's left edge and screen actions remain grouped on the right. Reflect's view chips align at the top-right of the content region without shifting its mascot/metric blocks. Do not invent a left action just to balance the header.
+
+## Mobile header ownership
+
+The app header uses two CSS-owned columns on mobile: the budget picker on the left, screen actions then Settings on the right. Remove the former inline three-column template. Keep Settings at the far-right position on Home, Budget and Reflect; Budget’s Rebalance action lives in the context toolbar beside month/planning controls.
+
+The header picker restores the original enclosing pill, mascot sizes, spacing and selection treatment, positioned on the left. No cuddling, overlapping artwork, inner selected pill or mobile captions. All picker mascots remain static (`calm`). The three separate 44px minimum targets and accessible names remain. Desktop labels and the planner layout retain their existing behavior.
+
+Local development uses `NEXT_BUILD_DIR=.next-local` so production builds in `.next` cannot replace its chunks. The preview returned HTTP 200 after restart. This header change passed TypeScript and whitespace checks; internal-browser automation remains unavailable, so rendered mobile/desktop acceptance is unverified.
+
+## Approved light unslop pass
+
+Scope: Home, Budget and Reflect, preserving accepted layout and mascot identity. Use readable semantic secondary text in summaries, 500 for ordinary facts and 600 for actionable/status facts; category names use 500 and amounts 600. Reflect leads with budget exceptions, then concentration and period health; shorten filler without changing dates, scope or calculations. Keep all financial destinations and full accessible labels.
+
+One shared desktop composition block owns the 2:3 overview/content columns. Remove earlier superseded grid placements rather than adding further overrides. Preserve inspector stacking, hero frame sizes and all header/toolbar decisions. No new artwork, font, palette, layout model or financial behavior is introduced.
+
+Method: unslop by Damir Sokolovsky (https://github.com/heydamir/unslop), CC BY 4.0. See docs/unslop-audit-2026-11-02.md for evidence and verification limits.
+
+## Focused hero polish
+
+Keep the approved 250px mascot artwork/frame and centered mobile summaries. Align the numerical digits with the mascot centerline; mirror the measured currency width as empty space on the left and retain the visible `MAD` on the right. Account for both gutters when fitting long numbers. Preserve all signs, cents, integer-change animation and accessible currency text. The hero currency mark uses the existing semantic muted color at full opacity so its small type retains readable contrast.
+
+`ui/hero-tokens.ts` owns the 250px mascot frame and Activity's 312px frame, 220px chart and 80px top inset. Activity has no duplicate main amount. Its loading state uses the same chart slot and a chart-shaped skeleton; Spending retains the mascot skeleton. Shared summary space owns its height, with no extra Reflect-only wrapper. Hero taps preserve their existing behavior and feedback without a decorative hover lift; keyboard focus remains visible.
+
+Direction remains the approved light unslop direction: household budgeting; warm, exact and unhurried; shared money jars on neutral surfaces; mascot waterline and spending chart as the rich moments; blue, Joint heart and pink as the signature. No financial calculations, palette, art or navigation changes.

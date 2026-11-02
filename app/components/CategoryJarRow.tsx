@@ -128,6 +128,6 @@ const rowStyle: CSSProperties = {
   textAlign: "left",
 };
 const textStyle: CSSProperties = { display: "grid", gap: 2, flex: 1, minWidth: 0 };
-const nameStyle: CSSProperties = { fontSize: 15, fontWeight: 700, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" };
+const nameStyle: CSSProperties = { fontSize: 15, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" };
 const lineStyle: CSSProperties = { fontSize: 12, fontVariantNumeric: "tabular-nums" };
-const amountStyle: CSSProperties = { fontSize: 17, fontWeight: 700, lineHeight: 1, fontVariantNumeric: "tabular-nums", flexShrink: 0 };
+const amountStyle: CSSProperties = { fontSize: 17, fontWeight: 600, lineHeight: 1, fontVariantNumeric: "tabular-nums", flexShrink: 0 };
