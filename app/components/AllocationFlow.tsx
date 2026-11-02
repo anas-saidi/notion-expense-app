@@ -77,7 +77,7 @@ export function AllocationFlow({
   readOnlyBanner,
   headerControls,
   flowPreview,
-  title = "Set Monthly Budget",
+  title = "Set monthly budget",
   balancedLabel = "Fully assigned",
   balancedNote,
   heroPool = false,
@@ -194,7 +194,7 @@ export function AllocationFlow({
       onCancel();
     } catch (error: unknown) {
       setSaveState("error");
-      setSaveError(error instanceof Error ? error.message : "Failed to save plan");
+      setSaveError(error instanceof Error ? error.message : "Could not save plan");
     }
   };
 
@@ -218,9 +218,9 @@ export function AllocationFlow({
             const jarMood = isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle";
             const jarStyle = { marginBottom: heroPool ? -8 : 4 };
             return jarLevel !== undefined ? (
-              <MascotTap label="Tap allocation mascot"><MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} style={jarStyle} /></MascotTap>
+              <MascotTap label="Allocation details"><MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} style={jarStyle} /></MascotTap>
             ) : (
-              <MascotTap label="Tap allocation mascot"><MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={jarStyle} /></MascotTap>
+              <MascotTap label="Allocation details"><MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={jarStyle} /></MascotTap>
             );
           })()}
           {heroPool ? (
@@ -348,7 +348,7 @@ export function AllocationFlow({
             <div role="status" style={confirmationStyle}>
               <span>
                 <strong style={confirmationTitleStyle}>Apply this rebalance?</strong>
-                <span style={confirmationCopyStyle}>{isBalanced ? "Every available dirham stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} will remain unassigned.`}</span>
+                <span style={confirmationCopyStyle}>{isBalanced ? "All available money stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} will remain unassigned.`}</span>
               </span>
               <button type="button" onClick={() => setConfirming(false)} style={confirmationBackStyle}>Back</button>
             </div>

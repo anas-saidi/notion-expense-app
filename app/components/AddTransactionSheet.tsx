@@ -311,7 +311,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             value={props.name}
             onChange={(e) => props.onNameChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && props.canSubmit && submit()}
-            placeholder={isIncome ? "Where did it come from?" : "What was it for?"}
+            placeholder={isIncome ? "Income source" : "Description"}
             style={{
               width: "100%",
               minHeight: 56,
@@ -634,7 +634,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             <div style={confirmIconStyle}><DeleteIcon size={20} /></div>
             <div style={{ display: "grid", gap: 6 }}>
               <h2 style={confirmTitleStyle}>Delete this expense?</h2>
-              <p style={confirmCopyStyle}>It will be removed from activity and budget totals. You can undo immediately afterward.</p>
+              <p style={confirmCopyStyle}>Removes this expense from activity and budget totals. Undo is available afterward.</p>
             </div>
             <SheetFooter style={confirmActionsStyle}>
               <button type="button" onClick={() => setConfirmingDelete(false)} disabled={deleting} style={cancelDeleteStyle}>Cancel</button>

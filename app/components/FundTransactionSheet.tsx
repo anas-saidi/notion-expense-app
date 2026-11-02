@@ -100,7 +100,7 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
         <SheetHeader style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={iconStyle}><FundIcon size={18} /></span>
-            <h2 style={titleStyle}>Edit fund</h2>
+            <h2 style={titleStyle}>Edit funding</h2>
           </div>
           <button type="button" className="sheet-close-button" onClick={onClose} aria-label="Close funding editor"><XIcon /></button>
         </SheetHeader>
@@ -110,10 +110,10 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
           <span style={amountFieldStyle}><input className="display-amount-input" autoFocus inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} aria-label="Funding amount" style={amountInputStyle} /><Currency /></span>
           <span style={{ fontSize: 12, color: reductionTooLarge ? "var(--danger)" : "var(--muted)" }}>
             {reductionTooLarge
-              ? `This fund cannot go below ${minimumAmount.toLocaleString("en-US")} because the rest has already been used.`
+              ? `Minimum ${minimumAmount.toLocaleString("en-US")}: the remaining funding has been used.`
               : transaction.amount > transaction.categoryAvailable
-                ? `${transaction.categoryAvailable.toLocaleString("en-US")} is available to remove. Delete is unavailable because part of this fund has been used.`
-                : `${transaction.categoryAvailable.toLocaleString("en-US")} from this category is currently available to remove.`}
+                ? `${transaction.categoryAvailable.toLocaleString("en-US")} available to remove. Used funding prevents deletion.`
+                : `${transaction.categoryAvailable.toLocaleString("en-US")} available to remove.`}
           </span>
         </label>
         <div style={fieldStyle}>
@@ -132,8 +132,8 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
         {confirmDelete && <Banner tone="danger" role="alert" compact>Delete this funding transaction? Budget totals will be recalculated.</Banner>}
 
         <SheetFooter style={actionsStyle}>
-          <button type="button" onClick={remove} disabled={status !== "idle" || transaction.amount > transaction.categoryAvailable} title={transaction.amount > transaction.categoryAvailable ? "This fund has already been partially used and cannot be deleted" : undefined} style={{ ...secondaryButtonStyle, color: "var(--danger)" }}>
-            <DeleteIcon size={17} />{status === "deleting" ? "Deleting…" : confirmDelete ? "Confirm delete" : "Delete"}
+          <button type="button" onClick={remove} disabled={status !== "idle" || transaction.amount > transaction.categoryAvailable} title={transaction.amount > transaction.categoryAvailable ? "Used funding cannot be deleted" : undefined} style={{ ...secondaryButtonStyle, color: "var(--danger)" }}>
+            <DeleteIcon size={17} />{status === "deleting" ? "Deleting…" : confirmDelete ? "Delete funding" : "Delete"}
           </button>
           <button type="button" onClick={save} disabled={!valid || status !== "idle"} style={primaryButtonStyle}>{status === "saving" ? "Saving…" : "Save changes"}</button>
         </SheetFooter>

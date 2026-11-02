@@ -8,7 +8,7 @@ import { ThemeToggle } from "./ui/ThemeToggle";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "./ui/icons";
 type Theme = "system" | "light" | "dark";
-export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccounts, syncTimestamp, syncing = false, onSync, workScope, budgetScope }: { budgetScope: BudgetScope; workScope?: BudgetScope; open: boolean; onClose: () => void; theme: Theme; onSelectTheme: (theme: Theme) => void; onOpenAccounts?: () => void; syncTimestamp?: string | null; syncing?: boolean; onSync?: () => void }) {
+export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccounts, onCheckBalances, canCheckBalances = true, syncTimestamp, syncing = false, onSync, workScope, budgetScope }: { budgetScope: BudgetScope; workScope?: BudgetScope; open: boolean; onClose: () => void; theme: Theme; onSelectTheme: (theme: Theme) => void; onOpenAccounts?: () => void; onCheckBalances?: () => void; canCheckBalances?: boolean; syncTimestamp?: string | null; syncing?: boolean; onSync?: () => void }) {
   const rates = useWorkRates();
   const [editingScope, setEditingScope] = useState<BudgetScope | null>(null);
   const [draft, setDraft] = useState("");
@@ -53,7 +53,7 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
             <label style={fieldLabelStyle}><span>Pay frequency</span><select className="field-input" value={person.frequency} onChange={event => updatePerson(index, { frequency: event.target.value as PayFrequency })}><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select></label>
             <label style={fieldLabelStyle}><span>Hours worked per week</span><input className="field-input" inputMode="decimal" value={person.hours} placeholder="40" onChange={event => updatePerson(index, { hours: event.target.value })} /></label>
           </fieldset>)}
-          <p aria-live="polite" style={{ margin: 0, fontSize: 15, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{calculatedRate === null ? "Your hourly rate will appear here." : `${editingScope === "joint" ? "Your household’s" : "Your"} hourly rate is ${calculatedRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} MAD`}</p>
+          <p aria-live="polite" style={{ margin: 0, fontSize: 15, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{calculatedRate === null ? "Enter pay and weekly hours to calculate your rate." : `${editingScope === "joint" ? "Your household’s" : "Your"} hourly rate is ${calculatedRate.toLocaleString(undefined, { maximumFractionDigits: 2 })} MAD`}</p>
         </> : <>
         <label style={{ display: "grid", gap: 8 }}>
           <span style={sectionTitleStyle}>Take-home hourly rate</span>
@@ -84,11 +84,14 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
           <ThemeToggle theme={theme} onSelectTheme={onSelectTheme} />
         </div>
       </section>
-      {onOpenAccounts && <section aria-label="Finances" style={sectionStyle}>
+      {(onOpenAccounts || onCheckBalances) && <section aria-label="Finances" style={sectionStyle}>
         <h3 style={sectionTitleStyle}>Finances</h3>
-        <button type="button" className="settings-navigation-row" onClick={onOpenAccounts} style={navigationRowStyle}>
+        {onOpenAccounts && <button type="button" className="settings-navigation-row" onClick={onOpenAccounts} style={navigationRowStyle}>
           Accounts <ChevronRightIcon size={18} aria-hidden="true" />
-        </button>
+        </button>}
+        {onCheckBalances && <button type="button" className="settings-navigation-row" disabled={!canCheckBalances} onClick={onCheckBalances} style={{ ...navigationRowStyle, opacity: canCheckBalances ? 1 : 0.5, cursor: canCheckBalances ? "pointer" : "default" }}>
+          Check balances <ChevronRightIcon size={18} aria-hidden="true" />
+        </button>}
       </section>}
       <button type="button" className="settings-navigation-row" onClick={() => startEditing(budgetScope)} style={navigationRowStyle}>
         <span>Work & income</span>

@@ -34,10 +34,10 @@ export function ReallocationAssistant({ scope, month, categories, onUse }: Props
       const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
         body: JSON.stringify({ action: "reallocate", text, scope, month }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Couldn't suggest moves.");
-      if (categories.some(c => data.balances?.[c.id] !== c.available) || Object.keys(data.balances ?? {}).length !== categories.length) throw new Error("Your budget changed. Close Rebalance, sync, and ask again.");
+      if (!response.ok) throw new Error(data.error || "Could not suggest moves.");
+      if (categories.some(c => data.balances?.[c.id] !== c.available) || Object.keys(data.balances ?? {}).length !== categories.length) throw new Error("Budget changed. Close Rebalance, refresh, and retry.");
       setSuggestion(data);
-    } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Couldn't reach Gemini. Try again."); }
+    } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Could not reach Gemini. Try again."); }
     finally { if (abort.current === controller) { locked.current = false; setBusy(false); } }
   };
 
@@ -55,7 +55,7 @@ export function ReallocationAssistant({ scope, month, categories, onUse }: Props
         <div className="ai-move-heading"><span>{categories.find(c => c.id === move.fromId)?.name} → {categories.find(c => c.id === move.toId)?.name}</span><span aria-label={`${move.amount} MAD`}><Money value={move.amount} /></span></div>
         <p className="ai-helper">{move.reason}</p>
       </div>)}
-      {suggestion.moves.length > 0 && <><button type="button" className="ai-action" onClick={() => { onUse(suggestion); setSuggestion(null); }}>Use suggestion</button><p className="ai-helper">Loads these amounts into Rebalance for review. Apply confirms the transfers.</p></>}
+      {suggestion.moves.length > 0 && <><button type="button" className="ai-action" onClick={() => { onUse(suggestion); setSuggestion(null); }}>Use suggestion</button><p className="ai-helper">Review these moves in Rebalance. Apply saves the transfers.</p></>}
     </div>}
     <span className="sr-only" role="status">{busy ? "Preparing reallocation suggestions" : ""}</span>
   </section>;

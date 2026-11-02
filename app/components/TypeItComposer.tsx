@@ -175,7 +175,7 @@ export function TypeItComposer(props: Props) {
       const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
         body: JSON.stringify({ action: "parse", text, defaultDate: props.defaultDate, categories: props.categories.map(c => ({ id: c.id, name: c.name, defaultAccountId: c.defaultAccount })), accounts: props.accounts.map(a => ({ id: a.id, name: a.label })), defaultAccountId: props.defaultAccountId }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Couldn't parse your text.");
+      if (!response.ok) throw new Error(data.error || "Could not create transaction drafts.");
       const result = validateParsing(data, props.categories.map(c => ({ id: c.id, name: c.name })), props.accounts.map(a => ({ id: a.id, name: a.label })));
       if (result.questions.length) { setFeedback({ error: true, message: result.questions.join(" ") }); return; }
       const nextChoices: Record<number, Choice> = {};
@@ -189,7 +189,7 @@ export function TypeItComposer(props: Props) {
       });
       setFeedback({ error: needsSelection, message: needsSelection ? "Choose the missing category or account before saving." : `${result.transactions.length} ${result.transactions.length === 1 ? "transaction" : "transactions"} ready to save.` });
     } catch (error) {
-      if (!controller.signal.aborted) setFeedback({ error: true, message: error instanceof Error ? error.message : "Couldn't reach Gemini. Your text is kept." });
+      if (!controller.signal.aborted) setFeedback({ error: true, message: error instanceof Error ? error.message : "Could not reach Gemini. Your text is kept." });
     } finally { setParsing(false); lock.current = false; }
   };
   const editLine = (index: number, value: string) => {
@@ -220,7 +220,7 @@ export function TypeItComposer(props: Props) {
   };
 
   return <div style={{ display: props.active ? "flex" : "none", flexDirection: "column", flex: "1 1 auto", minHeight: 0 }}>
-    <p id="typed-help" className="sr-only">Write naturally, then choose Create transactions to turn your text into transaction drafts. For local parsing, use one transaction per line and press Enter for a new line. Amounts are in MAD. Purchases are expenses; use salary, received, or a plus sign for income. Dates can be today, yesterday, a weekday, or YYYY-MM-DD. Tap a line's category or account to change it.</p>
+    <p id="typed-help" className="sr-only">Write in MAD, then choose Create transactions. Use salary, received, or + for income. For local parsing, put each transaction on a new line. Use today, yesterday, a weekday, or YYYY-MM-DD for dates. Review categories and accounts before saving.</p>
     <div style={{ flex: "1 1 auto", overflowY: "auto", minHeight: 0, display: "flex", flexDirection: "column", paddingTop: 24 }}>
       <div role="group" aria-label="Write transactions" style={{ display: "grid", gap: 28 }}>
         {lines.map((source, index) => {
@@ -260,7 +260,7 @@ export function TypeItComposer(props: Props) {
               </button>}
               {transaction.date !== props.defaultDate && <span style={dateNoteStyle}>{dayLabel(transaction.date)}</span>}
             </div>}
-            {row?.error && focusedLine !== index && <p style={helperStyle}>{row.error} Choose Create transactions to use this text.</p>}
+            {row?.error && focusedLine !== index && <p style={helperStyle}>{row.error} Create transactions to review this text.</p>}
           </div>;
         })}
       </div>
@@ -278,7 +278,7 @@ export function TypeItComposer(props: Props) {
     </div>
     <div style={{ flexShrink: 0, paddingTop: 12 }}>
       <button type="button" className="ai-action" aria-busy={parsing} disabled={!text.trim() || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? "Creating…" : "Create transactions"}</button>
-      <p style={helperStyle}>Processed by Google. Avoid sensitive details.</p>
+      <p style={helperStyle}>Google processes your text. Avoid sensitive details.</p>
     </div>
     {rows.length > 0 && <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 0 0" }}>
       <div style={{ color: "var(--text2)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}><Money value={total} currency /><span style={{ ...helperStyle, marginLeft: 8 }}>net</span></div>

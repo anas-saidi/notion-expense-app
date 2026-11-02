@@ -2,8 +2,8 @@ import { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Notion Expenses",
-    short_name: "Expenses",
+    name: "Couple Finance",
+    short_name: "Couple Finance",
     description: "Add expenses to Notion",
     start_url: "/",
     display: "standalone",

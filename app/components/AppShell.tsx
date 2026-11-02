@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { AppTab, BudgetScope } from "./app-types";
 import { BottomNav } from "./BottomNav";
-import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon, ScaleIcon } from "./ui/icons";
+import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon } from "./ui/icons";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import { SettingsSheet } from "./SettingsSheet";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -163,7 +163,6 @@ export function AppShell({
         <BottomNav tab={tab} onTabChange={onTabChange} desktopPrimaryAction={showAddButton && <button type="button" className="desktop-nav-action desktop-nav-add" onClick={event => { event.currentTarget.focus(); haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></button>} desktopActions={<>
           {tab !== "home" && <button type="button" className="desktop-nav-action" onClick={tab === "budget" ? onBudgetSearch : onReflectSearch} aria-label={tab === "budget" ? "Search categories" : "Search activity"}><SearchIcon size={20} /><span>{tab === "budget" ? "Search categories" : "Search activity"}</span></button>}
           {onBudgetRebalance && <button type="button" className="desktop-nav-action" onClick={onBudgetRebalance} aria-label="Rebalance"><ShuffleIcon size={20} /><span>Rebalance</span></button>}
-          {onCheckBalances && <button type="button" className="desktop-nav-action" disabled={!canCheckBalances} onClick={onCheckBalances} aria-label="Check balances"><ScaleIcon size={20} /><span>Check balances</span></button>}
           {onSelectTheme && <button type="button" className="desktop-nav-action" onClick={() => setSettingsOpen(true)} aria-label="Settings"><SettingsIcon size={20} /><span>Settings</span></button>}
         </>} />
 
@@ -206,6 +205,11 @@ export function AppShell({
           onSync={onSync}
           theme={theme}
           onSelectTheme={onSelectTheme}
+          canCheckBalances={canCheckBalances}
+          onCheckBalances={onCheckBalances ? () => {
+            setSettingsOpen(false);
+            onCheckBalances();
+          } : undefined}
           onOpenAccounts={onOpenManage ? () => {
             setSettingsOpen(false);
             onOpenManage();

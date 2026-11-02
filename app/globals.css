@@ -144,7 +144,7 @@
 /*
  * Selection follows the wallet (the app-wide mode), so "selected" also says whose
  * money it is: Anas's blue, Salma's pink, or ink for Joint. Blending blue and pink
- * gives lavender, so the two colours only meet inside the mascot's liquid.
+ * gives lavender, so the two colours only meet inside the mascot’s liquid.
  * --select-color: data fills (bars, charts, sliders)  --select-wash: selected backgrounds
  * --select-edge: selected outlines                     --select-ink: selected text
  */
@@ -1627,7 +1627,7 @@ button[aria-label^="Close" i]:focus-visible {
     display: grid;
     grid-template-columns: minmax(0, 1fr) repeat(3, var(--budget-col-width));
     gap: 12px;
-    padding: 8px 14px 6px 10px;
+    padding: 8px 24px 6px 10px;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
     font-size: 12px;
     font-weight: 700;
@@ -1743,7 +1743,6 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   .home-txn-list { grid-template-columns:1fr !important; }
   .reflect-desktop-panels { display:grid; grid-template-columns:minmax(240px, 0.8fr) minmax(0, 1.2fr); gap:24px; align-items:start; }
   .reflect-desktop-overview, .reflect-desktop-categories { min-width:0; background:var(--surface); border-radius:16px; box-shadow:var(--elevation-card); padding:24px; }
-  .budget-desktop-overview { padding:16px 24px !important; border-radius:16px; background:var(--surface2) !important; }
   .budget-desktop-controls { padding:8px 0; }
   .budget-desktop-group { gap:8px !important; }
 }
@@ -1754,20 +1753,10 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   .account-desktop-overview { background:var(--surface2); border-radius:16px; padding:20px; }
   .account-desktop-activity { padding:8px 0; }
 }
-@media (min-width:1200px) {
-  .wallet-overview-card { padding:16px 24px !important; border-radius:16px; background:var(--surface2) !important; }
-  .wallet-overview-card > div { display:flex !important; align-items:center; justify-content:flex-start; gap:32px !important; }
-  .wallet-overview-card > div > div:last-child { justify-items:start !important; text-align:left !important; margin-top:0 !important; }
-  .wallet-overview-card [aria-label="Balance"] > span:first-child { font-size:56px !important; }
-  .budget-desktop-overview { grid-template-columns:auto minmax(0,1fr); grid-template-rows:auto auto; justify-items:start !important; align-items:center; column-gap:32px !important; }
-  .budget-desktop-overview > :first-child { grid-row:1 / 3; }
-  .budget-desktop-overview > :nth-child(2) { align-self:end; }
-  .budget-desktop-overview > :nth-child(3) { align-self:start; }
-}
 
 .desktop-nav-actions { display:none; }
 @media (min-width:900px) {
-  .app-header-actions, .mobile-check-balances { display:none !important; }
+  .app-header-actions { display:none !important; }
   .desktop-nav-actions { display:flex; flex-direction:column; gap:2px; padding:24px 10px 0; pointer-events:auto; }
   .desktop-nav-action { display:flex; align-items:center; gap:12px; min-height:48px; width:100%; padding:11px 14px; border:0; border-radius:12px; background:transparent; color:var(--muted); font:inherit; font-size:13px; text-align:left; cursor:pointer; }
   .desktop-nav-action:hover { background:var(--surface2); color:var(--text2); }

@@ -92,7 +92,7 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
               : <><strong>{Math.abs(delta).toLocaleString("en-US")}</strong> will return to {source?.label ?? "the default account"}.</>}
           </p>
         )}
-        {!source ? <Banner tone="warning" compact>Set a default account in category settings before adjusting available.</Banner> : target.trim() !== "" && delta !== 0 && !valid && <Banner tone="danger" compact>Adjustment exceeds the available balance.</Banner>}
+        {!source ? <Banner tone="warning" compact>Choose a default account in category settings first.</Banner> : target.trim() !== "" && delta !== 0 && !valid && <Banner tone="danger" compact>Adjustment exceeds the available balance.</Banner>}
         {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
         <button type="button" disabled={!valid || saving} onClick={submit} style={{ ...saveStyle, opacity: valid && !saving ? 1 : .45 }}>{saving ? "Applying…" : "Apply adjustment"}</button>
       </SheetBody>

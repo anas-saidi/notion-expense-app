@@ -14,7 +14,7 @@ export function LoadingRecovery({ loading, onRetry }: { loading: boolean; onRetr
   }, [loading, attempt]);
   if (!loading || !slow) return null;
   return <div className="loading-recovery">
-    <span role="status">Loading is taking longer than usual.</span>
-    <button type="button" onClick={() => { setSlow(false); setAttempt(value => value + 1); onRetry(); }}>Retry loading</button>
+    <span role="status">Still loading.</span>
+    <button type="button" onClick={() => { setSlow(false); setAttempt(value => value + 1); onRetry(); }}>Retry</button>
   </div>;
 }

@@ -1,0 +1,77 @@
+.screen-hero {
+  --hero-number-size: clamp(44px, 14vw, 72px);
+  --hero-summary-size: 18px;
+  container-type: inline-size;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px 0 24px;
+  box-sizing: border-box;
+}
+.screen-hero-mascot {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  min-height: var(--hero-mascot-size);
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: -8px;
+}
+.screen-hero-metric { display: grid; gap: 8px; justify-items: center; width: 100%; min-width: 0; }
+.screen-hero-label { margin: 0; color: var(--muted); font-size: 13px; line-height: 20px; font-weight: 600; text-align: center; }
+.screen-hero-value {
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  min-height: 1.2em;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--hero-number-size);
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: -.022em;
+  font-variant-numeric: tabular-nums;
+}
+.screen-hero-value > span { display: inline-flex; justify-self: center; white-space: nowrap; max-width: none; }
+.screen-hero-value[data-tone="danger"] { color: var(--danger); }
+.screen-hero-supporting { color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
+.screen-hero-supporting > p { margin: 0; }
+.screen-hero-summary, .screen-hero-actions { width: 100%; min-width: 0; }
+.screen-hero-summary .summary { --summary-size: var(--hero-summary-size); margin: 0; line-height: 1.4; text-align: left; }
+.screen-hero-actions { display: grid; gap: 12px; }
+.screen-hero-actions:empty { display: none; }
+.screen-hero-actions .balance-check-notices { margin-bottom: 0 !important; }
+
+/* Primary screens share the same vertical regions, with content-specific rows. */
+.screen-layout { --screen-gap: 24px; --screen-heading-size: 13px; }
+.screen-hero-summary { min-height: 2.8em; font-size: var(--hero-summary-size); }
+.screen-overview { min-width: 0; }
+.screen-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 44px; width: 100%; }
+.screen-content { min-width: 0; }
+.screen-layout .card-header, .screen-layout .section-toggle { min-height: 44px; margin-bottom: 8px !important; }
+.screen-layout .card-header-title, .screen-layout .section-toggle h2 { font-size: var(--screen-heading-size) !important; line-height: 20px !important; font-weight: 600 !important; letter-spacing: normal !important; color: var(--text2) !important; }
+.screen-layout .card-header-action { min-height: 44px; }
+@media (max-width: 899px) {
+  .screen-layout { display: grid; row-gap: var(--screen-gap) !important; }
+  .screen-layout .home-content { gap: var(--screen-gap) !important; }
+  .screen-layout .budget-category-workspace, .screen-layout .reflect-desktop-panels { display: grid; gap: var(--screen-gap); }
+  .screen-layout .budget-overview-context { display: block; }
+  .screen-layout .home-overview-grid, .screen-layout .home-balance-panel { display: contents; }
+}
+
+/* Controls occupy the existing clear top of the visual frame, never a new row. */
+.screen-hero-mascot { width: 100%; position: relative; }
+.reflect-hero-visual { position: relative; display: grid; place-items: center; width: 100%; height: var(--hero-mascot-size); min-width: 0; }
+.reflect-hero-switch { position: absolute; top: 0; right: 0; z-index: 2; display: flex; gap: 8px; width: max-content; }
+.reflect-hero-chart { width: 100%; min-width: 0; box-sizing: border-box; padding: 80px 0 10px; height: 100%; }
+
+.reflect-hero-visual[data-view="activity"] { height: 310px; }
+@media (max-width: 899px) {
+  .screen-hero-summary .summary { text-align: center; }
+  .screen-hero-summary .skeleton { margin-inline: auto; }
+}

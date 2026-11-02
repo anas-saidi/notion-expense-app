@@ -60,13 +60,13 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to add income");
+      if (!res.ok) throw new Error(data.error || "Could not add income");
       setStatus("success");
-      onSuccess(`${account.label} funded`);
+      onSuccess(`Income added to ${account.label}`);
       onClose();
     } catch (err: unknown) {
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Failed to add income");
+      setError(err instanceof Error ? err.message : "Could not add income");
     }
   };
 
@@ -88,7 +88,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             <div style={accountIconStyle}><CategoryIcon icon={accountIconSource(account.type)} size={28} /></div>
             <div style={{ minWidth: 0 }}>
-              <div style={eyebrowStyle}>Account income</div>
+              <div style={eyebrowStyle}>Add income</div>
               <h2 style={titleStyle}>{account.label}</h2>
             </div>
           </div>

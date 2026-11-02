@@ -1,15 +1,16 @@
 "use client";
 import { categoryIconSource } from "../../lib/category-icons";
 
-import type { CSSProperties } from "react";
+import { useId, type CSSProperties } from "react";
 import type { BudgetScope, Category } from "./app-types";
 import { fmt } from "./app-utils";
 import { runwayLabel } from "./category-runway";
 import type { BudgetStatus } from "./category-status";
-import { CategoryJar } from "./mascot/CategoryJar";
+import type { CategoryJarState } from "./mascot/CategoryJar";
+import { CategoryIcon } from "./ui/CategoryIcon";
 
 /**
- * One category on the Budget tab: its jar (what's left, in the status palette),
+ * One category on the Budget tab: its artwork (fading with remaining funds),
  * the name, one quiet line only when it says something, and the one number.
  * Rows sit flat on a shared section surface; tapping opens the category.
  * On desktop the row becomes a table row: Budgeted and Spent columns appear (CSS).
@@ -31,7 +32,7 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, o
   const amountColor = state === "over" ? "var(--status-over)" : low ? "var(--status-low)" : state === "normal" ? "var(--text2)" : "var(--muted)";
   return (
     <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, ${fmt(Math.round(amount))} MAD${line ? `, ${line.text}` : state === "empty" ? ", all spent" : state === "unfunded" ? ", not funded" : ""}`}>
-      <CategoryJar scope={scope} level={level} state={state} low={low} icon={categoryIconSource(cat.icon, cat.name)} />
+      <BudgetCategoryArtwork level={level} state={state} icon={categoryIconSource(cat.icon, cat.name)} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {/* "X spent" repeats the desktop Spent column, so it hides there. */}
@@ -43,7 +44,7 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, o
   );
 }
 
-/** A savings category: its jar fills up towards the goal instead of emptying. */
+/** Savings artwork gains clarity as the goal fills. */
 export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }: {
   cat: Category;
   scope: BudgetScope;
@@ -62,11 +63,11 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
     : Math.round(planned) > 0 ? `+${fmt(Math.round(planned))} this month`
     : Math.round(spent) > 0 ? `${fmt(Math.round(spent))} used`
     : null;
-  // Without a goal the jar just shows there's money in it: a still, soft level.
-  const level = goal > 0 ? pct : saved > 0 ? 0.5 : 0;
+  // Without a goal, keep funded artwork clear.
+  const level = goal > 0 ? pct : saved > 0 ? 1 : 0;
   return (
     <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}`}>
-      <CategoryJar scope={scope} level={level} state={saved > 0 ? "normal" : "unfunded"} kind="savings" icon={categoryIconSource(cat.icon, cat.name)} />
+      <BudgetCategoryArtwork level={level} state={saved > 0 ? "normal" : "unfunded"} icon={categoryIconSource(cat.icon, cat.name)} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {line && <span style={{ ...lineStyle, color: reached ? "var(--status-good)" : "var(--muted)", fontWeight: reached ? 600 : 500 }}>{line}</span>}
@@ -75,6 +76,23 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
       <span style={{ ...amountStyle, color: "var(--text2)" }}>{fmt(Math.round(saved))}</span>
     </button>
   );
+}
+
+/** Large, uncontained artwork. Fading never implies the row is disabled. */
+function BudgetCategoryArtwork({ icon, level, state }: { icon: string; level: number; state: CategoryJarState }) {
+  const tintId = `budget-art-${useId().replace(/:/g, "")}`;
+  const overspent = state === "over";
+  const opacity = overspent ? 1 : 0.6 + 0.4 * Math.max(0, Math.min(1, level));
+  return <span aria-hidden="true" style={{ position: "relative", display: "inline-flex", flexShrink: 0, width: 60, height: 60 }}>
+    {overspent && <svg width="0" height="0" style={{ position: "absolute" }}><defs>
+      <filter id={tintId} colorInterpolationFilters="sRGB">
+        <feFlood floodColor="var(--status-over)" floodOpacity="0.3" />
+        <feComposite in2="SourceGraphic" operator="in" />
+        <feBlend in2="SourceGraphic" mode="normal" />
+      </filter>
+    </defs></svg>}
+    <CategoryIcon icon={icon} size={60} style={{ opacity, filter: overspent ? `url(#${tintId})` : undefined }} />
+  </span>;
 }
 
 /** Desktop-only Budgeted / Spent cells; hidden on mobile by `.budget-col`. */
@@ -100,7 +118,7 @@ const rowStyle: CSSProperties = {
   alignItems: "center",
   gap: 12,
   minHeight: 76,
-  padding: "8px 14px 8px 10px",
+  padding: "8px 24px 8px 10px",
   border: "none",
   background: "transparent",
   width: "100%",

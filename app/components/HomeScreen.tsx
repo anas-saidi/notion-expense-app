@@ -22,7 +22,8 @@ type HomeScreenProps = {
   onReviewBalance?: (account: Account) => void;
   /** A savings account holding less than its categories promise (personal views only). */
   savingsGap?: { account: Account; gap: number; source?: Account; onFix: () => void };
-  /** Each partner's share still to put into Joined this month (opens the plan, where advances are applied). */
+  /** Each partner's share still to put into Joined this month (opens Contributions). */
+  onOpenContributions: () => void;
   contributionLeft?: { partner: "anas" | "salma"; left: number }[];
   categories: Category[];
   monthlyLoading?: boolean;
@@ -61,6 +62,7 @@ export function HomeScreen({
   onReviewBalance,
   savingsGap,
   contributionLeft = [],
+  onOpenContributions,
   categories,
   monthlyLoading = false,
   monthlyError = false,
@@ -178,9 +180,9 @@ export function HomeScreen({
       const off = account.balance == null ? null : Math.abs(counted - account.balance);
       const review = onReviewBalance && (() => onReviewBalance(account));
       const reviewLabel = `Review balance check for ${account.label}`;
-      return <span key={key}><Fact icon={<CategoryIcon icon={accountIconSource(account.type)} size={20} />}>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact> your count</>}</span>;
+      return <span key={key}><Fact icon={<CategoryIcon icon={accountIconSource(account.type)} size={20} />}>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact></>}</span>;
     }),
-    ...contributionLeft.map(({ partner, left }) => <span key={`left-${partner}`}><Fact>{partner === "anas" ? "Anas" : "Salma"}</Fact> has <Fact onClick={onOpenPlan} label={`Open the plan: ${partner === "anas" ? "Anas" : "Salma"} has ${fmt(left)} MAD left to put in`}>{fmt(left)}</Fact> left to put in</span>),
+    ...(!monthlyLoading && !monthlyError && !monthlySummary.contributionError ? contributionLeft : []).map(({ partner, left }) => <span key={`left-${partner}`}><Fact>{partner === "anas" ? "Anas" : "Salma"}</Fact> has <Fact onClick={onOpenContributions} label={`Open monthly contributions: ${partner === "anas" ? "Anas" : "Salma"} has ${fmt(left)} MAD left to put in`}>{fmt(left)} due</Fact></span>),
     // Below zero is money already wrong, so it comes before what's about to run out. Opens Rebalance to cover it.
     overspentCategories.length > 0 && (overspentCategories.length === 1
       ? <span key="overspent"><Fact icon={<CategoryIcon icon={overspentCategories[0].icon} categoryName={overspentCategories[0].name} size={20} />}>{overspentCategories[0].name}</Fact> is <Fact tone="danger" onClick={onOpenAssign} label={`Rebalance to cover ${overspentCategories[0].name}`}>{fmt(Math.ceil(-(overspentCategories[0].available ?? 0) - 0.005))} overspent</Fact></span>
@@ -188,7 +190,7 @@ export function HomeScreen({
     firstLow && (runningLow.length === 1
       ? <span key="low"><Fact icon={<CategoryIcon icon={firstLow.category.icon} categoryName={firstLow.category.name} size={20} />}>{firstLow.category.name}</Fact> <Fact tone={firstLow.daysCovered < 1 ? "danger" : "warning"} onClick={onOpenAssign} label={`Rebalance ${firstLow.category.name}`}>runs out {firstLow.daysCovered < 1 ? "today" : `in about ${Math.round(firstLow.daysCovered)} days`}</Fact></span>
       : <span key="low"><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenAssign} label="Rebalance running low categories">running low</Fact></span>),
-    showPlanningPrompt && <span key="plan"><Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</Fact> is waiting to be planned for <Fact>{planningLabel}</Fact></span>,
+    showPlanningPrompt && <span key="plan"><Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>{fmt(Math.round(planningRemaining?.[budgetScope] ?? readyToAssign))}</Fact> is unplanned for <Fact>{planningLabel}</Fact></span>,
     showUnassignedPrompt && !showMonthEndAlert && <span key="unassigned"><Fact onClick={onOpenAssign} label="Assign unassigned money">{fmt(Math.round(unassigned))}</Fact> is <Fact>unassigned</Fact></span>,
     showMonthEndAlert && !showPlanningPrompt && <span key="month-end">{plannedCount > 0
       ? <><Fact onClick={onOpenPlan} label={`Resume planning ${planningLabel}`}>{plannedCount} of 3 budgets</Fact> are ready for <Fact>{planningLabel}</Fact></>
@@ -196,11 +198,11 @@ export function HomeScreen({
   ].filter(Boolean).slice(0, 3);
 
   return (
-    <div id="panel-home" role="tabpanel" aria-labelledby="tab-home">
+    <div id="panel-home" className="screen-layout" role="tabpanel" aria-labelledby="tab-home">
 
       {/* Zone 1: Hero */}
       <div className="home-overview-grid">
-      <div className="home-balance-panel">
+      <div className="home-balance-panel screen-overview">
       <div style={walletSwitcherWrapStyle}>
         <WalletCardSwitcher
           value={budgetScope}
@@ -213,14 +215,12 @@ export function HomeScreen({
           categories={categories}
           overspent={overspentInCategories}
           balanceDetail={contributions}
+          summary={summaryClauses.length > 0 ? <Summary>{joinClauses(summaryClauses)}.</Summary> : null}
+          feedback={balanceChecks}
         />
       </div>
 
 
-      <div className="home-balance-notices">
-        {summaryClauses.length > 0 && <Summary style={{ marginBottom: 12 }}>{joinClauses(summaryClauses)}.</Summary>}
-        {balanceChecks}
-      </div>
       </div>
       <div className="home-budget-context">
       <DesktopMonthBudget summary={monthlySummary} month={homeMonth} loading={monthlyLoading} error={monthlyError} showPlanAction={!showPlanningPrompt && !showMonthEndAlert} onOpenPlan={onOpenPlan} onOpenReceipt={onOpenReceipt} />
@@ -304,8 +304,8 @@ export function HomeScreen({
 /* ─── Styles ──────────────────────────────────────────────────── */
 
 const walletSwitcherWrapStyle: CSSProperties = {
-  paddingTop: 8,
-  paddingBottom: 16,
+  paddingTop: 0,
+  paddingBottom: 0,
 };
 
 const contentStyle: CSSProperties = {

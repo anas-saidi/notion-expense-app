@@ -18,7 +18,7 @@ export function SectionToggle({ id, label, count, total, open, onToggle }: {
   onToggle: () => void;
 }) {
   return (
-    <button type="button" onClick={onToggle} aria-expanded={open} style={toggleStyle}>
+    <button className="section-toggle" type="button" onClick={onToggle} aria-expanded={open} style={toggleStyle}>
       <h2 id={id} style={titleStyle}>
         {label} <span style={countStyle}>{count}</span>
       </h2>

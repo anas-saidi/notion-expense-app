@@ -61,7 +61,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
 
       <section aria-labelledby="account-list-heading" style={accountsSectionStyle}>
         <div style={sectionHeaderStyle}>
-          <h2 id="account-list-heading" style={sectionTitleStyle}>Your accounts</h2>
+          <h2 id="account-list-heading" style={sectionTitleStyle}>Accounts</h2>
           <span style={accountCountStyle}>{scopedAccounts.length}</span>
         </div>
 
@@ -93,7 +93,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
             ))}
           </div>
         ) : (
-          <div style={emptyStyle}>No accounts match this profile.</div>
+          <div style={emptyStyle}>No accounts in this wallet.</div>
         )}
       </section>
     </main>

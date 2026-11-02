@@ -43,7 +43,7 @@ export function savedPlanReceipt(month: string, summary: MonthlySummary, categor
 export async function persistMonthPlan(payload: unknown, contribution?: unknown): Promise<{ agreement?: ContributionAgreement; warning?: string }> {
   const response = await fetch("/api/monthly-planning/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Couldn't save the plan");
+  if (!response.ok) throw new Error(result.error || "Could not save the plan");
   if (!contribution) return {};
   try {
     const response = await fetch("/api/contribution-agreements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(contribution) });

@@ -16,7 +16,7 @@ import { accountKey, checkedFundsAfter } from "../lib/balance-checks";
 import { HomeScreen } from "./components/HomeScreen";
 import { LoadingRecovery } from "./components/ui/LoadingRecovery";
 
-const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen), { loading: () => <SkeletonRegion label="Loading Reflect"><Skeleton style={{ height: 220, marginBottom: 16 }} /><SkeletonRows /></SkeletonRegion> });
+const ReflectScreen = dynamic(() => import("./components/ReflectScreen").then(m => m.ReflectScreen), { loading: () => <ScreenLoadingSkeleton label="Loading Reflect" /> });
 import { CategoriesScreen } from "./components/CategoriesScreen";
 const AddTransactionSheet = dynamic(() => import("./components/AddTransactionSheet").then(m => m.AddTransactionSheet));
 const AccountIncomeSheet = dynamic(() => import("./components/AccountIncomeSheet").then(m => m.AccountIncomeSheet));
@@ -58,7 +58,7 @@ import {
   today,
   transactionMatchesScope,
 } from "./components/app-utils";
-import { AppLoadingSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./components/ui/Skeleton";
+import { AppLoadingSkeleton, ScreenLoadingSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./components/ui/Skeleton";
 
 type SessionUser = { email: string | null; name: string | null; avatarUrl: string | null };
 
@@ -433,7 +433,7 @@ export default function App() {
         setRefreshState(failure ? "stale" : "idle");
       } catch (error) {
         if (cancelled) return;
-        console.error("[app] Failed to load live data:", error);
+        console.error("[app] Could not load live data:", error);
         if (coreReady.current) { setRefreshState("stale"); setRefreshError(error instanceof Error ? error.message : null); }
         else setLoadError(error instanceof Error ? error.message : "Could not load financial data");
       } finally {
@@ -473,7 +473,7 @@ export default function App() {
   useEffect(() => {
     if (!initialLoadComplete.current) return;
     void fetchMonthlySummary(homeMonth).catch((error) => {
-      console.error("[app] Failed to refresh monthly summary:", error);
+      console.error("[app] Could not refresh monthly summary:", error);
       setRefreshError(error instanceof Error ? error.message : null);
       setRefreshState("stale");
     }); // eslint-disable-line react-hooks/exhaustive-deps
@@ -861,14 +861,14 @@ export default function App() {
         body: JSON.stringify({ id: category.id, snoozed: false }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to revive category");
-      refreshBudgetData(`${category.name} revived`);
+      if (!res.ok) throw new Error(data.error || "Could not restore category");
+      refreshBudgetData(`${category.name} restored`);
       if (openFunding) {
         setCategoryManageCategory({ ...category, snoozed: false });
         setCategoryManageMode("fund");
       }
     } catch (error: unknown) {
-      showToast(error instanceof Error ? error.message : "Failed to revive");
+      showToast(error instanceof Error ? error.message : "Could not restore category");
     }
   };
 
@@ -880,11 +880,11 @@ export default function App() {
         body: JSON.stringify({ id: category.id, snoozed: true }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to freeze category");
+      if (!res.ok) throw new Error(data.error || "Could not freeze category");
       refreshBudgetData(`${category.name} frozen`);
       if (selectedCat?.id === category.id) setShowCategoryDetails(false);
     } catch (error: unknown) {
-      showToast(error instanceof Error ? error.message : "Failed to freeze");
+      showToast(error instanceof Error ? error.message : "Could not freeze");
     }
   };
 
@@ -1112,7 +1112,7 @@ export default function App() {
   if (!mounted || loading) return <AppLoadingSkeleton recovery={recovery} />;
 
   if (loadError) {
-    return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 20, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 22 }}>Could not load your finances</h1><p style={{ margin: "10px 0 18px", color: "var(--text2)" }}>No balances were replaced. Check the connection and try again.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ minHeight: 48, padding: "0 18px", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>Retry</button></section></main>;
+    return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 20, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 22 }}>Could not load your finances</h1><p style={{ margin: "10px 0 18px", color: "var(--text2)" }}>Balances unchanged. Check your connection and retry.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ minHeight: 48, padding: "0 18px", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>Retry</button></section></main>;
   }
 
   const parsedAmount = amount ? evalExpr(amount) : 0;
@@ -1210,7 +1210,7 @@ export default function App() {
           refreshBudgetData();
           void fetchNextMonthFunds().catch(() => {});
         }}
-        onDraftSaved={() => showToast("Plan draft saved in this browser", 2400)}
+        onDraftSaved={() => showToast("Plan draft saved on this browser", 2400)}
         onCategoriesChanged={() => {
           void fetchCategoryCatalog().catch(error => showToast(error.message));
         }}
@@ -1225,12 +1225,13 @@ export default function App() {
 
       {tab === "home" && (
         <HomeScreen
-          contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : <ContributionEntry status={contribStatus} scope={budgetScope} onOpen={() => setShowContributions(true)} />)}
+          contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : <ContributionEntry status={contribStatus} scope={budgetScope} advancesOnly onOpen={() => setShowContributions(true)} />)}
           savingsGap={savingsGap ?? undefined}
           contributionLeft={contributionLeft}
+          onOpenContributions={() => setShowContributions(true)}
           balanceReviews={balanceChecksToReview(balanceChecks.checks, balanceChecks.reviewCounts, accounts, budgetScope)}
           onReviewBalance={account => { setStartBalanceCheck(true); setDetailsAccount(account); }}
-          balanceChecks={<PendingBalanceChecks reviewCounts={balanceChecks.reviewCounts} onRetry={() => void balanceChecks.refresh()} checks={balanceChecks.checks} accounts={accounts} scope={budgetScope} error={balanceChecks.error} paused={balanceChecks.paused} loading={balanceChecks.loading} onOpen={() => setShowBalanceAccounts(true)} />}
+          balanceChecks={<PendingBalanceChecks onRetry={() => void balanceChecks.refresh()} error={balanceChecks.error} paused={balanceChecks.paused} loading={balanceChecks.loading} />}
           billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={checkedAccounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
           monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
           monthlyError={monthError}
@@ -1627,7 +1628,7 @@ export default function App() {
 
       {archivedTransaction && (
         <div role="status" aria-live="polite" style={undoNoticeStyle}>
-          <span>{archiveStatus === "restoring" ? "Restoring transaction…" : archiveStatus === "error" ? "Restore failed; transaction remains archived." : "Transaction archived."}</span>
+          <span>{archiveStatus === "restoring" ? "Restoring transaction…" : archiveStatus === "error" ? "Restore failed; transaction remains archived." : "Transaction deleted."}</span>
           <button type="button" disabled={archiveStatus === "restoring"} onClick={restoreArchivedTransaction} style={undoButtonStyle}>
             {archiveStatus === "error" ? "Retry" : "Undo"}
           </button>

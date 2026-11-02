@@ -1,6 +1,6 @@
 {
-  "name": "Notion Expense",
-  "short_name": "Expenses",
+  "name": "Couple Finance",
+  "short_name": "Couple Finance",
   "description": "Track shared household expenses with Notion",
   "start_url": "/",
   "display": "standalone",

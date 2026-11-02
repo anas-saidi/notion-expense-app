@@ -14,7 +14,8 @@ import { useRememberedJar } from "./memory";
  * weight as the screen's main number, so the two read as one hero, not as a
  * number with a sticker.
  */
-export const MASCOT_HERO_SIZE = 175;
+export { SCREEN_HERO_MASCOT_SIZE as MASCOT_HERO_SIZE } from "../ui/hero-tokens";
+import { SCREEN_HERO_MASCOT_SIZE as MASCOT_HERO_SIZE } from "../ui/hero-tokens";
 
 type Common = {
   scope: BudgetScope;

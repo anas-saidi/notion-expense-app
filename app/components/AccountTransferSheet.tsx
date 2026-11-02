@@ -86,14 +86,14 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to move money");
+      if (!res.ok) throw new Error(data.error || "Could not move money");
 
       setStatus("success");
       onSuccess(`Moved to ${toAccount?.label ?? "account"}`);
       onClose();
     } catch (err: unknown) {
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Failed to move money");
+      setError(err instanceof Error ? err.message : "Could not move money");
     }
   };
 
@@ -113,7 +113,6 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
       <SheetBody style={innerStyle}>
         <SheetHeader style={headerStyle}>
           <div>
-            <div style={eyebrowStyle}>Account transfer</div>
             <h2 style={titleStyle}>Move money</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
@@ -200,7 +199,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
 function BalanceTile({ label, account, nextBalance }: { label: string; account: Account | null; nextBalance: number | null }) {
   return (
     <div style={balanceTileStyle}>
-      <span style={eyebrowStyle}>{label}</span>
+      <span style={balanceLabelStyle}>{label}</span>
       <strong style={balanceAccountStyle}>{account ? <><CategoryIcon icon={accountIconSource(account.type)} size={18} /> {account.label}</> : "Choose account"}</strong>
       <span style={balanceAmountStyle}>
         {nextBalance !== null ? <Money value={nextBalance} /> : account?.balance != null ? <Money value={account.balance} /> : "TBD"}
@@ -228,12 +227,6 @@ const headerStyle: CSSProperties = {
   gap: 12,
 };
 
-const eyebrowStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-
-  color: "var(--muted)",
-};
 
 const titleStyle: CSSProperties = {
   margin: "4px 0 0",
@@ -353,4 +346,11 @@ const submitStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 8,
+};
+
+const balanceLabelStyle: CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: 12,
+
+  color: "var(--muted)",
 };

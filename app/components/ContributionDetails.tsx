@@ -20,9 +20,10 @@ import "./contributions.css";
 export const contributionMonthName = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleDateString("en", { month: "long", year: "numeric" });
 const person = (partner: Partner) => partner === "anas" ? "Anas" : "Salma";
 
-export function ContributionEntry({ status, scope, onOpen }: { status: ContributionStatus | null; scope: BudgetScope; onOpen: () => void }) {
+export function ContributionEntry({ status, scope, onOpen, advancesOnly = false }: { status: ContributionStatus | null; scope: BudgetScope; onOpen: () => void; advancesOnly?: boolean }) {
   const owing = status?.advances?.outstanding;
   const amount = owing ? scope === "joint" ? money(owing.anas + owing.salma) : owing[scope] : 0;
+  if (advancesOnly && amount <= 0) return null;
   return <button type="button" className="contribution-entry" onClick={onOpen}>
     <span><span className="contribution-entry-title">{amount > 0 ? "Advances to apply" : "Monthly contributions"}</span>
       {amount <= 0 && <span className="contribution-entry-detail">{status?.agreement ? contributionMonthName(status.agreement.month) : "Review contributions"}</span>}</span>
@@ -59,7 +60,7 @@ export function ContributionAgreementEditor({ month, agreement, proposed, shares
         <label>Anas<input className="field-input" inputMode="decimal" value={anas} onChange={e => setAnas(e.target.value)} disabled={saving} /></label>
         <label>Salma<input className="field-input" inputMode="decimal" value={salma} onChange={e => setSalma(e.target.value)} disabled={saving} /></label>
       </div>
-      <p className="contribution-note">Extra contributions are repayable advances. Category changes leave this agreement unchanged.</p>
+      <p className="contribution-note">Extra contributions are repayable advances. Category edits keep these agreed amounts.</p>
       <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving || disabled} onClick={() => void save()}>{saving ? "Confirming…" : agreement ? "Update contributions" : "Confirm contributions"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setEditing(false)}>Cancel</button></div>
     </> : <>
       {agreement && <dl className="contribution-rows"><div><dt>Anas</dt><dd><Money value={agreement.targets.anas} /></dd></div><div><dt>Salma</dt><dd><Money value={agreement.targets.salma} /></dd></div></dl>}
@@ -100,10 +101,10 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
     try {
       applyIds.current[partner] ??= crypto.randomUUID();
       const response = await fetch("/api/contribution-offsets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner, amount: applicable(partner), date: today(), requestId: applyIds.current[partner] }) });
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Couldn't apply the advance.");
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Could not apply the advance.");
       delete applyIds.current[partner];
       setSuccess(`${person(partner)}'s advance applied`); onChanged();
-    } catch (e) { setSaveError(e instanceof Error ? e.message : "Couldn't apply the advance. Retry to finish it safely."); }
+    } catch (e) { setSaveError(e instanceof Error ? e.message : "Could not apply the advance. Retry to finish it safely."); }
     finally { setApplying(null); }
   };
   const startRepayment = (partner: Partner) => { setRepaying(partner); setAmount(String(outstanding[partner])); setDate(today()); setSaveError(""); setSuccess(""); setUncertain(false); requestId.current = crypto.randomUUID(); };
@@ -133,8 +134,8 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
             {scope === "joint" && <div className="contribution-split" role="img" aria-label={`Advances: ${partners.filter(partner => outstanding[partner] > 0).map(partner => `${person(partner)} ${fmt(outstanding[partner])} MAD`).join(", ")}`}>
               {partners.filter(partner => outstanding[partner] > 0).map(partner => <span key={partner} className="contribution-split-part" data-partner={partner} style={{ flexGrow: outstanding[partner] }} />)}
             </div>}
-            <span className="contribution-note">{partners.some(partner => applicable(partner) > 0) ? "Applying one takes it off what that person puts in. No money moves." : "Comes off the next month someone puts money in."}</span></>
-            : scopedDue > 0 ? <><span>Due to Joined</span><p className="contribution-hero-amount"><Money value={scopedDue} currency /></p></>
+            <span className="contribution-note">{partners.some(partner => applicable(partner) > 0) ? "Apply an advance to reduce that person’s contribution. No money moves." : "Reduces a future monthly contribution."}</span></>
+            : scopedDue > 0 ? <><span>Contributions due</span><p className="contribution-hero-amount"><Money value={scopedDue} currency /></p></>
             : <p className="contribution-all-settled">{status.agreement ? "All settled" : "No agreed amounts"}</p>}
         </section>
         <div className="contribution-people">

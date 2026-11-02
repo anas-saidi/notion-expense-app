@@ -40,7 +40,6 @@ export function MonthPlanReceipt({ receipt, onDone, onReview, title: heading = "
               {(["anas", "salma"] as const).map(partner => <div key={partner}><dt>{BUDGET_SCOPE_LABELS[partner]}</dt><dd><Money value={receipt.contributions![partner]} /></dd></div>)}
             </dl>
           </section>}
-          {receipt.wallets.joint > 0 && <footer>One month, together.</footer>}
         </article>
       </div>
     </div>

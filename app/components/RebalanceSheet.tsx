@@ -362,7 +362,7 @@ export function RebalanceSheet({
             }).then(async (r) => {
               if (!r.ok) {
                 const d = await r.json();
-                throw new Error(d.error ?? "Failed to create transfer");
+                throw new Error(d.error ?? "Could not create transfer");
               }
             }),
           ),
@@ -385,7 +385,7 @@ export function RebalanceSheet({
             }).then(async (r) => {
               if (!r.ok) {
                 const d = await r.json();
-                throw new Error(d.error ?? "Failed to fund category");
+                throw new Error(d.error ?? "Could not fund category");
               }
             });
           }),
@@ -406,7 +406,7 @@ export function RebalanceSheet({
             }).then(async (r) => {
               if (!r.ok) {
                 const d = await r.json();
-                throw new Error(d.error ?? "Failed to release category funds");
+                throw new Error(d.error ?? "Could not release category funds");
               }
             });
           }),
@@ -415,7 +415,7 @@ export function RebalanceSheet({
           // Stop on a failure instead of launching every Notion write at once.
           for (const operation of operations) await operation();
         } catch (error) {
-          throw new Error(`${error instanceof Error ? error.message : "Couldn’t apply moves."} Some changes may have saved. Close Rebalance and sync before trying again.`);
+          throw new Error(`${error instanceof Error ? error.message : "Could not apply moves."} Some changes may have saved. Close Rebalance and sync before trying again.`);
         }
       }}
     />

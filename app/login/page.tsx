@@ -10,14 +10,13 @@ export default function LoginPage({
   return (
     <div style={container}>
       <div style={card}>
-        <div style={eyebrow}>Expenses</div>
+        <div style={eyebrow}>Couple Finance</div>
         <h1 style={title}>Sign in to continue</h1>
         <p style={subtitle}>
-          This app is private to two people. Sign in with the Notion account
-          you already use.
+          Use your authorized Notion account.
         </p>
         {notAllowed && (
-          <p style={errorBanner}>Not an authorized account.</p>
+          <p style={errorBanner}>This Notion account is not authorized.</p>
         )}
         <a href="/api/auth/login" style={button}>
           Continue with Notion

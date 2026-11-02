@@ -3,7 +3,7 @@ import { SheetBody, SheetHeader } from "./ui/SheetLayout";
 
 import { Banner, bannerTextActionStyle } from "./ui/Banner";
 import { BottomSheet } from "./ui/BottomSheet";
-import { ScaleIcon, ChevronRightIcon, XIcon } from "./ui/icons";
+import { ChevronRightIcon, XIcon } from "./ui/icons";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { accountIconSource } from "../../lib/category-icons";
@@ -22,18 +22,15 @@ export function balanceChecksToReview(checks: BalanceCheckView[], reviewCounts: 
   ];
 }
 
-export function PendingBalanceChecks({ checks, reviewCounts = [], accounts, scope, error, paused = false, loading, onOpen, onRetry }: {
-  checks: BalanceCheckView[]; reviewCounts?: BalanceCountReview[]; accounts: Account[]; scope: BudgetScope; error: string | null; paused?: boolean; loading: boolean;
-  onOpen: () => void; onRetry: () => void;
+/** Home shows balance-check failures here; discrepancies live in its tappable summary. */
+export function PendingBalanceChecks({ error, paused = false, loading, onRetry }: {
+  error: string | null; paused?: boolean; loading: boolean; onRetry: () => void;
 }) {
-  const toReview = balanceChecksToReview(checks, reviewCounts, accounts, scope);
+  if (!error) return null;
   return <section className="balance-check-notices" aria-label="Balance checks" style={{ display: "grid", gap: 12, marginBottom: 20 }}>
-    {/* Paused: the server's own reason, no Retry, since retrying can't succeed until it's reconfigured. */}
-    {error && paused && <Banner desktopInline tone="neutral" role="status" compact>{error}</Banner>}
-    {error && !paused && <Banner desktopInline tone="warning" role="alert" compact action={<button type="button" style={bannerTextActionStyle} onClick={onRetry} disabled={loading}>Retry</button>}>{error}</Banner>}
-    {!paused && toReview.length === 0 && <button className="mobile-check-balances" type="button" onClick={onOpen} disabled={loading || accounts.length === 0} style={{ display: "inline-flex", alignItems: "center", justifySelf: "start", gap: 8, minHeight: 44, border: 0, padding: "0 4px", background: "none", color: "var(--text2)", font: "inherit", fontSize: 13, cursor: "pointer" }}>
-      <ScaleIcon size={18} /> Check balances
-    </button>}
+    {paused
+      ? <Banner desktopInline tone="neutral" role="status" compact>{error}</Banner>
+      : <Banner desktopInline tone="warning" role="alert" compact action={<button type="button" style={bannerTextActionStyle} onClick={onRetry} disabled={loading}>Retry</button>}>{error}</Banner>}
   </section>;
 }
 

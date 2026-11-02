@@ -113,7 +113,7 @@ export function CategoryDetailsSheet({
     fetch(`/api/categories/${category.id}/activity?month=${activeMonth}&limit=100`)
       .then(async (res) => {
         const payload = await res.json();
-        if (!res.ok) throw new Error(payload.error || "Failed to load category details");
+        if (!res.ok) throw new Error(payload.error || "Could not load category details");
         return payload as CategoryActivityPayload;
       })
       .then((activity) => {
@@ -121,7 +121,7 @@ export function CategoryDetailsSheet({
         setData(activity);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

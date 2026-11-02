@@ -1,27 +1,29 @@
 "use client";
 
-import { Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
+import { HeroSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
 import { buildMonthlyOverBudget, buildMoneyFlow, buildSpendingBreakdown, isReflectInflow, reflectAccountId, reflectPreset, UNKNOWN_ACCOUNT, type ReflectCategory, type ReflectPeriod } from "./reflect-utils";
 import { fmt, fmtDate, today } from "./app-utils";
 import { Money } from "./Money";
-import { MonthPicker } from "./DatePicker";
+import { DatePickerTrigger, MonthPicker } from "./DatePicker";
 import { ReflectActivity } from "./ReflectActivity";
 import { useWorkRates, workTime, hasMeaningfulWorkTime } from "./work-time";
 import { ReflectFlowChart } from "./ReflectFlowChart";
-import { MascotHero } from "./mascot/MascotHero";
+import { ScreenChip } from "./ui/ScreenChip";
+import { ScreenToolbar } from "./ui/ScreenLayout";
+import { ScreenHero } from "./ui/ScreenHero";
+import { MASCOT_HERO_SIZE, MascotHero } from "./mascot/MascotHero";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { spendingJarItems } from "./mascot/budgetJar";
 import { BottomSheet } from "./ui/BottomSheet";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
-import { ScreenChip } from "./ui/ScreenChip";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
 import { TransactionRow } from "./ui/TransactionRow";
-import { CalendarRangeIcon, ChevronDownIcon, SlidersIcon, XIcon } from "./ui/icons";
+import { SlidersIcon, XIcon } from "./ui/icons";
 
 type Props = {
   transactions: Transaction[];
@@ -42,8 +44,6 @@ type Props = {
 };
 const monthName = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleDateString("en", { month: "short", year: "numeric" });
 const periodName = ({ start, end }: ReflectPeriod) => !start ? "All time" : start === end ? monthName(start) : `${monthName(start)} – ${monthName(end)}`;
-/** Bigger than the other heroes: here the jar is the chart, not a companion to a number. */
-const REFLECT_JAR_SIZE = 250;
 const tone = (index: number) => `color-mix(in srgb, var(--select-ink) ${Math.max(20, 92 - index * 12)}%, var(--surface2))`;
 
 export function ReflectScreen(props: Props) {
@@ -121,48 +121,59 @@ export function ReflectScreen(props: Props) {
   </li>;
   };
 
-  return <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0, paddingBottom: 100 }}>
-    <header className="reflect-view-toolbar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <h1 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}>Reflect</h1>
-      <div role="group" aria-label="Reflect view" style={{ display: "flex", gap: 8 }}>
-        <ScreenChip selected={props.view === "spending"} onClick={() => props.onViewChange("spending")}>Spending</ScreenChip>
-        <ScreenChip selected={props.view === "activity"} onClick={() => props.onViewChange("activity")}>Activity</ScreenChip>
-      </div>
-    </header>
-    <div className="reflect-period-toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-      <button type="button" onClick={() => { setCustomPeriod(props.period.start ? props.period : reflectPreset("month")); setShowPeriod(true); }} aria-label={`Time period: ${label}`} aria-haspopup="dialog" style={quietButtonStyle}><CalendarRangeIcon size={16} /><span>{label}</span><ChevronDownIcon size={14} /></button>
-      {props.view === "spending" && <button type="button" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, background: filterCount ? "var(--select-wash)" : "transparent", color: filterCount ? "var(--select-ink)" : "var(--text2)" }}><SlidersIcon size={16} /><span>Filter{filterCount ? ` (${filterCount})` : ""}</span></button>}
-    </div>
-    {props.error ? <Banner tone="danger" role="alert" title="Could not load this period" action={<button onClick={props.onRetry} style={quietButtonStyle}>Try again</button>}>Your records are unchanged. Try refreshing Reflect.</Banner>
-      : props.transactionsLoading ? <SkeletonRegion label="Loading Reflect" style={{ display: "grid", gap: 16 }}><Skeleton style={{ height: 220, borderRadius: 16 }} /><SkeletonRows /></SkeletonRegion>
-      : props.view === "activity" ? <>
-          {flow.some(point => point.spent > 0 || point.moneyIn > 0) && !searchOpen && <section aria-label="Spending and money in over this period"><ReflectFlowChart points={flow} height={220} /></section>}
-          <ReflectActivity {...props} periodLabel={label} searchOpen={searchOpen} onSearchClose={() => setSearchOpen(false)} />
-        </>
-      : <>
-        {!hasData ? <section style={{ padding: "40px 0", textAlign: "center" }}><h2 style={{ fontSize: 20, fontWeight: 500 }}>{filterCount ? "Nothing matches these filters" : "No spending to reflect on yet"}</h2><p style={mutedStyle}>{filterCount ? "Include more categories or accounts to see the breakdown." : "Try another period, or add your first expense."}</p>{filterCount > 0 ? <button type="button" style={quietButtonStyle} onClick={() => { setExcludedAccounts([]); setExcludedCategories([]); }}>Reset filters</button> : <button type="button" style={quietButtonStyle} onClick={event => { event.currentTarget.focus(); props.onAddExpense(); }}>Add expense</button>}</section>
-          : <>
-            <div className="reflect-desktop-panels"><section className="reflect-desktop-overview" aria-label="Spending breakdown" style={{ display: "grid", justifyItems: "center", gap: 12 }}>
-              <button type="button" onClick={() => haptic("light")} aria-label="Tap spending mascot" style={jarButtonStyle}>
-                <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={REFLECT_JAR_SIZE} style={{ margin: "-28px auto -16px" }} />
-              </button>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <span style={mutedStyle}>Spent</span>
-                <span style={{ fontSize: breakdown.total >= 1000000 ? 28 : 36, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--text)" }}><Money value={breakdown.total} currency /></span>
-                {hasMeaningfulWorkTime(breakdown.total, rate) && <p style={{ ...mutedStyle, margin: "4px 0 0", textAlign: "center", fontVariantNumeric: "tabular-nums" }}>{workTime(breakdown.total, rate!)} of your {props.budgetScope === "joint" ? "combined work" : "work"}</p>}
-                {recap.length > 0 && <Summary style={{ marginTop: 12, maxWidth: 360, textAlign: "center" }}>{joinClauses(recap)}.</Summary>}
-              </div>
+  const periodControls = <ScreenToolbar label="Reflect period and filters" className="reflect-period-toolbar">
+    <DatePickerTrigger label={label} open={showPeriod} className="composer-picker-chip" showChevron={false}
+      ariaLabel={`Time period: ${label}`} onClick={() => { setCustomPeriod(props.period.start ? props.period : reflectPreset("month")); setShowPeriod(true); }} />
+    {props.view === "spending" && <button type="button" title="Filter spending" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" aria-expanded={showFilters}
+      onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, width: 44, height: 44, padding: 0, flexShrink: 0, borderRadius: "50%", border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)", background: filterCount ? "var(--select-wash)" : "transparent", color: filterCount ? "var(--select-ink)" : "var(--text2)" }}>
+      <SlidersIcon size={20} aria-hidden="true" />
+    </button>}
+  </ScreenToolbar>;
 
-            </section>
-            <section className="reflect-desktop-categories" aria-label="Spending by category">
-              <div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>Where it went</h2></div>
-              <ul style={listStyle}>{breakdown.spending.map((row, index) => categoryRow(row, index))}</ul>
-            </section>
-            </div>
-            {breakdown.inflows.length > 0 && <section aria-label="Positive category inflows"><h2 style={sectionTitleStyle}>More came back than went out</h2><p style={mutedStyle}>Net inflows in these categories are separate from the spending chart.</p><ul style={listStyle}>{breakdown.inflows.map((row, index) => categoryRow(row, index, true))}</ul></section>}
-            {breakdown.settled.length > 0 && <section aria-label="Fully offset categories"><h2 style={sectionTitleStyle}>Balanced out</h2><p style={mutedStyle}>Category inflows covered the spending.</p><ul style={listStyle}>{breakdown.settled.map((row, index) => categoryRow(row, index))}</ul></section>}
-          </>}
-      </>}
+  const viewControls = <div className="reflect-hero-switch" role="group" aria-label="Reflect view">
+    <ScreenChip selected={props.view === "spending"} onClick={() => props.onViewChange("spending")}>Spending</ScreenChip>
+    <ScreenChip selected={props.view === "activity"} onClick={() => props.onViewChange("activity")}>Activity</ScreenChip>
+  </div>;
+
+  const flowTotals = flow[flow.length - 1] ?? { spent: 0, moneyIn: 0 };
+  const flowDifference = Math.round((flowTotals.moneyIn - flowTotals.spent) * 100) / 100;
+  const activitySummary = flowTotals.spent === 0 && flowTotals.moneyIn === 0
+    ? <Summary>No money in or spending this period.</Summary>
+    : flowDifference === 0 ? <Summary>Money in matched spending this period.</Summary>
+    : <Summary>{flowDifference > 0 ? "Money in exceeded spending" : "Spending exceeded money in"} by <Fact><Money value={Math.abs(flowDifference)} currency /></Fact> this period.</Summary>;
+
+  const heroVisual = <div className="reflect-hero-visual" data-view={props.view}>
+    {viewControls}
+    {props.transactionsLoading ? <HeroSkeleton /> : props.view === "activity"
+      ? <section className="reflect-hero-chart" aria-label="Spending and money in over this period"><ReflectFlowChart points={flow} height={220} /></section>
+      : <button type="button" onClick={() => haptic("light")} aria-label="React to spending" style={jarButtonStyle}>
+        <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={MASCOT_HERO_SIZE} />
+      </button>}
+  </div>;
+
+  return <div id="panel-history" className="screen-layout" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0, paddingBottom: 100 }}>
+    <div className="reflect-desktop-panels">
+      <section className="reflect-desktop-overview screen-overview" aria-label="Spending breakdown">
+        <ScreenHero
+          mascot={heroVisual}
+          label="Spent" showMetric={props.view === "spending"} loading={props.transactionsLoading} value={props.transactionsLoading || props.error ? null : breakdown.total}
+          supporting={props.view === "spending" && !props.transactionsLoading && !props.error && hasMeaningfulWorkTime(breakdown.total, rate) ? <p>{workTime(breakdown.total, rate!)} of your {props.budgetScope === "joint" ? "combined work" : "work"}</p> : null}
+          summary={<div style={{ minHeight: "1.4em", fontSize: 18 }}>{props.transactionsLoading ? <Skeleton style={{ height: 26, width: "70%" }} /> : props.error ? null : props.view === "activity" ? activitySummary : recap.length > 0 ? <Summary>{joinClauses(recap)}.</Summary> : null}</div>}
+        />
+        {periodControls}
+      </section>
+      <section className="reflect-desktop-categories screen-content" aria-label="Reflect results">
+        {props.error ? <Banner tone="danger" role="alert" title="Could not load this period" action={<button onClick={props.onRetry} style={quietButtonStyle}>Retry</button>}>Records unchanged. Refresh Reflect to retry.</Banner>
+          : props.transactionsLoading ? <SkeletonRegion label="Loading Reflect"><SkeletonRows /></SkeletonRegion>
+          : props.view === "activity" ? <ReflectActivity {...props} periodLabel={label} searchOpen={searchOpen} onSearchClose={() => setSearchOpen(false)} />
+          : !hasData ? <section style={{ padding: "40px 0", textAlign: "center" }}><h2 style={{ fontSize: 20, fontWeight: 500 }}>{filterCount ? "No matching spending" : "No spending yet"}</h2><p style={mutedStyle}>{filterCount ? "Include more categories or accounts to see the breakdown." : "Choose another period or add an expense."}</p>{filterCount > 0 ? <button type="button" style={quietButtonStyle} onClick={() => { setExcludedAccounts([]); setExcludedCategories([]); }}>Reset filters</button> : <button type="button" style={quietButtonStyle} onClick={event => { event.currentTarget.focus(); props.onAddExpense(); }}>Add expense</button>}</section>
+          : <ul aria-label="Spending by category" style={listStyle}>{breakdown.spending.map((row, index) => categoryRow(row, index))}</ul>}
+      </section>
+    </div>
+    {!props.error && !props.transactionsLoading && props.view === "spending" && <>
+      {breakdown.inflows.length > 0 && <section aria-label="Positive category inflows"><h2 style={sectionTitleStyle}>More came back than went out</h2><p style={mutedStyle}>Net inflows in these categories are separate from the spending chart.</p><ul style={listStyle}>{breakdown.inflows.map((row, index) => categoryRow(row, index, true))}</ul></section>}
+      {breakdown.settled.length > 0 && <section aria-label="Fully offset categories"><h2 style={sectionTitleStyle}>Balanced out</h2><p style={mutedStyle}>Category inflows covered the spending.</p><ul style={listStyle}>{breakdown.settled.map((row, index) => categoryRow(row, index))}</ul></section>}
+    </>}
 
     <BottomSheet open={showPeriod} onClose={() => setShowPeriod(false)} label="Time period" size="compact" contentStyle={sheetContentStyle}>
       <SheetHeader title="Time period" onClose={() => setShowPeriod(false)} />
@@ -196,10 +207,9 @@ function SheetHeader({ title, onClose }: { title: string; onClose: () => void })
 function FilterGroup({ title, items, excluded, onToggle, onAll, onNone }: { title: string; items: { id: string; name: string }[]; excluded: string[]; onToggle: (id: string) => void; onAll: () => void; onNone: () => void }) { return <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}><legend style={sectionTitleStyle}>{title}</legend><div style={{ display: "flex", gap: 8, marginBottom: 4 }}><button onClick={onAll} style={quietButtonStyle}>All</button><button onClick={onNone} style={quietButtonStyle}>None</button></div>{items.map(item => <label key={item.id} style={{ minHeight: 48, display: "flex", gap: 12, alignItems: "center", fontSize: 15, color: "var(--text2)", cursor: "pointer" }}><input type="checkbox" checked={!excluded.includes(item.id)} onChange={() => onToggle(item.id)} style={{ width: 20, height: 20, accentColor: "var(--select-ink)", flexShrink: 0 }} /><span style={{ overflowWrap: "anywhere" }}>{item.name}</span></label>)}{!items.length && <p style={mutedStyle}>No {title.toLowerCase()} in this period.</p>}</fieldset>; }
 /** A flat selected fill: Joint's --select-wash is a gradient. */
 const SELECTED_FLAT = "color-mix(in srgb, var(--select-ink) 12%, var(--surface))";
-const jarButtonStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: REFLECT_JAR_SIZE - 44, border: 0, padding: 0, background: "transparent", font: "inherit", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
+const jarButtonStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: MASCOT_HERO_SIZE, border: 0, padding: 0, background: "transparent", font: "inherit", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
 const mutedStyle: CSSProperties = { fontSize: 13, color: "var(--muted)", lineHeight: 1.5 };
 const sectionTitleStyle: CSSProperties = { fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text2)" };
-const sectionHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 8 };
 const listStyle: CSSProperties = { listStyle: "none", margin: 0, padding: 0 };
 const categoryButtonStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, width: "100%", minHeight: 76, border: 0, background: "transparent", padding: "12px 0", textAlign: "left", font: "inherit", cursor: "pointer" };
 const quietButtonStyle: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 44, border: 0, borderRadius: "var(--radius-control)", padding: "0 12px", background: "transparent", color: "var(--text2)", font: "inherit", fontSize: 13, cursor: "pointer" };

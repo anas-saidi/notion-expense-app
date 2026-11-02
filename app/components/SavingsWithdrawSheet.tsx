@@ -71,13 +71,13 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Couldn't take money out of savings");
+      if (!res.ok) throw new Error(data.error ?? "Could not take money out of savings");
       onSuccess(`${fmt(value)} moved to ${destination.name}`);
       onClose();
     } catch (err: unknown) {
       setStatus("error");
       setConfirming(false);
-      setError(err instanceof Error ? err.message : "Couldn't take money out of savings");
+      setError(err instanceof Error ? err.message : "Could not take money out of savings");
     }
   };
 

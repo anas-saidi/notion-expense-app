@@ -3,21 +3,21 @@
 import { HeroSkeleton, SkeletonRows } from "./ui/Skeleton";
 
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
-import { Currency } from "./Money";
+import { ScreenToolbar } from "./ui/ScreenLayout";
+import { ScreenHero } from "./ui/ScreenHero";
+import { Fact, Summary } from "./ui/Summary";
 import { MonthPicker } from "./DatePicker";
 import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
-import { AlertTriangleIcon, CalendarIcon, ChevronDownIcon, ChevronRightIcon, FundIcon, PlusIcon, TransferIcon } from "./ui/icons";
+import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon } from "./ui/icons";
 import { SearchField } from "./ui/SearchField";
-import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned, today } from "./app-utils";
 import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
 import { MascotHero, MASCOT_HERO_SIZE } from "./mascot/MascotHero";
 import { MascotSpill } from "./mascot/MascotSpill";
 import { budgetJarItems } from "./mascot/budgetJar";
-import { JointFamily } from "./WalletCardSwitcher";
 import type { ContributionStatus } from "./contribution-utils";
 import { budgetStatus, budgetStatusRank, monthProgress, pace } from "./category-status";
 import { runningLowCategories, runwayLabel } from "./category-runway";
@@ -234,112 +234,21 @@ export function CategoriesScreen({
   const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
 
   return (
-    <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main" style={wrapStyle}>
+    <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main screen-layout" style={wrapStyle}>
 
-      {/* Search */}
-      {hasScopedCategories && searchOpen && (
-        <SearchField
-          ref={searchInputRef}
-          value={search}
-          onChange={setSearch}
-          onClose={() => { setSearch(""); setSearchOpen(false); }}
-          placeholder="Search categories"
-          ariaLabel="Search categories"
-          showClose={false}
-        />
-      )}
-
-      {/* Active groups */}
-      {activeGroups.length === 0
-        ? hasScopedCategories
-          ? <div style={emptyStyle}>No categories match “{search}”.</div>
-          : onOpenNewCategory
-            ? <button type="button" className="budget-empty-action" style={emptyActionStyle} onClick={() => onOpenNewCategory("Other")}>
-                <PlusIcon size={15} />
-                Add the first {BUDGET_SCOPE_LABELS[budgetScope]} category
-              </button>
-            : null
-        : <>
-            <div className="budget-overview-context">
-            <section className="budget-desktop-overview" aria-label={`${fmt(Math.round(availableInCategories))} MAD allocated in categories${!monthlySummary.contributionError && Math.round(leftToAllocate) !== 0 ? `; ${fmt(Math.round(leftToAllocate))} MAD unassigned` : ""}`} style={budgetHealthStyle}>
-              {/* The same liquid jar as Home (Joint with its family around it). As on Home, the
-                  emojis stay tucked away until the jar is tapped; then every category that still
-                  has money drops in, sized by its share of Available. */}
-              <div className="budget-summary-mascot">
-              {!loading && !monthError && budgetScope === "joint" && contribStatus ? (
-                <JointFamily contribStatus={contribStatus}>{budgetJar}</JointFamily>
-              ) : (
-                <div style={{ marginBottom: 4 }}>{budgetJar}</div>
-              )}
-              </div>
-              {/* Not money to assign: what's still in categories after spending. */}
-              <span className="budget-summary-label" style={budgetHealthLabelStyle}>Allocated</span>
-              <span className="budget-summary-amount" style={budgetHealthAmountStyle}>
-                <AnimatedCounter value={Math.round(availableInCategories)} animateOnMount />
-                <Currency />
-              </span>
+            <div className="budget-overview-context screen-overview">
+            <section className="budget-desktop-overview" aria-label="Category allocation overview">
+              <ScreenHero mascot={budgetJar} label="Allocated" loading={loading} value={loading || monthError ? null : Math.round(availableInCategories)}
+                summary={loading ? null : savingsGap ? <Summary><Fact>{savingsGap.account.label}</Fact> is <Fact tone="danger" onClick={savingsGap.onFix} label={savingsGap.source ? `Move money from ${savingsGap.source.label} to ${savingsGap.account.label}` : `Review ${savingsGap.account.label}`}>{fmt(savingsGap.gap)} short</Fact>.</Summary>
+                  : shortBy > 0 ? <Summary><Fact tone="danger" onClick={shortfallAction?.onClick ?? onOpenRebalance} label={`${shortfallAction?.label ?? "Rebalance"}: ${fmt(shortBy)} MAD short`}>{fmt(shortBy)} short</Fact>.</Summary>
+                  : firstLow ? <Summary>{runningLow.length === 1 ? <><Fact>{firstLow.category.name}</Fact> has <Fact tone="warning" onClick={onOpenRebalance} label={`Rebalance ${firstLow.category.name}`}>{runwayLabel(firstLow.daysCovered).toLowerCase()}</Fact></> : <><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenRebalance} label="Rebalance running low categories">running low</Fact></>}.</Summary>
+                  : !monthlySummary.contributionError && Math.round(leftToAllocate) > 0 ? <Summary><Fact onClick={onOpenRebalance} label="Assign unassigned money">{fmt(Math.round(leftToAllocate))}</Fact> is <Fact>unassigned</Fact>.</Summary>
+                  : budgetScope !== "joint" && contributionRemaining > 0 ? <Summary><Fact onClick={onMoveContribution} label={`Contribute ${fmt(Math.round(contributionRemaining))} MAD to Joint`}>{fmt(Math.round(contributionRemaining))} due to Joint</Fact>.</Summary>
+                  : null}
+                actions={monthlySummary.contributionError ? <Banner tone="neutral" compact>Confirmed contributions and repayment reserves unavailable</Banner> : null}
+              />
             </section>
-
-            {/* One banner at a time, the most urgent first: accounts falling short, categories
-                running low, unassigned money, then what's still due to Joint. Nothing to act on, no banner. */}
-            <div className="budget-overview-notices">
-            {loading ? null : savingsGap ? (
-              <Banner
-                desktopInline
-                tone="warning"
-                icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
-                title={`Savings ${fmt(savingsGap.gap)} short`}
-                action={<button type="button" onClick={savingsGap.onFix} style={bannerActionStyle}>{savingsGap.source ? `Move from ${savingsGap.source.label}` : "Review"}</button>}
-              />
-            ) : shortBy > 0 ? (
-              <Banner
-                desktopInline
-                tone="danger"
-                icon={<AlertTriangleIcon size={18} strokeWidth={2.2} />}
-                title={`Short by ${fmt(shortBy)}`}
-                action={(
-                  <button type="button" onClick={shortfallAction?.onClick ?? onOpenRebalance} style={bannerActionStyle}>
-                    {shortfallAction?.label ?? "Rebalance"}
-                  </button>
-                )}
-              />
-            ) : firstLow ? (
-              <Banner
-                tone="warning"
-                title={runningLow.length === 1 ? `${firstLow.category.name} is running low` : `${runningLow.length} categories running low`}
-                action={<button type="button" onClick={onOpenRebalance} style={bannerActionStyle}>Rebalance</button>}
-              >
-                {runningLow.length === 1 ? runwayLabel(firstLow.daysCovered) : `${firstLow.category.name} runs out first`}
-              </Banner>
-            ) : !monthlySummary.contributionError && Math.round(leftToAllocate) > 0 ? (
-              <Banner
-                tone="accent"
-                icon={<FundIcon size={18} strokeWidth={2.2} />}
-                title={`${fmt(Math.round(leftToAllocate))} unassigned`}
-                action={(
-                  <button type="button" onClick={onOpenRebalance} style={contributionActionStyle}>
-                    Assign
-                  </button>
-                )}
-              />
-            ) : budgetScope !== "joint" && contributionRemaining > 0 ? (
-              <Banner
-                tone="accent"
-                icon={<TransferIcon size={18} strokeWidth={2.2} />}
-                title={`${fmt(Math.round(contributionRemaining))} due to Joint`}
-                action={(
-                  <button type="button" onClick={onMoveContribution} style={contributionActionStyle}>
-                    Contribute
-                  </button>
-                )}
-              />
-            ) : null}
-
-            {monthlySummary.contributionError && <Banner tone="neutral" compact>Confirmed contributions and repayment reserves unavailable</Banner>}
-            </div>
-            </div>
-            <div className="budget-category-workspace">
-            <div className="budget-desktop-controls" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <ScreenToolbar label="Budget period and planning" className="budget-desktop-controls">
               <MonthPicker
                 value={homeMonth}
                 aria-label="Filter planned and spent by month"
@@ -355,9 +264,26 @@ export function CategoriesScreen({
                   {planMonth === homeMonth ? "Plan" : `Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}
                 </button>
               )}
+            </ScreenToolbar>
             </div>
+            <div className="budget-category-workspace screen-content">
+      {hasScopedCategories && searchOpen && (
+        <SearchField
+          ref={searchInputRef}
+          value={search}
+          onChange={setSearch}
+          onClose={() => { setSearch(""); setSearchOpen(false); }}
+          placeholder="Search categories"
+          ariaLabel="Search categories"
+          showClose={false}
+        />
+      )}
+
+            {!loading && !monthError && activeGroups.length === 0 && (hasScopedCategories
+              ? <div style={emptyStyle}>No categories match “{search}”.</div>
+              : onOpenNewCategory ? <button type="button" className="budget-empty-action" style={emptyActionStyle} onClick={() => onOpenNewCategory("Other")}><PlusIcon size={15} />Add category</button> : null)}
             {monthError && !loading && (
-              <Banner tone="danger" title="Couldn't load this month" action={<button type="button" onClick={onRetryMonth} style={bannerActionStyle}>Retry</button>} />
+              <Banner tone="danger" title="Could not load this month" action={<button type="button" onClick={onRetryMonth} style={bannerActionStyle}>Retry</button>} />
             )}
 
             {loading && <div style={listSurfaceStyle}><SkeletonRows label="Loading budget categories" count={4} iconSize={60} /></div>}
@@ -394,9 +320,9 @@ export function CategoriesScreen({
                         </>;
                       })()}
                       {onOpenNewCategory && (
-                        <button type="button" onClick={() => onOpenNewCategory(group.label === "Savings" ? "Saving" : group.label)} style={addRowStyle}>
+                        <button type="button" onClick={() => onOpenNewCategory(group.label === "Savings" ? "Saving" : group.label)} style={addRowStyle} aria-label={`Add category to ${group.label}`}>
                           <PlusIcon size={16} aria-hidden="true" />
-                          Add {group.label === "Savings" ? "a savings" : "a"} category
+                          Add
                         </button>
                       )}
                     </div>
@@ -424,8 +350,6 @@ export function CategoriesScreen({
               </section>
             )}
             </div>
-          </>
-      }
 
     </div>
   );
@@ -441,44 +365,8 @@ const wrapStyle: CSSProperties = {
   display: "grid",
   gap: 16,
   paddingBottom: 80,
-  animation: "fadeUp 0.2s ease both",
   minWidth: 0,
 };
-
-const budgetHealthStyle: CSSProperties = {
-  display: "grid",
-  justifyItems: "center",
-  gap: 8,
-  padding: "20px 16px 28px",
-  background: "transparent",
-  boxShadow: "none",
-  position: "relative",
-  isolation: "isolate",
-};
-
-const budgetHealthLabelStyle: CSSProperties = {
-  marginTop: 8,
-  fontSize: 12,
-  lineHeight: 1,
-  fontWeight: 700,
-  
-  color: "var(--muted)",
-};
-
-const budgetHealthAmountStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "baseline",
-  justifyContent: "center",
-  gap: 6,
-  fontSize: "clamp(40px, 12vw, 56px)",
-  lineHeight: 1,
-  fontWeight: 500,
-  letterSpacing: "-0.035em",
-  color: "var(--text)",
-  fontVariantNumeric: "tabular-nums",
-  whiteSpace: "nowrap",
-};
-
 
 const sectionStyle: CSSProperties = { display: "grid", gap: 4, minWidth: 0 };
 
@@ -511,18 +399,6 @@ const planChipStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const contributionActionStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 12px",
-  border: 0,
-  borderRadius: "var(--radius-control)",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontSize: 12,
-  fontWeight: 750,
-  whiteSpace: "nowrap",
-  cursor: "pointer",
-};
 
 /* ─── Frozen preview ────────────────────────────────────────────── */
 

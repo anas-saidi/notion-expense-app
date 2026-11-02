@@ -122,7 +122,7 @@ export function CategoryManageSheet({
   const actionLabel = useMemo(() => {
     if (status === "saving") return isEdit ? "Saving..." : isCreate ? "Creating..." : "Funding...";
     if (status === "success") return isEdit ? "Saved" : isCreate ? "Created" : "Funded";
-    if (status === "error") return "Try again";
+    if (status === "error") return "Retry";
     return isEdit ? "Save changes" : isCreate ? "Create category" : addingToSavings ? "Add to savings" : "Fund category";
   }, [addingToSavings, isCreate, isEdit, status]);
 
@@ -141,10 +141,10 @@ export function CategoryManageSheet({
           body: JSON.stringify({ ...(isEdit ? { id: category?.id } : {}), name: name.trim(), icon, scope, type: categoryType, accountId, spendingPattern: spendingPattern || null }),
         });
         const createData = await createRes.json();
-        if (!createRes.ok) throw new Error(createData.error || (isEdit ? "Failed to save category" : "Failed to create category"));
+        if (!createRes.ok) throw new Error(createData.error || (isEdit ? "Could not save category" : "Could not create category"));
         categoryId = createData.category?.id;
         categoryName = createData.category?.name ?? categoryName;
-        if (!categoryId) throw new Error("Category was created without an id");
+        if (!categoryId) throw new Error("Category created, but confirmation is missing. Refresh before retrying.");
       }
 
       if (addingToSavings && category && holdingAccount) {
@@ -183,7 +183,7 @@ export function CategoryManageSheet({
           }),
         });
         const moveData = await moveRes.json().catch(() => ({}));
-        if (!moveRes.ok) throw new Error(moveData.error || `Couldn't move the money to ${holdingAccount.label}`);
+        if (!moveRes.ok) throw new Error(moveData.error || `Could not move the money to ${holdingAccount.label}`);
         movedRef.current = moveKey;
       }
 
@@ -202,7 +202,7 @@ export function CategoryManageSheet({
         });
         const fundData = await fundRes.json();
         if (!fundRes.ok) {
-          const base = fundData.error || "Failed to fund category";
+          const base = fundData.error || "Could not fund category";
           // The money already moved; say so, so a retry (which won't move it again) makes sense.
           throw new Error(movedRef.current === moveKey && moveNeeded
             ? `${fmt(parsedAmount)} moved to ${holdingAccount?.label}, but funding failed: ${base}`
@@ -215,7 +215,7 @@ export function CategoryManageSheet({
       onClose();
     } catch (err: unknown) {
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(err instanceof Error ? err.message : "Could not save");
     }
   };
 
@@ -313,7 +313,7 @@ export function CategoryManageSheet({
             </div>
           </label>}
 
-          {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Owners match the account.</p>}
+          {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Uses the account’s owners.</p>}
           {!isEdit && selectedAssignable !== null && selectedAccount && (
             <div style={accountHintStyle}>
               <span>Unassigned in {selectedAccount.label}</span>
@@ -339,7 +339,7 @@ export function CategoryManageSheet({
           )}
         </section>
 
-        {pendingSavings && status !== "saving" && !error && <Banner tone="warning" compact>This deposit is unfinished. Retry to complete it.</Banner>}
+        {pendingSavings && status !== "saving" && !error && <Banner tone="warning" compact>Deposit unfinished. Retry to complete it.</Banner>}
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         </BlurScrollArea>

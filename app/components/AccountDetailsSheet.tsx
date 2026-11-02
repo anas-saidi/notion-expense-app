@@ -324,7 +324,7 @@ export function AccountDetailsSheet({
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not save the check.");
       setCheckVersion(data.check?.version ?? null);
-      setCheckMessage(action === "save" ? "Saved for review. Ledger unchanged." : "Balance check resolved.");
+      setCheckMessage(action === "save" ? "Balance check saved. Transactions unchanged." : "Balance check resolved.");
       await onBalanceCheckChanged?.();
     } catch (error) { setReconcileError(error instanceof Error ? error.message : "Could not save the check."); }
     finally { setCheckSaving(false); }
@@ -346,7 +346,7 @@ export function AccountDetailsSheet({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to reconcile");
+      if (!res.ok) throw new Error(data.error ?? "Could not reconcile");
       setReconcileStatus("success");
       onReconcileSuccess(`${account.label} reconciled`);
       await onBalanceCheckChanged?.();
@@ -371,7 +371,7 @@ export function AccountDetailsSheet({
       return;
     }
     if (txnType === "Expense" && !txnCategoryId) {
-      setTxnError("Pick a category");
+      setTxnError("Choose a category");
       return;
     }
     setTxnSaving(true);
@@ -388,7 +388,7 @@ export function AccountDetailsSheet({
         ),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to add transaction");
+      if (!res.ok) throw new Error(data.error ?? "Could not add transaction");
       const id = txnType === "Expense" ? data.id : data.income?.id;
       setAddedTxns(prev => [...prev, { id, name, amount: amt, type: txnType, date: txnDate }]);
       setLiveBalance(prev => prev + (txnType === "Income" ? amt : -amt));
@@ -407,7 +407,7 @@ export function AccountDetailsSheet({
       }
       onTransactionsChanged?.();
     } catch (e: unknown) {
-      setTxnError(e instanceof Error ? e.message : "Failed to add transaction");
+      setTxnError(e instanceof Error ? e.message : "Could not add transaction");
     } finally {
       setTxnSaving(false);
     }
@@ -645,7 +645,7 @@ export function AccountDetailsSheet({
                 <h2 style={reconcileTitleStyle}>Check {account.label}</h2>
                 {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
               </div>
-              <button type="button" className="sheet-close-button" onClick={closeReconcile} aria-label="Close reconciliation"><XIcon size={18} /></button>
+              <button type="button" className="sheet-close-button" onClick={closeReconcile} aria-label="Close balance check"><XIcon size={18} /></button>
             </SheetHeader>
             <div style={reconcileRowStyle}>
               <label style={reconcileFieldStyle}>
@@ -684,7 +684,7 @@ export function AccountDetailsSheet({
             {/* Add missed transaction — shrinks the difference above instead of reconciling it away */}
             <div style={addTxnSectionStyle}>
               <div style={addTxnHeaderRowStyle}>
-                <p style={addTxnHintStyle}>Already paid or received before this check?</p>
+                <p style={addTxnHintStyle}>Missing a transaction before this count?</p>
                 <button
                   type="button"
                   onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }}
@@ -832,7 +832,7 @@ export function AccountDetailsSheet({
               {reconcileStatus === "success" && <CheckIcon size={15} />}
               {reconcileStatus === "saving" ? "Saving..." :
                reconcileStatus === "success" ? "Reconciled" :
-               reconcileStatus === "error" ? "Try again" :
+               reconcileStatus === "error" ? "Retry" :
                isFullyReconciled ? "Mark as reconciled" :
                difference !== null ? `Reconcile remaining ${difference > 0 ? "+" : ""}${fmt(Math.round(difference * 100) / 100)}` :
                "Reconcile ledger"}

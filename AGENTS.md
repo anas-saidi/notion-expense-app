@@ -26,3 +26,7 @@
 ## Repeatable interface review
 
 For an app design review or an unslop pass, use [Interface Craft](/Users/anassaidi/.codex/skills/interface-craft/SKILL.md). Read this project's design.md and tokens first. Cite the skill's rule IDs, distinguish observed from inferred defects, and verify the rendered primary flow. Keep design.md as the product specification; record unresolved checks without claiming acceptance.
+
+## Readable product copy
+
+Use the writing principles recorded in design.md under Readable text. Front-load the useful fact, use parallel clauses for related states, and keep one name per financial concept. Preserve specific accessible action labels when visible copy is shortened.

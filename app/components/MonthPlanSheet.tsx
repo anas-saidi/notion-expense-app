@@ -15,7 +15,6 @@ import type { Account, BudgetScope, Category } from "./app-types";
 import { BUDGET_SCOPE_LABELS, categoryMatchesScope, getCategoryScope, fmt, monthBounds, parseAmount, today } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { calculateMonthPlanCapacity, getPlanningSplit, planCost, type PlanAmounts } from "./month-plan-capacity";
-import { JointFamily } from "./WalletCardSwitcher";
 import { Money } from "./Money";
 import { MascotHero } from "./mascot/MascotHero";
 import { MascotTap } from "./mascot/MascotTap";
@@ -221,13 +220,13 @@ export function MonthPlanSheet({
           setDraft(restored.amounts);
           setExpressions(restored.expressions);
           onScopeChange(stored.scope);
-          setDraftNotice(restored.changedSinceDraft ? "The saved plan changed since this draft. Review the amounts before saving." : restored.unavailable ? "Some draft categories are no longer available. Review the remaining amounts." : "");
-        } else if (raw) setDraftNotice("The browser draft could not be restored. Your saved plan is unchanged.");
+          setDraftNotice(restored.changedSinceDraft ? "Saved plan changed. Review this draft before saving." : restored.unavailable ? "Some draft categories are unavailable. Review the remaining amounts." : "");
+        } else if (raw) setDraftNotice("Could not restore this browser’s draft. Saved plan unchanged.");
       } catch { setDraftNotice("Browser drafts are unavailable. Check this browser’s storage settings."); }
       setCurrentPlanned(sumByCategory(summary.summary?.assignedByCategory ?? []));
       setCurrentSpent(sumByCategory(summary.summary?.spentByCategory ?? []));
     } catch (e) {
-      if (request === planRead.current) setLoadError(e instanceof Error ? e.message : "Couldn't load the plan");
+      if (request === planRead.current) setLoadError(e instanceof Error ? e.message : "Could not load the plan");
     } finally {
       if (request === planRead.current) setLoading(false);
     }
@@ -353,13 +352,10 @@ export function MonthPlanSheet({
   });
   const settleList = contributionRows.length > 0 && <div className="plan-settle">
     {contributionRows.map((row) => <div key={row.partner} className="plan-settle-row">
-      <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact>{fmt(Math.round(row.left))}</Fact> left to put in</Summary>
+      <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact>{fmt(Math.round(row.left))} due</Fact></Summary>
     </div>)}
   </div>;
-  const personalRemaining = {
-    anas: Math.max(0, planningCapacity.anas - costs.anas),
-    salma: Math.max(0, planningCapacity.salma - costs.salma),
-  };
+
 
   const jarItems = useMemo(
     () => allocationJarItems(
@@ -400,12 +396,12 @@ export function MonthPlanSheet({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: cat.id, snoozed: false }),
       });
-      if (!res.ok) throw new Error("Couldn't unfreeze");
+      if (!res.ok) throw new Error("Could not unfreeze");
       setLocallyFrozen((prev) => prev.filter((c) => c.id !== cat.id));
       setRevived((prev) => [...prev, { ...cat, snoozed: false }]);
       onCategoriesChanged();
     } catch {
-      setSaveError(`Couldn't unfreeze ${cat.name}`);
+      setSaveError(`Could not unfreeze ${cat.name}`);
     } finally {
       setUnfreezing(null);
     }
@@ -434,7 +430,7 @@ export function MonthPlanSheet({
       onCategoriesChanged();
       return true;
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : `Couldn't freeze ${cat.name}`);
+      setSaveError(error instanceof Error ? error.message : `Could not freeze ${cat.name}`);
       return false;
     } finally {
       freezeLock.current = false;
@@ -454,13 +450,13 @@ export function MonthPlanSheet({
       setHasLocalDraft(true);
       onDraftSaved();
       onClose();
-    } catch { setSaveError("Couldn’t save the draft in this browser. Check storage settings and try again."); }
+    } catch { setSaveError("Could not save the draft in this browser. Check storage settings and try again."); }
   };
   const discardDraft = () => {
     try {
       localStorage.removeItem(draftKey);
       setDraft({}); setExpressions({}); setHasLocalDraft(false); setDraftNotice(""); setReviewing(false);
-    } catch { setSaveError("Couldn’t remove the draft from this browser."); }
+    } catch { setSaveError("Could not remove the draft from this browser."); }
   };
   const draftStatus = hasLocalDraft && <div className="plan-draft-status"><span>Browser draft restored</span><button type="button" className="plan-copy" disabled={saving || !!freezing} onClick={discardDraft}>Discard draft</button></div>;
   const draftWarning = draftNotice && <Banner tone="warning" compact>{draftNotice}</Banner>;
@@ -505,7 +501,7 @@ export function MonthPlanSheet({
       if (result.agreement) setAgreement(result.agreement);
       setReceipt(confirmPlanReceipt(snapshot, result.agreement ?? agreement, result.warning));
     } catch (e) {
-      if (session === saveSession.current) setSaveError(e instanceof Error ? e.message : "Couldn't save the plan");
+      if (session === saveSession.current) setSaveError(e instanceof Error ? e.message : "Could not save the plan");
     } finally {
       saveLock.current = false;
       setSaving(false);
@@ -697,7 +693,7 @@ export function MonthPlanSheet({
               pointerEvents: heroHidden ? "auto" : "none",
             }}
           >
-            <MascotTap label="Tap planning mascot" tabIndex={heroHidden ? 0 : -1} style={{ margin: 0 }}><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} /></MascotTap>
+            <MascotTap label="Planning categories" tabIndex={heroHidden ? 0 : -1} style={{ margin: 0 }}><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} /></MascotTap>
             <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
               <span style={stickyLabelStyle}>{capacityLabel}</span>
               <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
@@ -719,13 +715,7 @@ export function MonthPlanSheet({
           </SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <>
           {/* Hero: the jar fills with the categories you plan; the number is what's still unassigned. */}
           <section aria-label={capacityLabel} style={heroStyle}>
-            {scope === "joint" ? (
-              <JointFamily planningCapacity={personalRemaining}>
-                <MascotTap label="Tap planning mascot"><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
-              </JointFamily>
-            ) : (
-              <MascotTap label="Tap planning mascot"><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
-            )}
+            <MascotTap label="Planning categories"><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
             <span style={heroLabelStyle}>{capacityLabel}</span>
             <span ref={setHeroTarget} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
               {left < 0 ? "−" : ""}

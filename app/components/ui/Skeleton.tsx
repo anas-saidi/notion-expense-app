@@ -1,3 +1,5 @@
+import "./screen-hero.css";
+import { SCREEN_HERO_MASCOT_SIZE } from "./hero-tokens";
 import type { CSSProperties, ReactNode } from "react";
 
 /** One visual treatment for pending content; decorative shapes stay out of the accessibility tree. */
@@ -9,7 +11,7 @@ export function SkeletonRegion({ label, children, style }: { label: string; chil
   return <div role="status" aria-label={label} aria-busy="true" style={style}>{children}</div>;
 }
 
-export function HeroSkeleton({ label = "Loading monthly details", size = 175 }: { label?: string; size?: number }) {
+export function HeroSkeleton({ label = "Loading monthly details", size = SCREEN_HERO_MASCOT_SIZE }: { label?: string; size?: number }) {
   return <SkeletonRegion label={label} style={{ minHeight: size, display: "grid", placeItems: "center" }}>
     <Skeleton style={{ width: size * 0.72, height: size * 0.84, borderRadius: 40 }} />
   </SkeletonRegion>;
@@ -31,6 +33,29 @@ export function SkeletonRows({ label = "Loading activity", count = 3, iconSize =
   </SkeletonRegion>;
 }
 
+/** Shared shimmer for an unknown primary amount; keep the metric row's height. */
+export function AmountSkeleton() {
+  return <Skeleton style={{ width: 180, maxWidth: "60vw", height: ".75em", borderRadius: 12 }} />;
+}
+
+/** Reserves the same mascot, metric, summary and toolbar regions as loaded screens. */
+export function ScreenLoadingSkeleton({ label = "Loading screen", toolbar = true }: { label?: string; toolbar?: boolean }) {
+  return <SkeletonRegion label={label} style={{ display: "grid", gap: 24 }}>
+    <div className="screen-overview">
+      <div className="screen-hero" style={{ "--hero-mascot-size": `${SCREEN_HERO_MASCOT_SIZE}px` } as CSSProperties}>
+        <div className="screen-hero-mascot"><HeroSkeleton /></div>
+        <div className="screen-hero-metric">
+          <div className="screen-hero-label"><Skeleton style={{ width: 64, height: 20 }} /></div>
+          <div className="screen-hero-value"><AmountSkeleton /></div>
+        </div>
+        <div className="screen-hero-summary"><Skeleton style={{ width: "70%", height: 25 }} /></div>
+      </div>
+      {toolbar && <div className="screen-toolbar"><Skeleton style={{ width: 120, height: 44, borderRadius: 24 }} /></div>}
+    </div>
+    <SkeletonRows count={4} />
+  </SkeletonRegion>;
+}
+
 export function AppLoadingSkeleton({ recovery }: { recovery?: ReactNode } = {}) {
   return <div className="app-shell-root" style={{ minHeight: "100dvh", background: "var(--bg)" }}>
     <div className="app-content">
@@ -40,14 +65,7 @@ export function AppLoadingSkeleton({ recovery }: { recovery?: ReactNode } = {}) 
           <Skeleton style={{ width: 138, height: 44, borderRadius: 24 }} />
           <Skeleton style={{ width: 44, height: 44, borderRadius: "50%" }} />
         </div>
-        <div style={{ padding: "16px 0 32px", display: "grid", justifyItems: "center", gap: 16 }}>
-          <Skeleton style={{ width: 126, height: 147, borderRadius: 40 }} />
-          <Skeleton style={{ width: 64, height: 12 }} />
-          <Skeleton style={{ width: 180, height: 56, borderRadius: 12 }} />
-          <Skeleton style={{ width: 120, height: 14 }} />
-        </div>
-        <Skeleton style={{ width: 76, height: 12, marginBottom: 12 }} />
-        <SkeletonRows count={4} />
+        <ScreenLoadingSkeleton label="Loading overview" toolbar={false} />
       </SkeletonRegion>
     </div>
   </div>;

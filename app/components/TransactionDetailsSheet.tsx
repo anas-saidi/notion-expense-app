@@ -19,8 +19,8 @@ type Props = {
 
 export function TransactionDetailsSheet({ transaction, accounts, categories, onClose, onUndone }: Props) {
   if (!transaction) return null;
-  const categoryName = (id: string | null | undefined) => categories.find(item => item.id === id)?.name ?? "Unresolved category";
-  const accountName = (id: string | null | undefined) => accounts.find(item => item.id === id)?.label ?? "Unresolved account";
+  const categoryName = (id: string | null | undefined) => categories.find(item => item.id === id)?.name ?? "Category unavailable";
+  const accountName = (id: string | null | undefined) => accounts.find(item => item.id === id)?.label ?? "Account unavailable";
   const type = transaction.type ?? "Unknown";
   const relationships = type === "Transfer"
     ? transaction.fromCategoryId || transaction.toCategoryId
@@ -43,8 +43,8 @@ export function TransactionDetailsSheet({ transaction, accounts, categories, onC
           <Detail label="Date" value={fmtDate(transaction.date)} />
           {type === "Expense" ? <><Detail label="Category" value={categoryName(transaction.category)} /><Detail label="Account" value={accountName(transaction.accountId)} /></> : <Detail label="Flow" value={relationships} />}
         </dl>
-        {type === "Transfer" ? <UndoSavingsDeposit key={transaction.id} operationId={transaction.savingsFundingOperation} transactionId={transaction.id} onUndone={onUndone} /> : <p style={{ margin: 0, padding: 14, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", fontSize: 14, lineHeight: 1.45 }}>
-          {type === "Expense" ? "Expense details." : `Editing ${type.toLowerCase()} transactions is not available here. The original type and relationships are protected.`}
+        {type === "Transfer" ? <UndoSavingsDeposit key={transaction.id} operationId={transaction.savingsFundingOperation} transactionId={transaction.id} onUndone={onUndone} /> : type !== "Expense" && <p style={{ margin: 0, padding: 14, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", fontSize: 14, lineHeight: 1.45 }}>
+          {`Editing is unavailable for this ${type.toLowerCase()}.`}
         </p>}
 
       </SheetBody>

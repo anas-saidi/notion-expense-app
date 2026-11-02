@@ -13,7 +13,7 @@ export async function freezeMonthPlanCategory({ month, categoryId, hasSavedAlloc
       body: JSON.stringify({ month, allowClear: true, budgetItems: [{ categoryId, amount: 0 }] }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Couldn't clear the monthly allocation");
+    if (!response.ok) throw new Error(data.error || "Could not clear the monthly allocation");
     onAllocationCleared();
   }
   const response = await fetch("/api/categories", {
@@ -22,5 +22,5 @@ export async function freezeMonthPlanCategory({ month, categoryId, hasSavedAlloc
     body: JSON.stringify({ id: categoryId, snoozed: true }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Couldn't freeze the category");
+  if (!response.ok) throw new Error(data.error || "Could not freeze the category");
 }
