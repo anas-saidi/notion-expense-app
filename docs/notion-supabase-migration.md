@@ -31,9 +31,19 @@ Rollback uses the retained previous Vercel deployment and configuration backup. 
 
 ## Verification
 
-- 626 passing unit/regression tests; five opt-in live integration tests passed separately.
+- 627 unit/regression tests passed, including the coordinator's hot-reload context; five opt-in live integration tests passed separately.
 - Real Supabase: separate Node processes serialize the same household; killed workers retain a write barrier; the anonymous browser role cannot read finance tables.
 - Real Notion/Supabase: fresh ledger instances preserve revision lineage even when query results are deliberately hidden to simulate indexing lag; stale versions are rejected. Synthetic checkpoints were archived after testing.
 - Combined SQL/Notion operation receipts return completed results without re-executing and retain uncertain requests without replay. Synthetic operation records and SQL test rows were cleaned up.
 - Local authenticated APIs return the existing contribution agreement and balance checks. A seeded mirror and a deliberately unreachable mirror returned matching November totals; the latter used live Notion without the legacy quota error.
 - Production build and type checks passed. Deployment verification is recorded below when cutover completes; local tests alone are not evidence of a production migration.
+
+## Production cutover verification, 2026-11-02
+
+The canonical `https://notion-expense-app.vercel.app/` deployment on main passed authenticated agreement, balance-check, monthly-summary and sync reads with HTTP 200 and no contribution/quota error. It returned the existing agreement and active balance check. Hosted preview reads also confirmed `X-Finance-Data-Source: mirror` and a current sync; deliberate mirror failure was separately verified against local production builds with matching Notion totals.
+
+All five original Finance Records payloads were verified unchanged after the tests. Only generated QA metadata was created and archived. The original Neon deployment/database is retained for rollback and history recovery; inaccessible SQL history is still unresolved.
+
+Older local servers owned by this session were stopped. The atlas-dev server on port 3001 remained running, so its existing environment was backed up and only `NOTION_SINGLE_WRITER` was changed to false. A harmless invalid expense request verified it returns the single-writer 503 before any save. The coordinated development preview runs from the migration checkout on port 3000.
+
+The explicit `.vercelignore` excludes local credentials, migration backups, agent scratch files and build output. An earlier disposable CLI preview that included local scratch files was removed; deployment dry-run verification confirms those paths are excluded. Existing production credentials unrelated to storage were preserved. No billing settings were changed.

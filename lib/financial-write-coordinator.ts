@@ -30,8 +30,9 @@ export interface CoordinationPool {
   connect(): Promise<CoordinationClient>;
 }
 type HeldWrite = { scope: string; client: CoordinationClient; lost: boolean };
-const heldWrites = new AsyncLocalStorage<HeldWrite>();
-const shared = globalThis as typeof globalThis & { financeWriteCoordinator?: FinancialWriteCoordinator; financeCoordinationPool?: Pool };
+const shared = globalThis as typeof globalThis & { financeHeldWriteContext?: AsyncLocalStorage<HeldWrite>; financeWriteCoordinator?: FinancialWriteCoordinator; financeCoordinationPool?: Pool };
+// Keep the context with the cached coordinator across Next development reloads.
+const heldWrites = shared.financeHeldWriteContext ??= new AsyncLocalStorage<HeldWrite>();
 export const databaseCoordinationConfigured = () => !notionOnlyMode() && !!process.env.FINANCE_COORDINATION_DATABASE_URL;
 export function coordinationPool() {
   if (!databaseCoordinationConfigured()) throw unavailable("Shared financial coordination is not configured. Nothing was changed.");

@@ -117,3 +117,14 @@ it("releases a healthy session after a handled validation failure", async () => 
   expect(db.guards.size).toBe(0);
   expect(await db.coordinator().run("home", async () => "corrected")).toBe("corrected");
 });
+
+it("preserves the held session when Next reloads modules around a cached coordinator", async () => {
+  const db = database(), coordinator = db.coordinator();
+  await coordinator.run("home", async () => {
+    vi.resetModules();
+    const reloaded = await import("./financial-write-coordinator");
+    await expect(reloaded.assertFinancialWriteConnection()).resolves.toBeUndefined();
+    await expect(reloaded.recordNotionWriteReceipt("records", { id: "page", scope: "home", kind: "agreement", key: "2026-11", version: "v1" })).resolves.toBeUndefined();
+  });
+  expect(db.guards.size).toBe(0);
+});
