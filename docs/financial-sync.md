@@ -8,22 +8,24 @@ for writes. The `pg` adapter works with Supabase and other Postgres providers.
 
 ## Enable
 
-1. Create a Neon project on **Free**, preferably near the Vercel function region.
-2. Configure its pooled, TLS-enabled connection string as server-only
-   `DATABASE_URL` locally and on Vercel. Do not place it in a `NEXT_PUBLIC_` variable.
+1. Create a Supabase project on **Free**, preferably near the Vercel function region.
+2. Configure its transaction-pooler connection string as server-only
+   `DATABASE_URL` locally and on Vercel. Configure a separate session-pooler URL as
+   `FINANCE_COORDINATION_DATABASE_URL` for coordinated Notion writes. Keep the
+   existing `NOTION_FINANCE_RECORDS_DB`. Do not use `NEXT_PUBLIC_` variables.
 3. Set a separate `CRON_SECRET`. Enable Fluid compute so background `waitUntil`
    work can use the route's bounded 240-second duration on the free deployment.
-4. Apply `db/migrations/001_finance_mirror.sql` if the app role cannot initialize
-   tables. Otherwise the first mirror operation initializes them automatically.
+4. Apply the tracked migration in `supabase/migrations/` before enabling the app.
+   It creates mirror/coordination tables and removes browser-role access.
 5. Seed via `GET /api/sync/refresh` with `Authorization: Bearer <CRON_SECRET>`.
    This endpoint verifies its own scheduler credentials. `/api/sync` uses the
    normal app session and exposes no connection credentials or raw snapshots.
 6. Confirm read response headers: `X-Finance-Data-Source: mirror` and
    `X-Finance-Synced-At`. The app displays that import timestamp and **Sync now**.
 
-The local workspace is connected to a Neon Free project, and a full import has
-been verified. Deployment environment variables and deployed sync still need to
-be configured before these changes reach the hosted app.
+The migration checkout has verified a full import on Supabase. Earlier Neon
+configuration is retained for source-history recovery; it is not the active
+destination. Deployment verification is tracked in the migration document.
 
 ## Freshness and recovery
 
@@ -101,7 +103,7 @@ latency guarantee.
 
 A PostgreSQL `53000` error explicitly reporting an exceeded quota is a provider availability failure. Balance-check and monthly-summary reads return HTTP 503 with `DATABASE_QUOTA_EXCEEDED` and `retryable: false`. The client surfaces the cause and does not immediately repeat the same failed monthly request. Manual Retry still performs a new read after access is restored. Other transient 429/5xx responses retain the existing retry behavior.
 
-The mirror can fall back to live Notion, but contribution agreements and unresolved balance checks are authoritative PostgreSQL records. Do not replace their read failures with empty agreements, zero debt, settled statuses or fabricated local records. Restoring the existing provider’s access preserves those records; migration requires copying the authoritative tables as well as any mirror data.
+The legacy deployment stored contribution agreements and unresolved balance checks authoritatively in PostgreSQL. The new setup uses Notion Finance Records instead, while PostgreSQL retains coordination and request claims. Do not replace any authoritative read failure with empty agreements, zero debt, settled statuses or fabricated records. Old SQL history still requires source access; rebuilding the mirror does not recover that history.
 
 For Neon, inspect the project usage and billing period in the console. Compute/network allowance exhaustion may require waiting for the billing-period reset or changing plan; storage limits do not reset monthly. A database connection error alone does not identify the exhausted resource or reset time. See [Neon quota guidance](https://neon.com/faqs/free-plan-limits-and-quotas) and [billing management](https://neon.com/docs/introduction/manage-billing).
 
@@ -134,4 +136,4 @@ Verification: live localhost Accounts, Categories and October monthly summary re
 
 Legacy finance namespaces incorporate the Notion connection token. Rotating it can leave the same household's contribution agreements under the previous scope while live Notion account/category reads continue working. `FINANCE_CONTRIBUTION_SCOPE` can pin the verified existing 64-character scope for contribution reads, plan validation and agreement writes. All consumers use contributionScope; the default remains the existing token-derived namespace. Invalid configured values fail visibly.
 
-Verify the database belongs to the same household and check existing agreement versions/targets before setting this value. This is a server-only configuration value, not an account identifier from a client request. It does not move or rewrite any financial record and does not change the namespaces used by the read mirror, balance checks, write fences or operation receipts. PostgreSQL continues to provide atomic agreement updates in production. Do not enable the local-only Notion writer on Vercel as a workaround.
+Verify the database belongs to the same household and check existing agreement versions/targets before setting this value. This is a server-only configuration value, not an account identifier from a client request. The migration pins the namespace verified against the current Notion agreement. It does not move or rewrite a financial record or change the namespace hashing of the original mirror databases. Production Notion revisions require Supabase coordination; never enable the local-only Notion writer on Vercel as a workaround.
