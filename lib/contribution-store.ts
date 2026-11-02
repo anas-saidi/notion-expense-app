@@ -25,12 +25,12 @@ export class ContributionStore {
     await this.ready();
     return (await this.db.query(`SELECT payload FROM finance_contribution_agreements WHERE scope=$1 ORDER BY month`, [scope])).rows.map(r => r.payload);
   }
-  async save(scope: string, month: string, targets: PartnerAmounts, shares: PartnerAmounts, expected: string | null) {
+  async save(scope: string, month: string, targets: PartnerAmounts, shares: PartnerAmounts, expected: string | null, planAdditions?: ContributionAgreement["planAdditions"]) {
     await this.ready();
     const current = (await this.list(scope)).find(a => a.month === month);
     if ((current?.version ?? null) !== expected) return null;
     const now = new Date().toISOString();
-    const agreement: ContributionAgreement = { month, original: current?.original ?? targets, targets, shares, confirmedAt: current?.confirmedAt ?? now, updatedAt: now, version: randomUUID() };
+    const agreement: ContributionAgreement = { month, planAdditions: planAdditions ?? current?.planAdditions, original: current?.original ?? targets, targets, shares, confirmedAt: current?.confirmedAt ?? now, updatedAt: now, version: randomUUID() };
     // The unique month key and conditional upsert make confirmation atomic.
     // Append every accepted revision in the same SQL statement.
     const result = await this.db.query(`WITH changed AS (

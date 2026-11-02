@@ -1547,6 +1547,7 @@ export default function App() {
       <DeferredMount active={categoryManageMode !== null}>      <CategoryManageSheet
         open={categoryManageMode !== null}
         mode={categoryManageMode ?? "fund"}
+        agreement={monthlySummary.contributionError ? undefined : monthlySummary.contributionAgreements?.find(a => a.month === homeMonth)}
         category={categoryManageCategory}
         month={homeMonth}
         accounts={displayAccounts}

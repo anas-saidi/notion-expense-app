@@ -656,3 +656,9 @@ Home, Budget and Reflect use `ui/ScreenHero.tsx` and `ui/screen-hero.css`. This 
 Primary amounts use `AmountSkeleton` for the shared shimmer treatment when unknown during loading. Reflect and Budget pass the explicit `loading` prop to `ScreenHero`; unavailable/error values retain the dash. The initial screen skeleton reuses `AmountSkeleton`.
 
 Activity summary compares the last cumulative flow point, preserving cents. It handles spending above money in, money in above spending, equal totals, and zero activity. It does not describe money in as income or the difference as available cash.
+
+## Forgotten Joint allocations
+
+Joint category Fund uses **Add to plan** when a saved contribution agreement exists. Preview the extra allocation and contribution increases using the existing split; confirm both in one action. Keep a checkbox for funding with existing money without revising agreed amounts. Original agreements and actual contributions remain recorded. Pending additions retain their operation ID across retries and reloads. See docs/plan-additions.md for recovery behavior.
+
+On mobile, the scope picker anchors the header's left edge and screen actions remain grouped on the right. Reflect's view chips align at the top-right of the content region without shifting its mascot/metric blocks. Do not invent a left action just to balance the header.

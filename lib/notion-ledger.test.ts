@@ -118,3 +118,12 @@ it("does not interpret an unfinished recovery as an empty set of agreements", as
   await expect(new NotionContributionStore(ledger).list("home")).rejects.toThrow("remain unknown");
   await expect(new NotionBalanceCheckStore(ledger).list("home")).rejects.toThrow("remain unknown");
 });
+it("preserves plan-addition recovery markers across Notion agreement revisions", async () => {
+  const store = new NotionContributionStore(ledger);
+  const shares = { anas: .65, salma: .35 };
+  const additions = { operation: { categoryId: "category", amount: 50, shares, state: "funding" as const } };
+  const initial = await store.save("home", "2026-11", { anas: 100, salma: 50 }, shares, null, additions);
+  const revised = await store.save("home", "2026-11", { anas: 110, salma: 60 }, shares, initial!.version);
+  expect(revised?.planAdditions).toEqual(additions);
+  expect(revised?.original).toEqual({ anas: 100, salma: 50 });
+});

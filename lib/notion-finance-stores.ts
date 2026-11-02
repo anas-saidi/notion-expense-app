@@ -16,12 +16,12 @@ export class NotionContributionStore {
     const keys = new Set(rows.map(row => row.key));
     return [...keys].map(key => currentLedgerRecord(rows.filter(row => row.key === key))!.payload).sort((a, b) => a.month.localeCompare(b.month));
   }
-  async save(scope: string, month: string, targets: PartnerAmounts, shares: PartnerAmounts, expected: string | null) {
+  async save(scope: string, month: string, targets: PartnerAmounts, shares: PartnerAmounts, expected: string | null, planAdditions?: ContributionAgreement["planAdditions"]) {
     await assertRecordsRecovered(this.ledger, scope);
     const current = await this.ledger.current<ContributionAgreement>(scope, "agreement", month);
     if ((current?.version ?? null) !== expected) return null;
     const now = new Date().toISOString();
-    const agreement: ContributionAgreement = { month, original: current?.payload.original ?? targets, targets, shares, confirmedAt: current?.payload.confirmedAt ?? now, updatedAt: now, version: randomUUID() };
+    const agreement: ContributionAgreement = { month, planAdditions: planAdditions ?? current?.payload.planAdditions, original: current?.payload.original ?? targets, targets, shares, confirmedAt: current?.payload.confirmedAt ?? now, updatedAt: now, version: randomUUID() };
     return (await this.ledger.revise(scope, "agreement", month, expected, agreement, "active", agreement.version))?.payload ?? null;
   }
 }

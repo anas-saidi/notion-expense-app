@@ -1825,3 +1825,11 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 
 /* Rebalance's "Still 384 short" sits where the Balanced mark would, at a small size. */
 .rebalance-short { --summary-size:15px; text-align:center; }
+
+/* On mobile, ownership anchors the left; screen actions remain grouped right. */
+@media (max-width: 899px) {
+  .app-content .app-header { grid-template-columns: minmax(0, 1fr) auto !important; }
+  .app-header .global-scope-picker { grid-column: 1; justify-self: start; }
+  .app-header .app-header-actions { grid-column: 2; }
+  .screen-layout .reflect-hero-switch { top: -16px; }
+}

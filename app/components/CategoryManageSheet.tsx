@@ -8,13 +8,15 @@ import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Account, Category, BudgetScope } from "./app-types";
-import { assignableOf, fmt, scopeFromAccountLabel, today } from "./app-utils";
+import { assignableOf, fmt, getCategoryScope, scopeFromAccountLabel, today } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
+import type { ContributionAgreement } from "../../lib/contribution-agreements";
+import { planAdditionAmounts, type PlanAdditionInput } from "../../lib/plan-addition";
 import { Banner } from "./ui/Banner";
 
 type CategoryManageSheetProps = {
@@ -29,6 +31,7 @@ type CategoryManageSheetProps = {
   onClose: () => void;
   onSuccess: (message: string) => void;
   zIndex?: number;
+  agreement?: ContributionAgreement;
 };
 
 export function CategoryManageSheet({
@@ -43,7 +46,11 @@ export function CategoryManageSheet({
   onClose,
   onSuccess,
   zIndex,
+  agreement,
 }: CategoryManageSheetProps) {
+  const [updateContributions, setUpdateContributions] = useState(true);
+  const [pendingAddition, setPendingAddition] = useState(false);
+  const additionDraft = useRef<PlanAdditionInput | null>(null);
   const [savingsTarget, setSavingsTarget] = useState<SavingsFundingTarget>("separate");
   const [pendingSavings, setPendingSavings] = useState(false);
   const savingsDraft = useRef<{ operationId: string; categoryId: string; accountId: string; amount: number; date: string; target: SavingsFundingTarget } | null>(null);
@@ -76,6 +83,18 @@ export function CategoryManageSheet({
     // Editing never guesses an account: it rewrites the category's owners.
     setAccountId(category?.defaultAccount ?? (mode === "edit" ? "" : accounts[0]?.id ?? ""));
     setAmount("");
+    setUpdateContributions(true); setPendingAddition(false); additionDraft.current = null;
+    if (mode === "fund" && category) {
+      try {
+        const saved = localStorage.getItem(`planAddition:${month}:${category.id}`);
+        if (saved) {
+          const draft = JSON.parse(saved) as PlanAdditionInput;
+          if (draft.categoryId === category.id && draft.month === month && draft.operationId) {
+            additionDraft.current = draft; setPendingAddition(true); setAmount(String(draft.amount));
+          }
+        }
+      } catch { /* The mounted request remains available for recovery. */ }
+    }
     movedRef.current = null;
     setSavingsTarget("separate"); setPendingSavings(false); savingsDraft.current = null;
     if (mode === "fund" && category && isSavingsCategory(category)) {
@@ -90,7 +109,7 @@ export function CategoryManageSheet({
         }
       } catch { /* The current mounted draft is still retained if storage is unavailable. */ }
     }
-  }, [category?.id, open, mode]);
+  }, [category?.id, open, mode, month]);
 
   const isCreate = mode === "create";
   const isEdit = mode === "edit";
@@ -107,10 +126,14 @@ export function CategoryManageSheet({
   const holdingAccount = mode === "fund" && category?.defaultAccount
     ? accounts.find((account) => sameId(account.id, category.defaultAccount)) ?? null
     : null;
-  const moveNeeded = !!holdingAccount && !!selectedAccount && holdingAccount.id !== selectedAccount.id;
+  const canAddToPlan = mode === "fund" && !!category && getCategoryScope(category, accounts) === "joint" && !isSavingsCategory(category) && !!holdingAccount && !/saving/i.test(holdingAccount.label) && scopeFromAccountLabel(holdingAccount.label) === "joint" && agreement?.month === month;
+  const addingToPlan = pendingAddition || (canAddToPlan && updateContributions);
+  const addedContributions = addingToPlan && agreement && Number.isFinite(parsedAmount) && parsedAmount > 0 ? planAdditionAmounts(parsedAmount, agreement.shares) : null;
+  const moveNeeded = !addingToPlan && !!holdingAccount && !!selectedAccount && holdingAccount.id !== selectedAccount.id;
   const moveKey = moveNeeded ? `${selectedAccount.id}>${holdingAccount.id}:${parsedAmount}` : null;
   const canSubmit =
     (status === "idle" || status === "error") &&
+    (!addingToPlan || Boolean(agreement)) &&
     accountId &&
     (isMetadata ? name.trim().length > 0 && (!isEdit || Boolean(category?.id)) : Boolean(category?.id)) &&
     (isMetadata || !category || !isSavingsCategory(category) || Boolean(holdingAccount)) &&
@@ -120,11 +143,13 @@ export function CategoryManageSheet({
   const addingToSavings = !isEdit && !isCreate && !!category && isSavingsCategory(category);
   const title = isEdit ? "Edit category" : isCreate ? "New category" : addingToSavings ? `Add to ${category?.name}` : `Fund ${category?.name ?? "category"}`;
   const actionLabel = useMemo(() => {
+    if (status === "saving" && addingToPlan) return "Adding to plan…";
     if (status === "saving") return isEdit ? "Saving..." : isCreate ? "Creating..." : "Funding...";
     if (status === "success") return isEdit ? "Saved" : isCreate ? "Created" : "Funded";
     if (status === "error") return "Retry";
+    if (addingToPlan) return "Add to plan";
     return isEdit ? "Save changes" : isCreate ? "Create category" : addingToSavings ? "Add to savings" : "Fund category";
-  }, [addingToSavings, isCreate, isEdit, status]);
+  }, [addingToSavings, addingToPlan, isCreate, isEdit, status]);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -133,6 +158,26 @@ export function CategoryManageSheet({
     try {
       let categoryId = category?.id ?? "";
       let categoryName = category?.name ?? name.trim();
+
+      if (addingToPlan && category && agreement) {
+        const draft = additionDraft.current ?? { operationId: crypto.randomUUID(), month, categoryId: category.id, amount: parsedAmount, expectedVersion: agreement.version };
+        additionDraft.current = draft; setPendingAddition(true);
+        // Persist before sending so closing or reloading cannot turn a retry into a new allocation.
+        try { localStorage.setItem(`planAddition:${month}:${category.id}`, JSON.stringify(draft)); }
+        catch { throw new Error("Could not save recovery details in this browser. Enable browser storage before adding to the plan."); }
+        const response = await fetch("/api/monthly-planning/addition", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
+        const data = await response.json();
+        if (!response.ok) {
+          if (!data.pending) {
+            additionDraft.current = null; setPendingAddition(false);
+            try { localStorage.removeItem(`planAddition:${month}:${category.id}`); } catch {}
+          }
+          throw new Error(data.pending ? `${data.error} Retry to finish the same addition.` : data.error);
+        }
+        try { localStorage.removeItem(`planAddition:${month}:${category.id}`); } catch {}
+        additionDraft.current = null; setPendingAddition(false);
+        setStatus("success"); onSuccess(`${category.name} added to plan; contributions updated`); onClose(); return;
+      }
 
       if (isMetadata) {
         const createRes = await fetch("/api/categories", {
@@ -288,8 +333,8 @@ export function CategoryManageSheet({
 
         <section style={sectionStyle}>
           <label style={fieldStyle}>
-            <span style={labelStyle}>{isMetadata ? "Default account" : "Funding account"}</span>
-            <ChoicePicker disabled={status === "saving" || pendingSavings} aria-label={isMetadata ? "Default account" : "Funding account"} value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+            <span style={labelStyle}>{isMetadata ? "Default account" : addingToPlan ? "Budget account" : "Funding account"}</span>
+            <ChoicePicker disabled={status === "saving" || pendingSavings || pendingAddition || addingToPlan}  aria-label={isMetadata ? "Default account" : addingToPlan ? "Budget account" : "Funding account"} value={addingToPlan ? holdingAccount?.id ?? accountId : accountId} onChange={(event) => setAccountId(event.target.value)}>
               <option value="" disabled>Choose account</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.label}</option>
@@ -303,7 +348,7 @@ export function CategoryManageSheet({
             <span style={labelStyle}>{isCreate ? "Fund this month" : "Amount to add"}</span>
             <div style={amountWrapStyle}>
               <input
-                disabled={status === "saving" || pendingSavings}
+                disabled={status === "saving" || pendingSavings || pendingAddition}
                 value={amount}
                 onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder={isCreate ? "Optional" : "0"}
@@ -313,15 +358,26 @@ export function CategoryManageSheet({
             </div>
           </label>}
 
+          {canAddToPlan && <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, minHeight: 44 }}>
+            <input type="checkbox" checked={updateContributions || pendingAddition} disabled={status === "saving" || pendingAddition} onChange={event => setUpdateContributions(event.target.checked)} />
+            Update agreed contributions
+          </label>}
+          {addedContributions && <div aria-live="polite" style={{ display: "grid", gap: 8, fontSize: 14 }}>
+            <div style={accountHintStyle}><span>Added to plan</span><strong><Money value={parsedAmount} currency /></strong></div>
+            <div style={accountHintStyle}><span>Anas contribution increase</span><strong>+<Money value={addedContributions.anas} /></strong></div>
+            <div style={accountHintStyle}><span>Salma contribution increase</span><strong>+<Money value={addedContributions.salma} /></strong></div>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Uses your agreed split. Contributions already paid stay recorded. No money moves.</p>
+          </div>}
+
           {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Uses the account’s owners.</p>}
-          {!isEdit && selectedAssignable !== null && selectedAccount && (
+          {!addingToPlan && !isEdit && selectedAssignable !== null && selectedAccount && (
             <div style={accountHintStyle}>
               <span>Unassigned in {selectedAccount.label}</span>
               <strong><Money value={selectedAssignable} /></strong>
             </div>
           )}
           {/* What the partner owes Joint is kept back, so say so when it changes the figure. */}
-          {!isEdit && selectedAccount && keptForJoint > 0 && (
+          {!addingToPlan && !isEdit && selectedAccount && keptForJoint > 0 && (
             <p style={keptNoteStyle}>{fmt(keptForJoint)} is kept back for your Joint contribution.</p>
           )}
           {moveNeeded && holdingAccount && selectedAccount && (
@@ -332,13 +388,14 @@ export function CategoryManageSheet({
                 : `The amount also moves from ${selectedAccount.label} to ${holdingAccount.label}.`}
             </p>
           )}
-          {!isEdit && selectedAssignable !== null && parsedAmount > Math.max(0, selectedAssignable) && (
+          {!addingToPlan && !isEdit && selectedAssignable !== null && parsedAmount > Math.max(0, selectedAssignable) && (
             <p role="alert" style={{ ...keptNoteStyle, color: "var(--danger)" }}>
               This leaves {selectedAccount?.label} short by {fmt(Math.round(parsedAmount - Math.max(0, selectedAssignable)))}.
             </p>
           )}
         </section>
 
+        {pendingAddition && status !== "saving" && !error && <Banner tone="warning" compact>Plan addition unfinished. Retry to complete the same addition.</Banner>}
         {pendingSavings && status !== "saving" && !error && <Banner tone="warning" compact>Deposit unfinished. Retry to complete it.</Banner>}
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 

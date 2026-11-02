@@ -14,6 +14,7 @@ export type ContributionAgreement = {
   confirmedAt: string;
   updatedAt: string;
   version: string;
+  planAdditions?: Record<string, import("./plan-addition").PlanAddition>;
 };
 export type ContributionMonth = {
   month: string;

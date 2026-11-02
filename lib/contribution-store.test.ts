@@ -20,3 +20,11 @@ it("persists one agreement per month with immutable original values, revision hi
   expect(await store.list("other-home")).toEqual([]);
   expect((await db.query("SELECT * FROM finance_contribution_agreement_history WHERE scope='home'")).rows).toHaveLength(2);
 });
+it("retains plan-addition recovery markers through ordinary contribution edits", async () => {
+  const shares = { anas: .65, salma: .35 };
+  const additions = { operation: { categoryId: "category", amount: 50, shares, state: "completed" as const } };
+  const initial = await store.save("amendments", "2026-11", { anas: 100, salma: 50 }, shares, null, additions);
+  const revised = await store.save("amendments", "2026-11", { anas: 110, salma: 60 }, shares, initial!.version);
+  expect(revised?.planAdditions).toEqual(additions);
+  expect(revised?.original).toEqual({ anas: 100, salma: 50 });
+});
