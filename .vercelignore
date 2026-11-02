@@ -1,0 +1,12 @@
+.git
+.vercel
+node_modules
+.next
+.env
+.env.*
+.codex
+.agents
+artifacts
+ios
+supabase/.temp
+supabase/.branches
