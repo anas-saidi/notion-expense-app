@@ -20,8 +20,6 @@ export function AppShell({
   onBudgetSearch,
   onReflectSearch,
   onBudgetRebalance,
-  onCheckBalances,
-  canCheckBalances = true,
   theme = "light",
   onSelectTheme,
   toast,
@@ -41,8 +39,6 @@ export function AppShell({
   onBudgetSearch?: () => void;
   onReflectSearch?: () => void;
   onBudgetRebalance?: () => void;
-  onCheckBalances?: () => void;
-  canCheckBalances?: boolean;
   theme?: "system" | "light" | "dark";
   onSelectTheme?: (theme: "system" | "light" | "dark") => void;
   toast?: string | null;
@@ -54,12 +50,6 @@ export function AppShell({
 }) {
   const { haptic } = useAppHaptics();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [workScope, setWorkScope] = useState<BudgetScope | undefined>();
-  useEffect(() => {
-    const open = (event: Event) => { setWorkScope((event as CustomEvent<BudgetScope>).detail); setSettingsOpen(true); };
-    window.addEventListener("open-work-settings", open);
-    return () => window.removeEventListener("open-work-settings", open);
-  }, []);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
   const { below: contentBelow } = useScrollEdges(contentEl);
@@ -181,19 +171,12 @@ export function AppShell({
       {onSelectTheme && (
         <SettingsSheet
           open={settingsOpen}
-          onClose={() => { setSettingsOpen(false); setWorkScope(undefined); }}
-          workScope={workScope}
-          budgetScope={budgetScope}
+          onClose={() => setSettingsOpen(false)}
           syncTimestamp={syncTimestamp}
           syncing={syncing}
           onSync={onSync}
           theme={theme}
           onSelectTheme={onSelectTheme}
-          canCheckBalances={canCheckBalances}
-          onCheckBalances={onCheckBalances ? () => {
-            setSettingsOpen(false);
-            onCheckBalances();
-          } : undefined}
           onOpenAccounts={onOpenManage ? () => {
             setSettingsOpen(false);
             onOpenManage();

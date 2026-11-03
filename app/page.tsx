@@ -11,7 +11,7 @@ import { AppShell } from "./components/AppShell";
 import { BillsSection } from "./components/BillsSection";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
 import { useBalanceChecks } from "./components/useBalanceChecks";
-import { BalanceCheckAccounts, PendingBalanceChecks, balanceChecksToReview } from "./components/BalanceChecks";
+import { PendingBalanceChecks, balanceChecksToReview } from "./components/BalanceChecks";
 import { accountKey, checkedFundsAfter } from "../lib/balance-checks";
 import { HomeScreen } from "./components/HomeScreen";
 import { LoadingRecovery } from "./components/ui/LoadingRecovery";
@@ -78,7 +78,6 @@ export default function App() {
   const [frozenCategories, setFrozenCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>(FALLBACK_ACCOUNTS);
   const balanceChecks = useBalanceChecks();
-  const [showBalanceAccounts, setShowBalanceAccounts] = useState(false);
   const [startBalanceCheck, setStartBalanceCheck] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgetTransactions, setBudgetTransactions] = useState<Transaction[]>([]);
@@ -1164,8 +1163,6 @@ export default function App() {
       onBudgetSearch={() => window.dispatchEvent(new Event("open-budget-search"))}
       onReflectSearch={() => window.dispatchEvent(new Event("open-reflect-search"))}
       onBudgetRebalance={() => setShowRebalance(true)}
-      onCheckBalances={() => setShowBalanceAccounts(true)}
-      canCheckBalances={!balanceChecks.loading && accounts.length > 0}
       theme={theme}
       onSelectTheme={selectTheme}
       toast={microToast}
@@ -1559,7 +1556,6 @@ export default function App() {
         zIndex={95}
       /></DeferredMount>
 
-      <BalanceCheckAccounts open={showBalanceAccounts} accounts={accounts} onClose={() => setShowBalanceAccounts(false)} onSelect={account => { setShowBalanceAccounts(false); setStartBalanceCheck(true); setDetailsAccount(account); }} />
 
       {showPlanReceipt && <SavedPlanReceiptSheet month={homeMonth} scope={budgetScope} summary={monthlySummary} categories={[...categories, ...frozenCategories]} accounts={accounts} onClose={() => setShowPlanReceipt(false)} />}
       <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />

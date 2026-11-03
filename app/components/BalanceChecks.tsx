@@ -1,15 +1,9 @@
 "use client";
-import { SheetBody, SheetHeader } from "./ui/SheetLayout";
 
 import { Banner, bannerTextActionStyle } from "./ui/Banner";
-import { BottomSheet } from "./ui/BottomSheet";
-import { ChevronRightIcon, XIcon } from "./ui/icons";
-import { Money } from "./Money";
-import { CategoryIcon } from "./ui/CategoryIcon";
-import { accountIconSource } from "../../lib/category-icons";
 import type { Account, BudgetScope } from "./app-types";
-import type { BalanceCheckView, BalanceCountReview } from "../../lib/balance-checks";
 import { accountKey } from "../../lib/balance-checks";
+import type { BalanceCheckView, BalanceCountReview } from "../../lib/balance-checks";
 import { scopeFromAccountLabel } from "./app-utils";
 
 /** Accounts in this scope with a check or a saved count waiting for review. Home shows nothing else while any exist. */
@@ -32,20 +26,4 @@ export function PendingBalanceChecks({ error, paused = false, loading, onRetry }
       ? <Banner desktopInline tone="neutral" role="status" compact>{error}</Banner>
       : <Banner desktopInline tone="warning" role="alert" compact action={<button type="button" style={bannerTextActionStyle} onClick={onRetry} disabled={loading}>Retry</button>}>{error}</Banner>}
   </section>;
-}
-
-export function BalanceCheckAccounts({ open, accounts, onClose, onSelect }: {
-  open: boolean; accounts: Account[]; onClose: () => void; onSelect: (account: Account) => void;
-}) {
-  return <BottomSheet open={open} onClose={onClose} label="Check balances" detent="content" size="standard">
-    <SheetBody style={{ padding: 24 }}>
-      <SheetHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 20 }}>Check balances</h2>
-        <button type="button" className="sheet-close-button" aria-label="Close balance checks" onClick={onClose}><XIcon size={18} /></button>
-      </SheetHeader>
-      {accounts.map(account => <button key={account.id} type="button" onClick={() => onSelect(account)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, minHeight: 60, padding: "12px 0", border: 0, borderBottom: "1px solid var(--border2)", background: "none", color: "var(--text)", font: "inherit", textAlign: "left", cursor: "pointer" }}>
-        <CategoryIcon icon={accountIconSource(account.type)} size={32} /><span style={{ flex: 1 }}>{account.label}</span>{account.balance == null ? "—" : <Money value={account.balance} />}<ChevronRightIcon size={16} />
-      </button>)}
-    </SheetBody>
-  </BottomSheet>;
 }

@@ -68,9 +68,9 @@
   .screen-layout .home-overview-grid, .screen-layout .home-balance-panel { display: contents; }
 }
 
-/* Controls occupy the existing clear top of the visual frame, never a new row. */
+/* The view switch sits under the mode picker, at the leading edge of the visual. */
 .reflect-hero-visual { position: relative; display: grid; place-items: center; width: 100%; height: var(--hero-mascot-size); min-width: 0; }
-.reflect-hero-switch { position: absolute; top: 0; right: 0; z-index: 2; display: flex; gap: 8px; width: max-content; }
+.reflect-hero-switch { position: absolute; top: 0; left: 0; z-index: 2; display: flex; gap: 4px; width: max-content; }
 .reflect-hero-chart { width: 100%; min-width: 0; box-sizing: border-box; padding: var(--hero-chart-top) 0 12px; height: 100%; }
 
 .reflect-hero-visual[data-view="activity"] { height: var(--hero-activity-size); }

@@ -352,7 +352,7 @@ export function MonthPlanSheet({
   });
   const settleList = contributionRows.length > 0 && <div className="plan-settle">
     {contributionRows.map((row) => <div key={row.partner} className="plan-settle-row">
-      <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact>{fmt(Math.round(row.left))} due</Fact></Summary>
+      <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact onClick={onOpenContributions} label={`Review ${name(row.partner)}’s contribution: ${fmt(Math.round(row.left))} MAD due`}>{fmt(Math.round(row.left))} due</Fact></Summary>
     </div>)}
   </div>;
 

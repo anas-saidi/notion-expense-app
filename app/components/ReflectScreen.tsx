@@ -9,7 +9,6 @@ import { fmt, fmtDate, today } from "./app-utils";
 import { Money } from "./Money";
 import { DatePickerTrigger, MonthPicker } from "./DatePicker";
 import { ReflectActivity } from "./ReflectActivity";
-import { useWorkRates, workTime, hasMeaningfulWorkTime } from "./work-time";
 import { ReflectFlowChart } from "./ReflectFlowChart";
 import { ScreenChip } from "./ui/ScreenChip";
 import { ScreenToolbar } from "./ui/ScreenLayout";
@@ -54,6 +53,7 @@ export function ReflectScreen(props: Props) {
   const [customPeriod, setCustomPeriod] = useState(props.period);
   const [excludedCategories, setExcludedCategories] = useState<string[]>([]);
   const [excludedAccounts, setExcludedAccounts] = useState<string[]>([]);
+  const [showOverBudget, setShowOverBudget] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const currentMonth = today().slice(0, 7);
@@ -62,8 +62,8 @@ export function ReflectScreen(props: Props) {
     window.addEventListener("open-reflect-search", open);
     return () => window.removeEventListener("open-reflect-search", open);
   }, [props.onViewChange]);
-  useEffect(() => { setExcludedCategories([]); setExcludedAccounts([]); setSelectedId(null); }, [props.budgetScope]);
-  useEffect(() => { setSelectedId(null); }, [props.period.start, props.period.end]);
+  useEffect(() => { setExcludedCategories([]); setExcludedAccounts([]); setSelectedId(null); setShowOverBudget(false); }, [props.budgetScope]);
+  useEffect(() => { setSelectedId(null); setShowOverBudget(false); }, [props.period.start, props.period.end]);
 
   const unfiltered = useMemo(() => buildSpendingBreakdown(props.transactions, props.categories, props.accounts, props.budgetScope), [props.transactions, props.categories, props.accounts, props.budgetScope]);
   const breakdown = useMemo(() => buildSpendingBreakdown(props.transactions, props.categories, props.accounts, props.budgetScope, excludedCategories, excludedAccounts), [props.transactions, props.categories, props.accounts, props.budgetScope, excludedCategories, excludedAccounts]);
@@ -74,8 +74,6 @@ export function ReflectScreen(props: Props) {
   const accountOptions = [...accountIds].map(id => ({ id, name: props.accounts.find(account => account.id === id)?.label ?? (id === UNKNOWN_ACCOUNT ? "No account" : "Archived account") }));
   const filterCount = excludedCategories.length + excludedAccounts.length;
   const jarItems = useMemo(() => spendingJarItems(breakdown.spending), [breakdown.spending]);
-  const rates = useWorkRates();
-  const rate = rates[props.budgetScope];
   const flow = useMemo(
     () => buildMoneyFlow(unfiltered.spending, props.transactions, props.categories, props.accounts, props.budgetScope, props.period, []),
     [unfiltered.spending, props.transactions, props.categories, props.accounts, props.budgetScope, props.period],
@@ -96,7 +94,7 @@ export function ReflectScreen(props: Props) {
   const recap = [
     // Actionable exceptions lead; concentration and period health follow.
     overRows.length === 1 && <span key="over"><Fact>{overRows[0].name}</Fact> {ongoing ? "is" : "went"} <Fact tone="danger" onClick={() => setSelectedId(overRows[0].id)} label={`${overRows[0].name} spending`}>{fmt(Math.round(overRows[0].overBudget))} over</Fact> budget</span>,
-    overRows.length > 1 && <span key="over"><Fact>{overRows.length} categories</Fact> {ongoing ? "are" : "went"} <Fact tone="danger">over budget</Fact></span>,
+    overRows.length > 1 && <span key="over"><Fact onClick={() => setShowOverBudget(true)} label={`Review ${overRows.length} over-budget categories`}>{overRows.length} categories</Fact> {ongoing ? "are" : "went"} <Fact tone="danger">over budget</Fact></span>,
     breakdown.spending.length > 3 && <span key="top">top 3 categories account for <Fact>{Math.round(breakdown.spending.slice(0, 3).reduce((sum, row) => sum + row.share, 0) * 100)}%</Fact> of spending</span>,
     budgetReady && excludedAccounts.length === 0 && overRows.length === 0 && <span key="within">all categories <Fact tone="success">{ongoing ? "are within budget" : "stayed within budget"}</Fact></span>,
   ].filter(Boolean);
@@ -131,8 +129,8 @@ export function ReflectScreen(props: Props) {
   </ScreenToolbar>;
 
   const viewControls = <div className="reflect-hero-switch" role="group" aria-label="Reflect view">
-    <ScreenChip selected={props.view === "spending"} onClick={() => props.onViewChange("spending")}>Spending</ScreenChip>
-    <ScreenChip selected={props.view === "activity"} onClick={() => props.onViewChange("activity")}>Activity</ScreenChip>
+    <ScreenChip minHeight={44} selected={props.view === "spending"} onClick={() => props.onViewChange("spending")}>Spending</ScreenChip>
+    <ScreenChip minHeight={44} selected={props.view === "activity"} onClick={() => props.onViewChange("activity")}>Activity</ScreenChip>
   </div>;
 
   const flowTotals = flow[flow.length - 1] ?? { spent: 0, moneyIn: 0 };
@@ -159,7 +157,6 @@ export function ReflectScreen(props: Props) {
         <ScreenHero
           mascot={heroVisual}
           label="Spent" showMetric={props.view === "spending"} loading={props.transactionsLoading} value={props.transactionsLoading || props.error ? null : breakdown.total}
-          supporting={props.view === "spending" && !props.transactionsLoading && !props.error && hasMeaningfulWorkTime(breakdown.total, rate) ? <p>{workTime(breakdown.total, rate!)} of your {props.budgetScope === "joint" ? "combined work" : "work"}</p> : null}
           summary={props.transactionsLoading ? <Skeleton style={{ height: "1.4em", width: "70%" }} /> : props.error ? null : props.view === "activity" ? activitySummary : recap.length > 0 ? <Summary>{joinClauses(recap)}.</Summary> : null}
         />
         {periodControls}
@@ -176,6 +173,13 @@ export function ReflectScreen(props: Props) {
       {breakdown.inflows.length > 0 && <section aria-label="Positive category inflows"><h2 style={sectionTitleStyle}>More came back than went out</h2><p style={mutedStyle}>Net inflows in these categories are separate from the spending chart.</p><ul style={listStyle}>{breakdown.inflows.map((row, index) => categoryRow(row, index, true))}</ul></section>}
       {breakdown.settled.length > 0 && <section aria-label="Fully offset categories"><h2 style={sectionTitleStyle}>Balanced out</h2><p style={mutedStyle}>Category inflows covered the spending.</p><ul style={listStyle}>{breakdown.settled.map((row, index) => categoryRow(row, index))}</ul></section>}
     </>}
+
+    <BottomSheet open={showOverBudget} onClose={() => setShowOverBudget(false)} label="Over-budget categories" size="compact" contentStyle={sheetContentStyle}>
+      <SheetHeader title="Over-budget categories" onClose={() => setShowOverBudget(false)} />
+      <BlurScrollArea style={sheetScrollStyle}>
+        <ul style={listStyle}>{overRows.map(row => <li key={row.id}><button type="button" style={{ ...categoryButtonStyle, justifyContent: "space-between" }} onClick={() => { setShowOverBudget(false); setSelectedId(row.id); }} aria-label={`${row.name}, ${fmt(row.overBudget)} MAD over budget, view transactions`}><span>{row.name}</span><span style={{ color: "var(--danger)" }}><Money value={row.overBudget} /> over</span></button></li>)}</ul>
+      </BlurScrollArea>
+    </BottomSheet>
 
     <BottomSheet open={showPeriod} onClose={() => setShowPeriod(false)} label="Time period" size="compact" contentStyle={sheetContentStyle}>
       <SheetHeader title="Time period" onClose={() => setShowPeriod(false)} />
@@ -200,7 +204,7 @@ export function ReflectScreen(props: Props) {
     </BottomSheet>
 
     <BottomSheet open={Boolean(selected)} onClose={() => setSelectedId(null)} label={selected ? `${selected.name} spending` : "Category spending"} size="standard" desktopHeight="fill" contentStyle={sheetContentStyle}>
-      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div>{hasMeaningfulWorkTime(selected.net, rate) && <p style={mutedStyle}>{props.budgetScope === "joint" ? "Together, you worked" : "You worked"} {workTime(selected.net, rate!)} for this.</p>}<p style={mutedStyle}>{selected.net < 0 ? "Net inflow from" : "Net spending across"} {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = isReflectInflow(transaction, props.accounts); return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === reflectAccountId(transaction, props.accounts))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} categoryName={selected.name} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
+      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow from" : "Net spending across"} {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = isReflectInflow(transaction, props.accounts); return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === reflectAccountId(transaction, props.accounts))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} categoryName={selected.name} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
     </BottomSheet>
   </div>;
 }

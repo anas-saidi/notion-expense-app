@@ -28,7 +28,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("list");
   const [month, setMonth] = useState("");
-  const [filter, setFilter] = useState<"Due" | "Paid" | "Skipped">("Due");
+  const [filter, setFilter] = useState<"Due" | "Overdue" | "Paid" | "Skipped">("Due");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState(""); const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState(""); const [accountId, setAccountId] = useState("");
@@ -59,6 +59,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const currentDue = scoped.filter(o => (o.state === "Due" || o.state === "Overdue") && o.dueDate <= currentCutoff);
   const monthBills = scoped.filter(o => o.dueDate.slice(0, 7) === activeMonth);
   const shown = day ? monthBills.filter(o => o.dueDate === day) : scoped.filter(o => filter === "Paid" ? o.state === "Paid" && o.payments.some(p => p.date.slice(0, 7) === activeMonth)
+    : filter === "Overdue" ? o.state === "Overdue" && o.dueDate <= cutoff
     : filter === "Skipped" ? o.state === "Skipped" && o.period === activeMonth
     : (o.state === "Due" || o.state === "Overdue") && (activeMonth === currentMonth ? o.dueDate <= cutoff : o.dueDate.slice(0, 7) === activeMonth));
   const reservations = earmarkedByCategory(scoped, currentCutoff);
@@ -76,7 +77,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const dueTotal = Math.round(currentDue.reduce((sum, o) => sum + o.amount, 0));
   const overdueTotal = Math.round(currentDue.filter(o => o.state === "Overdue").reduce((sum, o) => sum + o.amount, 0));
   const billsSummary = activeMonth !== currentMonth || dueTotal <= 0 ? [] : [
-    <span key="due"><Fact>{fmt(dueTotal)}</Fact> is still due{overdueTotal > 0 && <>, <Fact>{fmt(overdueTotal)}</Fact> of it <Fact tone="danger" onClick={() => { setDay(null); setFilter("Due"); }} label="Show overdue bills">overdue</Fact></>}</span>,
+    <span key="due"><Fact onClick={() => { setDay(null); setSearch(""); setFilter("Due"); }} label="Show all due bills">{fmt(dueTotal)}</Fact> is still due{overdueTotal > 0 && <>, <Fact>{fmt(overdueTotal)}</Fact> of it <Fact tone="danger" onClick={() => { setDay(null); setSearch(""); setFilter("Overdue"); }} label="Show overdue bills">overdue</Fact></>}</span>,
   ];
 
   function move(next: View) { setShowMore(false); setView(next); setSaveError(""); setConfirm(null); setPicker(null); haptic("selection"); }
@@ -141,7 +142,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
           {billsSummary.length > 0 && <Summary>{joinClauses(billsSummary)}.</Summary>}
           {activeMonth && <BillsCalendar month={activeMonth} today={data?.today ?? ""} bills={monthBills} categoryOf={categoryOf} selectedDay={day} onSelectDay={value => { setDay(day === value ? null : value); haptic("selection"); }} onOpenBill={details} />}
           {day ? <div className="bills-day-heading"><span>{new Date(`${day}T12:00:00`).toLocaleDateString("en", { weekday: "long", day: "numeric", month: "long" })}</span><button type="button" className="bills-quiet-action" onClick={() => setDay(null)}>Show all</button></div>
-            : <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>}
+            : <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", ...(filter === "Overdue" ? ["Overdue" as const] : []), "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>}
           {shown.length ? <div className="row-list">{shown.map(bill => <BillRow key={bill.id} bill={bill} category={categoryOf(bill)} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={!day && filter === "Paid" ? activeMonth : undefined} hideDate={!!day} />)}</div> : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}
         </>}
         {view === "detail" && selected && <>

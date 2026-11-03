@@ -3,7 +3,7 @@
 /* Clauses are written mid-sentence; whichever comes first gets its capital here. */
 .summary::first-letter { text-transform:uppercase; }
 .summary-fact { display:inline; padding:0; border:0; background:none; color:var(--text); font:inherit; font-weight:500; }
-.summary-fact[data-action] { position:relative; font-weight:600; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.summary-fact[data-action] { position:relative; font-weight:600; text-decoration:underline; text-decoration-thickness:1px; text-decoration-color:color-mix(in srgb, currentColor 30%, transparent); text-underline-offset:4px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
 @media (hover:hover) { .summary-fact[data-action]:hover { text-decoration:underline; text-decoration-thickness:2px; text-decoration-color:color-mix(in srgb, var(--text) 25%, transparent); text-underline-offset:5px; } }
 /* Extend inline actions without opening gaps in the sentence. */
 .summary-fact[data-action]::after { content:""; position:absolute; inset:-8px -4px; }
