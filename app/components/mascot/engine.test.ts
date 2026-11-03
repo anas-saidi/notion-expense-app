@@ -132,18 +132,20 @@ describe("outlines", () => {
   const jar = (scope: "anas" | "salma" | "joint", outline: "orb" | "squircle" | "partner" = "partner"): MascotTarget =>
     ({ scope, gap: 0, mood: "idle", outline, coins: scope === "joint" ? { anas: 0.4, salma: 0.3 } : { [scope]: 0.5 } });
 
-  it.each(["egg", "drop", "bean", "pebble"] as const)("keeps the shared heart-pebble independent of personal shape choices (Salma: %s)", salma => {
+  it.each(["egg", "drop", "bean", "pebble"] as const)("keeps the shared Pebble independent of personal shape choices (Salma: %s)", salma => {
     expect(jarShape("partner", "anas", salma).key).toBe("squircle");
     expect(jarShape("partner", "salma", salma).key).toBe(salma);
     const joint = jarShape("partner", "joint", salma);
-    expect(joint.key).toBe("heart-pebble");
+    expect(joint.key).toBe("joint-pebble");
     expect(joint.radii).toEqual(jarShape("partner", "joint").radii);
     expect(joint.radii.every(r => Number.isFinite(r) && r > 0)).toBe(true);
-    // Both upper lobes rise above the shallow cleft; the lower tip stays rounded.
-    const top = joint.radii.length * 3 / 4;
-    const y = (i: number) => Math.sin(i / joint.radii.length * Math.PI * 2) * joint.radii[i];
-    expect(y(top - 6)).toBeLessThan(y(top));
-    expect(y(top + 6)).toBeLessThan(y(top));
+    // The original Bloub profile has no heart cleft or pointed lower tip.
+    const expected = joint.radii.map((_, i, all) => {
+      const angle = i / all.length * Math.PI * 2;
+      return 1 + 0.075 * Math.cos(2 * angle + 0.5) + 0.035 * Math.cos(3 * angle + 2.1);
+    });
+    const peak = Math.max(...expected);
+    joint.radii.forEach((r, i) => expect(r).toBeCloseTo(expected[i] * 1.02 / peak, 12));
   });
 
   it("uses one face and the same shared outline for the picker and filled jar", () => {

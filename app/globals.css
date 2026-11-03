@@ -1088,8 +1088,11 @@ html { scrollbar-gutter: stable; }
   }
 }
 
-.global-scope-option:active {
-  transform: scale(0.96);
+/* Preserve the stack's horizontal placement in both states. The generic button
+   lift otherwise replaces translateX, moving the target out from under the
+   pointer and repeatedly entering/leaving hover. */
+.global-scope-option:not(:disabled):is(:hover, :active) {
+  transform: translateX(var(--scope-slot, 0px));
 }
 
 .global-scope-option:focus-visible {

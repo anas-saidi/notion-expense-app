@@ -2,7 +2,7 @@
 
 A soft glass creature that holds money. It stands for a **pool of money** and shows that pool's state: how full it is, where it went, and how it's going. Everything here is written so the mascot can be rebuilt in a later version of this app or carried into another one. Values are the ones shipped in this app (`app/components/mascot/`).
 
-Parts of the mechanics (radial-profile morphing, sphere-projected eyes, blink and gaze drift) and the eye expression presets are adapted from [bloub](https://github.com/jeremy-prt/bloub) under MIT — keep `BLOUB_LICENSE.txt` next to the code. Joint also adapts Bloub's Pebble harmonic profile into a rounded heart. The showcase cycles and rest pose are not used. [Live reference](https://bloub.vercel.app/).
+Parts of the mechanics (radial-profile morphing, sphere-projected eyes, blink and gaze drift) and the eye expression presets are adapted from [bloub](https://github.com/jeremy-prt/bloub) under MIT — keep `BLOUB_LICENSE.txt` next to the code. Joint uses Bloub's original Pebble harmonic profile. The showcase cycles and rest pose are not used. [Live reference](https://bloub.vercel.app/).
 
 ---
 
@@ -10,7 +10,7 @@ Parts of the mechanics (radial-profile morphing, sphere-projected eyes, blink an
 
 1. **It is a jar, not a sticker.** It always holds something that means money: liquid (what's left) or category emojis (where it goes). If there is no pool of money to show, there is no mascot.
 2. **One per screen, at hero weight.** Centred above the screen's main number and as heavy as it. Never a small decoration beside a row.
-3. **Shape says who, colour supports.** Each person has their own silhouette; a shared pool is a rounded heart-shaped pebble. Colour is secondary and soft, so the mascot works for colour-blind users and in both themes.
+3. **Shape says who, colour supports.** Each person has their own silhouette; a shared pool is a rounded pebble. Colour is secondary and soft, so the mascot works for colour-blind users and in both themes.
 4. **Calm by default.** It moves only when its data changes. Opening a screen never replays an entrance; it animates only what changed since it was last seen.
 5. **Glanceable first, details on demand.** The jar gives the read at a glance; tapping reveals exact numbers.
 6. **Soft, matte, muted.** Never game-like: no shine, no glow, no saturated candy colours, no hard outlines, no bounce.
@@ -44,11 +44,11 @@ Every body **sags**: `r × (1 + a·sin θ)` with a = 0.035 — fuller at the bot
 |---|---|---|
 | Partner A (here: Anas) | **Soft squircle** | superellipse n = 3.2, scale 0.93, sag 0.035. Deliberately softer than a true squircle so corners read as flesh, not machined edges. |
 | Partner B (here: Salma) | **Egg** (default) | superellipse n = 2.1, sx 0.9, sy 1.04, then `r × (1 + 0.07·sin θ)`. Alternatives kept for trying: drop, bean, pebble. |
-| Shared pool (joint) | **Heart-shaped Pebble** | 78% smoothed heart and 22% normalized Bloub Pebble harmonics. One face, shallow cleft, broad soft tip. |
+| Shared pool (joint) | **Pebble** | Bloub’s original two-harmonic Pebble profile, normalized to a peak radius of 1.02. One face; no heart cleft or pointed tip. |
 
 Rules:
 - Two people's shapes must differ in silhouette at a glance (one has corners, one has none).
-- The shared heart-pebble stays consistent when personal shape preferences change; blue/pink glass carries both partners.
+- The shared Pebble stays consistent when personal shape preferences change; blue/pink glass carries both partners.
 - Every variant (pool, emoji jar, loading) uses the same outline for the same scope.
 
 ---
@@ -193,7 +193,7 @@ home balance pool, budget split, planning / rebalancing / allocating flows, a mo
 
 1. Copy `app/components/mascot/` (engine, shapes, face, physics, `Mascot`, `MascotHero`, `MascotSpill`, `memory`) and `BLOUB_LICENSE.txt`. Dependencies: `matter-js`, `motion`, a haptics helper.
 2. Add the three tokens (`--mascot-edge`, `--mascot-shadow`, `--mascot-sticker`) in both themes.
-3. Map your people to shapes and hues (§3, §4); keep the shared heart-pebble consistent across contexts.
+3. Map your people to shapes and hues (§3, §4); keep the shared Pebble consistent across contexts.
 4. Decide each screen's pool and its meaning (level = what share? emojis = which items?) before placing a mascot (§11).
 5. Wire moods to your domain's thresholds (§6) and give every mascot a text equivalent.
 6. Check both themes, Reduce Motion, and a colour-blind simulation — the scopes must still be told apart by shape.

@@ -57,7 +57,7 @@ export function blendExpression(a: Expression, b: Expression, t: number): Expres
  * Outlines. "partner" gives each person their own silhouette so scopes differ
  * by shape, not only colour (colour alone fails for colour-blind users):
  * Anas is a soft squircle, Salma one of a few rounded organic shapes (being
- * chosen in the lab), and Joint is a heart-shaped pebble.
+ * chosen in the lab), and Joint uses Bloub's organic Pebble.
  */
 export type Outline = "orb" | "squircle" | "partner";
 
@@ -164,14 +164,13 @@ export const HEART_RADII = (() => {
 })();
 export const HEART_FACES: [FaceSlot, FaceSlot] = [{ x: -0.42, y: -0.22, s: 0.52, yaw: 8 }, { x: 0.42, y: -0.22, s: 0.52, yaw: -8 }];
 
-/** Bloub's Pebble harmonics (MIT), softened into a heart for the shared pool.
- * A shallow cleft and broad lower tip retain a stone-like, single-face body. */
+/** Bloub's original Pebble profile (MIT): two low harmonics, peak radius 1.02. */
 const JOINT_PEBBLE: JarShape = (() => {
-  const pebble = HEART_RADII.map((_, i, all) => {
+  const pebble = circleProfile(1).map((_, i, all) => {
     const a = (i / all.length) * Math.PI * 2;
     return 1 + 0.075 * Math.cos(2 * a + 0.5) + 0.035 * Math.cos(3 * a + 2.1);
   });
   const peak = Math.max(...pebble);
-  const radii = HEART_RADII.map((r, i) => 0.78 * r + 0.22 * pebble[i] * 1.02 / peak);
-  return { key: "heart-pebble", radii, half: 1.08, corner: 0.5 };
+  const radii = pebble.map(r => r * 1.02 / peak);
+  return { key: "joint-pebble", radii, half: 1.02, corner: 0.5 };
 })();
