@@ -1,0 +1,25 @@
+.glass-tuner { position: fixed; top: 90px; right: 16px; z-index: 65; width: min(340px, calc(100vw - 32px)); color: var(--text); font: 14px/1.45 var(--font-body); }
+.glass-tuner[data-expanded="false"] { width: max-content; }
+.glass-tuner-toggle { gap: 20px; }
+.glass-tuner button, .glass-tuner select { min-height: 44px; color: var(--text); background: var(--surface2); border: 0; border-radius: 12px; padding: 8px 12px; font: inherit; cursor: pointer; }
+.glass-tuner button:hover, .glass-tuner button:active { transform: none !important; }
+.glass-tuner-toggle { width: 100%; display: flex; justify-content: space-between; box-shadow: var(--elevation-float); }
+.glass-tuner-toggle span { color: var(--text2); }
+.glass-tuner-panel { margin-top: 8px; padding: 20px; background: var(--surface); border-radius: 16px; box-shadow: var(--elevation-float); max-height: calc(100dvh - 260px); overflow-y: auto; overscroll-behavior: contain; }
+.glass-tuner-panel h2 { margin: 0 0 8px; font: 600 19px/24px var(--font-body); }
+.glass-tuner-panel p { margin: 0 0 16px; }
+.glass-tuner-note { color: var(--text2); }
+.glass-tuner-theme { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.glass-tuner-compare { display: flex; align-items: center; gap: 8px; min-height: 48px; margin: 8px 0; }
+.glass-tuner input { accent-color: var(--text); }
+.glass-tuner fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
+.glass-tuner fieldset:disabled { opacity: .5; }
+.glass-tuner-control { display: block; margin: 0 0 12px; }
+.glass-tuner-control > span { display: flex; justify-content: space-between; gap: 8px; }
+.glass-tuner output { font-variant-numeric: tabular-nums; }
+.glass-tuner-control input { display: block; width: 100%; min-height: 36px; margin: 0; }
+.glass-tuner-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.glass-tuner-panel .glass-tuner-status { min-height: 20px; margin: 8px 0; }
+.glass-tuner textarea { box-sizing: border-box; width: 100%; background: var(--surface2); color: var(--text); padding: 8px; margin-bottom: 16px; border: 1px solid var(--track); border-radius: 8px; }
+.glass-tuner a { color: var(--text); text-underline-offset: 3px; }
+.glass-tuner :is(button, input, select, textarea, a):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }

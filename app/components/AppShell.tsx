@@ -1,3 +1,5 @@
+import dynamic from "next/dynamic";
+import { glassPreviewStyle, type GlassPreset } from "./glass/glass-preview";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { AppTab, BudgetScope } from "./app-types";
 import { LiquidButton } from "./ui/LiquidGlass";
@@ -9,6 +11,8 @@ import { useAppHaptics } from "./ui/useAppHaptics";
 import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { BUDGET_SCOPE_LABELS } from "./app-utils";
 import "./desktop-dashboard.css";
+
+const GlassTuner = dynamic(() => import("./glass/GlassTuner"), { ssr: false });
 
 export function AppShell({
   tab,
@@ -51,6 +55,9 @@ export function AppShell({
 }) {
   const { haptic } = useAppHaptics();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [glassLab, setGlassLab] = useState(false);
+  const [glassPreset, setGlassPreset] = useState<GlassPreset | null>(null);
+  useEffect(() => { setGlassLab(new URLSearchParams(window.location.search).get("glassLab") === "1"); }, []);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
   const { below: contentBelow } = useScrollEdges(contentEl);
@@ -134,8 +141,8 @@ export function AppShell({
         style={{ zIndex: 55 }}
       />
 
-      <div className="app-nav-wrap">
-        <BottomNav tab={tab} onTabChange={onTabChange} desktopPrimaryAction={showAddButton && <LiquidButton type="button" className="desktop-nav-action desktop-nav-add" onClick={event => { event.currentTarget.focus(); haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></LiquidButton>} desktopActions={<>
+      <div className="app-nav-wrap" data-glass-preview={glassPreset ? "" : undefined} style={glassPreset ? glassPreviewStyle(glassPreset) : undefined}>
+        <BottomNav key={glassPreset ? JSON.stringify(glassPreset) : "shipped"} tab={tab} onTabChange={onTabChange} desktopPrimaryAction={showAddButton && <LiquidButton type="button" className="desktop-nav-action desktop-nav-add" onClick={event => { event.currentTarget.focus(); haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></LiquidButton>} desktopActions={<>
           {tab !== "home" && <LiquidButton type="button" className="desktop-nav-action" onClick={tab === "budget" ? onBudgetSearch : onReflectSearch} aria-label={tab === "budget" ? "Search categories" : "Search activity"}><SearchIcon size={20} /><span>{tab === "budget" ? "Search categories" : "Search activity"}</span></LiquidButton>}
           {onBudgetRebalance && <LiquidButton type="button" className="desktop-nav-action" onClick={onBudgetRebalance} aria-label="Rebalance"><ShuffleIcon size={20} /><span>Rebalance</span></LiquidButton>}
           {onSelectTheme && <LiquidButton type="button" className="desktop-nav-action" onClick={() => setSettingsOpen(true)} aria-label="Settings"><SettingsIcon size={20} /><span>Settings</span></LiquidButton>}
@@ -184,6 +191,7 @@ export function AppShell({
         />
       )}
 
+      {glassLab && <GlassTuner onPreview={setGlassPreset} theme={theme} onTheme={onSelectTheme} />}
       {toast && (
         <div
           role="status"

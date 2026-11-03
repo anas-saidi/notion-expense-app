@@ -15,6 +15,10 @@ Use [Glisse](https://github.com/0kzh/glisse), pinned to 0.5.0, for interaction c
 
 Reflect’s view switch is unframed: only the selected view has a neutral glass pill; the inactive view is plain secondary text. Keep 44px touch targets and zero outer/thumb insets so the pill fills its slot. Retain the invisible measured track for Glisse’s moving/held lens, keyboard controls and radio semantics. Do not add an enclosing capsule or reduce the held lens-growth variables. Reduced-transparency and high-contrast preferences use an opaque selected pill.
 
+Phone navigation shows icons only; keep each Glisse label visually hidden as the tab’s accessible name, including the lens copy. Preserve tab/panel relationships and keyboard navigation. Keep the existing 52px tab targets and 24px icons.
+
+`/?glassLab=1` opens an optional navigation material tuner over the actual app. It reuses the shipped navigation, Add button, responsive geometry, themes, content backdrop and Glisse 0.5.0 interaction. Preview variables apply only to that navigation subtree; ordinary visits retain shipped tokens. Slider updates settle before refitting Glisse. Presets persist locally and can be copied as bounded numeric settings or a URL fragment, with a baseline comparison and reset. No preview data reads, polling, backdrop capture loop, or financial writes are added. Browser-specific Glisse fallbacks remain active; compare on each target device before applying a preset app-wide.
+
 Keep at least 44px control targets, visible keyboard focus, native disabled states and explicit selected states. Disable spatial motion for reduced motion; replace transparent surfaces with opaque theme surfaces for reduced transparency/high contrast or browsers without backdrop filtering. Do not mark the page as a Glisse refraction backdrop: glass fits on idle/resize rather than adding a content-following animation loop.
 
 ### Chart and mascot motion

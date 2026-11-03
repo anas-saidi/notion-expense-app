@@ -44,3 +44,9 @@ Validation: source geometry checked against the installed library's thumb calcul
 The user selected one glass pill for the active view and plain text for the inactive view. Remove the outer track material, keeping its measured geometry for Glisse. Zero outer/thumb insets align the selected pill with its 44px target. Preserve the held lens, radio semantics, keyboard focus and existing view handlers. The selected pill uses neutral glass in both themes, with opaque accessibility fallbacks. This supersedes the enclosing-track treatment above.
 
 Validation: production build and served asset checks are recorded with the release. Internal browser control is unavailable in this session; visual playback remains unverified. No financial data or loading behavior changed.
+
+## Follow-up: icon navigation and in-app material tuner
+
+Phone tabs now show 24px icons with visually hidden accessible names. Desktop navigation retains its labelled rail. The optional `/?glassLab=1` panel tunes the real navigation and Add button over real app content, rather than a separate approximation. Surface tint/frost/refraction/dispersion, moving-lens refraction/dispersion and rim strength are adjustable. The panel can be hidden while testing taps, holds, dragging and scrolling. Appearance uses the app’s existing theme setting. Compare restores shipped material; reset restores default draft values. Drafts are local, copyable as settings and shareable in a bounded URL fragment. They do not apply outside preview mode.
+
+The tuner loads dynamically only when requested. A 180ms settling delay refits the navigation after adjustments; no continual fitting or additional data fetching is introduced. Glisse’s browser and accessibility fallbacks remain intact. Build and preset validation tests pass. Internal browser inventory is empty, so visual and gesture verification remain unconfirmed in this session.
