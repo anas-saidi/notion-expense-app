@@ -148,15 +148,13 @@ export function AppShell({
               onOpenAdd();
             }}
             className="fab-add app-nav-add"
-            variant="filled" tint="var(--text)"
             aria-label="Add transaction"
             style={{
               width: 58,
               height: 58,
               borderRadius: "50%",
-              border: "1px solid var(--text)",
-              background: "var(--text)",
-              color: "var(--bg)",
+              border: 0,
+              color: "var(--text)",
               boxShadow: "var(--elevation-float)",
               cursor: "pointer",
               display: "flex",

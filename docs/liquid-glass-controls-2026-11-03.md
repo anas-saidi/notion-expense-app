@@ -20,3 +20,13 @@ Pattern evidence: [tab bar](https://mobbin.com/glossary/tab-bar) for top-level d
 Validation: TypeScript and final production build pass; 633 app/lib tests pass, 5 skip; five private server-rendered UI integration checks pass. Root first-load JS reported by Next grows from 253kB to 269kB (about 16kB). No content is marked as a Glisse backdrop source, avoiding its permanent content-following refraction loop. Material maps fit on idle/resize; Safari uses the library's native frosted fallback because live SVG backdrop refraction is Chromium-specific.
 
 Internal-browser verification is blocked: CUA returns `Browser is not available: iab`; Codex open-in-panel request returns queued, and direct native access to the Codex app is prohibited by the tool. The user explicitly requested the internal browser, so no further Safari verification was performed. No phone/desktop visual acceptance or device performance claim is made. Local localhost:3000 continues serving the updated app for user review.
+
+## Follow-up: visible library components
+
+The user reports no visible liquid glass. Source inspection confirms the first pass kept a custom phone selection, hid its glass layers on desktop, toned refraction down from Glisse defaults and left Add opaque. Those choices made the integration too subtle and omitted the library’s main tab-bar interaction.
+
+Phone navigation now renders Glisse TabBar directly, with its draggable/held refractive selection. Width follows the existing fluid navigation rail. Desktop has a visible Glass enclosure and Button destinations rather than hiding every material layer. Add now uses clear Glisse Button styling. Restored default 0.45 bend, 0.4 dispersion and 3px frost. Selected desktop destinations retain Glisse’s filter variable, rather than overriding it with blur alone.
+
+Phone and desktop have separate tablists, with exactly one exposed by the existing breakpoint. Desktop retains original IDs; a small layout-effect bridge adds per-item phone IDs/controls (not exposed by Glisse’s item API) and points the active panel label at the visible tablist. Reduced-motion/transparency and contrast fallbacks remain.
+
+Validation: 633 app/lib tests pass, TypeScript passes and production build passes. Five SSR integration checks now assert actual Glisse TabBar/lens markup plus desktop panel links. Local CSS response confirms the phone tab bar, visible desktop glass rail and restored default refraction. Internal-browser control remains unavailable (`iab`), so visual appearance/hold-drag interaction are still unverified; no external browser was substituted.

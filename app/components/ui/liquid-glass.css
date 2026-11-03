@@ -6,11 +6,11 @@
   --lg-fill: var(--text);
   --lg-on: var(--text);
   --lg-ring: var(--focus-ring);
-  --lg-glass: rgb(255 255 255 / .68);
+  --lg-glass: rgb(255 255 255 / .6);
   --lg-glass-active: rgb(244 245 244 / .88);
-  --lg-glass-bend: .18;
-  --lg-glass-dispersion: .08;
-  --lg-blur: 12px;
+  --lg-glass-bend: .45;
+  --lg-glass-dispersion: .4;
+  --lg-blur: 3px;
   --lg-segment-label: var(--text);
   --lg-tab-selected: var(--text);
 }
@@ -36,18 +36,20 @@ html[data-theme="dark"] {
 .app-top-action.lg-button, .date-picker-trigger.lg-button,
 .sheet-close-button.lg-button { background-color: var(--lg-glass); border: 0; }
 .date-picker-trigger.lg-button { box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 2px 6px var(--lg-drop); }
-/* Navigation remains one tablist, with stable tab/panel IDs and one glass thumb. */
-.app-nav { background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; isolation: isolate; }
-.app-nav-material.lg-glass { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 8px 24px var(--lg-drop); }
-.app-nav-inner { position: relative; isolation: isolate; }
-.app-nav-selection.lg-glass {
-  position: absolute; pointer-events: none; z-index: -1;
-  top: 4px; bottom: 4px; left: 8px; width: calc((100% - 16px) / 3);
-  border-radius: 999px; background-color: var(--lg-selection);
-  transform: translateX(calc(var(--nav-index) * 100%));
-  transition: transform 240ms cubic-bezier(.22,1,.36,1);
+/* Use Glisse's complete tab bar: native drag/hold lens, not a static replica. */
+.app-nav { background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.phone-nav-glass { width: 100%; container-type: inline-size; }
+.phone-nav-tabs.lg-tab-bar {
+  --lg-tab-width: min(calc((100vw - 110px) / 3), 176.6667px);
+  --lg-tab-height: 52px; --lg-tab-inset: 4px;
+  display: flex; width: max-content; font-family: var(--font-body);
 }
-.app-nav-btn { z-index: 1; }
+@supports (width: 1cqw) { .phone-nav-tabs.lg-tab-bar { --lg-tab-width: calc((100cqw - 8px) / 3); } }
+.phone-nav-tabs .lg-tab-bar-glass { box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 8px 24px var(--lg-drop); }
+.phone-nav-tabs.lg-tab-bar[data-icons] :is(.lg-tab, .lg-tab-copy) { font-size: 12px; font-weight: 600; gap: 4px; }
+.phone-nav-tabs .lg-tab-icon > svg { width: 22px; height: 22px; }
+.desktop-glass-nav { display: none; }
+.desktop-nav-material { display: none; }
 /* The selected destination has one shared lens; buttons don't add nested lenses. */
 .reflect-hero-switch.lg-segmented {
   --lg-tab-width: 94px; --lg-tab-height: 44px; --lg-tab-inset: 3px;
@@ -56,24 +58,28 @@ html[data-theme="dark"] {
 }
 .reflect-hero-switch .lg-tab, .reflect-hero-switch .lg-tab-copy { font-size: 13px; font-weight: 600; }
 @media (min-width:900px) {
-  .app-nav-material, .app-nav-selection { display: none; }
-  .app-nav-btn[aria-selected="true"], html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
-    background: var(--lg-glass); box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 2px 6px var(--lg-drop);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  .phone-nav-glass { display: none; }
+  .desktop-glass-nav { display: flex; position: relative; isolation: isolate; padding: 6px 10px; gap: 6px; }
+  .desktop-nav-material.lg-glass { display: block; position: absolute; inset: 0 4px; border-radius: 32px; pointer-events: none; z-index: -1; box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 6px 18px var(--lg-drop); }
+  .app-nav-btn.lg-button { position: relative; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .app-nav-btn.lg-button[aria-selected="true"], html[data-theme="dark"] .app-nav-btn.lg-button[aria-selected="true"] {
+    background-color: var(--lg-glass-active); background-image: var(--lg-rim, none);
+    box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 2px 8px var(--lg-drop);
+    backdrop-filter: blur(var(--lg-blur, 3px)) var(--lg-filter, saturate(1.5));
+    -webkit-backdrop-filter: blur(var(--lg-blur, 3px)) var(--lg-filter, saturate(1.5));
   }
   .desktop-nav-action.lg-button { height: auto; justify-content: flex-start; background-color: var(--lg-glass); background-image: var(--lg-rim, none); }
 }
 /* Opaque, high-contrast controls when transparency is unavailable or unwanted. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .lg-glass { background-color: var(--surface); background-image: none; }
-  .app-nav-selection.lg-glass, .app-nav-btn[aria-selected="true"] { background-color: var(--surface2); }
+  .app-nav-btn[aria-selected="true"] { background-color: var(--surface2); }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .lg-glass { background-color: var(--surface); background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .app-nav-selection.lg-glass, .app-nav-btn[aria-selected="true"] { background-color: var(--surface2); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .app-nav-btn[aria-selected="true"] { background-color: var(--surface2); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .lg-segmented-thumb { background: var(--surface); box-shadow: inset 0 0 0 1px var(--text2); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .app-nav-selection.lg-glass { transition: none; }
   .lg-button, .lg-tab { scale: 1 !important; translate: none !important; }
 }

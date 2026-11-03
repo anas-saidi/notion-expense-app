@@ -1,8 +1,8 @@
 "use client";
-import type { CSSProperties, ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import type { AppTab } from "./app-types";
 import { HomeIcon, SlidersIcon, ChartPieIcon, WalletIcon } from "./ui/icons";
-import { LiquidSurface } from "./ui/LiquidGlass";
+import { LiquidButton, LiquidSurface, LiquidTabBar } from "./ui/LiquidGlass";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
 type BottomNavProps = {
@@ -20,13 +20,40 @@ export function BottomNav({ tab, onTabChange, desktopPrimaryAction, desktopActio
     { key: "history", label: "Reflect" },
   ];
 
+  const phoneNav = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    // Glisse exposes container props but not per-item IDs. Link its focusable
+    // tabs to the same panels, using the visible tablist for panel labels.
+    const media = window.matchMedia("(max-width: 899px)");
+    const syncLabels = () => {
+      phoneNav.current?.querySelectorAll<HTMLButtonElement>("button[role=tab]").forEach((button, index) => {
+        const key = items[index]?.key;
+        if (!key) return;
+        button.id = `phone-tab-${key}`;
+        button.setAttribute("aria-controls", `panel-${key}`);
+      });
+      for (const { key } of items) document.getElementById(`panel-${key}`)?.setAttribute("aria-labelledby", `${media.matches ? "phone-tab" : "tab"}-${key}`);
+    };
+    syncLabels();
+    media.addEventListener("change", syncLabels);
+    return () => media.removeEventListener("change", syncLabels);
+  }, [tab]); // The tab items and their order are fixed.
+
+
   return (
     <nav aria-label="App navigation" className="app-nav">
-      <LiquidSurface className="app-nav-material" aria-hidden="true" />
+      <div ref={phoneNav} className="phone-nav-glass">
+        <LiquidTabBar className="phone-nav-tabs" aria-label="Main screens"
+          items={items.map(item => ({ value: item.key, label: item.label, icon: item.key === "home" ? <HomeIcon size={22} /> : item.key === "budget" ? <SlidersIcon size={22} /> : <ChartPieIcon size={22} /> }))}
+          value={tab} onValueChange={value => {
+            if (value !== "home" && value !== "budget" && value !== "history") return;
+            if (tab !== value) haptic("selection");
+            onTabChange(value);
+          }} />
+      </div>
       <span className="desktop-nav-brand" role="img" aria-label="Couple Finance" title="Couple Finance"><WalletIcon size={24} /></span>
       {desktopPrimaryAction && <div className="desktop-nav-primary" role="group" aria-label="Add transaction">{desktopPrimaryAction}</div>}
-      <div className="app-nav-inner" role="tablist" aria-label="Main screens"
-        style={{ "--nav-index": items.findIndex(item => item.key === tab) } as CSSProperties}
+      <div className="app-nav-inner desktop-glass-nav" role="tablist" aria-label="Main screens"
         onKeyDown={event => {
           const current = items.findIndex(item => item.key === tab);
           const next = event.key === "ArrowRight" || event.key === "ArrowDown" ? (current + 1) % items.length : event.key === "ArrowLeft" || event.key === "ArrowUp" ? (current + items.length - 1) % items.length : event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : -1;
@@ -36,12 +63,12 @@ export function BottomNav({ tab, onTabChange, desktopPrimaryAction, desktopActio
           onTabChange(items[next].key);
           event.currentTarget.querySelector<HTMLButtonElement>(`#tab-${items[next].key}`)?.focus();
         }}>
-        <LiquidSurface className="app-nav-selection" aria-hidden="true" />
+        <LiquidSurface className="desktop-nav-material" aria-hidden="true" />
         {items.map((item) => {
           const activeColor = "var(--accent-foreground)";
 
           return (
-            <button
+            <LiquidButton
               key={item.key}
               id={`tab-${item.key}`}
               role="tab"
@@ -61,7 +88,7 @@ export function BottomNav({ tab, onTabChange, desktopPrimaryAction, desktopActio
               {item.key === "history" && <ChartPieIcon size={20} strokeWidth={tab === "history" ? 2.5 : 2} />}
 
               <span className="nav-label">{item.label}</span>
-            </button>
+            </LiquidButton>
           );
         })}
       </div>
