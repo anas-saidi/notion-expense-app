@@ -9,7 +9,7 @@ const store = new MirrorStore({ query: async (sql, params) => {
   if (sql === MIRROR_DDL) { await db.exec(sql); return { rows: [] }; }
   return db.query<any>(sql, params);
 } });
-beforeAll(async () => { await db.waitReady; }, 20000);
+beforeAll(async () => { await db.waitReady; await db.exec(MIRROR_DDL); }, 20000);
 afterAll(async () => { await db.close(); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 

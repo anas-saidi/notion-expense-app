@@ -58,19 +58,12 @@ export function mirrorStore(): MirrorStore | null {
   }
   return new MirrorStore(globalStore.financeMirrorPool);
 }
-// DDL is initialized once per driver. Failure is evicted so a repaired DB can recover.
-const initialized = new WeakMap<SqlDriver, Promise<unknown>>();
+// Schema changes belong to tracked migrations, never request-time DDL. Even an
+// IF NOT EXISTS ALTER takes a table lock and can serialize cold route instances.
 const preparedScopes = new WeakMap<SqlDriver, Map<string, Promise<unknown>>>();
 export class MirrorStore {
   constructor(private db: SqlDriver) {}
   async ready(scope: string) {
-    let init = initialized.get(this.db);
-    if (!init) {
-      init = this.db.query(MIRROR_DDL);
-      initialized.set(this.db, init);
-      void init.catch(() => initialized.delete(this.db));
-    }
-    await init;
     let scopes = preparedScopes.get(this.db);
     if (!scopes) { scopes = new Map(); preparedScopes.set(this.db, scopes); }
     let prepared = scopes.get(scope);
@@ -92,27 +85,41 @@ export class MirrorStore {
       WHERE ${valid}`;
     const records = `SELECT page,ordinal FROM finance_mirror_records WHERE scope=$1 AND database_id=$2 AND generation=source.generation`;
     let sql: string, params: any[];
+    let pagination: { offset: number; size: number } | undefined;
     if (schemaOnly) {
-      sql = `WITH source AS (${source}) SELECT jsonb_build_object('schema',schema,'pages','[]'::jsonb) AS data,synced_at FROM source`;
+      sql = `WITH source AS (${source}) SELECT schema,synced_at FROM source`;
       params = baseParams;
     } else if (body !== undefined) {
       const query = compileMirrorQuery(body);
-      sql = `WITH source AS (${source}),
-        filtered AS (SELECT page,row_number() OVER (ORDER BY ${query.order}) AS n FROM source,
-          LATERAL (${records}) AS entries
-          WHERE ${query.where} AND NOT COALESCE((page->>'archived')::boolean,false) AND NOT COALESCE((page->>'in_trash')::boolean,false))
-        SELECT jsonb_build_object('queryResult',jsonb_build_object(
-          'results',COALESCE((SELECT jsonb_agg(page ORDER BY n) FROM filtered WHERE n>${query.offset} AND (${allRows ? "true" : "false"} OR n<=${query.offset}+${query.size})),'[]'::jsonb),
-          'has_more',${allRows ? 'false AND' : ''} (SELECT count(*) FROM filtered)>${query.offset}+${query.size},
-          'next_cursor',CASE WHEN ${allRows ? 'false AND' : ''} (SELECT count(*) FROM filtered)>${query.offset}+${query.size} THEN 'mirror:'||(${query.offset}+${query.size})::text ELSE NULL END)) AS data,synced_at FROM source`;
+      pagination = { offset: body.start_cursor ? Number(String(body.start_cursor).slice(7)) : 0, size: body.page_size ?? 100 };
+      // Return individual pages instead of aggregating the entire ledger into a
+      // nested JSONB value. Full-history reports spent seconds aggregating and
+      // constructing that value before sending any data.
+      // The source and its pages still share a single statement/MVCC snapshot.
+      // One extra row determines pagination without counting/sorting twice.
+      sql = `WITH source AS (${source}) SELECT entries.page,source.synced_at FROM source
+        LEFT JOIN LATERAL (SELECT page FROM (${records}) AS records
+          WHERE ${query.where} AND NOT COALESCE((page->>'archived')::boolean,false) AND NOT COALESCE((page->>'in_trash')::boolean,false)
+          ORDER BY ${query.order} OFFSET ${query.offset}${allRows ? "" : ` LIMIT ${query.size}+1`}) AS entries ON true`;
+      // compileMirrorQuery reserves the page-size parameter even for full reads.
+      // Keep it typed/referenced in that case without limiting the report.
+      if (allRows) sql += ` WHERE ${query.size}::integer > 0`;
       params = [...baseParams, ...query.params];
     } else {
-      sql = `WITH source AS (${source}) SELECT jsonb_build_object('schema',schema,'pages',
-        COALESCE((SELECT jsonb_agg(page ORDER BY ordinal) FROM (${records}) AS entries),'[]'::jsonb)) AS data,synced_at FROM source`;
+      sql = `WITH source AS (${source}) SELECT entries.page,source.schema,source.synced_at FROM source
+        LEFT JOIN LATERAL (${records} ORDER BY ordinal) AS entries ON true`;
       params = baseParams;
     }
     const { rows } = await this.db.query(sql, params);
-    return rows[0]?.data ? { data: rows[0].data as MirroredDatabase, syncedAt: new Date(rows[0].synced_at).toISOString() } : null;
+    if (!rows.length) return null;
+    const pages = rows.flatMap(row => row.page == null ? [] : [row.page]);
+    const more = !!pagination && !allRows && pages.length > pagination.size;
+    const data: MirroredDatabase = pagination ? { pages: [], schema: undefined, queryResult: {
+      results: more ? pages.slice(0, pagination.size) : pages,
+      has_more: more,
+      next_cursor: more ? `mirror:${pagination.offset + pagination.size}` : null,
+    } } : { schema: rows[0].schema, pages };
+    return { data, syncedAt: new Date(rows[0].synced_at).toISOString() };
   }
   async status(scope: string) {
     await this.ready(scope);

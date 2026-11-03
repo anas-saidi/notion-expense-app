@@ -9,7 +9,7 @@ const driver = { query: async (sql: string, params?: any[]) => {
 } };
 const store = new MirrorStore(driver);
 const snapshot = { abc: { schema: { properties: {} }, pages: [{ id: "one" }] } };
-beforeAll(async () => { await db.waitReady; }, 20000);
+beforeAll(async () => { await db.waitReady; await db.exec(MIRROR_DDL); }, 20000);
 afterAll(async () => { await db.close(); });
 
 it("atomically publishes complete snapshots and isolates connections", async () => {
@@ -106,4 +106,30 @@ it("filters and paginates inside Postgres, while full reports use one consistent
   expect(all.has_more).toBe(false);
   expect(all.next_cursor).toBeNull();
   expect(await store.read("sql-filter", "missing-db", 60000, {})).toBeNull();
+});
+
+it("distinguishes an empty published database from a missing or invalid snapshot", async () => {
+  const lease = await store.acquire("empty-query");
+  await store.publish("empty-query", lease!, { abc: { schema: { properties: {} }, pages: [
+    { id: "archived", archived: true }, { id: "trashed", in_trash: true },
+  ] } });
+  const empty = { results: [], has_more: false, next_cursor: null };
+  expect((await store.read("empty-query", "abc", 60000, {}))?.data.queryResult).toEqual(empty);
+  expect((await store.read("empty-query", "abc", 60000, {}, false, true))?.data.queryResult).toEqual(empty);
+  expect((await store.read("sql-filter", "abc", 60000, { start_cursor: "mirror:100" }))?.data.queryResult).toEqual(empty);
+  expect(await store.read("empty-query", "missing", 60000, {})).toBeNull();
+  const fence = await store.beginWrite("empty-query");
+  expect(await store.read("empty-query", "abc", 60000, {})).toBeNull();
+  await store.finishWrite("empty-query", fence);
+});
+
+it("reads migrated tables without running schema DDL on a cold driver", async () => {
+  const queries: string[] = [];
+  const cold = new MirrorStore({ query: async (sql, params) => {
+    queries.push(sql);
+    if (/\b(CREATE|ALTER|DROP)\b/i.test(sql)) throw new Error("Request-time schema mutation");
+    return db.query<any>(sql, params);
+  } });
+  expect((await cold.read("sql-filter", "abc", 60000, {}, false, true))?.data.queryResult.results).toHaveLength(12);
+  expect(queries).toHaveLength(2); // Scope setup and the consistent display read.
 });

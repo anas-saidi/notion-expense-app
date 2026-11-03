@@ -47,3 +47,13 @@ All five original Finance Records payloads were verified unchanged after the tes
 Older local servers owned by this session were stopped. The atlas-dev server on port 3001 remained running, so its existing environment was backed up and only `NOTION_SINGLE_WRITER` was changed to false. A harmless invalid expense request verified it returns the single-writer 503 before any save. The coordinated development preview runs from the migration checkout on port 3000.
 
 The explicit `.vercelignore` excludes local credentials, migration backups, agent scratch files and build output. An earlier disposable CLI preview that included local scratch files was removed; deployment dry-run verification confirms those paths are excluded. Existing production credentials unrelated to storage were preserved. No billing settings were changed.
+
+## Mirror read performance, 2026-11-03
+
+Mirror requests now use the schema installed by tracked migrations. They never run `MIRROR_DDL`: even a redundant `ALTER TABLE ... IF NOT EXISTS` takes a table lock and can contend with reads/imports across cold workers. New environments must apply the migration before starting the app; unavailable tables follow the existing live-Notion display fallback. Tests install their schema explicitly.
+
+Reports return individual PostgreSQL rows instead of building a nested `jsonb_agg` response in the database. One SQL statement still checks revision/freshness and reads the matching generation, preserving a consistent snapshot during publication or invalidation. Paginated queries retrieve one extra row to determine `has_more`; full reports remain unlimited. A left lateral join preserves the distinction between a valid empty result and a missing/stale snapshot.
+
+Against the same valid production mirror, the previous full-history transaction read took 20,453 ms and the revised read took 2,050 ms from the development host. All 2,621 returned pages matched exactly. The earlier query plan spent most of its execution time aggregating/constructing the nested JSON response. Local sequential and concurrent checks of nine authenticated app endpoints returned HTTP 200 with mirror provenance and no contribution errors. The full monthly summary took 2,658 ms sequentially and 3,048 ms concurrently. These are local measurements, not device or hosted latency guarantees.
+
+Validation: 629 regression tests passed; five opt-in live integration tests were not rerun for this read-query change. Production build and type checks passed. Regression coverage includes empty results, pagination past the end, archived records, missing/invalid snapshots, and cold reads without schema mutations. No financial payloads, write coordination, TLS rules, namespace inputs, or freshness limits changed.
