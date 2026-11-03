@@ -35,7 +35,7 @@ The primary object on Home is the wallet overview. One financial number owns the
 
 `Joint / Anas / Salma` is one app-wide context. It stays in the same top position across Home, Budget, and Reflect, and changing it updates every destination.
 
-- The original three-mascot picker has one enclosing pill and sits at the left of the mobile header. Keep separate 44px minimum targets and full accessible names; personal modes flank Joint.
+- The phone mode picker is an unframed mascot stack at the left of the header. Keep separate 44px minimum targets and full accessible names; the selected scope sits in the center foreground.
 - Picker artwork stays static between selections. On phones, a brief depth rotation brings the selected mascot forward; the others sit smaller behind it. No cuddling, captions or inner selected pill. Desktop retains visible names.
 - Preserve the established blue, heart and pink mascot artwork. Do not substitute gender symbols or decorative emoji.
 - Full-screen actions such as Rebalance inherit the global scope and show it as read-only context. They never introduce a second scope picker.
@@ -666,7 +666,7 @@ On mobile, the scope picker anchors the header's left edge and screen actions re
 
 The app header uses two CSS-owned columns on mobile: the budget picker on the left, screen actions then Settings on the right. Remove the former inline three-column template. Keep Settings at the far-right position on Home, Budget and Reflect; Budget’s Rebalance action lives in the context toolbar beside month/planning controls.
 
-The header picker keeps the original enclosing pill and static mascot artwork. On phones it is 136×48px, with three separate 44px touch targets. The selected scope rotates into the center foreground; the other scopes sit smaller and slightly higher behind it. Animate only selection, using transform/opacity over 320ms without bounce. Reduced motion changes state immediately. Desktop retains visible names.
+The phone picker is an unframed 132×48px group with three separate 44px touch targets. Keep the original static artwork: 32px for the selected mascot and 22px for the alternatives, which sit 4px higher at 80% opacity. Selection rotates that scope into the foreground in 220ms using transform/opacity without bounce. No idle animation. Reduced motion changes state immediately. Desktop retains its labeled picker.
 
 Local development uses `NEXT_BUILD_DIR=.next-local` so production builds in `.next` cannot replace its chunks. The preview returned HTTP 200 after restart. This header change passed TypeScript and whitespace checks; internal-browser automation remains unavailable, so rendered mobile/desktop acceptance is unverified.
 
