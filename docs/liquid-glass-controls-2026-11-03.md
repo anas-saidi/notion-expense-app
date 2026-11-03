@@ -30,3 +30,11 @@ Phone navigation now renders Glisse TabBar directly, with its draggable/held ref
 Phone and desktop have separate tablists, with exactly one exposed by the existing breakpoint. Desktop retains original IDs; a small layout-effect bridge adds per-item phone IDs/controls (not exposed by Glisse’s item API) and points the active panel label at the visible tablist. Reduced-motion/transparency and contrast fallbacks remain.
 
 Validation: 633 app/lib tests pass, TypeScript passes and production build passes. Five SSR integration checks now assert actual Glisse TabBar/lens markup plus desktop panel links. Local CSS response confirms the phone tab bar, visible desktop glass rail and restored default refraction. Internal-browser control remains unavailable (`iab`), so visual appearance/hold-drag interaction are still unverified; no external browser was substituted.
+
+## Follow-up: Reflect switch geometry and dark material
+
+The supplied dark phone screenshot shows the resting selected pill protruding beneath the track. Glisse's segmented root defaults to no outer padding. The app set `--lg-tab-inset:3px`, which moved the thumb but never added that track padding. A 44px track therefore contained a 40px thumb starting at 5px, ending at 45px. Apply actual 3px padding and derive the capsule radius from the padded 50px height: the same thumb now has 5px clearance above and below, and equal horizontal clearance. Keep overflow visible so the held lens can lift as intended.
+
+The dark resting thumb uses 14% light neutral instead of the library's 30%, with a fine specular edge. Selected labels use stronger text/weight. Remove the reduced custom 10px/6px lens growth, allowing the package's native 24px/16px held lens. Keep capsule-shaped keyboard focus and preserve the stronger opaque-thumb border under reduced transparency/high contrast.
+
+Validation: source geometry checked against the installed library's thumb calculations; production build passed. This CSS-only fix does not run database diagnostics or change financial behavior. Internal browser still reports `iab` unavailable, so rendered dark/light and hold/drag playback remain unverified; no external browser substituted.

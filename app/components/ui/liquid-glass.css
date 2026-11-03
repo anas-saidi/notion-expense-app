@@ -53,10 +53,22 @@ html[data-theme="dark"] {
 /* The selected destination has one shared lens; buttons don't add nested lenses. */
 .reflect-hero-switch.lg-segmented {
   --lg-tab-width: 94px; --lg-tab-height: 44px; --lg-tab-inset: 3px;
-  --lg-lens-grow-x: 10px; --lg-lens-grow-y: 6px;
-  gap: 0; width: auto; font-family: var(--font-body);
+  /* Glisse's thumb offsets include --lg-tab-inset. Its segmented root has
+     no padding by default, so a custom inset must add matching track padding. */
+  padding: var(--lg-tab-inset);
+  border-radius: calc(var(--lg-tab-height) / 2 + var(--lg-tab-inset));
+  gap: 0; width: max-content; font-family: var(--font-body);
 }
-.reflect-hero-switch .lg-tab, .reflect-hero-switch .lg-tab-copy { font-size: 13px; font-weight: 600; }
+.reflect-hero-switch .lg-tab, .reflect-hero-switch .lg-tab-copy { font-size: 13px; font-weight: 500; }
+.reflect-hero-switch .lg-tab { color: var(--text2); }
+.reflect-hero-switch .lg-tab[data-selected], .reflect-hero-switch .lg-tab-copy[data-selected] { color: var(--text); font-weight: 600; }
+.reflect-hero-switch .lg-segmented-thumb {
+  box-shadow: inset 0 .5px 0 rgb(255 255 255 / .38), inset 0 -.5px 0 var(--lg-edge), 0 1px 3px var(--lg-drop);
+}
+html[data-theme="dark"] .reflect-hero-switch { --lg-segment-thumb: rgb(235 235 245 / .14); }
+/* Use the segment's capsule for keyboard focus; preserve the same radius
+   for the held lens rather than inheriting the hero button's control radius. */
+.screen-hero-mascot .reflect-hero-switch .lg-tab:focus-visible { border-radius: calc(var(--lg-tab-height) / 2); outline-offset: -3px; }
 @media (min-width:900px) {
   .phone-nav-glass { display: none; }
   .desktop-glass-nav { display: flex; position: relative; isolation: isolate; padding: 6px 10px; gap: 6px; }
@@ -78,7 +90,7 @@ html[data-theme="dark"] {
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .lg-glass { background-color: var(--surface); background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .app-nav-btn[aria-selected="true"] { background-color: var(--surface2); backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .lg-segmented-thumb { background: var(--surface); box-shadow: inset 0 0 0 1px var(--text2); }
+  .lg-segmented-thumb, .reflect-hero-switch .lg-segmented-thumb { background: var(--surface); box-shadow: inset 0 0 0 1px var(--text2); }
 }
 @media (prefers-reduced-motion: reduce) {
   .lg-button, .lg-tab { scale: 1 !important; translate: none !important; }
