@@ -57,3 +57,19 @@ Reports return individual PostgreSQL rows instead of building a nested `jsonb_ag
 Against the same valid production mirror, the previous full-history transaction read took 20,453 ms and the revised read took 2,050 ms from the development host. All 2,621 returned pages matched exactly. The earlier query plan spent most of its execution time aggregating/constructing the nested JSON response. Local sequential and concurrent checks of nine authenticated app endpoints returned HTTP 200 with mirror provenance and no contribution errors. The full monthly summary took 2,658 ms sequentially and 3,048 ms concurrently. These are local measurements, not device or hosted latency guarantees.
 
 Validation: 629 regression tests passed; five opt-in live integration tests were not rerun for this read-query change. Production build and type checks passed. Regression coverage includes empty results, pagination past the end, archived records, missing/invalid snapshots, and cold reads without schema mutations. No financial payloads, write coordination, TLS rules, namespace inputs, or freshness limits changed.
+
+## First load after inactivity, 2026-11-03
+
+A fresh-mirror benchmark does not cover opening the app after inactivity. The mirror expires after 15 minutes, while the Vercel Hobby cron in `vercel.json` runs daily. Reproduction against production returned live-Notion account data in 11,830 ms and the full monthly summary in 15,716 ms. This explains the ten-second loading recovery banner even though warm mirror reads were fast.
+
+The tracked `20261103103000_schedule_mirror_refresh.sql` migration installs a Supabase job named `finance-mirror-refresh` every five minutes. It calls the existing canonical refresh endpoint independently of app visits. It still imports the complete Notion databases and publishes atomically through the existing lease and revision checks. It never extends the freshness limit, serves an invalidated snapshot, or bypasses write coordination. The daily Vercel job remains a redundant refresh. This uses the existing projects without a plan upgrade.
+
+Supabase supports scheduled HTTP calls through [pg_cron and pg_net](https://supabase.com/docs/guides/functions/schedule-functions). Its database-owned HTTP queue can be read by database login roles. The job therefore sends a task-specific HMAC signature that expires after five minutes, rather than putting a reusable credential in that queue. The separate `FINANCE_MIRROR_REFRESH_SECRET` is stored in canonical production settings and encrypted Supabase Vault; browser roles cannot read Vault or execute the enqueue wrapper. The existing Vercel bearer authentication remains supported.
+
+Setup after applying the migration:
+
+1. Configure `FINANCE_MIRROR_REFRESH_SECRET` as a sensitive server-only setting on the canonical Vercel project and deploy the route that accepts signed refreshes.
+2. Run `node --env-file=.env.local --env-file=/private/path/scheduler.env scripts/configure-mirror-refresh.mjs --apply`, using the same secret. Without `--apply`, the script only inspects configuration. It verifies the canonical endpoint before storing secrets and refuses another project or destination.
+3. Verify `cron.job_run_details`, the matching `net._http_response` status and an advancing mirror `synced_at` after a scheduled run. Then measure a fresh browser session without first refreshing the mirror manually.
+
+If the scheduler fails, the original bounded-freshness fallback still applies. Do not hide loading recovery or represent an expired snapshot as current. To disable only this job, use `SELECT cron.unschedule('finance-mirror-refresh')`; do not drop shared extensions or financial coordination tables. Rotate the dedicated secret in Vercel and Vault together when needed.
