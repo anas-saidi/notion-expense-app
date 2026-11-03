@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./ui/LiquidGlass";
 import { PlanPartnerRemaining } from "./PlanPartnerRemaining";
 import { clearUnchangedPlanDraft, parsePlanDraft, planDraftKey, restorePlanDraft, type LocalPlanDraft } from "./month-plan-draft";
 import { MonthPlanReview } from "./MonthPlanReview";
@@ -929,7 +930,7 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
       {open && quickChoices.length > 0 && (
         <div role="group" aria-label={`Quick amounts for ${cat.name}`} style={quickRowStyle}>
           {quickChoices.map((q) => (
-            <button
+            <LiquidButton
               key={q.label}
               type="button"
               // Keep the input focused so the row stays open while filling.
@@ -939,7 +940,7 @@ function PlanRow({ cat, index, savings, amount, currentPlanned, currentSpent, pl
               style={quickChipStyle}
             >
               {q.label}
-            </button>
+            </LiquidButton>
           ))}
         </div>
       )}

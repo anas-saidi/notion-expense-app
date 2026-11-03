@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./ui/LiquidGlass";
 
 import { HeroSkeleton, SkeletonRows } from "./ui/Skeleton";
 
@@ -259,11 +260,11 @@ export function CategoriesScreen({
               />
               {/* Next month's plan sits with the month it follows, and only appears in the month's last week. */}
               {planMonth && onOpenPlan && !past && (planMonth === homeMonth || nextMonthPlanningOpen()) && (
-                <button type="button" className="composer-picker-chip" disabled={!!monthlySummary.contributionError} title={monthlySummary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`} style={planChipStyle}>
+                <LiquidButton type="button" className="composer-picker-chip" disabled={!!monthlySummary.contributionError} title={monthlySummary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`} style={planChipStyle}>
                   <CalendarIcon size={16} aria-hidden="true" />
                   {/* The month picker beside it already names this month. */}
                   {planMonth === homeMonth ? "Plan" : `Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}
-                </button>
+                </LiquidButton>
               )}
               </div>
               <button type="button" className="app-top-action budget-rebalance-control" onClick={onOpenRebalance} aria-label="Rebalance budget" title="Rebalance budget"><ShuffleIcon size={18} /></button>
@@ -391,8 +392,8 @@ const planChipStyle: CSSProperties = {
   minHeight: 44,
   padding: "0 14px",
   borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
-  background: "var(--surface)",
+  border: 0,
+  background: "var(--lg-glass)",
   color: "var(--text2)",
   fontSize: 13,
   fontWeight: 600,

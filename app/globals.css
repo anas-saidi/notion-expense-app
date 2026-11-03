@@ -1689,7 +1689,7 @@ html[data-theme="dark"] .bottom-sheet-panel {
 }
 
 /* Shared single-choice and calendar controls. */
-.choice-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px !important; border: 1px solid var(--border) !important; border-radius: var(--radius-control) !important; background: var(--surface) !important; color: var(--text) !important; font-size: 15px !important; cursor: pointer; }
+.choice-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px !important; border: 0; border-radius: var(--radius-control) !important; background-color: var(--lg-glass); color: var(--text) !important; font-size: 15px !important; cursor: pointer; }
 /* Text fields share the choice-trigger geometry so mixed forms read as one control set. */
 .field-input { width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 15px; box-sizing: border-box; }
 .field-input::placeholder { color: var(--muted); }

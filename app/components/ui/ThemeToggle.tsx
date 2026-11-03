@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./LiquidGlass";
 
 import { useEffect, useId, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
@@ -26,11 +27,11 @@ export function ThemeToggle({ theme, onSelectTheme }: { theme: Theme; onSelectTh
   const transition = { duration: reduceMotion ? 0 : 0.35, ease: "easeInOut" as const };
 
   return <div role="group" aria-label="Appearance" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-    <button type="button" className="appearance-system-button" aria-label="Use system appearance" aria-pressed={theme === "system"}
+    <LiquidButton type="button" className="appearance-system-button" aria-label="Use system appearance" aria-pressed={theme === "system"}
       onClick={() => { if (theme !== "system") { haptic("selection"); onSelectTheme("system"); } }}>
       System
-    </button>
-    <button type="button" className="appearance-theme-button" aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+    </LiquidButton>
+    <LiquidButton type="button" className="appearance-theme-button" aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
       title={`Switch to ${isDark ? "light" : "dark"} mode`}
       onClick={() => { haptic("selection"); onSelectTheme(isDark ? "light" : "dark"); }}>
       <svg width="26" height="26" viewBox="0 0 32 32" fill="currentColor" strokeLinecap="round" aria-hidden="true">
@@ -45,6 +46,6 @@ export function ThemeToggle({ theme, onSelectTheme }: { theme: Theme; onSelectTh
           </motion.g>
         </g>
       </svg>
-    </button>
+    </LiquidButton>
   </div>;
 }

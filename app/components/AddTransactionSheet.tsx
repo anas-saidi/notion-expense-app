@@ -1,4 +1,6 @@
 "use client";
+import { ChoicePicker } from "./ChoicePicker";
+import { LiquidButton, glassControlStyle } from "./ui/LiquidGlass";
 
 import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
 
@@ -245,8 +247,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
         {!isEditMode && entryMode === "form" && (
           <div role="tablist" aria-label="Transaction type" style={typeSwitcherStyle}>
-            <button type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" disabled={typedBusy} onClick={() => selectTransactionType("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></button>
-            <button type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" disabled={typedBusy} onClick={() => selectTransactionType("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></button>
+            <LiquidButton type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" disabled={typedBusy} onClick={() => selectTransactionType("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></LiquidButton>
+            <LiquidButton type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" disabled={typedBusy} onClick={() => selectTransactionType("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></LiquidButton>
           </div>
         )}
 
@@ -334,7 +336,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
             {/* Account picker */}
             <div style={pickerSlotStyle} ref={props.accountRef}>
-              <button
+              <LiquidButton
                 onClick={props.onToggleAccountPicker}
                 aria-haspopup="dialog"
                 aria-expanded={props.showAccountPicker}
@@ -346,7 +348,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               >
                 <span style={pickerChipIconStyle}>{props.selectedAccount?.icon ?? "$"}</span>
                 <span style={pickerChipLabelStyle}>{props.selectedAccount?.label ?? ""}</span>
-              </button>
+              </LiquidButton>
 
               <PickerPopover open={props.showAccountPicker} title="Account" onClose={props.onCloseAccountPicker} align="left" placement="top" size="choice" zIndex={140} anchorRef={props.accountRef}>
                 <AccountOptionList id="account-picker" accounts={props.filteredAccounts} selectedId={props.selectedAccount?.id} onSelect={props.onSelectAccount} />
@@ -357,7 +359,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
             {/* Category picker */}
             {!isIncome && <div style={pickerSlotStyle} ref={props.catRef}>
-              <button
+              <LiquidButton
                 onClick={props.onToggleCatPicker}
                 aria-haspopup="dialog"
                 aria-expanded={props.showCatPicker}
@@ -369,7 +371,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               >
                 <span style={pickerChipIconStyle}><CategoryIcon icon={props.selectedCat?.icon} categoryName={props.selectedCat?.name} size={24} /></span>
                 <span style={pickerChipLabelStyle}>{props.selectedCat?.name ?? "Category"}</span>
-              </button>
+              </LiquidButton>
 
               <PickerPopover open={props.showCatPicker} title="Category" onClose={props.onCloseCatPicker} align="left" placement="top" size="choice" zIndex={140} anchorRef={props.catRef}>
                 <CategoryOptionList id="category-picker" categories={props.filteredCats} selectedId={props.selectedCat?.id} lastUsedId={props.lastUsedCatId} onSelect={props.onSelectCategory} search={props.catSearch} onSearchChange={props.onCatSearchChange} />
@@ -415,20 +417,20 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     {/* Fund from dropdown — only shown once amount is entered */}
                     {props.onQuickFund && sourceCandidates.length > 0 && deficit > 0 && (
                       <div style={{ position: "relative", flexShrink: 0 }} ref={fundPickerRef}>
-                        <button
+                        <LiquidButton
                           type="button"
                           disabled={!!fundingSourceId}
                           onClick={() => setShowFundPicker(v => !v)}
                           aria-label="Move funds from another category"
                           aria-expanded={showFundPicker}
                           aria-haspopup="listbox"
-                          style={fundTriggerStyle(!!fundingSourceId)}
+                          style={glassControlStyle(fundTriggerStyle(!!fundingSourceId))}
                         >
                           {fundingSourceId
                             ? <><span style={{ width: 11, height: 11, border: "1.5px solid color-mix(in srgb, currentColor 30%, transparent)", borderTopColor: "currentColor", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} /> Moving…</>
                             : <>Move from <ChevronDownIcon size={10} style={{ flexShrink: 0, color: "var(--muted)", transition: "transform 0.15s", transform: showFundPicker ? "rotate(180deg)" : "none" }} /></>
                           }
-                        </button>
+                        </LiquidButton>
 
                         <PickerPopover open={showFundPicker} title="Source category" onClose={() => setShowFundPicker(false)} align="left" placement="top" size="choice" zIndex={150} anchorRef={fundPickerRef}>
                           <div role="listbox" aria-label="Source categories" style={{ maxHeight: 220, overflowY: "auto", padding: 6, boxSizing: "border-box" }}>
@@ -507,7 +509,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           </button>
           </div>
           {showRepeat && !isEditMode && !isIncome && <div id="transaction-repeat" style={{ display: "grid", gap: 8, padding: "0 16px" }}>
-            <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, fontSize: 13, color: "var(--text2)" }}>Repeat<select aria-label="Repeat expense" value={repeat} disabled={props.status === "saving"} onChange={event => { setRepeat(event.target.value as BillRepeat); haptic("selection"); }} style={{ minHeight: 44, padding: "0 12px", borderRadius: "var(--radius-control)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", font: "inherit" }}><option value="None">Off</option><option value="Monthly">Monthly</option><option value="Yearly">Yearly</option></select></label>
+            <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, fontSize: 13, color: "var(--text2)" }}>Repeat<ChoicePicker aria-label="Repeat expense" value={repeat} disabled={props.status === "saving"} onChange={event => { setRepeat(event.target.value as BillRepeat); haptic("selection"); }} style={{ minHeight: 44, padding: "0 12px", borderRadius: "var(--radius-control)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", font: "inherit" }}><option value="None">Off</option><option value="Monthly">Monthly</option><option value="Yearly">Yearly</option></ChoicePicker></label>
             {nextDue && <p style={{ margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--muted)" }}>Next bill due {fmtDate(nextDue)}. Future bills use this amount and category.</p>}
           </div>}
 
@@ -762,13 +764,13 @@ const typeSwitcherStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 2,
-  height: 44,
+  minHeight: 44,
   width: "fit-content",
   margin: "0 auto 14px",
   padding: 3,
   boxSizing: "border-box",
   borderRadius: 999,
-  background: "var(--surface2)",
+  background: "transparent",
 };
 
 const dialogTitleStyle: CSSProperties = {

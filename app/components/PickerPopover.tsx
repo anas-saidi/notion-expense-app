@@ -1,6 +1,7 @@
 "use client";
 
 import "./ui/sheet-layout.css";
+import { LiquidSurface } from "./ui/LiquidGlass";
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
@@ -160,7 +161,8 @@ export function PickerPopover({
   const isMobilePinned = "right" in positionStyle;
 
   return createPortal(
-    <div
+    <LiquidSurface
+      className="picker-glass-surface"
       ref={popoverRef}
       data-picker-popover="true"
       role="dialog"
@@ -170,8 +172,7 @@ export function PickerPopover({
         width: isMobilePinned ? "auto" : width,
         maxWidth: "min(calc(100vw - 16px), calc(100dvw - 16px))",
         // positionStyle owns max-height so iOS keyboard changes use the visual viewport.
-        background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
-        border: "1px solid color-mix(in srgb, var(--border2) 64%, transparent)",
+        border: 0,
         borderRadius: "var(--radius-card)",
         overflow: "hidden",
         boxShadow: "var(--elevation-float)",
@@ -181,7 +182,7 @@ export function PickerPopover({
     >
       {showHeader && <div className="picker-heading"><strong>{title}</strong>{onClose && <button type="button" aria-label={`Close ${title}`} onClick={onClose}>×</button>}</div>}
       <div className="picker-body">{children}</div>
-    </div>,
+    </LiquidSurface>,
     document.body
   );
 }

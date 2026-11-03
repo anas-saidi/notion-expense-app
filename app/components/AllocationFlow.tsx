@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./ui/LiquidGlass";
 import { ChoicePicker } from "./ChoicePicker";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -280,14 +281,14 @@ export function AllocationFlow({
             {active.items.map((item) => {
               const isActive = item.categoryId === activeItem?.categoryId;
               return (
-                <button key={item.categoryId} type="button" onClick={() => setActiveCategoryId(item.categoryId)} style={{ ...(isActive ? categoryPillActiveStyle : categoryPillStyle) }} aria-pressed={isActive}>
+                <LiquidButton key={item.categoryId} type="button" onClick={() => setActiveCategoryId(item.categoryId)} style={{ ...(isActive ? categoryPillActiveStyle : categoryPillStyle) }} aria-pressed={isActive}>
                   <CategoryIcon icon={item.icon} categoryName={item.name} size={17} style={categoryIconStyle(isActive)} />
                   <span style={categoryNameStyle}>{item.name}</span>
                   {/* Rebalancing: each category's live available, so you can see where money is without tapping. */}
                   {rebalanceMode && Math.round(item.amount) !== 0 && (
                     <span style={categoryAmountStyle(isActive, item.amount < 0)}>{fmt(Math.round(item.amount))}</span>
                   )}
-                </button>
+                </LiquidButton>
               );
             })}
           </div>
@@ -400,8 +401,8 @@ const deltaChipStyle = (isOver: boolean): CSSProperties => ({
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
-const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 196, minHeight: 44, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)", background: "var(--surface)", color: "var(--text2)", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", boxShadow: "none", transition: "background-color var(--motion-standard) ease, color var(--motion-standard) ease" };
-const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "var(--select-wash)", boxShadow: "inset 0 0 0 1px var(--select-edge)", color: "var(--select-ink)" };
+const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 196, minHeight: 44, borderRadius: 999, border: 0, background: "var(--lg-glass)", color: "var(--text2)", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", boxShadow: "none", transition: "background-color var(--motion-standard) ease, color var(--motion-standard) ease" };
+const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "var(--lg-glass-active)", boxShadow: "inset 0 0 0 .5px var(--lg-edge)", color: "var(--text)" };
 const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActive ? "var(--select-ink)" : "var(--text2)", flexShrink: 0 });
 const categoryAmountStyle = (isActive: boolean, negative: boolean): CSSProperties => ({ flexShrink: 0, fontSize: 12, fontWeight: 650, fontVariantNumeric: "tabular-nums", color: negative ? "var(--danger)" : isActive ? "var(--select-ink)" : "var(--muted)", opacity: isActive ? 0.72 : 1 });
 const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };

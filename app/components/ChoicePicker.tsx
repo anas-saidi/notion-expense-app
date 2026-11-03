@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton, glassControlStyle } from "./ui/LiquidGlass";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Children, isValidElement, useRef, useState, type SelectHTMLAttributes, type ChangeEvent, type ReactNode } from "react";
 import { PickerPopover } from "./PickerPopover";
@@ -12,7 +13,7 @@ export function ChoicePicker({ children, value, onChange, style, disabled, ...re
   const title = rest["aria-label"] ?? "Choose an option";
   const content = (option: typeof selected) => <>{option?.["data-icon"] && <CategoryIcon icon={option["data-icon"]} size={24} />}{option?.children ?? "Choose"}</>;
   return <span ref={anchor} style={{ display: "block", minWidth: 0 }}>
-    <button type="button" disabled={disabled} aria-label={rest["aria-label"]} aria-haspopup="dialog" aria-expanded={open} className="choice-trigger" style={style} onClick={() => { setSearch(""); setOpen(!open); }}>{content(selected)}<ChevronDownIcon size={16} /></button>
+    <LiquidButton type="button" disabled={disabled} aria-label={rest["aria-label"]} aria-haspopup="dialog" aria-expanded={open} className="choice-trigger" style={glassControlStyle(style)} onClick={() => { setSearch(""); setOpen(!open); }}>{content(selected)}<ChevronDownIcon size={16} /></LiquidButton>
     <PickerPopover open={open} anchorRef={anchor} title={title} onClose={() => setOpen(false)} zIndex={180} size="choice">
       {options.length > 10 && <input className="picker-search" aria-label={`Search ${title}`} placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} />}
       <div className="picker-options">

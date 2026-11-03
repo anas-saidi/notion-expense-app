@@ -26,8 +26,8 @@ export function ScreenChip({
     <LiquidButton
       type="button"
       className="screen-chip"
-      variant={selected ? "filled" : "glass"}
-      tint={selected ? "var(--text)" : undefined}
+      variant="glass"
+      data-selected={selected ? "" : undefined}
       role={mode === "tab" ? "tab" : undefined}
       aria-selected={mode === "tab" ? selected : undefined}
       aria-pressed={mode === "filter" ? selected : undefined}
@@ -50,7 +50,7 @@ const chipStyle = (selected: boolean): CSSProperties => ({
   padding: "0 12px",
   borderRadius: 999,
   border: 0,
-  color: selected ? "var(--bg)" : "var(--text2)",
+  color: selected ? "var(--text)" : "var(--text2)",
   fontFamily: "var(--font-body)",
   fontSize: 12,
   lineHeight: 1,
@@ -68,7 +68,7 @@ const badgeStyle = (selected: boolean, tone: "neutral" | "metric"): CSSPropertie
   justifyContent: "center",
   background: tone === "metric" && !selected
     ? "var(--select-wash)"
-    : selected ? "color-mix(in srgb, var(--bg) 18%, transparent)" : "var(--surface2)",
+    : selected ? "var(--lg-glass)" : "var(--surface2)",
   color: tone === "metric" && !selected ? "var(--select-ink)" : "inherit",
   fontSize: 11,
   fontWeight: 600,

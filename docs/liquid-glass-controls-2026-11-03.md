@@ -54,3 +54,9 @@ The tuner loads dynamically only when requested. A 180ms settling delay refits t
 ## Approved material preset
 
 Applied the user's exported Glisse 0.5.0 preset across shared control tokens: tint 0.45, frost 7px, surface bend 0.4, surface dispersion 0.1, moving lens bend/dispersion 0, rim highlight 0. Theme alphas are 0.27 light, 0.342 dark and 0.396 active, matching the preview’s multiplier math. Segmented held lenses also use zero bend. Tuner reset defaults now match production; its original tint bases remain fixed for share-link fidelity. Existing mascot rendering, control geometry, semantics and accessibility fallbacks remain unchanged.
+
+## Remove tuner and finish control coverage
+
+The temporary preview UI and draft helpers are removed. Old glassLab URLs clean the query/preset fragment and local preview draft without reloading. Shared glass controls now replace the remaining opaque triggers and tabs: account/category/target and bill pickers, repeat choices, composer/plan/quick chips, allocation pills, period choices, appearance controls and the scope stack. Picker popovers use Glisse Glass; selected option/calendar rows use the active material. ScreenChip selection uses glass instead of the previous filled variant. Choice/date triggers strip caller material overrides but retain geometry. Preserve mascot stack transforms, control handlers, labels, disabled states, selection, focus and reduced-transparency/high-contrast/no-filter fallbacks. Long option lists retain lightweight native rows inside the shared glass surface.
+
+Validation covers production build and eight SSR checks for navigation/panel links, selected filter semantics, choice values/disabled state, date dialog state, savings target and scope selection. Internal rendered/gesture verification remains unavailable.

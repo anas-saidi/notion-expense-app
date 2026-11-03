@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./ui/LiquidGlass";
 
 import { useEffect, useId, useRef, useState } from "react";
 import type { IncomeUse } from "@/lib/joint-income";
@@ -24,12 +25,12 @@ export function IncomeUseControl({ value, onChange, disabled = false, onOpen, di
   const selectedLabel = options.find(([use]) => use === value)![1];
   return (
     <div ref={anchorRef} style={{ position: "relative", minWidth: 0 }}>
-      <button type="button" disabled={disabled} aria-label={`How to use this income: ${selectedLabel}`} title={`Target: ${selectedLabel}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}
+      <LiquidButton type="button" disabled={disabled} aria-label={`How to use this income: ${selectedLabel}`} title={`Target: ${selectedLabel}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}
         style={{ ...pickerChipStyle, color: open ? "var(--text2)" : "var(--muted)", opacity: disabled ? 0.5 : 1 }}
         onClick={() => { if (!open) onOpen?.(); setOpen(!open); }}>
         <span style={pickerChipIconStyle}><TargetIcon size={18} aria-hidden="true" /></span>
         <span style={pickerChipLabelStyle}>Target</span>
-      </button>
+      </LiquidButton>
       <PickerPopover open={open} title="How to use this income" onClose={() => setOpen(false)} anchorRef={anchorRef} placement="top" size="choice" zIndex={140}>
         <div id={id} style={{ padding: 8, display: "grid", gap: 2 }}>
           {options.map(([use, label]) => {

@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./ui/LiquidGlass";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { accountIconSource } from "../../lib/category-icons";
 import "./finance-ai.css";
@@ -250,14 +251,14 @@ export function TypeItComposer(props: Props) {
               {transaction && <span aria-label={`${income ? "Income" : "Expense"} ${transaction.amount} MAD`} style={{ flexShrink: 0, paddingTop: 6, fontSize: 20, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: signedAmountColor(income ? "income" : "expense") }}>{income ? "+" : "−"}<Money value={transaction.amount} /></span>}
             </div>
             {transaction && <div style={metaRowStyle}>
-              {!income && <button type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "category"} aria-label={`Category for line ${index + 1}: ${row?.category?.name ?? "none"}`} onClick={event => openPicker(event, index, "category")} style={{ ...pickerChipStyle, color: row?.category ? "var(--text2)" : "var(--muted)" }}>
+              {!income && <LiquidButton type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "category"} aria-label={`Category for line ${index + 1}: ${row?.category?.name ?? "none"}`} onClick={event => openPicker(event, index, "category")} style={{ ...pickerChipStyle, color: row?.category ? "var(--text2)" : "var(--muted)" }}>
                 <span style={pickerChipIconStyle}><CategoryIcon icon={row?.category?.icon} categoryName={row?.category?.name} size={24} /></span>
                 <span style={pickerChipLabelStyle}>{row?.category?.name ?? "Category"}</span>
-              </button>}
-              {(activeLine === index || row?.account?.id !== props.defaultAccountId) && <button type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "account"} aria-label={`Account for line ${index + 1}: ${row?.account?.label ?? "none"}`} onClick={event => openPicker(event, index, "account")} style={{ ...pickerChipStyle, color: "var(--muted)" }}>
+              </LiquidButton>}
+              {(activeLine === index || row?.account?.id !== props.defaultAccountId) && <LiquidButton type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "account"} aria-label={`Account for line ${index + 1}: ${row?.account?.label ?? "none"}`} onClick={event => openPicker(event, index, "account")} style={{ ...pickerChipStyle, color: "var(--muted)" }}>
                 <span style={pickerChipIconStyle}><CategoryIcon icon={accountIconSource(row?.account?.type)} size={24} /></span>
                 <span style={pickerChipLabelStyle}>{row?.account?.label ?? "Account"}</span>
-              </button>}
+              </LiquidButton>}
               {transaction.date !== props.defaultDate && <span style={dateNoteStyle}>{dayLabel(transaction.date)}</span>}
             </div>}
             {row?.error && focusedLine !== index && <p style={helperStyle}>{row.error} Create transactions to review this text.</p>}

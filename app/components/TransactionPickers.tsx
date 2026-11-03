@@ -98,7 +98,7 @@ export function filterCategories(categories: Category[], search: string): Catego
   return needle ? categories.filter((cat) => cat.name.toLowerCase().includes(needle)) : categories;
 }
 
-/* ─── Composer picker chip (quiet outlined pill) ──────────────────── */
+/* ─── Composer picker chip (shared glass material) ──────────────────── */
 
 export const pickerChipStyle: CSSProperties = {
   minHeight: 44,
@@ -106,8 +106,8 @@ export const pickerChipStyle: CSSProperties = {
   maxWidth: "100%",
   padding: "0 12px",
   borderRadius: 999,
-  border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
-  background: "var(--surface)",
+  border: 0,
+  background: "var(--lg-glass)",
   color: "var(--text2)",
   fontSize: 13,
   fontWeight: 600,

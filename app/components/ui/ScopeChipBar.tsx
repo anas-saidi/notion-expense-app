@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./LiquidGlass";
 
 import { useRef } from "react";
 import type { BudgetScope } from "../app-types";
@@ -44,7 +45,7 @@ export function GlobalBudgetScopePicker({
         const active = scope === value;
         const slot = (index - selected + 3) % 3;
         return (
-          <button
+          <LiquidButton
             key={scope}
             type="button"
             role="tab"
@@ -66,7 +67,7 @@ export function GlobalBudgetScopePicker({
             />
             </span>
             <span className="global-scope-label">{GLOBAL_SCOPE_NAMES[scope]}</span>
-          </button>
+          </LiquidButton>
         );
       })}
     </div>
