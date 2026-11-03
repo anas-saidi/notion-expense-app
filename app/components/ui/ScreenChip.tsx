@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { LiquidButton } from "./LiquidGlass";
 
 export function ScreenChip({
   selected,
@@ -10,7 +11,7 @@ export function ScreenChip({
   badgeTone = "neutral",
   mode = "filter",
   ariaLabel,
-  minHeight = 36,
+  minHeight = 44,
 }: {
   selected: boolean;
   onClick: () => void;
@@ -22,8 +23,11 @@ export function ScreenChip({
   minHeight?: number;
 }) {
   return (
-    <button
+    <LiquidButton
       type="button"
+      className="screen-chip"
+      variant={selected ? "filled" : "glass"}
+      tint={selected ? "var(--text)" : undefined}
       role={mode === "tab" ? "tab" : undefined}
       aria-selected={mode === "tab" ? selected : undefined}
       aria-pressed={mode === "filter" ? selected : undefined}
@@ -33,20 +37,19 @@ export function ScreenChip({
     >
       <span>{children}</span>
       {badge !== undefined && <span aria-hidden="true" style={badgeStyle(selected, badgeTone)}>{badge}</span>}
-    </button>
+    </LiquidButton>
   );
 }
 
 const chipStyle = (selected: boolean): CSSProperties => ({
-  minHeight: 36,
+  minHeight: 44,
   flexShrink: 0,
   display: "inline-flex",
   alignItems: "center",
   gap: 8,
   padding: "0 12px",
   borderRadius: 999,
-  border: selected ? "1px solid transparent" : "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
-  background: selected ? "var(--text)" : "var(--surface)",
+  border: 0,
   color: selected ? "var(--bg)" : "var(--text2)",
   fontFamily: "var(--font-body)",
   fontSize: 12,

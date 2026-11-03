@@ -1,4 +1,5 @@
 "use client";
+import { LiquidButton } from "./ui/LiquidGlass";
 import { SheetHeader } from "./ui/SheetLayout";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -9,7 +10,7 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
     <div className="sheet-body" style={sheetContentStyle}>
       <SheetHeader style={headerStyle}>
         <h2 style={titleStyle}>Settings</h2>
-        <button type="button" className="settings-close-button sheet-close-button" aria-label="Close settings" onClick={onClose}><XIcon size={20} /></button>
+        <LiquidButton type="button" className="settings-close-button sheet-close-button" aria-label="Close settings" onClick={onClose}><XIcon size={20} /></LiquidButton>
       </SheetHeader>
       <section aria-label="Preferences" style={sectionStyle}>
         <h3 style={sectionTitleStyle}>Preferences</h3>

@@ -2,9 +2,18 @@
 
 ## Design reference index
 
+- [Glisse](https://github.com/0kzh/glisse): liquid glass control material and interactions.
 - [Mobbin glossary](https://mobbin.com/glossary): component behavior and mobile patterns.
 - [Bloub live](https://bloub.vercel.app/) and [MIT source](https://github.com/jeremy-prt/bloub): radial shape morphing, eyes, and Pebble's organic profile. Local implementation and attribution: `mascot-design-system.md` and `app/components/mascot/BLOUB_LICENSE.txt`.
 - [Skiper theme toggle](https://skiper-ui.com/v1/skiper4), [Toggles](https://toggles.dev), and [Skiper input](https://skiper-ui.com/v1/skiper105): specific control references; use existing semantic tokens.
+
+### Liquid glass controls
+
+Use [Glisse](https://github.com/0kzh/glisse), pinned to 0.5.0, for interaction chrome: floating navigation, selected destinations, app actions, shared filter chips, date triggers, sheet close controls and the Reflect view switch. Keep financial rows, forms, charts and mascot rendering in their existing materials. This explicitly supersedes the earlier restriction on glass navigation/buttons; it does not authorize recolouring mascots.
+
+`app/components/ui/LiquidGlass.tsx` is the integration point and `liquid-glass.css` owns product tuning. Glass is neutral in both themes, with restrained refraction and dispersion. Use the package’s `Button` and `SegmentedControl` where their semantics fit. Main navigation retains its native tab buttons and stable panel IDs, with Glisse `Glass` for the shared background and moving selection. This preserves the responsive desktop rail and phone tablist without replacing navigation semantics.
+
+Keep at least 44px control targets, visible keyboard focus, native disabled states and explicit selected states. Disable spatial motion for reduced motion; replace transparent surfaces with opaque theme surfaces for reduced transparency/high contrast or browsers without backdrop filtering. Do not mark the page as a Glisse refraction backdrop: glass fits on idle/resize rather than adding a content-following animation loop.
 
 ### Chart and mascot motion
 

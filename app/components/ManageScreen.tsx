@@ -1,5 +1,6 @@
 "use client";
 
+import { LiquidButton } from "./ui/LiquidGlass";
 import { SheetHeader } from "./ui/SheetLayout";
 
 import { useMemo, type CSSProperties } from "react";
@@ -43,9 +44,9 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
     <main className="manage-screen sheet-body" style={screenStyle}>
       <SheetHeader style={headerStyle}>
         <h1 style={titleStyle}>Accounts</h1>
-        <button className="sheet-close-button" type="button" onClick={onClose} aria-label="Close accounts" style={closeStyle}>
+        <LiquidButton className="sheet-close-button" type="button" onClick={onClose} aria-label="Close accounts" style={closeStyle}>
           <XIcon size={18} />
-        </button>
+        </LiquidButton>
       </SheetHeader>
 
       <section aria-label="Account totals" style={heroStyle}>
@@ -115,7 +116,7 @@ const sheetContentStyle: CSSProperties = { overflowX: "hidden" };
 
 const headerStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 };
 const titleStyle: CSSProperties = { margin: 0, fontFamily: "var(--font-display)", fontSize: 24, lineHeight: 1.1, fontWeight: 750, letterSpacing: "-0.025em", color: "var(--text)" };
-const closeStyle: CSSProperties = { width: 44, height: 44, border: "none", borderRadius: "50%", background: "var(--surface2)", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
+const closeStyle: CSSProperties = { width: 44, height: 44, border: "none", borderRadius: "50%", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const heroStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 10, padding: "16px 0 8px", textAlign: "center" };
 const heroLabelStyle: CSSProperties = { fontSize: 12, lineHeight: 1, fontWeight: 700, color: "var(--muted)" };
 const heroAmountStyle: CSSProperties = { display: "inline-flex", justifyContent: "center", fontFamily: "var(--font-body)", fontSize: "clamp(44px, 13vw, 64px)", lineHeight: 0.96, fontWeight: 500, letterSpacing: "-0.035em", color: "var(--text)", whiteSpace: "nowrap" };

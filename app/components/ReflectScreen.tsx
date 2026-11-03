@@ -10,7 +10,7 @@ import { Money } from "./Money";
 import { DatePickerTrigger, MonthPicker } from "./DatePicker";
 import { ReflectActivity } from "./ReflectActivity";
 import { ReflectFlowChart } from "./ReflectFlowChart";
-import { ScreenChip } from "./ui/ScreenChip";
+import { LiquidButton, LiquidSegments } from "./ui/LiquidGlass";
 import { ScreenToolbar } from "./ui/ScreenLayout";
 import { SCREEN_HERO_CHART_HEIGHT } from "./ui/hero-tokens";
 import { ScreenHero } from "./ui/ScreenHero";
@@ -123,16 +123,15 @@ export function ReflectScreen(props: Props) {
   const periodControls = <ScreenToolbar label="Reflect period and filters" className="reflect-period-toolbar">
     <DatePickerTrigger label={label} open={showPeriod} className="composer-picker-chip" showChevron={false}
       ariaLabel={`Time period: ${label}`} onClick={() => { setCustomPeriod(props.period.start ? props.period : reflectPreset("month")); setShowPeriod(true); }} />
-    {props.view === "spending" && <button type="button" title="Filter spending" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" aria-expanded={showFilters}
-      onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, width: 44, height: 44, padding: 0, flexShrink: 0, borderRadius: "50%", border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)", background: filterCount ? "var(--select-wash)" : "transparent", color: filterCount ? "var(--select-ink)" : "var(--text2)" }}>
+    {props.view === "spending" && <LiquidButton type="button" title="Filter spending" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" aria-expanded={showFilters}
+      onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, width: 44, height: 44, padding: 0, flexShrink: 0, borderRadius: "50%", border: 0, ...(filterCount ? { background: "var(--select-wash)" } : {}), color: filterCount ? "var(--select-ink)" : "var(--text2)" }}>
       <SlidersIcon size={20} aria-hidden="true" />
-    </button>}
+    </LiquidButton>}
   </ScreenToolbar>;
 
-  const viewControls = <div className="reflect-hero-switch" role="group" aria-label="Reflect view">
-    <ScreenChip minHeight={44} selected={props.view === "spending"} onClick={() => props.onViewChange("spending")}>Spending</ScreenChip>
-    <ScreenChip minHeight={44} selected={props.view === "activity"} onClick={() => props.onViewChange("activity")}>Activity</ScreenChip>
-  </div>;
+  const viewControls = <LiquidSegments className="reflect-hero-switch" aria-label="Reflect view"
+    items={[{ value: "spending", label: "Spending" }, { value: "activity", label: "Activity" }]}
+    value={props.view} onValueChange={value => { if (value === "spending" || value === "activity") props.onViewChange(value); }} />;
 
   const flowTotals = flow[flow.length - 1] ?? { spent: 0, moneyIn: 0 };
   const flowDifference = Math.round((flowTotals.moneyIn - flowTotals.spent) * 100) / 100;

@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState, type InputHTMLAttributes, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
+import { LiquidButton } from "./ui/LiquidGlass";
 import { PickerPopover } from "./PickerPopover";
 import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "./ui/icons";
 import { today } from "./app-utils";
@@ -55,7 +56,7 @@ export function MonthPicker({value,onChange,max,min,style,placement="bottom",ali
 }
 
 export function DatePickerTrigger({ label, open, style, ariaLabel, onClick, className = "", showChevron = true, icon }: { label: string; open: boolean; style?: CSSProperties; ariaLabel: string; onClick: () => void; className?: string; showChevron?: boolean; icon?: ReactNode }) {
-  return <button type="button" className={`choice-trigger date-picker-trigger ${className}`.trim()} style={style} aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} onClick={onClick}>{icon ?? <CalendarIcon size={16} aria-hidden="true" />}<span>{label}</span>{showChevron && <ChevronDownIcon size={14} aria-hidden="true" className={open ? "date-picker-chevron date-picker-chevron--open" : "date-picker-chevron"} />}</button>;
+  return <LiquidButton type="button" className={`choice-trigger date-picker-trigger ${className}`.trim()} style={style} aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} onClick={onClick}>{icon ?? <CalendarIcon size={16} aria-hidden="true" />}<span>{label}</span>{showChevron && <ChevronDownIcon size={14} aria-hidden="true" className={open ? "date-picker-chevron date-picker-chevron--open" : "date-picker-chevron"} />}</LiquidButton>;
 }
 
 const PickerTrigger = DatePickerTrigger;

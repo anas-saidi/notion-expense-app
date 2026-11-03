@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { AppTab, BudgetScope } from "./app-types";
+import { LiquidButton } from "./ui/LiquidGlass";
 import { BottomNav } from "./BottomNav";
 import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon } from "./ui/icons";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
@@ -107,15 +108,15 @@ export function AppShell({
           <ProgressiveBlur position="top" height={32} maxBlur={6} tint="var(--bg)" visible={scrolled} style={{ top: "100%", zIndex: -1 }} />
           <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
           <div className="app-header-actions">
-            {tab === "budget" && onBudgetSearch && <button className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
+            {tab === "budget" && onBudgetSearch && <LiquidButton className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
               <SearchIcon size={18} />
-            </button>}
-            {tab === "history" && onReflectSearch && <button className="app-top-action" type="button" onClick={onReflectSearch} aria-label="Search activity" style={menuButtonStyle}>
+            </LiquidButton>}
+            {tab === "history" && onReflectSearch && <LiquidButton className="app-top-action" type="button" onClick={onReflectSearch} aria-label="Search activity" style={menuButtonStyle}>
               <SearchIcon size={18} />
-            </button>}
-            {onSelectTheme && <button className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
+            </LiquidButton>}
+            {onSelectTheme && <LiquidButton className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
               <SettingsIcon size={18} />
-            </button>}
+            </LiquidButton>}
           </div>
         </header>
         {children}
@@ -134,19 +135,20 @@ export function AppShell({
       />
 
       <div className="app-nav-wrap">
-        <BottomNav tab={tab} onTabChange={onTabChange} desktopPrimaryAction={showAddButton && <button type="button" className="desktop-nav-action desktop-nav-add" onClick={event => { event.currentTarget.focus(); haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></button>} desktopActions={<>
-          {tab !== "home" && <button type="button" className="desktop-nav-action" onClick={tab === "budget" ? onBudgetSearch : onReflectSearch} aria-label={tab === "budget" ? "Search categories" : "Search activity"}><SearchIcon size={20} /><span>{tab === "budget" ? "Search categories" : "Search activity"}</span></button>}
-          {onBudgetRebalance && <button type="button" className="desktop-nav-action" onClick={onBudgetRebalance} aria-label="Rebalance"><ShuffleIcon size={20} /><span>Rebalance</span></button>}
-          {onSelectTheme && <button type="button" className="desktop-nav-action" onClick={() => setSettingsOpen(true)} aria-label="Settings"><SettingsIcon size={20} /><span>Settings</span></button>}
+        <BottomNav tab={tab} onTabChange={onTabChange} desktopPrimaryAction={showAddButton && <LiquidButton type="button" className="desktop-nav-action desktop-nav-add" onClick={event => { event.currentTarget.focus(); haptic("light"); onOpenAdd(); }} aria-label="Add transaction"><PlusIcon size={20} /><span>Add transaction</span></LiquidButton>} desktopActions={<>
+          {tab !== "home" && <LiquidButton type="button" className="desktop-nav-action" onClick={tab === "budget" ? onBudgetSearch : onReflectSearch} aria-label={tab === "budget" ? "Search categories" : "Search activity"}><SearchIcon size={20} /><span>{tab === "budget" ? "Search categories" : "Search activity"}</span></LiquidButton>}
+          {onBudgetRebalance && <LiquidButton type="button" className="desktop-nav-action" onClick={onBudgetRebalance} aria-label="Rebalance"><ShuffleIcon size={20} /><span>Rebalance</span></LiquidButton>}
+          {onSelectTheme && <LiquidButton type="button" className="desktop-nav-action" onClick={() => setSettingsOpen(true)} aria-label="Settings"><SettingsIcon size={20} /><span>Settings</span></LiquidButton>}
         </>} />
 
         {showAddButton && (
-          <button
+          <LiquidButton
             onClick={() => {
               haptic("light");
               onOpenAdd();
             }}
             className="fab-add app-nav-add"
+            variant="filled" tint="var(--text)"
             aria-label="Add transaction"
             style={{
               width: 58,
@@ -164,7 +166,7 @@ export function AppShell({
             }}
           >
             <PlusIcon size={22} strokeWidth={2.5} />
-          </button>
+          </LiquidButton>
         )}
       </div>
 
@@ -219,15 +221,13 @@ const menuButtonStyle = {
   width: 44,
   height: 44,
   borderRadius: "50%",
-  border: "1px solid color-mix(in srgb, var(--border) 44%, transparent)",
-  background: "var(--surface)",
+  border: 0,
   color: "var(--text2)",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   flexShrink: 0,
-  boxShadow: "none",
 };
 
 // Responsive column ownership lives in CSS; mobile scope left, actions right.
