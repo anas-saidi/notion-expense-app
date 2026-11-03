@@ -38,3 +38,9 @@ The supplied dark phone screenshot shows the resting selected pill protruding be
 The dark resting thumb uses 14% light neutral instead of the library's 30%, with a fine specular edge. Selected labels use stronger text/weight. Remove the reduced custom 10px/6px lens growth, allowing the package's native 24px/16px held lens. Keep capsule-shaped keyboard focus and preserve the stronger opaque-thumb border under reduced transparency/high contrast.
 
 Validation: source geometry checked against the installed library's thumb calculations; production build passed. This CSS-only fix does not run database diagnostics or change financial behavior. Internal browser still reports `iab` unavailable, so rendered dark/light and hold/drag playback remain unverified; no external browser substituted.
+
+## Follow-up: unframed Reflect views
+
+The user selected one glass pill for the active view and plain text for the inactive view. Remove the outer track material, keeping its measured geometry for Glisse. Zero outer/thumb insets align the selected pill with its 44px target. Preserve the held lens, radio semantics, keyboard focus and existing view handlers. The selected pill uses neutral glass in both themes, with opaque accessibility fallbacks. This supersedes the enclosing-track treatment above.
+
+Validation: production build and served asset checks are recorded with the release. Internal browser control is unavailable in this session; visual playback remains unverified. No financial data or loading behavior changed.
