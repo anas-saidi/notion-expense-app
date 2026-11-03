@@ -125,7 +125,7 @@ const DROP = 0.6;
 const LEAVE = DUST_DURATION;
 const SPAWN_Y = -1.35;
 
-const MORPH = 0.5;
+const MORPH = 0.42;
 const REACTIONS: Record<ReactionKind, { dur: number; mood: Mood }> = {
   cheer: { dur: 0.9, mood: "excited" },
   dip: { dur: 0.7, mood: "worried" },
@@ -143,7 +143,7 @@ export function poseFor(target: MascotTarget): Pose {
   const colors: [string, string] = [MASCOT_COLORS.anas, MASCOT_COLORS.salma];
   // Any jar (liquid, coins or spending items) is one body, joint included: the
   // two-lobe "Shape" body is only for the plain, contents-free mascot.
-  if (fill >= 0 || target.coins || target.items) return { radii: jar.radii, faces: SOLO_FACES, colors, expr, fill };
+  if (target.outline === "partner" || fill >= 0 || target.coins || target.items) return { radii: jar.radii, faces: SOLO_FACES, colors, expr, fill };
   if (target.celebrate) return { radii: HEART_RADII, faces: HEART_FACES, colors, expr, fill };
   const duo = duoBody(clamp(target.gap));
   return { radii: duo.radii, faces: duo.faces, colors, expr, fill };

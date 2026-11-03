@@ -132,12 +132,25 @@ describe("outlines", () => {
   const jar = (scope: "anas" | "salma" | "joint", outline: "orb" | "squircle" | "partner" = "partner"): MascotTarget =>
     ({ scope, gap: 0, mood: "idle", outline, coins: scope === "joint" ? { anas: 0.4, salma: 0.3 } : { [scope]: 0.5 } });
 
-  it.each(["egg", "drop", "bean", "pebble"] as const)("gives each partner their own silhouette, with joint between them (Salma: %s)", salma => {
+  it.each(["egg", "drop", "bean", "pebble"] as const)("keeps the shared heart-pebble independent of personal shape choices (Salma: %s)", salma => {
     expect(jarShape("partner", "anas", salma).key).toBe("squircle");
     expect(jarShape("partner", "salma", salma).key).toBe(salma);
     const joint = jarShape("partner", "joint", salma);
-    const anas = jarShape("partner", "anas", salma).radii, wife = jarShape("partner", "salma", salma).radii;
-    joint.radii.forEach((r, i) => expect(r).toBeCloseTo((anas[i] + wife[i]) / 2));
+    expect(joint.key).toBe("heart-pebble");
+    expect(joint.radii).toEqual(jarShape("partner", "joint").radii);
+    expect(joint.radii.every(r => Number.isFinite(r) && r > 0)).toBe(true);
+    // Both upper lobes rise above the shallow cleft; the lower tip stays rounded.
+    const top = joint.radii.length * 3 / 4;
+    const y = (i: number) => Math.sin(i / joint.radii.length * Math.PI * 2) * joint.radii[i];
+    expect(y(top - 6)).toBeLessThan(y(top));
+    expect(y(top + 6)).toBeLessThan(y(top));
+  });
+
+  it("uses one face and the same shared outline for the picker and filled jar", () => {
+    const icon = new MascotEngine({ scope: "joint", gap: 0, mood: "idle", outline: "partner", celebrate: true }, { calm: true }).sample(0);
+    const filled = new MascotEngine({ ...jar("joint"), coins: {} }, { calm: true }).sample(0);
+    expect(icon.body).toEqual(filled.body);
+    expect(icon.eyes).toHaveLength(2);
   });
 
   it.each(["custom", "matter"] as const)("keeps %s physics coins inside a squircle jar", physics => {

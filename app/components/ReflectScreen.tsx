@@ -15,7 +15,8 @@ import { ScreenToolbar } from "./ui/ScreenLayout";
 import { SCREEN_HERO_CHART_HEIGHT } from "./ui/hero-tokens";
 import { ScreenHero } from "./ui/ScreenHero";
 import { MASCOT_HERO_SIZE, MascotHero } from "./mascot/MascotHero";
-import { useAppHaptics } from "./ui/useAppHaptics";
+import { motion, useReducedMotion } from "motion/react";
+import { MascotTap } from "./mascot/MascotTap";
 import { spendingJarItems } from "./mascot/budgetJar";
 import { BottomSheet } from "./ui/BottomSheet";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
@@ -47,7 +48,7 @@ const periodName = ({ start, end }: ReflectPeriod) => !start ? "All time" : star
 const tone = (index: number) => `color-mix(in srgb, var(--select-ink) ${Math.max(20, 92 - index * 12)}%, var(--surface2))`;
 
 export function ReflectScreen(props: Props) {
-  const { haptic } = useAppHaptics();
+  const reducedMotion = useReducedMotion();
   const [showPeriod, setShowPeriod] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [customPeriod, setCustomPeriod] = useState(props.period);
@@ -142,13 +143,15 @@ export function ReflectScreen(props: Props) {
 
   const heroVisual = <div className="reflect-hero-visual" data-view={props.view}>
     {viewControls}
+    <motion.div key={props.view} initial={{ opacity: 0.65 }} animate={{ opacity: 1 }} transition={{ duration: reducedMotion ? 0 : 0.22 }} style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", minWidth: 0 }}>
     {props.view === "activity"
       ? <section className="reflect-hero-chart" aria-label="Spending and money in over this period">{props.transactionsLoading
         ? <SkeletonRegion label="Loading activity chart" style={{ height: SCREEN_HERO_CHART_HEIGHT, display: "grid", gridTemplateRows: "16px 1fr", gap: 16 }}><Skeleton style={{ width: "60%", height: 16, marginInline: "auto" }} /><Skeleton style={{ height: "100%", borderRadius: 8 }} /></SkeletonRegion>
         : <ReflectFlowChart points={flow} height={SCREEN_HERO_CHART_HEIGHT} />}</section>
-      : props.transactionsLoading ? <HeroSkeleton /> : <button type="button" onClick={() => haptic("light")} aria-label="React to spending" style={jarButtonStyle}>
+      : props.transactionsLoading ? <HeroSkeleton /> : <MascotTap label="React to spending" style={jarButtonStyle}>
         <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={MASCOT_HERO_SIZE} />
-      </button>}
+      </MascotTap>}
+    </motion.div>
   </div>;
 
   return <div id="panel-history" className="screen-layout" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0, paddingBottom: 100 }}>

@@ -2,6 +2,8 @@
 
 ## Mobile interface work
 
+- Design reference links live in `design.md` under **Design reference index**; mascot geometry and motion are documented in `mascot-design-system.md`.
+
 - Before introducing, redesigning, or materially changing a UI component, read `DESIGN.md`, especially **External mobile design references** and the rule for the relevant shared component.
 - Consult the relevant pattern in the [Mobbin Design Glossary](https://mobbin.com/glossary) and identify the component by behavior before styling it—for example card, stacked list, chip, badge, banner, bottom sheet, or segmented control.
 - Apply Mobbin as pattern evidence, not as a replacement design system. Existing product hierarchy, semantic tokens, accessibility requirements, and `DESIGN.md` take precedence.

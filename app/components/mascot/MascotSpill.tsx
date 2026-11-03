@@ -52,7 +52,7 @@ export function MascotSpill({ children, details, label, size, hintKey, initially
     haptic(open ? "selection" : "light");
     setOpen(o => !o);
     // A soft squish on every tap, settling back without bounce.
-    if (!reduce) animate(jar.current, { scaleX: [1, 1.04, 1], scaleY: [1, 0.95, 1] }, { duration: 0.38, ease: EASE_OUT });
+    if (!reduce) animate(jar.current, { scaleX: [1, 1.04, 1], scaleY: [1, 0.95, 1] }, { duration: 0.28, ease: EASE_OUT });
   };
 
   // First time ever: show the details once by themselves, so people learn the jar holds more.

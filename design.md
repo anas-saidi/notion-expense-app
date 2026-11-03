@@ -1,5 +1,17 @@
 # Couple Finance App — Design System
 
+## Design reference index
+
+- [Mobbin glossary](https://mobbin.com/glossary): component behavior and mobile patterns.
+- [Bloub live](https://bloub.vercel.app/) and [MIT source](https://github.com/jeremy-prt/bloub): radial shape morphing, eyes, and Pebble's organic profile. Local implementation and attribution: `mascot-design-system.md` and `app/components/mascot/BLOUB_LICENSE.txt`.
+- [Skiper theme toggle](https://skiper-ui.com/v1/skiper4), [Toggles](https://toggles.dev), and [Skiper input](https://skiper-ui.com/v1/skiper105): specific control references; use existing semantic tokens.
+
+### Chart and mascot motion
+
+Joint uses a heart-shaped Pebble: shallow top cleft, two rounded lobes, broad lower tip, one face, and the existing blue/pink glass. Use the same silhouette in the scope picker, liquid pool and spending jar. Personal shapes stay distinct.
+
+Tap feedback compresses and settles in 280ms. Shape changes take 420ms and continue from the current pose when interrupted. Reflect view replacement fades in over 220ms; chart data changes take 360ms with no delay. Exact totals remain visible; do not count up from invented zeroes. Reduced motion removes the press, shape drift and chart interpolation. Keep the mascot's existing visibility pause; add no decorative animation loops.
+
 ## Concept: glass jars that hold money
 
 This is a shared financial home for two people, built around one idea: **money lives in glass jars.** Every pool of money is a jar. The level is how much is in it, and the shape is whose it is (Anas's squircle, Salma's egg, and the midpoint of the two for Joint). Spending drains a jar, saving fills one, and Rebalance pours money from one jar into another. Nobody is competing; it's one household's set of jars.

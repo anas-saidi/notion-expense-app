@@ -57,7 +57,7 @@ export function blendExpression(a: Expression, b: Expression, t: number): Expres
  * Outlines. "partner" gives each person their own silhouette so scopes differ
  * by shape, not only colour (colour alone fails for colour-blind users):
  * Anas is a soft squircle, Salma one of a few rounded organic shapes (being
- * chosen in the lab), and joint sits exactly between them.
+ * chosen in the lab), and Joint is a heart-shaped pebble.
  */
 export type Outline = "orb" | "squircle" | "partner";
 
@@ -118,22 +118,10 @@ const BEAN: JarShape = {
 export type SalmaShape = "egg" | "drop" | "bean" | "pebble";
 const SALMA_SHAPES: Record<SalmaShape, JarShape> = { egg: EGG, drop: DROP, bean: BEAN, pebble: PEBBLE };
 
-// Joint is the literal midpoint of the two partners' outlines.
-const betweenCache = new Map<SalmaShape, JarShape>();
-function between(salma: SalmaShape): JarShape {
-  let shape = betweenCache.get(salma);
-  if (!shape) {
-    const s = SALMA_SHAPES[salma];
-    shape = { key: `between-${salma}`, radii: SQUIRCLE.radii.map((r, i) => (r + s.radii[i]) / 2), half: (SQUIRCLE.half + s.half) / 2, corner: 0.44 };
-    betweenCache.set(salma, shape);
-  }
-  return shape;
-}
-
 export function jarShape(outline: Outline = "orb", scope: MascotScope, salma: SalmaShape = "egg"): JarShape {
   if (outline === "orb") return ORB;
   if (outline === "squircle") return SQUIRCLE;
-  return scope === "anas" ? SQUIRCLE : scope === "salma" ? SALMA_SHAPES[salma] : between(salma);
+  return scope === "anas" ? SQUIRCLE : scope === "salma" ? SALMA_SHAPES[salma] : JOINT_PEBBLE;
 }
 
 /** Personal: one round blob, one face. Both face slots coincide so it reads as a single face. */
@@ -175,3 +163,15 @@ export const HEART_RADII = (() => {
   return radii;
 })();
 export const HEART_FACES: [FaceSlot, FaceSlot] = [{ x: -0.42, y: -0.22, s: 0.52, yaw: 8 }, { x: 0.42, y: -0.22, s: 0.52, yaw: -8 }];
+
+/** Bloub's Pebble harmonics (MIT), softened into a heart for the shared pool.
+ * A shallow cleft and broad lower tip retain a stone-like, single-face body. */
+const JOINT_PEBBLE: JarShape = (() => {
+  const pebble = HEART_RADII.map((_, i, all) => {
+    const a = (i / all.length) * Math.PI * 2;
+    return 1 + 0.075 * Math.cos(2 * a + 0.5) + 0.035 * Math.cos(3 * a + 2.1);
+  });
+  const peak = Math.max(...pebble);
+  const radii = HEART_RADII.map((r, i) => 0.78 * r + 0.22 * pebble[i] * 1.02 / peak);
+  return { key: "heart-pebble", radii, half: 1.08, corner: 0.5 };
+})();

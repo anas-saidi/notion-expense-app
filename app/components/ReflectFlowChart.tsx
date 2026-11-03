@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useId, type CSSProperties } from "react";
 import { Area, ComposedChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { useReducedMotion } from "motion/react";
 import { fmt } from "./app-utils";
@@ -13,6 +13,7 @@ const MONEY_IN = "var(--action-income)";
 
 /** Running spending and money-in totals shown above Activity’s transaction history. */
 export function ReflectFlowChart({ points, height }: Props) {
+  const fillId = useId();
   const animate = !useReducedMotion();
   const last = points[points.length - 1] ?? { spent: 0, moneyIn: 0 };
   // A handful of evenly spaced labels: the first, the last, and a few between.
@@ -32,15 +33,15 @@ export function ReflectFlowChart({ points, height }: Props) {
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={points} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id="reflectSpentFill" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={SPENT} stopOpacity={0.18} />
                 <stop offset="95%" stopColor={SPENT} stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <XAxis dataKey="key" ticks={ticks} tickFormatter={key => labelOf.get(key) ?? ""} tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
             <YAxis tick={{ fontSize: 12, fill: "var(--muted)" }} tickLine={false} axisLine={false} width={34} tickFormatter={v => Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-            <Area type="monotone" dataKey="moneyIn" stroke={MONEY_IN} strokeWidth={2} strokeDasharray="4 4" fill="none" dot={false} activeDot={false} isAnimationActive={animate} />
-            <Area type="monotone" dataKey="spent" stroke={SPENT} strokeWidth={2} fill="url(#reflectSpentFill)" dot={false} activeDot={false} isAnimationActive={animate} />
+            <Area type="monotone" dataKey="moneyIn" stroke={MONEY_IN} strokeWidth={2} strokeDasharray="4 4" fill="none" dot={false} activeDot={false} isAnimationActive={animate} animationBegin={0} animationDuration={360} animationEasing="ease-out" />
+            <Area type="monotone" dataKey="spent" stroke={SPENT} strokeWidth={2} fill={`url(#${fillId})`} dot={false} activeDot={false} isAnimationActive={animate} animationBegin={0} animationDuration={360} animationEasing="ease-out" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

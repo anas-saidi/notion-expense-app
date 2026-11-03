@@ -10,6 +10,7 @@ import { DatePicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
 
 import { useState, useMemo, useEffect, type CSSProperties, type ReactNode } from "react";
+import { useReducedMotion } from "motion/react";
 import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -86,6 +87,7 @@ export function AccountDetailsSheet({
   onReconcileSuccess,
   onTransactionsChanged,
 }: AccountDetailsSheetProps) {
+  const reducedMotion = useReducedMotion();
   const [showReconcile, setShowReconcile] = useState(false);
   const [checkVersion, setCheckVersion] = useState<string | null>(null);
   const [checkSaving, setCheckSaving] = useState(false);
@@ -567,6 +569,10 @@ export function AccountDetailsSheet({
                       cursor={{ stroke: "var(--border2)", strokeWidth: 1 }}
                     />
                     <Area
+                      isAnimationActive={!reducedMotion}
+                      animationBegin={0}
+                      animationDuration={360}
+                      animationEasing="ease-out"
                       type="monotone"
                       dataKey="balance"
                       stroke="var(--select-color)"
