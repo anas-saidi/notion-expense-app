@@ -98,16 +98,17 @@ export class MirrorStore {
       // The source and its pages still share a single statement/MVCC snapshot.
       // One extra row determines pagination without counting/sorting twice.
       sql = `WITH source AS (${source}) SELECT entries.page,source.synced_at FROM source
-        LEFT JOIN LATERAL (SELECT page FROM (${records}) AS records
+        LEFT JOIN LATERAL (SELECT page,row_number() OVER (ORDER BY ${query.order}) AS position FROM (${records}) AS records
           WHERE ${query.where} AND NOT COALESCE((page->>'archived')::boolean,false) AND NOT COALESCE((page->>'in_trash')::boolean,false)
           ORDER BY ${query.order} OFFSET ${query.offset}${allRows ? "" : ` LIMIT ${query.size}+1`}) AS entries ON true`;
       // compileMirrorQuery reserves the page-size parameter even for full reads.
       // Keep it typed/referenced in that case without limiting the report.
       if (allRows) sql += ` WHERE ${query.size}::integer > 0`;
+      sql += " ORDER BY entries.position";
       params = [...baseParams, ...query.params];
     } else {
       sql = `WITH source AS (${source}) SELECT entries.page,source.schema,source.synced_at FROM source
-        LEFT JOIN LATERAL (${records} ORDER BY ordinal) AS entries ON true`;
+        LEFT JOIN LATERAL (${records}) AS entries ON true ORDER BY entries.ordinal`;
       params = baseParams;
     }
     const { rows } = await this.db.query(sql, params);
