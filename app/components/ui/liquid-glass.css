@@ -6,11 +6,13 @@
   --lg-fill: var(--text);
   --lg-on: var(--text);
   --lg-ring: var(--focus-ring);
-  --lg-glass: rgb(255 255 255 / .6);
-  --lg-glass-active: rgb(244 245 244 / .88);
-  --lg-glass-bend: .45;
-  --lg-glass-dispersion: .4;
-  --lg-blur: 3px;
+  --lg-glass: rgb(255 255 255 / .27);
+  --lg-glass-active: rgb(244 245 244 / .396);
+  --lg-glass-bend: .4;
+  --lg-glass-dispersion: .1;
+  --lg-blur: 7px;
+  --lg-tab-bend: 0; --lg-tab-dispersion: 0;
+  --lg-segment-bend: 0; --lg-rim-shine: 0;
   --lg-segment-label: var(--text);
   --lg-tab-selected: var(--text);
 }
@@ -20,8 +22,8 @@ html[data-theme="dark"] {
   --lg-fill: var(--text);
   --lg-on: var(--text);
   --lg-ring: var(--focus-ring);
-  --lg-glass: rgb(40 42 40 / .76);
-  --lg-glass-active: rgb(62 65 62 / .88);
+  --lg-glass: rgb(40 42 40 / .342);
+  --lg-glass-active: rgb(62 65 62 / .396);
   --lg-segment-label: var(--text);
   --lg-tab-selected: var(--text);
 }
@@ -53,8 +55,8 @@ html[data-theme="dark"] {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
 }
-/* Preview changes only the real navigation/Add subtree. Default values reproduce
-   the shipped material; shared settings can later move to the app's root tokens. */
+/* Preview changes only the real navigation/Add subtree. Tint remains relative to the original theme material so exported presets
+   retain the same meaning after the shipped defaults change. */
 .app-nav-wrap[data-glass-preview] {
   --lg-glass: rgb(255 255 255 / calc(.6 * var(--glass-preview-tint)));
   --lg-glass-active: rgb(244 245 244 / calc(.88 * var(--glass-preview-tint)));
