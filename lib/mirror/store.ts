@@ -23,7 +23,7 @@ export const MIRROR_DDL = `
 CREATE TABLE IF NOT EXISTS finance_mirror (
   scope text PRIMARY KEY, revision bigint NOT NULL DEFAULT 0,
   published_revision bigint NOT NULL DEFAULT -1,
-  snapshot jsonb, synced_at timestamptz,
+  snapshot jsonb, synced_at timestamptz, content_hash text, content_generation uuid,
   lease_id uuid, lease_until timestamptz, not_before timestamptz
 );
 CREATE TABLE IF NOT EXISTS finance_mirror_writes (
@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS finance_mirror_writes (
 );
 ALTER TABLE finance_mirror ADD COLUMN IF NOT EXISTS not_before timestamptz;
 ALTER TABLE finance_mirror ADD COLUMN IF NOT EXISTS generation uuid;
+ALTER TABLE finance_mirror ADD COLUMN IF NOT EXISTS content_hash text;
+ALTER TABLE finance_mirror ADD COLUMN IF NOT EXISTS content_generation uuid;
 CREATE INDEX IF NOT EXISTS finance_mirror_writes_scope ON finance_mirror_writes(scope);
 CREATE TABLE IF NOT EXISTS finance_mirror_schemas (
   scope text NOT NULL REFERENCES finance_mirror(scope), generation uuid NOT NULL,
@@ -43,7 +45,29 @@ CREATE TABLE IF NOT EXISTS finance_mirror_records (
   PRIMARY KEY (scope, generation, database_id, ordinal)
 );
 `;
-export type SqlDriver = { query: (sql: string, params?: any[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
+export type SqlDriver = {
+  query: (sql: string, params?: any[]) => Promise<{ rows: any[]; rowCount?: number | null }>;
+  /** Pool transactions must pin one connection until commit/rollback. */
+  connect?: () => Promise<{ query: SqlDriver["query"]; release: () => void }>;
+};
+
+/** Object key order is not a data change; page/array order remains meaningful. */
+export function snapshotFingerprint(snapshot: MirrorSnapshot) {
+  // Notion attaches a fresh HTTP request_id to each retrieved database
+  // schema. It describes the request, not its financial/schema content.
+  // Exclude only this exact transport field, never similarly named page
+  // fields or user-defined properties.
+  const content = Object.fromEntries(Object.entries(snapshot).map(([id, data]) => {
+    if (!data.schema || typeof data.schema !== "object" || Array.isArray(data.schema)) return [id, data];
+    const { request_id: _requestId, ...schema } = data.schema;
+    return [id, { ...data, schema }];
+  }));
+  const canonical = JSON.stringify(content, (_key, value) => value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))
+    : value);
+  return createHash("sha256").update(canonical).digest("hex");
+}
+const PUBLISH_BATCH_SIZE = 200;
 const globalStore = globalThis as typeof globalThis & { financeMirrorPool?: Pool };
 // Notion recomputes balance rollups/formulas several seconds after a write. Reads stay
 // live during this window; importing sooner publishes pre-write balances as current.
@@ -138,20 +162,54 @@ export class MirrorStore {
     return rows.length ? { id, revision: rows[0].revision } : null;
   }
   async publish(scope: string, lease: { id: string; revision: string | number }, snapshot: MirrorSnapshot) {
-    const { rows } = await this.db.query(`WITH published AS (UPDATE finance_mirror
-      SET snapshot=NULL, generation=$2, synced_at=now(), published_revision=revision, lease_id=NULL, lease_until=NULL
-      WHERE scope=$1 AND lease_id=$2 AND revision=$3 AND lease_until > now()
-      AND NOT EXISTS (SELECT 1 FROM finance_mirror_writes WHERE scope=$1 AND expires_at > now()) RETURNING synced_at),
-      schemas AS (INSERT INTO finance_mirror_schemas(scope,generation,database_id,schema)
-        SELECT $1,$2,db.key,db.value->'schema' FROM published,jsonb_each($4::jsonb) AS db),
-      records AS (INSERT INTO finance_mirror_records(scope,generation,database_id,ordinal,page)
-        SELECT $1,$2,db.key,entries.ordinal,entries.page FROM published,jsonb_each($4::jsonb) AS db,
-        LATERAL jsonb_array_elements(db.value->'pages') WITH ORDINALITY AS entries(page,ordinal)),
-      old_schemas AS (DELETE FROM finance_mirror_schemas WHERE scope=$1 AND generation<>$2 AND EXISTS (SELECT 1 FROM published)),
-      old_records AS (DELETE FROM finance_mirror_records WHERE scope=$1 AND generation<>$2 AND EXISTS (SELECT 1 FROM published))
-      SELECT synced_at FROM published`,
-    [scope, lease.id, lease.revision, JSON.stringify(snapshot)]);
-    return rows[0] ? new Date(rows[0].synced_at).toISOString() : null;
+    const fingerprint = snapshotFingerprint(snapshot);
+    // pg Pool.query("BEGIN") followed by Pool.query(...) can use different
+    // sessions. Keep every statement on the acquired client. Embedded/test
+    // drivers already represent one connection and need no pool acquisition.
+    const client = this.db.connect ? await this.db.connect() : this.db;
+    try {
+      await client.query("BEGIN");
+      try {
+        const { rows } = await client.query(`WITH previous AS (
+          SELECT scope,generation,COALESCE(content_hash=$4 AND content_generation=generation AND generation IS NOT NULL,false) AS unchanged
+          FROM finance_mirror WHERE scope=$1 AND lease_id=$2 AND revision=$3 AND lease_until > now()
+          AND NOT EXISTS (SELECT 1 FROM finance_mirror_writes WHERE scope=$1 AND expires_at > now()) FOR UPDATE
+        ) UPDATE finance_mirror AS mirror
+          SET snapshot=NULL, generation=CASE WHEN previous.unchanged THEN previous.generation ELSE $2::uuid END,
+              content_generation=CASE WHEN previous.unchanged THEN previous.generation ELSE $2::uuid END,
+              content_hash=$4,synced_at=now(),published_revision=mirror.revision,lease_id=NULL,lease_until=NULL
+          FROM previous WHERE mirror.scope=previous.scope
+          RETURNING mirror.synced_at,mirror.generation,previous.unchanged`, [scope, lease.id, lease.revision, fingerprint]);
+        const published = rows[0];
+        if (published && !published.unchanged) {
+          for (const [databaseId, data] of Object.entries(snapshot)) {
+            await client.query(`INSERT INTO finance_mirror_schemas(scope,generation,database_id,schema) VALUES($1,$2,$3,$4::jsonb)`,
+              [scope, published.generation, databaseId, JSON.stringify(data.schema)]);
+            for (let start = 0; start < data.pages.length; start += PUBLISH_BATCH_SIZE) {
+              const params: any[] = [scope, published.generation, databaseId];
+              const values = data.pages.slice(start, start + PUBLISH_BATCH_SIZE).map((page, offset) => {
+                params.push(start + offset + 1, JSON.stringify(page));
+                return `($1,$2,$3,$${params.length - 1}::bigint,$${params.length}::jsonb)`;
+              });
+              // VALUES streams bounded rows. jsonb_array_elements over the
+              // complete ledger materialized tens of MB into temp files/run.
+              await client.query(`INSERT INTO finance_mirror_records(scope,generation,database_id,ordinal,page) VALUES ${values.join(",")}`, params);
+            }
+          }
+          await client.query("DELETE FROM finance_mirror_records WHERE scope=$1 AND generation<>$2", [scope, published.generation]);
+          await client.query("DELETE FROM finance_mirror_schemas WHERE scope=$1 AND generation<>$2", [scope, published.generation]);
+        }
+        // Head, schemas, pages and cleanup become visible together. Unchanged
+        // snapshots only renew freshness after checking the same write fences.
+        await client.query("COMMIT");
+        return published ? new Date(published.synced_at).toISOString() : null;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      }
+    } finally {
+      if ("release" in client && typeof client.release === "function") client.release();
+    }
   }
   async release(scope: string, id: string) {
     await this.db.query("UPDATE finance_mirror SET lease_id=NULL, lease_until=NULL WHERE scope=$1 AND lease_id=$2", [scope, id]);

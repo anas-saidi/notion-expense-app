@@ -73,3 +73,23 @@ Setup after applying the migration:
 3. Verify `cron.job_run_details`, the matching `net._http_response` status and an advancing mirror `synced_at` after a scheduled run. Then measure a fresh browser session without first refreshing the mirror manually.
 
 If the scheduler fails, the original bounded-freshness fallback still applies. Do not hide loading recovery or represent an expired snapshot as current. To disable only this job, use `SELECT cron.unschedule('finance-mirror-refresh')`; do not drop shared extensions or financial coordination tables. Rotate the dedicated secret in Vercel and Vault together when needed.
+
+## Disk I/O amplification, 2026-11-03
+
+A Supabase disk-I/O budget email identified this same project. Read-only PostgreSQL statistics showed the old publication query had executed 199 times, written 934,536 temporary blocks (about 7.65 GB) and generated 2,221,886,670 WAL bytes (about 2.22 GB). The current mirror held 3,342 records; its table counters showed 665,153 inserts, 661,811 deletes and 199 autovacuum runs. These are cumulative statistics, not a claim about the provider's remaining budget or a single-day billing period.
+
+The five-minute warmup job amplified an existing full-replacement publisher. Its `jsonb_each`/`jsonb_array_elements` function scans materialized complete ledger JSON and spilled to temporary storage, while every refresh inserted/deleted records even when nothing changed in Notion.
+
+Apply `20261103210000_reduce_mirror_publication_io.sql` before deploying the revised publisher. It adds nullable fingerprint metadata only. The current schema, read APIs, namespace, 15-minute freshness limit, write fences, lease ownership/expiry and revision checks remain. No financial records or coordination receipts are discarded.
+
+Publication now pins one pool connection and commits head, schema, bounded 200-page INSERT VALUES batches and generation cleanup in one transaction. A failed batch rolls back the entire publication. There is no full-ledger JSON set-returning function and no history truncation or SQL parameter-count ceiling tied to ledger length.
+
+A SHA-256 fingerprint of canonical content detects identical imports. Object key order and only each database schema response's top-level `request_id` are excluded; those IDs change per HTTP request and are transport metadata. Page contents, user-defined similarly named properties, formulas, schema fields and array order remain significant. A matching fingerprint renews freshness only after a complete live Notion import passes the existing fences. It preserves the generation and touches no record/schema rows.
+
+The fingerprint is tied to the generation that it describes. An older deployment publishing a new generation without updating fingerprint metadata cannot cause a false unchanged result during rollout or rollback.
+
+Live checks against all 3,342 records: a changed/full publication wrote zero temporary blocks; a subsequent verified unchanged import preserved identical content and generation, executed one publication statement, wrote zero temporary blocks and 329 WAL bytes. The first attempts exposed six changing schema `request_id` fields and a concurrent scheduled lease; the final check waited for the importer and passed. No Notion records were modified. To avoid an unnecessary seed rewrite during verification, a generation-checked metadata-only update described the existing cached generation without renewing its freshness.
+
+Validation: 640 ordinary tests passed, 5 optional tests skipped; production build and types passed. Added coverage includes fingerprint stability, exact trace-field exclusion, unchanged refresh, lease/fence rejection, old-publisher compatibility, bounded complete batches, connection pinning and rollback after a partial batch. `npm test` now excludes ignored `.codex` operational scripts and build directories; live diagnostics/migrations require an explicit opt-in configuration.
+
+Operational mitigation temporarily spaced `finance-mirror-refresh` to ten minutes using `cron.alter_job`, within the unchanged freshness limit. Direct locking of the extension-owned cron table was rejected and made no change; the supported job function succeeded. Restore the original five-minute schedule only after the optimized deployment is ready. No compute/billing changes, destructive maintenance or coordination-table cleanup were performed. Provider budget replenishment must be checked in Supabase Database Health; SQL counters do not expose that balance.

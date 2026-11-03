@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
-import { MIRROR_DDL, MirrorStore, mirrorScope } from "./store";
+import { MIRROR_DDL, MirrorStore, mirrorScope, snapshotFingerprint } from "./store";
 
 const db = new PGlite();
 const driver = { query: async (sql: string, params?: any[]) => {
@@ -132,4 +132,101 @@ it("reads migrated tables without running schema DDL on a cold driver", async ()
   } });
   expect((await cold.read("sql-filter", "abc", 60000, {}, false, true))?.data.queryResult.results).toHaveLength(12);
   expect(queries).toHaveLength(2); // Scope setup and the consistent display read.
+});
+
+
+it("fingerprints complete snapshots without treating object-key order as a change", () => {
+  const a = { abc: { schema: { b: 2, a: 1 }, pages: [{ id: "one", properties: { b: 2, a: 1 } }, { id: "two" }] } };
+  const reordered = { abc: { pages: [{ properties: { a: 1, b: 2 }, id: "one" }, { id: "two" }], schema: { a: 1, b: 2 } } };
+  expect(snapshotFingerprint(a)).toBe(snapshotFingerprint(reordered));
+  expect(snapshotFingerprint(a)).not.toBe(snapshotFingerprint({ abc: { ...a.abc, pages: [...a.abc.pages].reverse() } }));
+  expect(snapshotFingerprint(a)).not.toBe(snapshotFingerprint({ abc: { ...a.abc, schema: { a: 3, b: 2 } } }));
+});
+
+it("renews verified unchanged snapshots without replacing records or schemas", async () => {
+  const queries: string[] = [];
+  const observed = new MirrorStore({ query: async (sql, params) => { queries.push(sql); return db.query<any>(sql, params); } });
+  const first = await observed.acquire("unchanged");
+  await observed.publish("unchanged", first!, snapshot);
+  await db.query("UPDATE finance_mirror SET synced_at=now()-interval '20 minutes' WHERE scope=$1", ["unchanged"]);
+  const second = await observed.acquire("unchanged");
+  queries.length = 0;
+  await observed.publish("unchanged", second!, snapshot);
+  expect(queries.filter(sql => /(?:INSERT INTO|DELETE FROM) finance_mirror_(?:records|schemas)/.test(sql))).toEqual([]);
+  const head = (await db.query<any>("SELECT generation,content_generation,lease_id,now()-synced_at < interval '1 minute' AS fresh FROM finance_mirror WHERE scope=$1", ["unchanged"])).rows[0];
+  expect(head).toEqual({ generation: first!.id, content_generation: first!.id, lease_id: null, fresh: true });
+  expect((await observed.read("unchanged", "abc", 60000))?.data.pages).toEqual(snapshot.abc.pages);
+});
+
+it("does not trust a fingerprint left behind by an older publisher", async () => {
+  const first = await store.acquire("old-publisher");
+  await store.publish("old-publisher", first!, snapshot);
+  // Legacy publication changes generation without updating fingerprint metadata.
+  await db.query("UPDATE finance_mirror SET content_generation='11111111-1111-4111-8111-111111111111' WHERE scope=$1", ["old-publisher"]);
+  const next = await store.acquire("old-publisher");
+  await store.publish("old-publisher", next!, snapshot);
+  const head = (await db.query<any>("SELECT generation,content_generation FROM finance_mirror WHERE scope=$1", ["old-publisher"])).rows[0];
+  expect(head).toEqual({ generation: next!.id, content_generation: next!.id });
+});
+
+it("keeps expiry and write fences effective even when content is unchanged", async () => {
+  const first = await store.acquire("unchanged-fences");
+  await store.publish("unchanged-fences", first!, snapshot);
+  const expired = await store.acquire("unchanged-fences");
+  await db.query("UPDATE finance_mirror SET synced_at=now()-interval '20 minutes',lease_until=now()-interval '1 second' WHERE scope=$1", ["unchanged-fences"]);
+  expect(await store.publish("unchanged-fences", expired!, snapshot)).toBeNull();
+  expect(await store.read("unchanged-fences", "abc", 60000)).toBeNull();
+  const importing = await store.acquire("unchanged-fences");
+  const write = await store.beginWrite("unchanged-fences");
+  expect(await store.publish("unchanged-fences", importing!, snapshot)).toBeNull();
+  expect(await store.read("unchanged-fences", "abc", 60000)).toBeNull();
+  await store.release("unchanged-fences", importing!.id);
+  await store.finishWrite("unchanged-fences", write);
+});
+
+it("pins a pool connection and rolls back a failure after a partial batch", async () => {
+  const first = await store.acquire("rollback-batch");
+  await store.publish("rollback-batch", first!, snapshot);
+  let batch = 0;
+  const release = vi.fn();
+  const statements: string[] = [];
+  const client = { query: async (sql: string, params?: any[]) => {
+    statements.push(sql);
+    if (sql.startsWith("INSERT INTO finance_mirror_records") && ++batch === 2) throw new Error("Simulated batch failure");
+    return db.query<any>(sql, params);
+  }, release };
+  const pooled = new MirrorStore({ query: async (sql, params) => {
+    if (sql === "BEGIN" || sql.includes("WITH previous") || sql.startsWith("INSERT INTO finance_mirror_records")) throw new Error("Transaction escaped its connection");
+    return db.query<any>(sql, params);
+  }, connect: async () => client });
+  const next = await pooled.acquire("rollback-batch");
+  const pages = Array.from({ length: 450 }, (_, i) => ({ id: `new-${i}` }));
+  await expect(pooled.publish("rollback-batch", next!, { abc: { schema: {}, pages } })).rejects.toThrow("Simulated batch failure");
+  expect(statements[0]).toBe("BEGIN");expect(statements.at(-1)).toBe("ROLLBACK");expect(release).toHaveBeenCalledTimes(1);
+  expect((await store.read("rollback-batch", "abc", 60000))?.data.pages).toEqual(snapshot.abc.pages);
+  const rows = await db.query<any>("SELECT DISTINCT generation FROM finance_mirror_records WHERE scope=$1", ["rollback-batch"]);
+  expect(rows.rows).toEqual([{ generation: first!.id }]);
+  await store.release("rollback-batch", next!.id);
+});
+
+it("publishes all records across bounded batches, including an empty database", async () => {
+  const batches: number[] = [];
+  const bounded = new MirrorStore({ query: async (sql, params) => {
+    if (sql.startsWith("INSERT INTO finance_mirror_records")) batches.push(params!.length);
+    return db.query<any>(sql, params);
+  } });
+  const pages = Array.from({ length: 505 }, (_, i) => ({ id: String(i) }));
+  const lease = await bounded.acquire("bounded-batches");
+  await bounded.publish("bounded-batches", lease!, { abc: { schema: {}, pages }, empty: { schema: {}, pages: [] } });
+  expect(batches).toEqual([403, 403, 213]);
+  expect((await bounded.read("bounded-batches", "abc", 60000))?.data.pages).toEqual(pages);
+  expect((await bounded.read("bounded-batches", "empty", 60000))?.data.pages).toEqual([]);
+});
+
+
+it("ignores only Notion database response trace IDs, not financial properties with the same name", () => {
+  const a = { abc: { schema: { request_id: "request-a", properties: { request_id: { name: "request_id" } } }, pages: [{ id: "one", request_id: "user-data-a" }] } };
+  expect(snapshotFingerprint(a)).toBe(snapshotFingerprint({ abc: { ...a.abc, schema: { ...a.abc.schema, request_id: "request-b" } } }));
+  expect(snapshotFingerprint(a)).not.toBe(snapshotFingerprint({ abc: { ...a.abc, pages: [{ id: "one", request_id: "user-data-b" }] } }));
+  expect(snapshotFingerprint(a)).not.toBe(snapshotFingerprint({ abc: { ...a.abc, schema: { ...a.abc.schema, properties: { request_id: { name: "Changed property" } } } } }));
 });
