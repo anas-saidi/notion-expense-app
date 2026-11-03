@@ -61,19 +61,31 @@ export function startFrom<T>(kind: "items" | "level", seen: unknown, current: T)
  * the current state.
  */
 export function useRememberedJar<T>(key: string | null, kind: "items" | "level", current: T, animate: boolean): T {
-  const [start] = useState<T>(() => (key && animate && typeof window !== "undefined" ? startFrom(kind, read(key), current) : current));
-  const [revealed, setRevealed] = useState(start === current);
+  const [entry, setEntry] = useState(() => ({
+    key,
+    start: key && animate && typeof window !== "undefined" ? startFrom(kind, read(key), current) : current,
+  }));
+  const [revealed, setRevealed] = useState(entry.start === current);
+
+  // A different scope is a new context, not a deposit/spending event. Keep the
+  // mascot mounted, but discard the old context's delayed reveal. Adjust state
+  // before commit so even a switch during the first 350ms cannot show old items.
+  if (entry.key !== key) {
+    setEntry({ key, start: current });
+    if (!revealed) setRevealed(true);
+  }
 
   useEffect(() => {
     if (revealed) return;
+    if (!animate) { setRevealed(true); return; }
     const id = window.setTimeout(() => setRevealed(true), REVEAL_DELAY_MS);
     return () => window.clearTimeout(id);
-  }, [revealed]);
+  }, [revealed, animate, key]);
 
   const serialised = JSON.stringify(current);
   useEffect(() => {
     if (key && revealed) write(key, current);
   }, [key, serialised, revealed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return revealed ? current : start;
+  return !animate || entry.key !== key || revealed ? current : entry.start;
 }

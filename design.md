@@ -10,7 +10,7 @@
 
 Joint uses Bloub’s original Pebble outline: softly irregular, no heart cleft or pointed tip, one face, and the existing blue/pink glass. Use the same silhouette in the scope picker, liquid pool and spending jar. Personal shapes stay distinct.
 
-Tap feedback compresses and settles in 280ms. Shape changes take 420ms and continue from the current pose when interrupted. Reflect view replacement fades in over 220ms; chart data changes take 360ms with no delay. Exact totals remain visible; do not count up from invented zeroes. Reduced motion removes the press, shape drift and chart interpolation. Keep the mascot's existing visibility pause; add no decorative animation loops.
+Tap feedback compresses and settles in 280ms. Scope changes keep the same hero mascot mounted. Its shape, colour and liquid level morph over 420ms from the current pose, including interrupted switches. Switch contents directly to the selected scope; remembered entrance fills apply only when opening a screen. Reflect view replacement fades in over 220ms; chart data changes take 360ms with no delay. Exact totals remain visible; do not count up from invented zeroes. Reduced motion removes the press, shape drift and chart interpolation. Keep the mascot's existing visibility pause; add no decorative animation loops.
 
 ## Concept: glass jars that hold money
 

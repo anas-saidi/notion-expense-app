@@ -54,8 +54,9 @@ export type MascotHeroProps =
  * facts are stated in text next to it.
  */
 export function MascotHero(props: MascotHeroProps) {
-  // Each scope's jar has its own memory of what it last showed, so it starts fresh.
-  return <HeroJar key={props.scope} {...props} />;
+  // Keep the engine mounted across scopes so its radial profile, colour and
+  // waterline can interpolate from the frame currently on screen.
+  return <HeroJar {...props} />;
 }
 
 /**

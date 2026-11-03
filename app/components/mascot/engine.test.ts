@@ -33,6 +33,37 @@ describe("mascot engine", () => {
   });
 });
 
+describe("hero scope morph", () => {
+  const target = (scope: MascotTarget["scope"], pool: boolean): MascotTarget => ({
+    scope, gap: 0, mood: "idle", outline: "partner", items: [], ...(pool ? { fill: 0.6 } : {}),
+  });
+
+  it.each([true, false])("continues interrupted scope changes from the displayed shape (pool: %s)", pool => {
+    const engine = new MascotEngine(target("joint", pool));
+    const before = engine.sample(1);
+    engine.setTarget(target("anas", pool), 1);
+    expect(engine.sample(1).body).toBe(before.body);
+    expect(engine.sample(1).colors).toEqual(before.colors);
+    const middle = engine.sample(1.12);
+    expect(middle.body).not.toBe(new MascotEngine(target("anas", pool)).sample(1.12).body);
+    engine.setTarget(target("salma", pool), 1.12);
+    expect(engine.sample(1.12).body).toBe(middle.body);
+    expect(engine.sample(1.12).colors).toEqual(middle.colors);
+    const final = engine.sample(2);
+    const expected = new MascotEngine(target("salma", pool)).sample(2);
+    expect(final.body).toBe(expected.body);
+    expect(final.colors).toEqual(expected.colors);
+  });
+
+  it.each([true, false])("switches directly under reduced motion (pool: %s)", pool => {
+    const engine = new MascotEngine(target("joint", pool), { calm: true });
+    engine.setTarget(target("anas", pool), 1);
+    const expected = new MascotEngine(target("anas", pool), { calm: true }).sample(1);
+    expect(engine.sample(1).body).toBe(expected.body);
+    expect(engine.sample(1).colors).toEqual(expected.colors);
+  });
+});
+
 describe("mascot mood", () => {
   const base = { scope: "joint" as const, fundingGap: 0, spentPct: 50, unassigned: 0, loading: false };
   it("celebrates a funded joint budget as a heart", () => {

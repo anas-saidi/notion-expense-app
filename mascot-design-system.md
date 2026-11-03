@@ -36,6 +36,8 @@ Parts of the mechanics (radial-profile morphing, sphere-projected eyes, blink an
 
 ## 3. Shapes
 
+Changing scope preserves the mounted hero and engine. Morph from the current shape over 420ms; rapid changes start from the in-between pose. Scope changes use the new scope’s current contents and never replay the remembered entrance. Reduce Motion switches directly.
+
 Bodies are **radial profiles**: 64 radii sampled around the centre (θ = 90° is straight down), drawn as a closed Catmull-Rom curve. Changing shape = interpolating radii, so any shape morphs into any other.
 
 Every body **sags**: `r × (1 + a·sin θ)` with a = 0.035 — fuller at the bottom, narrower at the top, like something soft resting on a surface.
