@@ -1571,6 +1571,7 @@ export default function App() {
         savedCountForReview={balanceChecks.reviewCounts.find(count => count.accountId === accountKey(detailsAccount?.id ?? ""))?.actualBalance}
         balanceCheck={balanceChecks.checks.find(check => check.accountId === accountKey(detailsAccount?.id ?? ""))}
         onBalanceCheckChanged={balanceChecks.refresh}
+        onBalanceCheckSaved={balanceChecks.applySavedCheck}
         account={detailsAccount && (displayAccounts.find((a) => a.id === detailsAccount.id) ?? detailsAccount)}
         transactions={transactions}
         categories={categories}

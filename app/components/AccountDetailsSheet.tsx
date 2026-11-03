@@ -3,6 +3,7 @@ import { accountIconSource, categoryIconSource } from "../../lib/category-icons"
 
 import { SheetBody, SheetHeader } from "./ui/SheetLayout";
 
+import { changeBalanceCheck } from "../../lib/balance-check-actions";
 import { money, type BalanceCheckView } from "../../lib/balance-checks";
 import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
 import { DatePicker } from "./DatePicker";
@@ -38,6 +39,7 @@ type AccountDetailsSheetProps = {
   startBalanceCheck?: boolean;
   balanceCheck?: BalanceCheckView;
   onBalanceCheckChanged?: () => Promise<void>;
+  onBalanceCheckSaved?: (accountId: string, check: BalanceCheckView | null) => void;
   account: Account | null;
   transactions: Transaction[];
   categories: Category[];
@@ -73,6 +75,7 @@ export function AccountDetailsSheet({
   startBalanceCheck = false,
   balanceCheck,
   onBalanceCheckChanged,
+  onBalanceCheckSaved,
   account,
   transactions,
   categories,
@@ -319,13 +322,15 @@ export function AccountDetailsSheet({
     if (!account || checkSaving) return;
     setCheckSaving(true); setReconcileError(""); setCheckMessage(null);
     try {
-      const response = await fetch("/api/balance-checks", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, accountId: account.id, actualBalance: parsedActual, expectedVersion: checkVersion }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Could not save the check.");
-      setCheckVersion(data.check?.version ?? null);
-      setCheckMessage(action === "save" ? "Balance check saved. Transactions unchanged." : "Balance check resolved.");
-      await onBalanceCheckChanged?.();
+      await changeBalanceCheck({ action, accountId: account.id, actualBalance: parsedActual, expectedVersion: checkVersion }, {
+        committed: check => {
+          setCheckVersion(check?.version ?? null);
+          onBalanceCheckSaved?.(account.id, check);
+          setCheckMessage(action === "save" ? "Balance check saved. Transactions unchanged." : "Balance check resolved.");
+        },
+        refresh: onBalanceCheckChanged,
+        refreshFailed: () => setCheckMessage(action === "save" ? "Balance check saved. Refresh to update other checks." : "Balance check resolved. Refresh to update other checks."),
+      });
     } catch (error) { setReconcileError(error instanceof Error ? error.message : "Could not save the check."); }
     finally { setCheckSaving(false); }
   };

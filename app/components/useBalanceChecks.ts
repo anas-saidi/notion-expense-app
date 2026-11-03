@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { accountKey } from "../../lib/balance-checks";
 import type { BalanceCheckView, BalanceCountReview } from "../../lib/balance-checks";
 
 export function useBalanceChecks() {
@@ -25,6 +26,15 @@ export function useBalanceChecks() {
       if (request === sequence.current) { setError(error instanceof DOMException || error instanceof TypeError ? "Balance checks are slow to load right now." : error instanceof Error ? error.message : "Balance checks unavailable."); setPaused(pausedRef.current); }
     } finally { if (request === sequence.current) setLoading(false); }
   }, []);
+  const applySavedCheck = useCallback((accountId: string, check: BalanceCheckView | null) => {
+    // A read started before this acknowledged save must not overwrite its receipt.
+    sequence.current++;
+    const id = accountKey(accountId);
+    setChecks(current => [...current.filter(row => accountKey(row.accountId) !== id), ...(check ? [check] : [])]);
+    setReviewCounts(current => current.filter(row => accountKey(row.accountId) !== id));
+    pausedRef.current = false; setPaused(false); setError(null);
+    setLoading(false);
+  }, []);
   useEffect(() => {
     void refresh();
     const visible = () => { if (document.visibilityState === "visible") void refresh(); };
@@ -33,5 +43,5 @@ export function useBalanceChecks() {
     const timer = window.setInterval(visible, 60000);
     return () => { sequence.current++; window.removeEventListener("focus", visible); document.removeEventListener("visibilitychange", visible); window.clearInterval(timer); };
   }, [refresh]);
-  return { checks, reviewCounts, error, paused, loading, refresh };
+  return { checks, reviewCounts, error, paused, loading, refresh, applySavedCheck };
 }
