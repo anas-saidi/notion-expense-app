@@ -1,5 +1,11 @@
 # Project instructions
 
+## Roadmap and task status
+
+- At the start of every app task, read [docs/roadmap.md](docs/roadmap.md). It owns pending work, stable IDs, priorities, dependencies and completion evidence; `design.md` owns durable product conventions.
+- Before picking an item, inspect its status and current changes. Reuse candidates marked `verify`; do not repeat `done` work. Claim/update the relevant ID, preserve other agents' changes, and follow the roadmap's completion/handoff rules.
+- Update the roadmap in the same change as implementation. Mark completion only with acceptance evidence and commit/release references (or explicit local-only acceptance). A local fix is not a deployed fix. Keep historical IDs and deduplicate new feedback.
+
 ## Mobile interface work
 
 - Design reference links live in `design.md` under **Design reference index**; mascot geometry and motion are documented in `mascot-design-system.md`.
