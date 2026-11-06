@@ -75,3 +75,23 @@ it("queries the month once, follows pagination, and preserves existing updates a
   expect(JSON.parse(fetchMock.mock.calls[1][1].body).start_cursor).toBe("page2");
   expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ archived: true });
 });
+
+it("plans from the category's Default account when none is sent, and refuses when it has none", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test");
+  const funded = vi.fn()
+    .mockResolvedValueOnce(Response.json({ results: [] }))
+    .mockResolvedValueOnce(Response.json({ properties: { Default: { relation: [{ id: "home-account" }] } } }))
+    .mockResolvedValueOnce(Response.json({ id: "home-fund" }));
+  vi.stubGlobal("fetch", funded);
+  expect((await save([{ categoryId: "home", amount: 300 } as any])).status).toBe(200);
+  expect(JSON.parse(funded.mock.calls[2][1].body).properties["🏦 Accounts"]).toEqual({ relation: [{ id: "home-account" }] });
+
+  const unbacked = vi.fn()
+    .mockResolvedValueOnce(Response.json({ results: [] }))
+    .mockResolvedValueOnce(Response.json({ properties: { Name: { type: "title", title: [{ plain_text: "home" }] }, Default: { relation: [] } } }));
+  vi.stubGlobal("fetch", unbacked);
+  const refused = await save([{ categoryId: "home", amount: 300 } as any]);
+  expect(refused.status).toBe(400);
+  expect((await refused.json()).error).toContain("home has no holding account");
+  expect(unbacked).toHaveBeenCalledTimes(2);
+});

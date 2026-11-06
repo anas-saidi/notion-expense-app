@@ -186,6 +186,18 @@ async function handlePOST(req: NextRequest) {
       const result = calculateMonthPlanCapacity(capacity, totals, split);
       if (result.left.anas < -.005 || result.left.salma < -.005) return NextResponse.json({ error: "This plan exceeds the money available after existing commitments and advance repayments. Refresh and reduce allocations." }, { status: 409 });
     }
+    // Notion's Available formula ignores fund rows without an account, so fill any
+    // gap from the category's Default before writing anything.
+    for (const allocation of allocations) {
+      if (allocation.amount <= 0 || allocation.defaultAccount) continue;
+      const { data: category } = await notionFetchJson<any>(token, `/pages/${allocation.categoryId}`);
+      allocation.defaultAccount = category.properties?.Default?.relation?.[0]?.id ?? null;
+      if (!allocation.defaultAccount) {
+        const title: any = Object.values(category.properties ?? {}).find((p: any) => p.type === "title");
+        const name = (title?.title ?? []).map((p: any) => p.plain_text).join("") || "A category";
+        return NextResponse.json({ error: `${name} has no holding account. Set one before planning money for it.` }, { status: 400 });
+      }
+    }
     for (const allocation of allocations) {
       savedFunds.push(await upsertFund(token, allocation, bounds.start, byCategory.get(normalizeId(allocation.categoryId)), body.allowClear === true));
     }

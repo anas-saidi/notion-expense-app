@@ -44,6 +44,18 @@ async function getCategoryAvailable(token: string, categoryId: string) {
   return Math.max(0, Number(available));
 }
 
+// Notion's Available formula ignores fund rows without an account, so a row
+// created without one silently adds nothing. Fall back to the category's Default.
+async function resolveFundAccount(token: string, categoryId: string, accountId: string | null) {
+  if (accountId) return accountId;
+  const response = await fetch(`https://api.notion.com/v1/pages/${categoryId}`, { headers: notionHeaders(token), cache: "no-store" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Could not read the category");
+  const fallback = data.properties?.Default?.relation?.[0]?.id;
+  if (!fallback) throw Object.assign(new Error("Choose the account this money comes from"), { status: 400 });
+  return fallback as string;
+}
+
 async function assertFundReductionIsAvailable(token: string, page: any, nextPlanned: number) {
   const currentPlanned = Number(page.properties?.Planned?.number ?? 0);
   const reduction = Math.max(0, currentPlanned - nextPlanned);
@@ -133,7 +145,7 @@ async function handlePOST(req: NextRequest) {
 
   const planned = Number(body.planned ?? 0);
   const categoryId = String(body.categoryId);
-  const accountId = body.accountId ? String(body.accountId) : null;
+  let accountId = body.accountId ? String(body.accountId) : null;
   const shouldIncrement = body.mode === "increment" || body.increment === true;
   const shouldSet = body.mode === "set";
   const shouldRelease = body.mode === "release";
@@ -145,6 +157,7 @@ async function handlePOST(req: NextRequest) {
   }
 
   try {
+    if (shouldRelease || shouldAdd) accountId = await resolveFundAccount(token, categoryId, accountId);
     if (shouldRelease) {
       if (planned <= 0) return NextResponse.json({ fund: null, mode: "skipped" });
       const available = await getCategoryAvailable(token, categoryId);
@@ -268,6 +281,7 @@ async function handlePOST(req: NextRequest) {
       });
     }
 
+    accountId = await resolveFundAccount(token, categoryId, accountId);
     await assertAdvanceReservation(token, accountId, categoryId, planned);
     const createRes = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
