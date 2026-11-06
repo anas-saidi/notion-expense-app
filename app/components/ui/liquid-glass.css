@@ -114,17 +114,12 @@ html[data-theme="dark"] {
 .screen-chip.lg-button[data-selected],
 .lg-button[aria-expanded="true"],
 .transaction-type.lg-button[aria-selected="true"],
-.appearance-system-button.lg-button[aria-pressed="true"],
-.global-scope-picker .global-scope-option.lg-button[aria-selected="true"] {
+.appearance-system-button.lg-button[aria-pressed="true"] {
   background-color: var(--lg-glass-active); color: var(--text);
   box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 2px 6px var(--lg-drop);
 }
 .transaction-type.lg-button { min-height: 44px; background-color: var(--lg-glass); }
 .appearance-system-button.lg-button, .appearance-theme-button.lg-button { background-color: var(--lg-glass); }
-/* Keep the approved rotating mascot stack's position under Glisse's press response. */
-.global-scope-picker .global-scope-option.lg-button:not(:disabled):is(:hover, :active) {
-  transform: translateX(var(--scope-slot, 0px));
-}
 .picker-option[aria-pressed="true"],
 .date-calendar button[aria-pressed="true"],
 .date-grid button[aria-current="date"][aria-pressed="true"],
@@ -138,7 +133,6 @@ html[data-theme="dark"] {
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .screen-chip.lg-button[data-selected], .lg-button[aria-expanded="true"],
   .transaction-type.lg-button, .appearance-system-button.lg-button, .appearance-theme-button.lg-button,
-  .global-scope-picker .global-scope-option.lg-button[aria-selected="true"],
   .picker-option[aria-pressed="true"], .date-calendar button[aria-pressed="true"],
   .date-grid button[aria-current="date"][aria-pressed="true"],
   .month-grid button[aria-current="date"][aria-pressed="true"] {
@@ -151,7 +145,6 @@ html[data-theme="dark"] {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .screen-chip.lg-button[data-selected], .lg-button[aria-expanded="true"],
   .transaction-type.lg-button, .appearance-system-button.lg-button, .appearance-theme-button.lg-button,
-  .global-scope-picker .global-scope-option.lg-button[aria-selected="true"],
   .picker-option[aria-pressed="true"], .date-calendar button[aria-pressed="true"],
   .date-grid button[aria-current="date"][aria-pressed="true"],
   .month-grid button[aria-current="date"][aria-pressed="true"] {
