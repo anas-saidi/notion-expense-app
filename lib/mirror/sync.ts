@@ -1,5 +1,6 @@
 import { waitUntil } from "@vercel/functions";
 import { mirrorReadContext } from "./context";
+import { slimMirrorPage } from "./slim";
 import { mirrorDatabases, mirrorScope, mirrorStore, normalizeDatabaseId, WRITE_SETTLE_MS, type MirrorSnapshot } from "./store";
 
 type SyncTask = { promise: Promise<unknown>; rerun: boolean };
@@ -48,7 +49,7 @@ export async function syncMirror(token: string) {
       for (const id of new Set(databaseIds)) {
         const { data: schema } = await notionFetchJson<any>(token, `/databases/${id}`);
         const pages = await queryDatabaseAll(token, id);
-        snapshot[normalizeDatabaseId(id)] = { schema, pages };
+        snapshot[normalizeDatabaseId(id)] = { schema, pages: pages.map(slimMirrorPage) };
       }
       const syncedAt = await store.publish(scope, lease, snapshot);
       return { syncing: false, syncedAt };

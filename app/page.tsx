@@ -4,7 +4,7 @@ import { runwayWindow } from "./components/category-runway";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
-import { fetchApiJson, fetchMonthlyData, fetchHistoryData, historyReadUrls, invalidateFinancialReads, restartFinancialReads, loadHomeData, type MonthlyData } from "@/lib/app-data";
+import { fetchApiJson, fetchMonthlyData, monthlyDataUrl, readSavedApiJson, fetchHistoryData, historyReadUrls, invalidateFinancialReads, restartFinancialReads, loadHomeData, type MonthlyData } from "@/lib/app-data";
 import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
@@ -65,6 +65,11 @@ type SessionUser = { email: string | null; name: string | null; avatarUrl: strin
 const FALLBACK_ACCOUNTS: Account[] = [];
 
 const formatMonthInput = (dateString: string) => dateString.slice(0, 7);
+
+const CATEGORY_CATALOG_URL = "/api/categories?includeSnoozed=true&includeArchived=true";
+const ACCOUNTS_URL = "/api/accounts";
+const BILLS_URL = "/api/bills";
+const RECENT_TRANSACTIONS_URL = "/api/transactions?page_size=100";
 
 export default function App() {
   const [showContributions, setShowContributions] = useState(false);
@@ -284,8 +289,11 @@ export default function App() {
 
   const fetchTransactions = async () => {
     const request = ++transactionsRequest.current;
-    const data = await fetchApiJson<{ transactions?: Transaction[] }>("/api/transactions?page_size=100");
+    const data = await fetchApiJson<{ transactions?: Transaction[] }>(RECENT_TRANSACTIONS_URL);
     if (request !== transactionsRequest.current) return;
+    applyTransactions(data);
+  };
+  const applyTransactions = (data: { transactions?: Transaction[] }) => {
     const txns: Transaction[] = data.transactions ?? [];
     setTransactions(txns);
     let hasCorpus = false;
@@ -332,19 +340,33 @@ export default function App() {
     try {
       const target = month ?? formatMonthInput(today());
       const { start, end } = monthBounds(`${target}-01`);
-      const spendingWindow = runwayWindow(today());
+      const activityUrl = spendingActivityUrl();
       const [data, activity] = await Promise.all([
         fetchMonthlyData(target, target, true),
         target === formatMonthInput(today())
-          ? fetchApiJson<{ transactions: Transaction[] }>(`/api/transactions?start=${spendingWindow.start}&end=${spendingWindow.end}`).catch(() => null)
+          ? fetchApiJson<{ transactions: Transaction[] }>(activityUrl).catch(() => null)
           : Promise.resolve(null),
       ]);
       if (request !== monthRequest.current) return;
       monthlySnapshot.current = { month: target, data, expires: Date.now() + 15000 };
+      applyMonthlyData(target, data);
+      setBudgetTransactions(activity?.transactions ?? []);
+    } catch (error) {
+      if (request === monthRequest.current) setMonthError(true);
+      throw error;
+    } finally {
+      if (request === monthRequest.current) setMonthLoading(false);
+    }
+  };
+  const spendingActivityUrl = () => {
+    const spendingWindow = runwayWindow(today());
+    return `/api/transactions?start=${spendingWindow.start}&end=${spendingWindow.end}`;
+  };
+  const applyMonthlyData = (target: string, data: MonthlyData) => {
+      const { start, end } = monthBounds(`${target}-01`);
       if (target === formatMonthInput(today())) setCurrentMonthFunds(data.funds ?? []);
       setContributionTransactions(data.transactions ?? []);
       setJointDebtTransactions(data.jointDebtTransactions ?? []);
-      setBudgetTransactions(activity?.transactions ?? []);
       setMonthlySummary({
         contributionAgreements: data.summary.contributionAgreements,
         contributionError: data.summary.contributionError,
@@ -355,19 +377,13 @@ export default function App() {
         assignedByCategory: data.summary?.assignedByCategory ?? [],
         spentByCategory: data.summary?.spentByCategory ?? [],
       });
-    } catch (error) {
-      if (request === monthRequest.current) setMonthError(true);
-      throw error;
-    } finally {
-      if (request === monthRequest.current) setMonthLoading(false);
-    }
   };
 
   const fetchBills = async () => {
     const request = ++billsRequest.current;
     setBillsLoading(true);
     try {
-      const data = await fetchApiJson<BillsData>("/api/bills");
+      const data = await fetchApiJson<BillsData>(BILLS_URL);
       if (request === billsRequest.current) { setBillsData(data); setBillsError(null); }
     } catch (error) {
       if (request === billsRequest.current) setBillsError(error instanceof Error ? error.message : "Could not load bills");
@@ -394,8 +410,11 @@ export default function App() {
 
   const fetchCategoryCatalog = async () => {
     const request = ++catalogRequest.current;
-    const data = await fetchApiJson<{ categories?: Category[] }>("/api/categories?includeSnoozed=true&includeArchived=true");
+    const data = await fetchApiJson<{ categories?: Category[] }>(CATEGORY_CATALOG_URL);
     if (request !== catalogRequest.current) return;
+    applyCategoryCatalog(data);
+  };
+  const applyCategoryCatalog = (data: { categories?: Category[] }) => {
     const catalog: Category[] = data.categories ?? [];
     setDebtCategories(catalog);
     const active = catalog.filter((category) => !category.snoozed && !category.archived);
@@ -406,7 +425,7 @@ export default function App() {
 
   const fetchAccounts = async () => {
     const request = ++accountsRequest.current;
-    const data = await fetchApiJson<{ accounts?: Account[] }>("/api/accounts");
+    const data = await fetchApiJson<{ accounts?: Account[] }>(ACCOUNTS_URL);
     if (request === accountsRequest.current) { setAccounts(data.accounts ?? []); void balanceChecks.refresh(); }
   };
 
@@ -414,8 +433,29 @@ export default function App() {
   useEffect(() => {
 
     let cancelled = false;
+    // First open: show the last good answers kept on this device at once, marked
+    // as updating, while the live read runs. Skipped when any essential is missing.
+    const showSavedData = () => {
+      if (coreReady.current) return;
+      const catalog = readSavedApiJson<{ categories?: Category[] }>(CATEGORY_CATALOG_URL);
+      const savedAccounts = readSavedApiJson<{ accounts?: Account[] }>(ACCOUNTS_URL);
+      if (!catalog || !savedAccounts) return;
+      applyCategoryCatalog(catalog.data);
+      setAccounts(savedAccounts.data.accounts ?? []);
+      const recent = readSavedApiJson<{ transactions?: Transaction[] }>(RECENT_TRANSACTIONS_URL);
+      if (recent) applyTransactions(recent.data);
+      const bills = readSavedApiJson<BillsData>(BILLS_URL);
+      if (bills) setBillsData(bills.data);
+      const month = homeMonth;
+      const monthly = readSavedApiJson<MonthlyData>(monthlyDataUrl(month, month, true));
+      if (monthly) applyMonthlyData(month, monthly.data);
+      const activity = month === formatMonthInput(today()) ? readSavedApiJson<{ transactions: Transaction[] }>(spendingActivityUrl()) : null;
+      if (activity) setBudgetTransactions(activity.data.transactions ?? []);
+      coreReady.current = true;
+    };
     const loadLiveData = async () => {
       try {
+        showSavedData();
         setLoading(!coreReady.current);
         setRefreshState(coreReady.current ? "updating" : "idle");
         setRefreshError(null);

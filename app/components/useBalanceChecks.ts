@@ -3,6 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { accountKey } from "../../lib/balance-checks";
 import type { BalanceCheckView, BalanceCountReview } from "../../lib/balance-checks";
 
+const BALANCE_CHECK_POLL_MS = 5 * 60_000;
+const BALANCE_CHECK_MIN_GAP_MS = 30_000;
+
 export function useBalanceChecks() {
   const [checks, setChecks] = useState<BalanceCheckView[]>([]);
   const [reviewCounts, setReviewCounts] = useState<BalanceCountReview[]>([]);
@@ -17,7 +20,7 @@ export function useBalanceChecks() {
     if (pausedRef.current) return;
     const request = ++sequence.current;
     try {
-      const response = await fetch("/api/balance-checks", { cache: "no-store", signal: AbortSignal.timeout(30000) });
+      const response = await fetch("/api/balance-checks", { cache: "no-cache", signal: AbortSignal.timeout(30000) });
       const data = await response.json();
       if (!response.ok && data.retryable === false) pausedRef.current = true;
       if (!response.ok) throw new Error(data.error ?? "Could not load balance checks.");
@@ -37,10 +40,17 @@ export function useBalanceChecks() {
   }, []);
   useEffect(() => {
     void refresh();
-    const visible = () => { if (document.visibilityState === "visible") void refresh(); };
+    // Every refresh reads the mirror database, and that read counts as Supabase
+    // egress. Poll only while visible, and skip focus/visibility events that
+    // arrive soon after the last read (switching tabs fires both).
+    let last = Date.now();
+    const visible = () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < BALANCE_CHECK_MIN_GAP_MS) return;
+      last = Date.now(); void refresh();
+    };
     window.addEventListener("focus", visible);
     document.addEventListener("visibilitychange", visible);
-    const timer = window.setInterval(visible, 60000);
+    const timer = window.setInterval(visible, BALANCE_CHECK_POLL_MS);
     return () => { sequence.current++; window.removeEventListener("focus", visible); document.removeEventListener("visibilitychange", visible); window.clearInterval(timer); };
   }, [refresh]);
   return { checks, reviewCounts, error, paused, loading, refresh, applySavedCheck };

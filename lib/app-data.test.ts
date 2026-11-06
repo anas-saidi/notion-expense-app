@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchApiJson, fetchMonthlyData, fetchHistoryData, historyReadUrls, loadHomeData, readTimeout, restartFinancialReads } from "./app-data";
+import { clearSavedReads, fetchApiJson, fetchMonthlyData, fetchHistoryData, historyReadUrls, loadHomeData, readSavedApiJson, readTimeout, restartFinancialReads } from "./app-data";
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 it("coalesces simultaneous reads but fetches a fresh response on the next refresh", async () => {
@@ -179,4 +179,58 @@ it("can reuse an already completed matching Home snapshot for Activity", async (
   expect(result.summary).toEqual({ totalSpent: 15 });
   expect(fetch).not.toHaveBeenCalled();
   expect(historyReadUrls("").transactions).toBe("/api/transactions?all=true");
+});
+
+describe("device-saved reads", () => {
+  const memoryStorage = () => {
+    const values = new Map<string, string>();
+    return {
+      get length() { return values.size; },
+      key: (i: number) => [...values.keys()][i] ?? null,
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      removeItem: (key: string) => { values.delete(key); },
+    };
+  };
+  const setup = () => {
+    const storage = memoryStorage();
+    vi.stubGlobal("window", { dispatchEvent: () => true });
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("CustomEvent", class { constructor(public type: string) {} });
+    return storage;
+  };
+
+  it("keeps the last good answer for launch reads and revalidates instead of bypassing the cache", async () => {
+    setup();
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ accounts: [{ id: "a", balance: 10 }] }));
+    vi.stubGlobal("fetch", fetcher);
+    await fetchApiJson("/api/accounts");
+    expect(fetcher.mock.calls[0][1].cache).toBe("no-cache");
+    expect(readSavedApiJson("/api/accounts")?.data).toEqual({ accounts: [{ id: "a", balance: 10 }] });
+  });
+
+  it("does not keep other reads, failed reads, or answers older than a week", async () => {
+    const storage = setup();
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(Response.json({ funds: [] }))
+      .mockResolvedValueOnce(Response.json({ error: "nope", retryable: false }, { status: 400 })));
+    await fetchApiJson("/api/monthly-planning/funds?month=2026-12");
+    await expect(fetchApiJson("/api/bills")).rejects.toThrow("nope");
+    expect(readSavedApiJson("/api/monthly-planning/funds?month=2026-12")).toBeNull();
+    expect(readSavedApiJson("/api/bills")).toBeNull();
+
+    const week = 7 * 24 * 60 * 60 * 1000;
+    storage.setItem("finance-read:v1:/api/accounts", JSON.stringify({ savedAt: Date.now() - week, data: { accounts: [] } }));
+    expect(readSavedApiJson("/api/accounts")).toBeNull();
+  });
+
+  it("clears every saved answer", async () => {
+    const storage = setup();
+    storage.setItem("theme", "dark");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ bills: [] })));
+    await fetchApiJson("/api/bills");
+    clearSavedReads();
+    expect(readSavedApiJson("/api/bills")).toBeNull();
+    expect(storage.getItem("theme")).toBe("dark");
+  });
 });

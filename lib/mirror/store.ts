@@ -151,6 +151,16 @@ export class MirrorStore {
     const { rows } = await this.db.query("SELECT synced_at, revision=published_revision AND generation IS NOT NULL AS current, lease_until > now() AS syncing FROM finance_mirror WHERE scope=$1", [scope]);
     return rows[0];
   }
+  /** One small row: which stored copy is live, and whether reads may trust it. */
+  async version(scope: string, maxAgeMs: number) {
+    await this.ready(scope);
+    const { rows } = await this.db.query(`SELECT generation, synced_at,
+      revision=published_revision AND generation IS NOT NULL AND synced_at > now() - ($2 * interval '1 millisecond')
+        AND NOT EXISTS (SELECT 1 FROM finance_mirror_writes WHERE scope=$1 AND expires_at > now()) AS usable
+      FROM finance_mirror WHERE scope=$1`, [scope, maxAgeMs]);
+    const row = rows[0];
+    return row?.usable && row.generation ? { generation: String(row.generation), syncedAt: new Date(row.synced_at).toISOString() } : null;
+  }
   async acquire(scope: string) {
     await this.ready(scope);
     const id = randomUUID();

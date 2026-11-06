@@ -4,15 +4,32 @@ import { NextResponse } from "next/server";
 import { mirrorReadContext } from "./context";
 import { mirrorScope, mirrorStore } from "./store";
 import { scheduleMirrorSync } from "./sync";
+import { etagMatches, mirrorVersionTag } from "./version-tag";
 
 type Handler = (...args: any[]) => Promise<Response>;
 /** Opt in only display reads. Write validation always uses live Notion data. */
 export function withMirrorReads<T extends Handler>(handler: T): T {
   return (async (...args: Parameters<T>) => {
     const context = { enabled: true, sources: new Set<string>(), syncedAt: [] as string[], databases: new Map() };
+    const request = args[0] instanceof Request ? args[0] : null;
+    // Read the version before the data: the data can only be the same or newer,
+    // so a stale tag at worst costs one extra full read, never a stale screen.
+    const tag = request ? await mirrorVersionTag(request) : null;
+    if (request && tag && etagMatches(request, tag.etag)) {
+      // Nothing changed since this browser's copy: answer without reading the ledger.
+      const token = process.env.NOTION_TOKEN;
+      if (token && Date.now() - Date.parse(tag.syncedAt) > 60_000) scheduleMirrorSync(token);
+      return new Response(null, { status: 304, headers: {
+        ETag: tag.etag, "Cache-Control": "private, no-cache", "X-Finance-Data-Source": "mirror", "X-Finance-Synced-At": tag.syncedAt,
+      } });
+    }
     return mirrorReadContext.run(context, async () => {
       const response = await handler(...args);
-      response.headers.set("Cache-Control", "private, no-store");
+      const fromCopyOnly = context.sources.size === 1 && context.sources.has("mirror");
+      if (tag && response.status === 200 && fromCopyOnly) {
+        response.headers.set("ETag", tag.etag);
+        response.headers.set("Cache-Control", "private, no-cache");
+      } else response.headers.set("Cache-Control", "private, no-store");
       response.headers.set("X-Finance-Data-Source", context.sources.size === 1 ? [...context.sources][0] : "mixed");
       if (context.syncedAt.length) response.headers.set("X-Finance-Synced-At", context.syncedAt.sort()[0]);
       return response;
