@@ -923,9 +923,10 @@ html { scrollbar-gutter: stable; }
 .appearance-system-button {
   min-width: 44px;
   height: 44px;
-  padding: 0 12px;
+  padding: 0 16px;
   border: 0;
-  border-radius: var(--radius-control);
+  /* A pill beside the round theme button, like the app's other glass controls. */
+  border-radius: 999px;
   background: var(--surface2);
   color: var(--text);
   font-size: 14px;

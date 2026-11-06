@@ -28,6 +28,10 @@ html[data-theme="dark"] {
   --lg-tab-selected: var(--text);
 }
 .lg-button { background-image: var(--lg-rim, none); min-height: 44px; font-family: var(--font-body); font-weight: 600; }
+/* The rim map is drawn for the control's exact box. A component's `background:`
+   shorthand resets it to auto/repeat, which shows a slice of a larger rim as a
+   stroke through the control, so the fit outranks single-class shorthands. */
+.lg-glass.lg-glass { background-size: 100% 100%; background-repeat: no-repeat; }
 /* Avoid adding the app-wide hover lift to Glisse's own pointer response. */
 .lg-button:not(:disabled):is(:hover, :active),
 .lg-tab:not(:disabled):is(:hover, :active),
