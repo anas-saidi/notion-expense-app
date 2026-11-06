@@ -108,13 +108,13 @@ export function ReflectScreen(props: Props) {
       <span style={{ flex: 1, minWidth: 0, display: "grid", gap: 8 }}>
         <span style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "baseline" }}>
           <span style={{ overflowWrap: "anywhere", color: "var(--text2)", fontSize: 15, fontWeight: 500 }}>{row.name}</span>
-          <span style={{ flexShrink: 0, color: inflow ? "var(--action-income)" : "var(--text2)", fontSize: 15, fontWeight: 600 }}>{inflow ? "+" : ""}<Money value={Math.abs(row.net)} /></span>
+          <span style={{ flexShrink: 0, color: inflow ? "var(--action-income)" : "var(--text2)", fontSize: 15, fontWeight: 600 }}>{inflow ? "+" : ""}<OverviewMoney value={Math.abs(row.net)} /></span>
         </span>
         <span style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {!inflow && row.net > 0 && <span aria-hidden="true" style={{ height: 4, flex: 1, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${row.share * 100}%`, background: variance ? "var(--danger)" : tone(index), borderRadius: 4 }} /></span>}
-          <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{row.net > 0 ? `${(row.share * 100).toFixed(1)}%` : `${row.transactions.length} transactions`}</span>
+          <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{row.net > 0 ? row.share * 100 < 0.5 ? "<1%" : `${Math.round(row.share * 100)}%` : `${row.transactions.length} transactions`}</span>
         </span>
-        {variance && <span style={{ fontSize: 13, color: "var(--danger)" }}><Money value={variance.overBudget} /> over budget</span>}
+        {variance && <span style={{ fontSize: 13, color: "var(--danger)" }}><OverviewMoney value={variance.overBudget} /> over budget</span>}
       </span>
     </button>
   </li>;
@@ -158,7 +158,7 @@ export function ReflectScreen(props: Props) {
       <section className="reflect-desktop-overview screen-overview" aria-label="Spending breakdown">
         <ScreenHero
           mascot={heroVisual}
-          label="Spent" showMetric={props.view === "spending"} loading={props.transactionsLoading} value={props.transactionsLoading || props.error ? null : breakdown.total}
+          label="Spent" showMetric={props.view === "spending"} loading={props.transactionsLoading} value={props.transactionsLoading || props.error ? null : breakdown.total > 0 ? Math.max(1, Math.round(breakdown.total)) : 0}
           summary={props.transactionsLoading ? <Skeleton style={{ height: "1.4em", width: "70%" }} /> : props.error ? null : props.view === "activity" ? activitySummary : recap.length > 0 ? <Summary>{joinClauses(recap)}.</Summary> : null}
         />
         {periodControls}
@@ -209,6 +209,12 @@ export function ReflectScreen(props: Props) {
       {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow from" : "Net spending across"} {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = isReflectInflow(transaction, props.accounts); return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === reflectAccountId(transaction, props.accounts))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} categoryName={selected.name} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
     </BottomSheet>
   </div>;
+}
+
+/** Overview precision only; calculations and transaction details retain exact amounts. */
+function OverviewMoney({ value, currency = false }: { value: number; currency?: boolean }) {
+  const belowOne = value > 0 && Math.round(value) === 0;
+  return <>{belowOne && "<"}<Money value={belowOne ? 1 : Math.round(value)} currency={currency} /></>;
 }
 
 function SheetHeader({ title, onClose }: { title: string; onClose: () => void }) { return <header className="sheet-header" style={{ display: "flex", flexShrink: 0, alignItems: "center", justifyContent: "space-between", gap: 16 }}><h2 style={{ fontSize: 20, fontWeight: 600, margin: 0, overflowWrap: "anywhere" }}>{title}</h2><button type="button" aria-label="Close" onClick={onClose} style={{ ...quietButtonStyle, padding: 0, width: 44, flexShrink: 0 }}><XIcon size={20} /></button></header>; }

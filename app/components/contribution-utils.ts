@@ -1,3 +1,4 @@
+import { normalizeId } from "../../lib/savings-funding";
 import { calculateJointDebt } from "./joint-debt-utils";
 import type { Account, Category, MonthlySummary, Transaction } from "./app-types";
 import { savingsHeldIn } from "../../lib/savings-funding";
@@ -31,7 +32,7 @@ export function contributionDue(status: ContributionStatus, partner: "anas" | "s
 }
 
 const accountLabel = (accounts: Account[], id: string | null | undefined) =>
-  id ? (accounts.find((account) => account.id === id)?.label ?? "").toLowerCase() : "";
+  id ? (accounts.find((account) => normalizeId(account.id) === normalizeId(id))?.label ?? "").toLowerCase() : "";
 
 export function calculateContributionStatus({
   accounts,
@@ -67,6 +68,7 @@ export function calculateContributionStatus({
   const savingsReserve = savingsHeldIn(categories, joinedAccount.id);
   if (savingsReserve === null) return null;
 
+  const historicalCategories = [...categories, ...debtCategories.filter(category => !categories.some(current => normalizeId(current.id) === normalizeId(category.id)))];
   const jointCategories = categories.filter(category => categoryMatchesScope(category, "joint", accounts));
   if (jointCategories.some(category => category.available == null)) return null;
 
@@ -115,7 +117,7 @@ export function calculateContributionStatus({
     if (transaction.accountId === joinedAccount.id) joinedOutflows += transaction.amount;
 
     if (!transaction.category) continue;
-    const category = categories.find((candidate) => candidate.id === transaction.category);
+    const category = historicalCategories.find((candidate) => normalizeId(candidate.id) === normalizeId(transaction.category));
     if (!category || isSavingsCategory(category) || !categoryMatchesScope(category, "joint", accounts)) continue;
     const payerLabel = accountLabel(accounts, transaction.accountId);
     if (payerLabel.includes("hubb")) anasDirectSpend += transaction.amount;
@@ -126,7 +128,7 @@ export function calculateContributionStatus({
   // Current ledger availability includes carry-over and category rebalancing.
   // Reconstruct the total funding target from credited contributions + cash still needed.
   // Borrowed personal money is a receivable, not a shared funding gap.
-  // Repayments restore cash without also earning contribution credit.
+  // Repayments restore cash or cover Joint spending, without also earning contribution credit.
   const cents = (amount: number) => Math.round((amount + Number.EPSILON) * 100);
   const debt = calculateJointDebt(accounts, debtCategories, debtTransactions, monthlySummary);
   const advances = monthlySummary.contributionAgreements ? contributionLedger(accounts, debtCategories, debtTransactions, monthlySummary.contributionAgreements, monthlySummary.start.slice(0, 7)) : undefined;

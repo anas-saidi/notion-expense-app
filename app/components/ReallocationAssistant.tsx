@@ -46,7 +46,6 @@ export function ReallocationAssistant({ scope, month, categories, onUse }: Props
     <textarea id="reallocation-request" className="ai-request" rows={2} maxLength={2000} disabled={busy} value={text}
       placeholder="I need 900 for a repair. Keep grocery money intact."
       onChange={event => { setText(event.target.value); setSuggestion(null); setError(""); }} />
-    <p className="ai-helper">Sends your request, category names and remaining budgets to Google. Savings and unpaid bills stay protected. Avoid sensitive details.</p>
     <button type="button" className="ai-action" disabled={busy || !text.trim() || categories.length < 2} onClick={suggest}>{busy ? "Thinking…" : "Suggest moves"}</button>
     {error && <Banner tone="danger" compact role="alert">{error}</Banner>}
     {suggestion && <div className="ai-suggestion" role="status">

@@ -5,7 +5,8 @@ import { normalizeId } from "../../lib/savings-funding";
 
 export type JointDebt = { anas: number; salma: number; anasRepaid: number; salmaRepaid: number };
 
-/** Ordinary personal-to-joint transfers repay earlier borrowing first. Only the
+/** Personal payments for Joint and ordinary personal-to-joint transfers repay
+ * earlier borrowing first. Only the
  * remainder is a contribution. Rebuild from the ledger so edits, deletions and
  * prior months never leave stale obligations. Dedicated savings stay separate. */
 export function calculateJointDebt(accounts: Account[], categories: Category[], transactions: Transaction[], range: Pick<MonthlySummary, "start" | "end">): JointDebt {
@@ -20,11 +21,18 @@ export function calculateJointDebt(accounts: Account[], categories: Category[], 
   for (const transaction of ordered) {
     const day = transaction.date.slice(0, 10);
     if (!day || day > range.end || !Number.isFinite(transaction.amount)) continue;
-    if ((transaction.type == null || transaction.type === "Expense") && scope(transaction.accountId) === "joint") {
+    if (transaction.type == null || transaction.type === "Expense") {
       const category = categories.find(c => normalizeId(c.id) === normalizeId(transaction.category));
       if (!category || isSavingsCategory(category)) continue;
       const owner = getCategoryScope(category, accounts);
-      if (owner === "anas" || owner === "salma") balance[owner] += cents(transaction.amount);
+      const payer = scope(transaction.accountId);
+      if (payer === "joint" && (owner === "anas" || owner === "salma")) {
+        balance[owner] += cents(transaction.amount);
+      } else if (owner === "joint" && (payer === "anas" || payer === "salma")) {
+        const paid = Math.min(Math.max(0, balance[payer]), Math.max(0, cents(transaction.amount)));
+        balance[payer] -= paid;
+        if (day >= range.start) repaid[payer] += paid;
+      }
     } else if (transaction.type === "Transfer" && scope(transaction.toAccountId) === "joint" && !transaction.savingsFundingOperation && !transaction.savingsFundingTarget) {
       const owner = scope(transaction.fromAccountId);
       if (owner !== "anas" && owner !== "salma") continue;

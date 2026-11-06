@@ -61,3 +61,53 @@ describe("personal borrowing from Joint", () => {
     expect(debt([transfer(500, "2026-10-09"), loan]).anas).toBe(100.25);
   });
 });
+
+
+describe("Joint spending paid personally offsets borrowing", () => {
+  const direct = (amount: number, accountId = "a", date = "2026-10-11"): Transaction => ({ ...expense("direct", "house", amount, date), accountId });
+  it("reduces the same partner's debt and due by the exact expense, without double contribution credit", () => {
+    const loan = expense("loan", "personal-a", 100);
+    const before = status([loan], -100);
+    const after = status([loan, direct(40)], -100, 960);
+    expect(after.anasPersonalDebt).toBe(60);
+    expect(after.anasActual).toBe(0);
+    expect(dues(before)).toEqual([750, 350]);
+    expect(dues(after)).toEqual([710, 350]);
+    expect(dues(status([loan, direct(40)], 2000, 960))).toEqual([60, 0]);
+  });
+  it("credits only the excess beyond the debt as a contribution", () => {
+    const result = status([expense("loan", "personal-a", 100), direct(150)], -100, 850);
+    expect(result.anasPersonalDebt).toBe(0);
+    expect(result.anasActual).toBe(50);
+    expect(dues(result)).toEqual([600, 350]);
+  });
+  it("offsets Salma's own debt without paying Anas's borrowing", () => {
+    const entries = [expense("loan-a", "personal-a", 100), expense("loan-s", "personal-s", 80), direct(30, "s")];
+    expect(debt(entries)).toMatchObject({ anas: 100, salma: 50, anasRepaid: 0, salmaRepaid: 30 });
+  });
+  it("carries earlier borrowing into this month's direct repayment, with exact cents", () => {
+    const old = expense("old", "personal-a", 100.25, "2026-09-10");
+    expect(debt([old, direct(37.12)])).toMatchObject({ anas: 63.13, anasRepaid: 37.12 });
+    expect(debt([old, direct(37.12, "a", "2026-09-11")])).toMatchObject({ anas: 63.13, anasRepaid: 0 });
+  });
+  it("rebuilds the offset after edits and deletion, and preserves savings exclusions", () => {
+    const loan = expense("loan", "personal-a", 100);
+    expect(debt([loan, direct(20)]).anas).toBe(80);
+    expect(debt([loan, direct(70)]).anas).toBe(30);
+    expect(debt([loan]).anas).toBe(100);
+    expect(debt([loan, { ...direct(70), category: "saving" }]).anas).toBe(100);
+  });
+  it("does not turn earlier contributions into prepayment of later borrowing", () => {
+    expect(debt([direct(100, "a", "2026-10-09"), expense("loan", "personal-a", 100)]).anas).toBe(100);
+  });
+});
+
+it("keeps archived Joint expenses in repayment and contribution accounting", () => {
+  const loan = expense("loan", "personal-a", 100);
+  const direct: Transaction = { ...expense("direct", "house", 40, "2026-10-11"), accountId: "a" };
+  const result = calculateContributionStatus({ accounts, categories: categories.filter(category => category.id !== "house"),
+    debtCategories: categories.map(category => ({ ...category, archived: true })), transactions: [loan, direct], debtTransactions: [loan, direct],
+    monthlySummary: { ...range, totalAssigned: 0, totalSpent: 0, assignedByCategory: [], spentByCategory: [] } })!;
+  expect(result.anasPersonalDebt).toBe(60);
+  expect(result.anasActual).toBe(0);
+});

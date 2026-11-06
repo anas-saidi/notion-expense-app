@@ -58,7 +58,7 @@ The primary object on Home is the wallet overview. One financial number owns the
 
 - Type it retains the quiet writing canvas and editable transaction rows. An explicit **Create transactions** action converts natural text into drafts; typing alone never sends data. Missing details return inline clarification without replacing the draft. Saving remains a separate action.
 - Rebalance adds a labeled [text field](https://mobbin.com/glossary/text-field) and **Suggest moves** inside its existing [modal bottom sheet](https://mobbin.com/glossary/bottom-sheet). Recommendations are flat label/value rows with a short reason, never cards or badges. **Use suggestion** loads amounts for review; the existing **Apply** confirmation commits them.
-- Both actions explain the data sent to Google before invocation, preserve input on network/quota errors, announce loading/error/result states, and use the existing semantic controls and 44-point targets. Suggestions inherit the global scope, protect savings and unpaid bills, and never introduce a second scope picker.
+- Type it explains the data sent to Google before invocation; Rebalance omits the routine helper paragraph. Both actions preserve input on network/quota errors, announce loading/error/result states, and use the existing semantic controls and 44-point targets. Suggestions inherit the global scope, protect savings and unpaid bills, and never introduce a second scope picker.
 
 ## Global budget scope
 
@@ -425,6 +425,8 @@ Bills’ Due / Paid / Skipped filters compose the shared `ScreenChip`, with comp
 
 ## Reflect: spending in time
 
+**Overview precision:** round Reflect’s spending hero (positive totals show at least 1), category totals, over-budget amounts, and percentage labels to the nearest whole number. Positive values that would round to zero show `<1` or `<1%`. Keep exact cents in Activity, category details, transaction details, inputs, calculations, budget comparisons, and accessible category labels. Share-bar widths use exact proportions; rounded percentage labels are not forced to total 100.
+
 **Over budget:** integrate monthly plan variance into the existing **Where it went** category rows, following the flat [stacked-list pattern](https://mobbin.com/glossary/stacked-list). Keep the category's spent amount and share; affected rows add one plain danger-text line such as “220 over budget” and use danger for their share bar. Do not duplicate categories in a separate section or add a second summary. Never chain Spent and Assigned values with dot separators. Omit routine calculation explanations and placeholder reporting hints.
 
 Compare each category's selected-month net spending (after category refunds) with its net monthly Assignments, to the cent: only `spent > assigned` is over budget; equality is fully spent. Missing assignments count as zero. Savings, uncategorized spending, and the synthetic To Joint row do not receive this comparison. Rebalances, carry-over, and current Available never change the assignment baseline. Assignment edits do change it; this is not a frozen original-plan comparison. Category exclusions apply. Show variance only for one selected month, with all accounts included and matching assignments successfully loaded. Keep assigned amounts and excess in accessible row labels. Load assignments and transactions together; failed reads must never appear as zero assignments. The existing category transaction detail and available-money gate remain in place.
@@ -438,6 +440,12 @@ The cumulative spending/money-in flow chart belongs above the transaction list i
 ### Compact bill payment confirmation
 
 Pay due opens a quiet filled summary inside the existing bill sheet, inspired by Lime’s payment approval layout. Show bill name, plain amount, due date, selected payment account, category, and recording date. Record payment is the primary action; Edit reveals amount, account and date controls while retaining the summary and budget checks. A missing or unavailable account exposes Choose account and prevents submission. Cancel returns to bill detail without saving. Preserve funding blocks, earmarked-money warnings, failure drafts and duplicate-submission protection. Keep the normal confirmation concise: omit explanatory payment disclaimers and routine Available / Earmarked / Free balance breakdowns. Only actionable funding and earmarked-money warnings appear when relevant.
+
+### Joint income use
+
+Joint-account income offers a **Target** picker in the composer’s account/date control row, following the shared anchored picker and option-row pattern. Its popover shows only the two option labels, without a visible heading, descriptions, or checkmark. The selected row uses the shared selection highlight; **How to use this income** remains its accessible name. **Cover contributions** is the default and retains existing behavior. **Keep unassigned** increases free money without reducing partner dues. Both increase cash balance. Use the shared `IncomeUseControl` in account income and the form composer, including edits, with keyboard-operable options, visible selection, and 44-point targets. Personal and savings accounts omit this choice.
+
+Persist unassigned income and its net joint-allocation baseline in Notion. Later net allocations consume that free money before increasing partner obligations; allocation reversals restore consumed free money. Baselines use all-time assignment totals so monthly rollover and edits to existing plans preserve the behavior. Income edits retain the baseline unless its use or account changes; legacy income defaults to covering contributions. The app-derived unassigned amount is distinct from Notion’s raw Ready to Assign when existing joint categories still await partner funding.
 
 ### Savings funding and purchases
 

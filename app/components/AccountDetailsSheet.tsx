@@ -652,7 +652,7 @@ export function AccountDetailsSheet({
           <BottomSheet open onClose={closeReconcile} label="Check balance" detent="content" layered size="standard" zIndex={140} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
           <SheetBody style={reconcilePanelStyle}>
             <SheetHeader style={reconcileHeaderStyle}>
-              <div style={{ display: "grid", gap: 5 }}>
+              <div style={{ display: "grid", gap: 5, minWidth: 0 }}>
                 <h2 style={reconcileTitleStyle}>Check {account.label}</h2>
                 {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
               </div>
@@ -1196,6 +1196,7 @@ const reconcileTitleStyle: CSSProperties = {
   lineHeight: 1.2,
   fontWeight: 750,
   color: "var(--text)",
+  overflowWrap: "anywhere",
 };
 
 const reconcileHintStyle: CSSProperties = {
@@ -1207,12 +1208,14 @@ const reconcileHintStyle: CSSProperties = {
 
 const reconcileRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
   gap: 10,
+  minWidth: 0,
 };
 
 const reconcileFieldStyle: CSSProperties = {
   display: "grid",
+  minWidth: 0,
   gap: 6,
 };
 
@@ -1224,6 +1227,8 @@ const reconcileLabelStyle: CSSProperties = {
 };
 
 const reconcileReadonlyStyle: CSSProperties = {
+  minWidth: 0,
+  overflowWrap: "anywhere",
   minHeight: 48,
   borderRadius: 12,
   background: "color-mix(in srgb, var(--surface2) 50%, var(--surface))",
@@ -1237,6 +1242,8 @@ const reconcileReadonlyStyle: CSSProperties = {
 };
 
 const reconcileInputWrapStyle: CSSProperties = {
+  minWidth: 0,
+  width: "100%",
   minHeight: 48,
   borderRadius: 12,
   border: "1.5px solid color-mix(in srgb, var(--border2) 60%, transparent)",
@@ -1248,7 +1255,8 @@ const reconcileInputWrapStyle: CSSProperties = {
 };
 
 const reconcileInputStyle: CSSProperties = {
-  flex: 1,
+  flex: "1 1 0%",
+  width: 0,
   minWidth: 0,
   background: "transparent",
   border: "none",
