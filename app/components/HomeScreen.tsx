@@ -175,13 +175,20 @@ export function HomeScreen({
   // ponytail: first three facts in priority order; Budget still lists every running-low category.
   const summaryClauses = [
     savingsGap && <span key="savings-gap"><Fact>{savingsGap.account.label}</Fact> is <Fact tone="danger" onClick={savingsGap.onFix} label={savingsGap.source ? `Move money from ${savingsGap.source.label} to ${savingsGap.account.label}` : `Review ${savingsGap.account.label}`}>{fmt(savingsGap.gap)} short</Fact></span>,
-    ...balanceReviews.map(({ key, account, counted }) => {
+    // A count that matches needs nothing from you, so only counts to review or that differ are listed.
+    ...balanceReviews.filter(({ account, counted }) => account.balance == null || Math.abs(counted - account.balance) >= 0.01).map(({ key, account, counted }) => {
       const off = account.balance == null ? null : Math.abs(counted - account.balance);
       const review = onReviewBalance && (() => onReviewBalance(account));
       const reviewLabel = `Review balance check for ${account.label}`;
       return <span key={key}><Fact>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact></>}</span>;
     }),
-    ...(!monthlyLoading && !monthlyError && !monthlySummary.contributionError ? contributionLeft : []).map(({ partner, left }) => <span key={`left-${partner}`}><Fact>{partner === "anas" ? "Anas" : "Salma"}</Fact> has <Fact onClick={onOpenContributions} label={`Open monthly contributions: ${partner === "anas" ? "Anas" : "Salma"} has ${fmt(left)} MAD left to put in`}>{fmt(left)} due</Fact></span>),
+    ...(!monthlyLoading && !monthlyError && !monthlySummary.contributionError ? contributionLeft : []).map(({ partner, left }) => {
+      const name = partner === "anas" ? "Anas" : "Salma";
+      // Beyond the agreement is an advance Couple owes back; it reads as extra, not as a row of its own.
+      return left > 0
+        ? <span key={`left-${partner}`}><Fact>{name}</Fact> has <Fact tone="danger" onClick={onOpenContributions} label={`Open monthly contributions: ${name} has ${fmt(left)} MAD left to put in`}>{fmt(left)} due</Fact></span>
+        : <span key={`left-${partner}`}><Fact>{name}</Fact> put in <Fact tone="success" onClick={onOpenContributions} label={`Open monthly contributions: ${name} put in ${fmt(-left)} MAD beyond the agreement`}>{fmt(-left)} extra</Fact></span>;
+    }),
     // Below zero is money already wrong, so it comes before what's about to run out. Opens Rebalance to cover it.
     overspentCategories.length > 0 && (overspentCategories.length === 1
       ? <span key="overspent"><Fact>{overspentCategories[0].name}</Fact> is <Fact tone="danger" onClick={onOpenAssign} label={`Rebalance to cover ${overspentCategories[0].name}`}>{fmt(Math.ceil(-(overspentCategories[0].available ?? 0) - 0.005))} overspent</Fact></span>

@@ -155,3 +155,18 @@ html[data-theme="dark"] {
     background: var(--surface2) !important; box-shadow: inset 0 0 0 1px var(--text2) !important;
   }
 }
+
+/* Menus are frosted, not refracting. A lens is right for a small control, but
+   behind a panel full of rows it bends and splits whatever sits underneath
+   (amounts, text), which reads as a rendering fault. Keep the blur, drop the
+   displacement map and rim, and make the tint dense enough to read rows on. */
+:root, html[data-theme="light"] { --menu-glass: rgb(255 255 255 / .82); }
+html[data-theme="dark"] { --menu-glass: rgb(30 32 30 / .84); }
+.picker-glass-surface.lg-glass {
+  background-color: var(--menu-glass);
+  background-image: none;
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow: inset 0 0 0 .5px var(--lg-edge), var(--elevation-float);
+}
+.picker-glass-surface.lg-glass::after { content: none; }

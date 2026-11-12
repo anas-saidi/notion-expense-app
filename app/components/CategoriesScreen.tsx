@@ -244,7 +244,7 @@ export function CategoriesScreen({
                   : shortBy > 0 ? <Summary><Fact tone="danger" onClick={shortfallAction?.onClick ?? onOpenRebalance} label={`${shortfallAction?.label ?? "Rebalance"}: ${fmt(shortBy)} MAD short`}>{fmt(shortBy)} short</Fact>.</Summary>
                   : firstLow ? <Summary>{runningLow.length === 1 ? <><Fact>{firstLow.category.name}</Fact> has <Fact tone="warning" onClick={onOpenRebalance} label={`Rebalance ${firstLow.category.name}`}>{runwayLabel(firstLow.daysCovered).toLowerCase()}</Fact></> : <><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenRebalance} label="Rebalance running low categories">running low</Fact></>}.</Summary>
                   : !monthlySummary.contributionError && Math.round(leftToAllocate) > 0 ? <Summary><Fact onClick={onOpenRebalance} label="Assign unassigned money">{fmt(Math.round(leftToAllocate))}</Fact> is <Fact>unassigned</Fact>.</Summary>
-                  : budgetScope !== "joint" && contributionRemaining > 0 ? <Summary><Fact onClick={onMoveContribution} label={`Contribute ${fmt(Math.round(contributionRemaining))} MAD to Joint`}>{fmt(Math.round(contributionRemaining))} due to Joint</Fact>.</Summary>
+                  : budgetScope !== "joint" && contributionRemaining > 0 ? <Summary><Fact onClick={onMoveContribution} label={`Contribute ${fmt(Math.round(contributionRemaining))} MAD to Couple`}>{fmt(Math.round(contributionRemaining))} due to Couple</Fact>.</Summary>
                   : null}
                 actions={monthlySummary.contributionError ? <Banner tone="neutral" compact>Confirmed contributions and repayment reserves unavailable</Banner> : null}
               />

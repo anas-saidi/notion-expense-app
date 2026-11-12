@@ -71,8 +71,8 @@ export function buildSpendingBreakdown(transactions: Transaction[], categories: 
     const id = toJoint ? TO_JOINT : transaction.category || UNCATEGORIZED;
     if (excludedCategories.includes(id) || excludedAccounts.includes(reflectAccountId(transaction, accounts))) continue;
     const category = categories.find(item => item.id === id);
-    const name = toJoint ? "To Joint" : category?.name ?? (id === UNCATEGORIZED ? "Uncategorized" : "Archived category");
-    const bucket = buckets.get(id) ?? { id, name, icon: toJoint ? "🤝" : category?.icon ?? null, spent: 0, inflow: 0, net: 0, share: 0, transactions: [] };
+    const name = toJoint ? "To Couple" : category?.name ?? (id === UNCATEGORIZED ? "Uncategorized" : "Archived category");
+    const bucket = buckets.get(id) ?? { id, name, icon: toJoint ? "/category-icons/handshake.webp" : category?.icon ?? null, spent: 0, inflow: 0, net: 0, share: 0, transactions: [] };
     const amount = cents(transaction.amount);
     if (isReflectInflow(transaction, accounts)) bucket.inflow += Math.abs(amount);
     else bucket.spent += amount;

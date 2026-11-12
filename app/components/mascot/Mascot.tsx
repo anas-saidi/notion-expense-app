@@ -171,8 +171,8 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   const contents = isJar ? (
     <svg viewBox={viewBox} width={size} height={size} style={{ display: "block", overflow: "visible" }}>
       <defs>
-        {/* Soft, never saturated: a personal pool is its partner's colour lightened;
-            a joint pool lightens both further and puts their real mix in the middle. */}
+        {/* A personal pool is its partner's own colour, as on their picker face;
+            a joint pool lightens both and puts their real mix in the middle. */}
         <linearGradient id={`${ids}-partner`} gradientUnits="userSpaceOnUse" x1={-80} y1={0} x2={80} y2={0}>
           <stop offset="0" stopColor={tone(frame.colors[0], jointPool ? SOFTEN_JOINT : SOFTEN)} />
           {jointPool && <stop offset="0.5" stopColor={tone(mixHex(frame.colors[0], frame.colors[1], 0.5), SOFTEN_JOINT + 0.05)} />}
@@ -305,8 +305,9 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   );
 }
 
-/** How far the partner colours are lightened towards white in the liquid (and wash). */
-const SOFTEN = 0.35;
+/** How far the partner colours are lightened towards white in the liquid (and wash).
+ *  None: the liquid is the same blue and pink as each partner's face in the mode picker. */
+const SOFTEN = 0;
 /** How much of the scope's colour tints a pool's empty glass: just enough to give it a body. */
 const POOL_WASH = 0.07;
 /** The status palette's liquids (--status-low-liquid / --status-over-liquid in globals.css). */
@@ -395,12 +396,29 @@ const Coin = memo(function Coin(coin: CoinFrame & { coinStyle: CoinStyle; outlin
   );
 });
 
+/** Glyph prefix for a figure token instead of artwork: `label:<figure>|<word>|<tone>`. */
+export const LABEL_GLYPH = "label:";
+
 /**
  * A spend in the jar: its category emoji, upright-ish, sized by the amount.
  * When undone it shrinks and fades in place rather than bursting into specks.
  */
 function ItemGlyph({ x, y, rot, opacity, dust, glyph, itemRadius = COIN_R, glyphFilter }: CoinFrame & { glyphFilter?: string }) {
   const radius = itemRadius * SCALE * (1 - 0.35 * dust);
+  const label = glyph?.startsWith(LABEL_GLYPH) ? glyph.slice(LABEL_GLYPH.length).split("|") : null;
+  if (label) {
+    // A figure dropped into the jar: a small pill that settles at the bottom, under
+    // the face. Its body is a small disc so it rests low; the pill is drawn wider.
+    const [figure, , tone = ""] = label;
+    const ink = tone === "danger" ? "var(--danger)" : tone === "success" ? "var(--success)" : "var(--text)";
+    const w = radius * (1.1 + 0.42 * figure.length), h = radius * 1.3;
+    return (
+      <g transform={`translate(${x} ${y}) rotate(${rot})`} opacity={dust > 0 ? 1 - dust : opacity}>
+        <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h / 2} fill="var(--bg)" fillOpacity={0.95} stroke="var(--border)" strokeWidth={1} />
+        <text y={radius * 0.27} textAnchor="middle" fontSize={radius * 0.78} fontWeight={600} fill={ink} style={{ fontVariantNumeric: "tabular-nums" }}>{figure}</text>
+      </g>
+    );
+  }
   return (
     <g transform={`translate(${x} ${y}) rotate(${rot})`} opacity={dust > 0 ? 1 - dust : opacity}>
       <image href={categoryIconSource(glyph)} x={-radius} y={-radius} width={2 * radius} height={2 * radius} preserveAspectRatio="xMidYMid meet" />

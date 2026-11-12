@@ -378,7 +378,7 @@ export function CategoryManageSheet({
           )}
           {/* What the partner owes Joint is kept back, so say so when it changes the figure. */}
           {!addingToPlan && !isEdit && selectedAccount && keptForJoint > 0 && (
-            <p style={keptNoteStyle}>{fmt(keptForJoint)} is kept back for your Joint contribution.</p>
+            <p style={keptNoteStyle}>{fmt(keptForJoint)} is kept back for your Couple contribution.</p>
           )}
           {moveNeeded && holdingAccount && selectedAccount && (
             <p style={moveNoteStyle}>

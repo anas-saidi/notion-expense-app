@@ -36,7 +36,7 @@ import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { calculateContributionStatus, contributionDue } from "./components/contribution-utils";
 import { ContributionDetails, ContributionEntry } from "./components/ContributionDetails";
 import { contributionLedger, money as contributionMoney } from "../lib/contribution-agreements";
-import { scopeFromAccountLabel } from "./components/app-utils";
+import { scopeFromAccountLabel, withDisplayNames } from "./components/app-utils";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
   categoryMatchesScope,
@@ -426,7 +426,7 @@ export default function App() {
   const fetchAccounts = async () => {
     const request = ++accountsRequest.current;
     const data = await fetchApiJson<{ accounts?: Account[] }>(ACCOUNTS_URL);
-    if (request === accountsRequest.current) { setAccounts(data.accounts ?? []); void balanceChecks.refresh(); }
+    if (request === accountsRequest.current) { setAccounts(withDisplayNames(data.accounts ?? [])); void balanceChecks.refresh(); }
   };
 
 
@@ -441,7 +441,7 @@ export default function App() {
       const savedAccounts = readSavedApiJson<{ accounts?: Account[] }>(ACCOUNTS_URL);
       if (!catalog || !savedAccounts) return;
       applyCategoryCatalog(catalog.data);
-      setAccounts(savedAccounts.data.accounts ?? []);
+      setAccounts(withDisplayNames(savedAccounts.data.accounts ?? []));
       const recent = readSavedApiJson<{ transactions?: Transaction[] }>(RECENT_TRANSACTIONS_URL);
       if (recent) applyTransactions(recent.data);
       const bills = readSavedApiJson<BillsData>(BILLS_URL);
@@ -839,8 +839,9 @@ export default function App() {
     if (!month) return [];
     const partners = budgetScope === "joint" ? (["anas", "salma"] as const) : [budgetScope] as const;
     return partners.flatMap(partner => {
+      // Positive: still to put in. Negative: put in beyond the agreement (an advance).
       const left = Math.round(month.agreement.targets[partner] - month.contributed[partner]);
-      return left >= 1 ? [{ partner, left }] : [];
+      return Math.abs(left) >= 1 ? [{ partner, left }] : [];
     });
   })();
 
@@ -1262,7 +1263,7 @@ export default function App() {
 
       {tab === "home" && (
         <HomeScreen
-          contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : <ContributionEntry status={contribStatus} scope={budgetScope} advancesOnly onOpen={() => setShowContributions(true)} />)}
+          contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : null)}
           savingsGap={savingsGap ?? undefined}
           contributionLeft={contributionLeft}
           onOpenContributions={() => setShowContributions(true)}
@@ -1332,7 +1333,7 @@ export default function App() {
             const source = accounts.find(account => !isSavingsAccount(account) && account.label.toLowerCase().includes(sourceNeedle));
             const destination = accounts.find(account => account.label.toLowerCase().includes("joined") || account.label.toLowerCase().includes("joint"));
             if (!source || !destination) {
-              showToast("Personal or Joint account is missing");
+              showToast("Personal or Joined account is missing");
               return;
             }
             setTransferPreset({

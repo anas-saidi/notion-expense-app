@@ -1,4 +1,5 @@
 "use client";
+import { accountIconSource } from "../../lib/category-icons";
 import { ChoicePicker } from "./ChoicePicker";
 import { LiquidButton, glassControlStyle } from "./ui/LiquidGlass";
 
@@ -346,8 +347,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   color: props.showAccountPicker ? "var(--text2)" : "var(--muted)",
                 }}
               >
-                <span style={pickerChipIconStyle}>{props.selectedAccount?.icon ?? "$"}</span>
-                <span style={pickerChipLabelStyle}>{props.selectedAccount?.label ?? ""}</span>
+                <span style={pickerChipIconStyle}><CategoryIcon icon={accountIconSource(props.selectedAccount?.type)} size={24} /></span>
+                <span style={pickerChipLabelStyle}>{props.selectedAccount?.label ?? "Account"}</span>
               </LiquidButton>
 
               <PickerPopover open={props.showAccountPicker} title="Account" onClose={props.onCloseAccountPicker} align="left" placement="top" size="choice" zIndex={140} anchorRef={props.accountRef}>
@@ -404,7 +405,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 </button>
               )}
               {props.advanceBelowZero != null && props.selectedCat && (
-                <Banner tone="warning" compact>Joint owes you this. <strong>{props.selectedCat.name}</strong> goes <strong>{fmt(Math.round(props.advanceBelowZero))}</strong> below zero.</Banner>
+                <Banner tone="warning" compact>Couple owes you this. <strong>{props.selectedCat.name}</strong> goes <strong>{fmt(Math.round(props.advanceBelowZero))}</strong> below zero.</Banner>
               )}
               {props.advanceBelowZero == null && (props.categoryUnfunded || props.categoryOverBudget) && props.selectedCat && (
                 <Banner

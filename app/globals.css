@@ -1028,90 +1028,12 @@ html { scrollbar-gutter: stable; }
   outline-offset: 2px;
 }
 
-/*
-  Mode picker: one soft track holding Joint and both partners as mascots, always
-  the same width. Selection is shown by scale and presence, not colour.
-*/
-.global-scope-picker {
-  grid-column: 2;
-  display: inline-flex;
-  align-items: center;
-  flex: 0 1 auto;
-  gap: 0;
-  min-width: 0;
-  padding: 2px;
-  border: 1px solid color-mix(in srgb, var(--border) 44%, transparent);
-  border-radius: 999px;
-  background: var(--surface);
-}
-
-.global-scope-option {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 7px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text2);
-  cursor: pointer;
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 650;
-  white-space: nowrap;
-  transition:
-    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.2s ease,
-    color 0.16s ease;
-}
-
-/* Mascots only: shape and colour name the scope; the label stays for screen readers via aria-label. */
-.global-scope-label {
-  display: none;
-}
-
-/* Scope artwork stays static internally; selection alone changes its depth. */
-.global-scope-art { display: inline-flex; align-items: center; justify-content: center; pointer-events: none; }
-.global-scope-option > * {
-  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
-}
-.global-scope-option:not([aria-selected="true"]) > * {
-  opacity: 0.5;
-  transform: scale(0.78);
-}
-
-@media (hover: hover) {
-  .global-scope-option:not([aria-selected="true"]):hover > * {
-    opacity: 0.8;
-  }
-}
-
-/* Preserve the stack's horizontal placement in both states. The generic button
-   lift otherwise replaces translateX, moving the target out from under the
-   pointer and repeatedly entering/leaving hover. */
-.global-scope-option:not(:disabled):is(:hover, :active) {
-  transform: translateX(var(--scope-slot, 0px));
-}
-
-.global-scope-option:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
 @media (max-width: 390px) {
   .app-header {
     gap: 8px !important;
   }
 }
 
-@media (prefers-reduced-transparency: reduce) {
-  .global-scope-option {
-    background: var(--surface);
-  }
-}
 
 /* The nav becomes a sidebar on desktop; nothing floats over the page bottom. */
 @media (min-width: 900px) {
@@ -1790,13 +1712,6 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   .desktop-search-button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 }
 
-/* Desktop scope names make ownership explicit without changing the phone rail. */
-@media (min-width: 900px) {
-  .global-scope-option { gap:var(--space-2); padding-inline:var(--space-3); }
-  .global-scope-option .global-scope-label { display:inline; opacity:1; transform:none; font-weight:400; }
-  .global-scope-option[aria-selected="true"] { background:var(--surface2); color:var(--text); }
-  .global-scope-option[aria-selected="true"] .global-scope-label { font-weight:600; }
-}
 .loading-recovery { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-3); padding-block:var(--space-3); color:var(--text2); font-size:var(--type-body); }
 .loading-recovery button { min-width:var(--control-min); min-height:var(--control-min); padding-inline:var(--space-3); border:0; border-radius:var(--radius-control); background:var(--surface2); color:var(--text); font:inherit; cursor:pointer; }
 @media (hover:hover) { .loading-recovery button:hover { background:var(--track); } }
@@ -1814,26 +1729,61 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 /* On mobile, ownership anchors the left; screen actions remain grouped right. */
 @media (max-width: 899px) {
   .app-content .app-header { grid-template-columns: minmax(0, 1fr) auto; }
-  .app-header .global-scope-picker { grid-column: 1; justify-self: start; }
+  .app-header .couple-picker { grid-column: 1; justify-self: start; }
   .app-header .app-header-actions { grid-column: 2; }
   .screen-layout .reflect-hero-switch { top: -16px; }
 }
 
 .budget-rebalance-control { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; border: 1px solid color-mix(in srgb, var(--border) 44%, transparent); border-radius: 50%; padding: 0; background: transparent; color: var(--text2); cursor: pointer; }
 
-/* The touch targets stay 44px wide; only the artwork gathers into a compact stack.
-   Fixed scope keys let an interrupted selection continue from its current position. */
-@media (max-width: 899px) {
-  .app-header .global-scope-picker { position: relative; display: block; width: 132px; height: 48px; padding: 0; border: 0; background: transparent; box-shadow: none; box-sizing: border-box; isolation: isolate; }
-  .app-header .global-scope-option { position: absolute; left: calc(50% - 22px); top: 2px; width: 44px; height: 44px; min-width: 44px; padding: 0; transform: translateX(var(--scope-slot)); transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1); z-index: 1; background: transparent; }
-  .app-header .global-scope-option[data-position="front"] { --scope-slot: 0px; z-index: 3; }
-  .app-header .global-scope-option[data-position="back-left"] { --scope-slot: -44px; }
-  .app-header .global-scope-option[data-position="back-right"] { --scope-slot: 44px; }
-  .app-header .global-scope-option .global-scope-art { transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease; }
-  .app-header .global-scope-option[data-position="front"] .global-scope-art { transform: translateY(3px) scale(1.0666667); opacity: 1; }
-  .app-header .global-scope-option[data-position="back-left"] .global-scope-art { transform: translate(10px, -4px) scale(.7333333); opacity: .8; }
-  .app-header .global-scope-option[data-position="back-right"] .global-scope-art { transform: translate(-10px, -4px) scale(.7333333); opacity: .8; }
+/*
+  Mode picker: two faces and one pill. The pill wraps whoever is included, one
+  partner or both (Couple), so selection reads as "who" rather than as a third
+  mascot.
+*/
+.couple-picker {
+  grid-column: 2;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 44px 12px 44px auto;
+  align-items: center;
+  height: 48px;
+  padding: 2px;
+  box-sizing: border-box;
+  isolation: isolate;
+}
+/* The pill is Glisse glass: its lens and rim are drawn for its real box, so it
+   moves and resizes (rather than being clipped) to wrap one face or both. */
+.couple-picker-pill.lg-glass {
+  position: absolute;
+  top: 2px; bottom: 2px; left: 2px;
+  width: 44px;
+  border-radius: 22px;
+  z-index: -1;
+  transition: left 240ms cubic-bezier(0.22, 1, 0.36, 1), width 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.couple-picker[data-selected="both"] .couple-picker-pill.lg-glass { width: 100px; }
+.couple-picker[data-selected="end"] .couple-picker-pill.lg-glass { left: 58px; }
+.couple-picker-person, .couple-picker-join {
+  height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer;
+  border-radius: 22px; -webkit-tap-highlight-color: transparent;
+}
+.couple-picker-person { width: 44px; display: grid; place-items: center; }
+.couple-picker-join { width: 12px; }
+.couple-picker-art {
+  display: inline-flex; pointer-events: none;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+}
+.couple-picker-person:not([data-included]) .couple-picker-art { opacity: .45; transform: scale(.8); }
+@media (hover: hover) {
+  .couple-picker-person:not([data-included]):hover .couple-picker-art { opacity: .75; }
+}
+.couple-picker :is(.couple-picker-person, .couple-picker-join):not(:disabled):is(:hover, :active) { transform: none; }
+.couple-picker :is(.couple-picker-person, .couple-picker-join):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.couple-picker-label { display: none; }
+@media (min-width: 900px) {
+  .couple-picker-label { display: inline; padding-inline: 12px 4px; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .global-scope-picker .global-scope-option, .global-scope-picker .global-scope-option .global-scope-art { transition: none; }
+  .couple-picker-pill.lg-glass, .couple-picker-art { transition: none; }
 }

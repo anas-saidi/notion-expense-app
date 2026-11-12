@@ -316,8 +316,8 @@ export function MonthPlanSheet({
   const name = (partner: "anas" | "salma") => BUDGET_SCOPE_LABELS[partner];
   const roundUp = (value: number) => fmt(Math.ceil(value - 0.005));
   const jointCovered = capacity.due.anas + capacity.due.salma > 0.005;
-  const jointReason = planningCapacity.joint < 0 && totals.joint > 0 ? "Joint is already short and its plan needs more"
-    : planningCapacity.joint < 0 ? "Joint is already short" : "Joint's plan needs more than it holds";
+  const jointReason = planningCapacity.joint < 0 && totals.joint > 0 ? "Couple is already short and its plan needs more"
+    : planningCapacity.joint < 0 ? "Couple is already short" : "Couple's plan needs more than it holds";
   // Each view only talks about its own money: Joint names who covers its gap; a partner's view adds their own shortfall.
   const partnerClauses = shortPartners.filter((partner) => partner === scope).map((partner) => {
     const open = partner === scope ? undefined : () => onScopeChange(partner);
@@ -728,7 +728,7 @@ export function MonthPlanSheet({
               </span>
             )}
             {scope !== "joint" && (
-              <span style={heroSubStyle}>{fmt(Math.round(capacity.due[scope]))} reserved for Joint</span>
+              <span style={heroSubStyle}>{fmt(Math.round(capacity.due[scope]))} reserved for Couple</span>
             )}
           </section>
 

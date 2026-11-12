@@ -1,5 +1,6 @@
 "use client";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { accountIconSource } from "../../lib/category-icons";
 
 import type { CSSProperties } from "react";
 import type { Account, Category } from "./app-types";
@@ -26,10 +27,10 @@ export function AccountOptionList({ id, accounts, selectedId, onSelect }: {
           const selected = acct.id === selectedId;
           return (
             <button className="picker-option" aria-pressed={selected} key={acct.id} onClick={() => { if (!selected) haptic("selection"); onSelect(acct.id); }} style={optionRowStyle(selected)}>
-              <div style={pickerIconStyle}>{acct.icon ?? "$"}</div>
+              <div style={pickerIconStyle}><CategoryIcon icon={accountIconSource(acct.type)} size={24} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: selected ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acct.label}</div>
-                {acct.type && <div style={pickerMetaStyle}>{acct.type}</div>}
+                {acct.type && acct.type.toLowerCase() !== acct.label.toLowerCase() && <div style={pickerMetaStyle}>{acct.type}</div>}
               </div>
               {acct.balance !== null && (
                 <span style={{ ...monoSmallStyle, color: acct.balance < 0 ? "var(--danger)" : "var(--muted)", paddingLeft: 8 }}>

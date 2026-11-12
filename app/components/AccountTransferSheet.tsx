@@ -144,7 +144,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
             >
               <option value="" disabled>Choose source</option>
               {accounts.map((entry) => (
-                <option key={entry.id} value={entry.id}>{entry.icon} {entry.label}</option>
+                <option key={entry.id} value={entry.id}>{entry.label}</option>
               ))}
             </ChoicePicker>
           </label>
@@ -154,7 +154,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
             <ChoicePicker aria-label="To account" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} style={inputStyle}>
               <option value="" disabled>Choose destination</option>
               {destinationAccounts.map((entry) => (
-                <option key={entry.id} value={entry.id}>{entry.icon} {entry.label}</option>
+                <option key={entry.id} value={entry.id}>{entry.label}</option>
               ))}
             </ChoicePicker>
           </label>

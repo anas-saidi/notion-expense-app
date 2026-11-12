@@ -129,7 +129,7 @@ export const monthBounds = (dateStr: string) => {
 };
 
 export const BUDGET_SCOPE_LABELS: Record<BudgetScope, string> = {
-  joint: "Joint",
+  joint: "Couple",
   anas: "Anas",
   salma: "Salma",
 };
@@ -299,6 +299,11 @@ export const getJointAccountUnassigned = (accounts: Account[]): number => {
     return sum + ((account.unassignedIncome ?? 0) > 0 ? Math.max(account.readyToAssign ?? 0, account.unassignedIncome!) : account.readyToAssign ?? 0);
   }, 0);
 };
+
+/** "Hubby Account" reads as "Hubby": every row is already an account, so the suffix only repeats itself. */
+export const accountDisplayName = (label: string) => label.replace(/\s+account\s*$/i, "").trim() || label;
+export const withDisplayNames = <T extends { label: string }>(accounts: T[]): T[] =>
+  accounts.map(account => ({ ...account, label: accountDisplayName(account.label) }));
 
 export const scopeFromAccountLabel = (label: string): BudgetScope | null => {
   const l = label.toLowerCase();
