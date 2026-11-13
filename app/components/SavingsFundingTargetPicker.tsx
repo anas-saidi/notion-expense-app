@@ -12,8 +12,9 @@ export function SavingsFundingTargetPicker({ value, onChange, disabled }: { valu
   const { haptic } = useAppHaptics();
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
   const options = [["separate", "Separate savings"], ["shared", "Shared contribution"]] as const;
+  const selectedLabel = options.find(([target]) => target === value)![1];
   return <div ref={anchor} style={{ position: "relative" }}>
-    <LiquidButton type="button" disabled={disabled} style={pickerChipStyle} aria-haspopup="dialog" aria-expanded={open} aria-label={`Savings target: ${options.find(([target]) => target === value)![1]}`} onClick={() => setOpen(!open)}>Target</LiquidButton>
+    <LiquidButton type="button" disabled={disabled} style={pickerChipStyle} aria-haspopup="dialog" aria-expanded={open} aria-label={`Savings target: ${selectedLabel}`} onClick={() => setOpen(!open)}>{selectedLabel}</LiquidButton>
     <PickerPopover open={open} onClose={() => setOpen(false)} anchorRef={anchor} title="Savings target" zIndex={180} size="menu">
       <div className="picker-options">{options.map(([target, label]) => <button type="button" className="picker-option" key={target} aria-pressed={value === target} onClick={() => { if (value !== target) haptic("selection"); onChange(target); setOpen(false); anchor.current?.querySelector("button")?.focus(); }}>{label}</button>)}</div>
     </PickerPopover>

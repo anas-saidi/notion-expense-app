@@ -3,7 +3,7 @@
 import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { Currency } from "./Money";
+import { Currency, Money } from "./Money";
 import type { Account } from "./app-types";
 import { ChoicePicker } from "./ChoicePicker";
 import { DatePicker } from "./DatePicker";
@@ -49,6 +49,7 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
   const parsedAmount = Number(amount);
   const minimumAmount = Math.max(0, transaction.amount - Math.max(0, transaction.categoryAvailable));
   const reductionTooLarge = Number.isFinite(parsedAmount) && parsedAmount < minimumAmount;
+  const deleteBlocked = transaction.amount > transaction.categoryAvailable;
   const valid = Number.isFinite(parsedAmount) && parsedAmount > 0 && !reductionTooLarge && Boolean(date && accountId);
 
   const save = async () => {
@@ -108,34 +109,33 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
         <label style={fieldStyle}>
           <span style={labelStyle}>Amount</span>
           <span style={amountFieldStyle}><input className="display-amount-input" autoFocus inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} aria-label="Funding amount" style={amountInputStyle} /><Currency /></span>
-          <span style={{ fontSize: 12, color: reductionTooLarge ? "var(--danger)" : "var(--muted)" }}>
+          {(reductionTooLarge || deleteBlocked) && <span style={{ fontSize: 12, color: reductionTooLarge ? "var(--danger)" : "var(--muted)" }}>
             {reductionTooLarge
-              ? `Minimum ${minimumAmount.toLocaleString("en-US")}: the remaining funding has been used.`
-              : transaction.amount > transaction.categoryAvailable
-                ? `${transaction.categoryAvailable.toLocaleString("en-US")} available to remove. Used funding prevents deletion.`
-                : `${transaction.categoryAvailable.toLocaleString("en-US")} available to remove.`}
-          </span>
+              ? <>Minimum <Money value={minimumAmount} />: the rest is already used</>
+              : <>Up to <Money value={Math.max(0, transaction.categoryAvailable)} /> can be removed</>}
+          </span>}
         </label>
         <div style={fieldStyle}>
           <span style={labelStyle}>Date</span>
           <DatePicker value={date} onChange={(event) => setDate(event.target.value)} aria-label="Funding date" style={controlStyle} />
         </div>
         <div style={fieldStyle}>
-          <span style={labelStyle}>Funding source</span>
-          <ChoicePicker value={accountId} onChange={(event) => setAccountId(event.target.value)} aria-label="Funding source" style={controlStyle}>
+          <span style={labelStyle}>Account</span>
+          <ChoicePicker value={accountId} onChange={(event) => setAccountId(event.target.value)} aria-label="Account" style={controlStyle}>
             <option value="" disabled>Choose account</option>
             {accounts.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
           </ChoicePicker>
         </div>
 
         {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
-        {confirmDelete && <Banner tone="danger" role="alert" compact>Delete this funding transaction? Budget totals will be recalculated.</Banner>}
+        {confirmDelete && <p role="status" style={confirmLineStyle}>Delete this funding transaction? Budget totals will be recalculated.</p>}
 
         <SheetFooter style={actionsStyle}>
-          <button type="button" onClick={remove} disabled={status !== "idle" || transaction.amount > transaction.categoryAvailable} title={transaction.amount > transaction.categoryAvailable ? "Used funding cannot be deleted" : undefined} style={{ ...secondaryButtonStyle, color: "var(--danger)" }}>
+          <button type="button" onClick={remove} disabled={status !== "idle" || deleteBlocked} aria-describedby={deleteBlocked ? "fund-delete-blocked" : undefined} style={{ ...secondaryButtonStyle, color: "var(--danger)" }}>
             <DeleteIcon size={17} />{status === "deleting" ? "Deleting…" : confirmDelete ? "Delete funding" : "Delete"}
           </button>
           <button type="button" onClick={save} disabled={!valid || status !== "idle"} style={primaryButtonStyle}>{status === "saving" ? "Saving…" : "Save changes"}</button>
+          {deleteBlocked && <span id="fund-delete-blocked" style={deleteBlockedStyle}>Used funding prevents deletion</span>}
         </SheetFooter>
       </SheetBody>
     </BottomSheet>
@@ -153,4 +153,6 @@ const amountFieldStyle: CSSProperties = { minHeight: 112, padding: "0 4px", back
 const amountInputStyle: CSSProperties = { width: "min(260px, 68vw)", height: 88, padding: 0, border: 0, outline: 0, background: "transparent", color: "var(--text)", textAlign: "right", font: "700 clamp(48px, 15vw, 72px)/1 var(--font, inherit)", fontVariantNumeric: "tabular-nums", boxSizing: "border-box" };
 const actionsStyle: CSSProperties = { marginTop: "auto", display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.2fr)", gap: 8 };
 const secondaryButtonStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", font: "inherit", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7 };
+const confirmLineStyle: CSSProperties = { margin: 0, fontSize: 13, lineHeight: "18px", color: "var(--text2)" };
+const deleteBlockedStyle: CSSProperties = { gridColumn: "1 / 2", fontSize: 12, lineHeight: "16px", color: "var(--muted)", textAlign: "center" };
 const primaryButtonStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", font: "inherit", fontWeight: 750 };

@@ -113,7 +113,7 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
             />
             <Currency />
           </div>
-          {tooMuch && <span role="alert" style={errorTextStyle}>Only {fmt(available)} in savings</span>}
+          {tooMuch && <span role="alert" style={errorTextStyle}>More than in savings</span>}
         </label>
 
         <label style={fieldStyle}>
@@ -156,6 +156,6 @@ const labelStyle: CSSProperties = { fontSize: 12, fontWeight: 700, color: "var(-
 const amountWrapStyle: CSSProperties = { minHeight: 56, borderRadius: "var(--radius-control)", border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 10, padding: "0 14px" };
 const amountInputStyle: CSSProperties = { flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--text2)", fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800 };
 const errorTextStyle: CSSProperties = { fontSize: 12, color: "var(--danger)" };
-const confirmStyle: CSSProperties = { padding: "12px 14px", borderRadius: "var(--radius-control)", background: "color-mix(in srgb, var(--warning) 10%, var(--surface))", color: "var(--text2)" };
+const confirmStyle: CSSProperties = { padding: "12px 14px", borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)" };
 // Neutral, not the accent: taking out of savings shouldn't look like a reward.
 const submitStyle: CSSProperties = { width: "100%", minHeight: 52, borderRadius: 14, border: "none", background: "var(--text)", color: "var(--bg)", fontWeight: 800, fontSize: 15, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 };

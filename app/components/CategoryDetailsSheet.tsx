@@ -176,7 +176,7 @@ export function CategoryDetailsSheet({
         {/* ── Budget summary ── */}
         <section style={statsWrapStyle}>
           <div style={availableStyle}>
-            <span style={statLabelStyle}>Allocated</span>
+            <span style={statLabelStyle}>Available</span>
             <span style={availableValueStyle}><Money value={available} currency /></span>
           </div>
           <div style={supportingStatsStyle}>
@@ -186,15 +186,14 @@ export function CategoryDetailsSheet({
             </div>
             <div style={supportingStatStyle}>
               <span style={supportingLabelStyle}>Spent</span>
-              <span style={{ ...supportingValueStyle, color: "var(--danger)" }}>
+              <span style={supportingValueStyle}>
                 <Money value={spent} />
               </span>
             </div>
           </div>
           {planned > 0 && spent > 0 && (
             <div style={progressGroupStyle}>
-              <span style={progressLabelStyle}>{Math.round(spentPct)}% of plan used</span>
-              <div style={progressRailStyle} role="progressbar" aria-label="Budget spent" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(spentPct)}>
+              <div style={progressRailStyle} role="progressbar" aria-label="Budget spent" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(spentPct)} aria-valuetext={`${Math.round(spentPct)}% of plan used`}>
                 <div style={{ ...progressFillStyle, transform: `scaleX(${spentPct / 100})` }} />
               </div>
             </div>
@@ -281,8 +280,9 @@ export function CategoryDetailsSheet({
           {!loading && !error && (data?.timeline?.length ?? 0) > 0 && (
             <div className="row-list">
               {data!.timeline.map((item) => {
+                // The row's icon already marks an expense; only funding and transfers get a label.
                 const meta = [
-                  eventKindLabel(item.kind),
+                  item.kind === "expense" ? null : eventKindLabel(item.kind),
                   item.relatedCategoryName,
                   item.subtitle,
                 ].filter(Boolean);
@@ -501,14 +501,6 @@ const progressGroupStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 6,
-};
-
-const progressLabelStyle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 500,
-  color: "var(--muted)",
-  textAlign: "center",
-  fontVariantNumeric: "tabular-nums",
 };
 
 const statLabelStyle: CSSProperties = {

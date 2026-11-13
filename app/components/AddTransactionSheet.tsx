@@ -240,7 +240,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 <DateCalendar value={props.date} onChange={props.onSelectDate} />
               </PickerPopover>
             </div>
-          </div> : <h2 style={dialogTitleStyle}>{isEditMode ? (isIncome ? "Edit income" : "Edit expense") : "New transaction"}</h2>}
+          </div> : isEditMode ? <h2 style={dialogTitleStyle}>{isIncome ? "Edit income" : "Edit expense"}</h2> : <span aria-hidden="true" />}
           <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
             <XIcon strokeWidth={2.2} />
           </button>
@@ -283,24 +283,23 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             onBlur={() => setAmountFocused(false)}
           />
           {isExpression(props.amount) && (
-            <p style={{ ...exprPreviewStyle, color: isIncome ? "var(--action-income)" : "var(--danger)" }}>
+            <p style={{ ...exprPreviewStyle, color: "var(--text2)" }}>
               = {fmt(evalExpr(props.amount))}
             </p>
           )}
           {visibleBalance !== null && props.amount.trim() !== "" && (
-            <p style={{ ...heroCopyStyle, color: isIncome && visibleBalance >= 0 ? "var(--action-income)" : "var(--danger)" }}>
-              {props.balanceCheckedAt ? "Ledger after" : "Balance after"}: <Money value={visibleBalance} />
+            <p style={{ ...heroCopyStyle, color: visibleBalance < 0 ? "var(--danger)" : "var(--text2)" }}>
+              Balance after <Money value={visibleBalance} />
             </p>
           )}
         </section>
 
         {props.actualAfterSpending != null && props.actualAfterSpending < 0 && <Banner tone="warning" role="alert" compact icon={<AlertTriangleIcon size={18} />}>
-          Exceeds estimated actual funds by <Money value={Math.abs(props.actualAfterSpending)} />
+          Exceeds actual funds by <Money value={Math.abs(props.actualAfterSpending)} />
           {props.balanceCheckedAt && <span style={{ display: "block", marginTop: 4 }}>Checked {fmtDate(props.balanceCheckedAt.slice(0, 10))}</span>}
         </Banner>}
         {props.actualAfterSpending != null && props.actualAfterSpending >= 0 && props.balanceCheckedAt && <p style={{ ...heroCopyStyle, margin: "8px 0" }}>
-          Estimated actual after: <Money value={props.actualAfterSpending} />
-          <span style={{ display: "block", marginTop: 4 }}>Checked {fmtDate(props.balanceCheckedAt.slice(0, 10))}</span>
+          Actual funds after <Money value={props.actualAfterSpending} />
         </p>}
         {props.balanceCheckUnavailable && <Banner tone="warning" compact>{props.balanceCheckPaused ? "Actual-funds checks are paused while the shared database is off." : "Actual-funds checks unavailable. Refresh before spending."}</Banner>}
 
@@ -405,7 +404,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 </button>
               )}
               {props.advanceBelowZero != null && props.selectedCat && (
-                <Banner tone="warning" compact>Couple owes you this. <strong>{props.selectedCat.name}</strong> goes <strong>{fmt(Math.round(props.advanceBelowZero))}</strong> below zero.</Banner>
+                <Banner tone="warning" compact>Couple owes you this. <strong>{props.selectedCat.name}</strong> goes <strong><Money value={Math.round(props.advanceBelowZero)} /></strong> below zero.</Banner>
               )}
               {props.advanceBelowZero == null && (props.categoryUnfunded || props.categoryOverBudget) && props.selectedCat && (
                 <Banner
@@ -462,7 +461,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                       <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
                                       {isPartial && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>partial</div>}
                                     </div>
-                                    <span style={{ fontSize: 12, color: isPartial ? "var(--status-low)" : "var(--status-good)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
+                                    <span style={{ fontSize: 12, color: "var(--text2)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
                                       {fmt(moveAmount)}
                                     </span>
                                   </button>
@@ -482,7 +481,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     </div>
                   )}
                 >
-                  <strong>{props.selectedCat.name}</strong> goes <strong>{fmt(Math.round(props.overspendBelowZero ?? deficit))}</strong> below zero.
+                  <strong>{props.selectedCat.name}</strong> goes <strong><Money value={Math.round(props.overspendBelowZero ?? deficit)} /></strong> below zero.
                 </Banner>
               )}
             </div>
@@ -626,7 +625,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         <BottomSheet
           open
           onClose={() => !deleting && setConfirmingDelete(false)}
-          label="Confirm delete expense"
+          label={isIncome ? "Confirm delete income" : "Confirm delete expense"}
           detent="content"
           layered
           size="compact"
@@ -636,8 +635,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           <SheetBody style={confirmContentStyle}>
             <div style={confirmIconStyle}><DeleteIcon size={20} /></div>
             <div style={{ display: "grid", gap: 6 }}>
-              <h2 style={confirmTitleStyle}>Delete this expense?</h2>
-              <p style={confirmCopyStyle}>Removes this expense from activity and budget totals. Undo is available afterward.</p>
+              <h2 style={confirmTitleStyle}>{isIncome ? "Delete this income?" : "Delete this expense?"}</h2>
+              <p style={confirmCopyStyle}>Removes this {isIncome ? "income" : "expense"} from activity and budget totals. Undo is available afterward.</p>
             </div>
             <SheetFooter style={confirmActionsStyle}>
               <button type="button" onClick={() => setConfirmingDelete(false)} disabled={deleting} style={cancelDeleteStyle}>Cancel</button>
@@ -657,7 +656,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 }}
                 style={confirmDeleteStyle}
               >
-                {deleting ? "Deleting…" : "Delete expense"}
+                {deleting ? "Deleting…" : isIncome ? "Delete income" : "Delete expense"}
               </button>
             </SheetFooter>
           </SheetBody>

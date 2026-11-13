@@ -97,6 +97,15 @@ export function AllocationFlow({
   const [saveError, setSaveError] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(null);
+  // While the slider is held, numbers update plainly instead of rolling on every stop.
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    if (!dragging) return;
+    const stop = () => setDragging(false);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    return () => { window.removeEventListener("pointerup", stop); window.removeEventListener("pointercancel", stop); };
+  }, [dragging]);
   // Reset active item only when the set of group keys changes (not on every amount update)
   const groupKeysSignal = useMemo(() => groups.map((g) => g.key).join(","), [groups]);
   useEffect(() => {
@@ -170,7 +179,7 @@ export function AllocationFlow({
   const rangeMin = activeItem ? getSpentFloor(activeItem) : 0;
   const rangeMax = activeItem ? Math.max(rangeMin, activeItem.amount + Math.max(0, leftToAssign)) : 0;
   const updateActiveAmount = (nextAmount: number) => {
-    if (!activeItem) return;
+    if (readOnly || !activeItem) return;
     setConfirming(false);
     const minAmount = getSpentFloor(activeItem);
     const maxAmount = Math.max(minAmount, activeItem.amount + Math.max(0, leftToAssign));
@@ -206,7 +215,7 @@ export function AllocationFlow({
           <button onClick={onCancel} aria-label="Close" style={closeButtonStyle}>
             <XIcon size={14} />
           </button>
-          <span style={monthLabelFallbackStyle}>{monthLabel}</span>
+          {!rebalanceMode && <span style={monthLabelFallbackStyle}>{monthLabel}</span>}
           {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
         </header>
 
@@ -218,38 +227,31 @@ export function AllocationFlow({
             // when balanced, not the oversized "excited" eyes nothing else uses.
             const jarMood = isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle";
             const jarStyle = { marginBottom: heroPool ? -8 : 4 };
+            // While editing, a smaller jar keeps the active amount and slider in view on a phone.
+            const jarSize = heroPool && !readOnly ? 176 : undefined;
             return jarLevel !== undefined ? (
-              <MascotTap label="Allocation details"><MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} style={jarStyle} /></MascotTap>
+              <MascotTap label="Allocation details"><MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} /></MascotTap>
             ) : (
-              <MascotTap label="Allocation details"><MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={jarStyle} /></MascotTap>
+              <MascotTap label="Allocation details"><MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={jarSize} style={jarStyle} /></MascotTap>
             );
           })()}
-          {heroPool ? (
+          {heroPool && readOnly ? (
+            // A closed or future month has nothing to assign: the hero is the pool itself.
             <div style={heroPoolWrapStyle}>
               <span style={heroPoolLabelStyle}>{poolLabel}</span>
               <span style={heroPoolNumberStyle}>
                 <Money value={availablePool} currency animated />
               </span>
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
-                {isBalanced && balancedNote ? balancedNote : isBalanced ? (
-                  <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-                    ✓ {balancedLabel}
-                  </span>
-                ) : (
-                  <span key={isOver ? "over" : "under"} style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: 16,
-                    fontWeight: 700,
-                    letterSpacing: -0.3,
-                    color: isOver
-                      ? "var(--danger)"
-                      : "color-mix(in srgb, var(--success) 72%, var(--text2))",
-                    animation: "chipIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both",
-                  }}>
-                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
-                  </span>
-                )}
-              </div>
+            </div>
+          ) : heroPool ? (
+            // The hero is what is left to place; the pool it comes from is a quiet line under it.
+            <div style={heroPoolWrapStyle}>
+              <span style={heroPoolLabelStyle}>{isOver ? "Over-assigned" : "Unassigned"}</span>
+              <span style={{ ...heroPoolNumberStyle, color: isOver ? "var(--danger)" : heroPoolNumberStyle.color }}>
+                {isOver && "−"}<Money value={Math.abs(Math.round(leftToAssign))} currency animated={!dragging} />
+              </span>
+              {/* "Unassigned 0" already says it's balanced; only a caller's own note adds anything. */}
+              {isBalanced && balancedNote && <div style={heroPoolMetaStyle}>{balancedNote}</div>}
             </div>
           ) : (
             <div style={{ ...quietAvailableRowStyle, alignItems: "flex-start" }}>
@@ -266,7 +268,7 @@ export function AllocationFlow({
                   </span>
                 ) : (
                   <span key={isOver ? "over" : "under"} style={{ ...deltaChipStyle(isOver), animation: "chipIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-                    {isOver ? "−" : "+"}<Money value={Math.abs(Math.round(leftToAssign))} />
+                    <Money value={Math.abs(Math.round(leftToAssign))} /> {isOver ? "over-assigned" : "unassigned"}
                   </span>
                 )}
               </div>
@@ -285,7 +287,8 @@ export function AllocationFlow({
                   <CategoryIcon icon={item.icon} categoryName={item.name} size={17} style={categoryIconStyle(isActive)} />
                   <span style={categoryNameStyle}>{item.name}</span>
                   {/* Rebalancing: each category's live available, so you can see where money is without tapping. */}
-                  {rebalanceMode && Math.round(item.amount) !== 0 && (
+                  {/* The active one is already the big number below. */}
+                  {rebalanceMode && !isActive && Math.round(item.amount) !== 0 && (
                     <span style={categoryAmountStyle(isActive, item.amount < 0)}>{fmt(Math.round(item.amount))}</span>
                   )}
                 </LiquidButton>
@@ -302,8 +305,9 @@ export function AllocationFlow({
               <Currency style={amountCurrencyBigStyle} />
               <label style={amountEditorStyle}>
                 <span style={srOnlyStyle}>Planned amount for {activeItem.name}</span>
-                {draftValue === null && (
-                  <AnimatedCounter value={activeItem.amount} separator="." style={{ ...amountCounterStyle, color: isOver ? "var(--danger)" : "var(--text2)" }} />
+                {draftValue === null && (dragging
+                  ? <span aria-hidden="true" style={{ ...amountCounterStyle, display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums", color: isOver ? "var(--danger)" : "var(--text2)" }}>{formatCounter(activeItem.amount)}</span>
+                  : <AnimatedCounter value={activeItem.amount} separator="." style={{ ...amountCounterStyle, color: isOver ? "var(--danger)" : "var(--text2)" }} />
                 )}
                 <input
                   className="planning-amount-input"
@@ -341,9 +345,11 @@ export function AllocationFlow({
         )}
       </BlurScrollArea>
 
-      {activeItem && (
+      {activeItem && !readOnly && (
         <div className="sheet-footer sheet-inset" aria-label="Budget control" style={slimBarPanelStyle}>
-          <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
+          <div onPointerDownCapture={() => setDragging(true)}>
+            <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
+          </div>
           {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
           {confirming && (
             <div role="status" style={confirmationStyle}>
@@ -372,6 +378,13 @@ export function AllocationFlow({
 
 
 
+/** Same digits as AnimatedCounter, without the rolling wheels. */
+function formatCounter(value: number): string {
+  const rounded = Math.round(Number.isFinite(value) ? value : 0);
+  const magnitude = String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return rounded < 0 ? `−${magnitude}` : magnitude;
+}
+
 // GroupPicker and styles (copied/encapsulated for reusability)
 function GroupPicker({ groups, activeGroup, onSelect }: { groups: AllocationGroup[]; activeGroup: BudgetGroupKey; onSelect: (key: BudgetGroupKey) => void; }) {
   return <ChoicePicker aria-label="Budget group" value={activeGroup} onChange={event => onSelect(event.target.value as BudgetGroupKey)}>
@@ -391,13 +404,11 @@ const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "ce
 const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
 const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };
 const quietAvailableValueStyle: CSSProperties = { color: "var(--text2)", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', letterSpacing: -0.5 };
-const balancedTextStyle: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0.1, color: "color-mix(in srgb, var(--success) 62%, var(--text2))" };
+const balancedTextStyle: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0.1, color: "var(--text2)" };
 const deltaChipStyle = (isOver: boolean): CSSProperties => ({
   display: "inline-flex", alignItems: "center", gap: 2,
   fontSize: 12, fontWeight: 700, fontFamily: "var(--font-body)",
-  color: isOver
-    ? "color-mix(in srgb, var(--danger) 78%, var(--text2))"
-    : "color-mix(in srgb, var(--success) 72%, var(--text2))",
+  color: isOver ? "var(--danger)" : "var(--text2)",
 });
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
@@ -436,6 +447,7 @@ const heroPoolLabelStyle: CSSProperties = {
   
   color: "var(--muted)",
 };
+const heroPoolMetaStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 4, marginTop: 8 };
 const heroPoolNumberStyle: CSSProperties = {
   fontSize: "clamp(52px, 14vw, 80px)",
   fontWeight: 400,

@@ -52,6 +52,7 @@ export function ReflectScreen(props: Props) {
   const [showPeriod, setShowPeriod] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [customPeriod, setCustomPeriod] = useState(props.period);
+  const [showCustomRange, setShowCustomRange] = useState(false);
   const [excludedCategories, setExcludedCategories] = useState<string[]>([]);
   const [excludedAccounts, setExcludedAccounts] = useState<string[]>([]);
   const [showOverBudget, setShowOverBudget] = useState(false);
@@ -122,7 +123,7 @@ export function ReflectScreen(props: Props) {
 
   const periodControls = <ScreenToolbar label="Reflect period and filters" className="reflect-period-toolbar">
     <DatePickerTrigger label={label} open={showPeriod} className="composer-picker-chip" showChevron={false}
-      ariaLabel={`Time period: ${label}`} onClick={() => { setCustomPeriod(props.period.start ? props.period : reflectPreset("month")); setShowPeriod(true); }} />
+      ariaLabel={`Time period: ${label}`} onClick={() => { setCustomPeriod(props.period.start ? props.period : reflectPreset("month")); setShowCustomRange(!!props.period.start && !PERIOD_PRESETS.some(([key]) => { const preset = reflectPreset(key); return preset.start === props.period.start && preset.end === props.period.end; })); setShowPeriod(true); }} />
     {props.view === "spending" && <LiquidButton type="button" title="Filter spending" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" aria-expanded={showFilters}
       onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, width: 44, height: 44, padding: 0, flexShrink: 0, borderRadius: "50%", border: 0, ...(filterCount ? { background: "var(--select-wash)" } : {}), color: filterCount ? "var(--select-ink)" : "var(--text2)" }}>
       <SlidersIcon size={20} aria-hidden="true" />
@@ -187,13 +188,15 @@ export function ReflectScreen(props: Props) {
       <SheetHeader title="Time period" onClose={() => setShowPeriod(false)} />
       <BlurScrollArea style={sheetScrollStyle}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {([["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const).map(([key, name]) => { const period = reflectPreset(key); const selected = props.period.start === period.start && props.period.end === period.end; return <LiquidButton type="button" key={key} aria-pressed={selected} onClick={() => choosePeriod(period)} style={{ ...quietButtonStyle, justifyContent: "center", background: selected ? "var(--lg-glass-active)" : "var(--lg-glass)", color: selected ? "var(--text)" : "var(--text2)" }}>{name}</LiquidButton>; })}
+          {PERIOD_PRESETS.map(([key, name]) => { const period = reflectPreset(key); const selected = props.period.start === period.start && props.period.end === period.end; return <LiquidButton type="button" key={key} aria-pressed={selected} onClick={() => choosePeriod(period)} style={{ ...quietButtonStyle, justifyContent: "center", background: selected ? "var(--lg-glass-active)" : "var(--lg-glass)", color: selected ? "var(--text)" : "var(--text2)" }}>{name}</LiquidButton>; })}
         </div>
-        <h3 style={{ ...sectionTitleStyle, margin: "24px 0 12px" }}>Choose your own range</h3>
-        <div style={{ display: "grid", gap: 16 }}><label style={mutedStyle}>From<MonthPicker value={customPeriod.start} max={currentMonth} aria-label="Start month" onChange={event => setCustomPeriod({ ...customPeriod, start: event.target.value })} /></label><label style={mutedStyle}>Through<MonthPicker value={customPeriod.end} max={currentMonth} aria-label="End month" onChange={event => setCustomPeriod({ ...customPeriod, end: event.target.value })} /></label></div>
-        {customPeriod.start > customPeriod.end && <p role="alert" style={{ ...mutedStyle, color: "var(--danger)" }}>The end month must follow the start month.</p>}
+        <button type="button" aria-expanded={showCustomRange} aria-controls="reflect-custom-range" onClick={() => setShowCustomRange(value => !value)} style={{ ...quietButtonStyle, width: "100%", marginTop: 16, justifyContent: "center", fontSize: 14 }}>Custom range</button>
+        {showCustomRange && <div id="reflect-custom-range">
+          <div style={{ display: "grid", gap: 16, marginTop: 8 }}><label style={mutedStyle}>From<MonthPicker value={customPeriod.start} max={currentMonth} aria-label="Start month" onChange={event => setCustomPeriod({ ...customPeriod, start: event.target.value })} /></label><label style={mutedStyle}>Through<MonthPicker value={customPeriod.end} max={currentMonth} aria-label="End month" onChange={event => setCustomPeriod({ ...customPeriod, end: event.target.value })} /></label></div>
+          {customPeriod.start > customPeriod.end && <p role="alert" style={{ ...mutedStyle, color: "var(--danger)" }}>The end month must follow the start month.</p>}
+        </div>}
       </BlurScrollArea>
-      <button disabled={!customPeriod.start || !customPeriod.end || customPeriod.start > customPeriod.end || customPeriod.end > currentMonth} onClick={() => choosePeriod(customPeriod)} style={primaryButtonStyle}>Apply range</button>
+      {showCustomRange && <button disabled={!customPeriod.start || !customPeriod.end || customPeriod.start > customPeriod.end || customPeriod.end > currentMonth} onClick={() => choosePeriod(customPeriod)} style={primaryButtonStyle}>Apply range</button>}
     </BottomSheet>
 
     <BottomSheet open={showFilters} onClose={() => setShowFilters(false)} label="Filter spending" size="standard" desktopHeight="fill" contentStyle={sheetContentStyle}>
@@ -202,11 +205,11 @@ export function ReflectScreen(props: Props) {
         <FilterGroup title="Categories" items={categoryOptions} excluded={excludedCategories} onToggle={id => toggle(id, excludedCategories, setExcludedCategories)} onAll={() => setExcludedCategories([])} onNone={() => setExcludedCategories(categoryOptions.map(row => row.id))} />
         <FilterGroup title="Accounts" items={accountOptions} excluded={excludedAccounts} onToggle={id => toggle(id, excludedAccounts, setExcludedAccounts)} onAll={() => setExcludedAccounts([])} onNone={() => setExcludedAccounts(accountOptions.map(row => row.id))} />
       </BlurScrollArea>
-      <button onClick={() => setShowFilters(false)} style={primaryButtonStyle}>Show breakdown</button>
+      <button onClick={() => setShowFilters(false)} style={primaryButtonStyle}>Done</button>
     </BottomSheet>
 
     <BottomSheet open={Boolean(selected)} onClose={() => setSelectedId(null)} label={selected ? `${selected.name} spending` : "Category spending"} size="standard" desktopHeight="fill" contentStyle={sheetContentStyle}>
-      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow from" : "Net spending across"} {selected.transactions.length} {selected.transactions.length === 1 ? "transaction" : "transactions"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = isReflectInflow(transaction, props.accounts); return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === reflectAccountId(transaction, props.accounts))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} categoryName={selected.name} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
+      {selected && <><SheetHeader title={selected.name} onClose={() => setSelectedId(null)} /><BlurScrollArea style={sheetScrollStyle}><p style={{ ...mutedStyle, marginTop: 0 }}>{label}</p><div style={{ fontSize: 32, fontWeight: 600, margin: "8px 0" }}><Money value={Math.abs(selected.net)} currency /></div><p style={mutedStyle}>{selected.net < 0 ? "Net inflow" : "Net spending"}</p>{selected.inflow > 0 && <p style={mutedStyle}><span style={{ display: "block" }}><Money value={selected.spent} /> out</span><span style={{ display: "block" }}><Money value={selected.inflow} /> in</span></p>}<div style={{ marginTop: 24 }}>{selected.transactions.map(transaction => { const income = isReflectInflow(transaction, props.accounts); return <TransactionRow key={transaction.id} title={transaction.name || selected.name} subtitle={props.accounts.find(account => account.id === reflectAccountId(transaction, props.accounts))?.label} date={fmtDate(transaction.date)} amount={transaction.amount} tone={income ? "income" : "expense"} prefix={income ? "+" : "−"} icon={<CategoryIcon icon={selected.icon} categoryName={selected.name} size={22} />} onClick={() => { setSelectedId(null); props.onClickTransaction(transaction); }} />; })}</div></BlurScrollArea></>}
     </BottomSheet>
   </div>;
 }
@@ -221,6 +224,7 @@ function SheetHeader({ title, onClose }: { title: string; onClose: () => void })
 function FilterGroup({ title, items, excluded, onToggle, onAll, onNone }: { title: string; items: { id: string; name: string }[]; excluded: string[]; onToggle: (id: string) => void; onAll: () => void; onNone: () => void }) { return <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}><legend style={sectionTitleStyle}>{title}</legend><div style={{ display: "flex", gap: 8, marginBottom: 4 }}><button onClick={onAll} style={quietButtonStyle}>All</button><button onClick={onNone} style={quietButtonStyle}>None</button></div>{items.map(item => <label key={item.id} style={{ minHeight: 48, display: "flex", gap: 12, alignItems: "center", fontSize: 15, color: "var(--text2)", cursor: "pointer" }}><input type="checkbox" checked={!excluded.includes(item.id)} onChange={() => onToggle(item.id)} style={{ width: 20, height: 20, accentColor: "var(--select-ink)", flexShrink: 0 }} /><span style={{ overflowWrap: "anywhere" }}>{item.name}</span></label>)}{!items.length && <p style={mutedStyle}>No {title.toLowerCase()} in this period.</p>}</fieldset>; }
 /** A flat selected fill: Joint's --select-wash is a gradient. */
 const jarButtonStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: MASCOT_HERO_SIZE, border: 0, padding: 0, background: "transparent", font: "inherit", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
+const PERIOD_PRESETS = [["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const;
 const mutedStyle: CSSProperties = { fontSize: 13, color: "var(--muted)", lineHeight: 1.5 };
 const sectionTitleStyle: CSSProperties = { fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text2)" };
 const listStyle: CSSProperties = { listStyle: "none", margin: 0, padding: 0 };

@@ -212,7 +212,6 @@ export function AccountDetailsSheet({
   const canGoNext = chartMonth < CURRENT_MONTH();
   const xTicks = [1, Math.round(chartData.daysInMonth / 2), chartData.daysInMonth]
     .filter(t => t <= chartData.todayDay);
-  const lastPoint = chartData.points[chartData.points.length - 1];
 
   const handleClose = () => {
     if (checkSaving || txnSaving || reconcileStatus === "saving") return;
@@ -479,6 +478,7 @@ export function AccountDetailsSheet({
               type="button"
               onClick={() => setShowChart(v => !v)}
               aria-label={showChart ? "Hide balance history" : "Show balance history"}
+              aria-pressed={showChart}
               style={{
                 ...chartToggleBtnStyle,
                 background: showChart
@@ -488,10 +488,11 @@ export function AccountDetailsSheet({
               }}
             >
               <TrendingUpIcon size={13} strokeWidth={2} />
+              History
             </button>
           </div>
           <p style={{ ...heroValueStyle, color: isNegative ? "var(--danger)" : "var(--text)" }}>
-            <Money value={liveBalance} absolute={isNegative} currency animated animateOnMount />
+            <Money value={liveBalance} absolute={isNegative} currency animated />
           </p>
           {assignableOf(account) != null && (
             <p style={heroSubStyle}>
@@ -585,20 +586,13 @@ export function AccountDetailsSheet({
                 </ResponsiveContainer>
 
                 {/* Net change footer */}
-                <div style={chartFooterStyle}>
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                    {fmt(Math.abs(lastPoint?.balance ?? 0))}
-                  </span>
-                  {chartData.netChange !== 0 && (
-                    <span style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: chartData.netChange > 0 ? "var(--action-income)" : "var(--danger)",
-                    }}>
+                {chartData.netChange !== 0 && (
+                  <div style={chartFooterStyle}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>
                       {chartData.netChange > 0 ? "+" : ""}{fmt(chartData.netChange)} this month
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -608,17 +602,46 @@ export function AccountDetailsSheet({
         {showChart && (totalSpentFromAcct > 0 || totalIncomeToAcct > 0) && (
           <div style={statsRowStyle}>
             {totalSpentFromAcct > 0 && (
-              <div style={{ ...statPillStyle, background: "color-mix(in srgb, var(--danger) 8%, var(--surface))" }}>
-                <ArrowDownIcon size={13} strokeWidth={2.5} style={{ color: "var(--danger)", flexShrink: 0 }} />
-                <strong style={{ ...statValueStyle, color: "var(--danger)" }}><Money value={totalSpentFromAcct} /></strong>
+              <div style={{ ...statPillStyle, background: "var(--surface2)" }}>
+                <ArrowDownIcon size={13} strokeWidth={2.5} style={{ color: "var(--muted)", flexShrink: 0 }} aria-label="Out" />
+                <strong style={{ ...statValueStyle, color: "var(--text2)" }}><Money value={totalSpentFromAcct} /></strong>
               </div>
             )}
             {totalIncomeToAcct > 0 && (
-              <div style={{ ...statPillStyle, background: "color-mix(in srgb, var(--action-income) 8%, var(--surface))" }}>
-                <ArrowUpIcon size={13} strokeWidth={2.5} style={{ color: "var(--action-income)", flexShrink: 0 }} />
-                <strong style={{ ...statValueStyle, color: "var(--action-income)" }}><Money value={totalIncomeToAcct} /></strong>
+              <div style={{ ...statPillStyle, background: "var(--surface2)" }}>
+                <ArrowUpIcon size={13} strokeWidth={2.5} style={{ color: "var(--muted)", flexShrink: 0 }} aria-label="In" />
+                <strong style={{ ...statValueStyle, color: "var(--text2)" }}><Money value={totalIncomeToAcct} /></strong>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Category breakdown, history panel only */}
+        {showChart && catBreakdown.length > 0 && (
+          <div style={sectionStyle}>
+            <p style={sectionLabelStyle}>Top categories</p>
+            <div style={{ display: "grid", gap: 10 }}>
+              {catBreakdown.map(({ cat, total }) => {
+                if (!cat) return null;
+                const pct = Math.round((total / maxCatSpend) * 100);
+                return (
+                  <div key={cat.id} style={catRowStyle}>
+                    <div style={catIconWrapStyle}>
+                      <CategoryIcon icon={cat.icon} categoryName={cat.name} size={15} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <span style={catNameStyle}>{cat.name}</span>
+                        <span style={catAmtStyle}><Money value={total} /></span>
+                      </div>
+                      <div style={barTrackStyle}>
+                        <div style={{ ...barFillStyle, width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -626,23 +649,20 @@ export function AccountDetailsSheet({
         <div style={actionsRowStyle}>
           <ActionBtn
             icon={<TransferIcon size={18} strokeWidth={2.2} />}
+            label="Move"
             ariaLabel="Move money"
-            bg="color-mix(in srgb, var(--action-transfer) 11%, var(--surface))"
-            ink="var(--action-transfer)"
             onClick={() => { handleClose(); onMove(account); }}
           />
           <ActionBtn
             icon={<BanknoteIcon size={18} strokeWidth={2.2} />}
+            label="Add income"
             ariaLabel="Add income"
-            bg="color-mix(in srgb, var(--action-income) 11%, var(--surface))"
-            ink="var(--action-income)"
             onClick={() => { handleClose(); onIncome(account); }}
           />
           <ActionBtn
             icon={<ScaleIcon size={18} strokeWidth={2.2} />}
+            label="Check balance"
             ariaLabel="Check balance"
-            bg="color-mix(in srgb, var(--surface2) 54%, var(--surface))"
-            ink="var(--text2)"
             onClick={() => { setCheckVersion(balanceCheck?.version ?? null); setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : savedCountForReview != null ? String(savedCountForReview) : ""); setCheckMessage(null); setShowReconcile(true); }}
           />
         </div>
@@ -693,7 +713,7 @@ export function AccountDetailsSheet({
             )}
 
             {/* Add missed transaction — shrinks the difference above instead of reconciling it away */}
-            <div style={addTxnSectionStyle}>
+            {((difference !== null && difference !== 0) || showAddTxn || addedTxns.length > 0) && <div style={addTxnSectionStyle}>
               <div style={addTxnHeaderRowStyle}>
                 <p style={addTxnHintStyle}>Missing a transaction before this count?</p>
                 <button
@@ -786,7 +806,7 @@ export function AccountDetailsSheet({
                       <span style={addedNameStyle}>{t.name}</span>
                       <span style={{
                         ...addedAmtStyle,
-                        color: t.type === "Income" ? "var(--action-income)" : "var(--text2)",
+                        color: "var(--text2)",
                       }}>
                         {t.type === "Income" ? "+" : "−"}{fmt(t.amount)}
                       </span>
@@ -802,9 +822,12 @@ export function AccountDetailsSheet({
                   ))}
                 </div>
               )}
-            </div>
+            </div>}
 
             {checkMessage && <Banner tone="success" compact role="status">{checkMessage}</Banner>}
+            {reconcileError && (
+              <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
+            )}
             <button type="button" onClick={() => void changeCheck("save")}
               disabled={!Number.isFinite(parsedActual) || checkSaving || txnSaving || reconcileStatus === "saving"}
               style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)", opacity: checkSaving || !Number.isFinite(parsedActual) ? 0.42 : 1 }}>
@@ -813,10 +836,6 @@ export function AccountDetailsSheet({
             {checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0 && <button type="button"
               onClick={() => void changeCheck("close")} disabled={checkSaving || txnSaving || reconcileStatus === "saving"}
               style={{ ...reconcileSubmitStyle, background: "var(--surface2)", color: "var(--text)" }}>Mark resolved</button>}
-
-            {reconcileError && (
-              <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
-            )}
 
             <button
               type="button"
@@ -845,40 +864,11 @@ export function AccountDetailsSheet({
                reconcileStatus === "success" ? "Reconciled" :
                reconcileStatus === "error" ? "Retry" :
                isFullyReconciled ? "Mark as reconciled" :
-               difference !== null ? `Reconcile remaining ${difference > 0 ? "+" : ""}${fmt(Math.round(difference * 100) / 100)}` :
+               difference !== null ? "Reconcile difference" :
                "Reconcile ledger"}
             </button>
           </SheetBody>
           </BottomSheet>
-        )}
-
-        {/* Category breakdown */}
-        {catBreakdown.length > 0 && (
-          <div style={sectionStyle}>
-            <p style={sectionLabelStyle}>Top categories</p>
-            <div style={{ display: "grid", gap: 10 }}>
-              {catBreakdown.map(({ cat, total }) => {
-                if (!cat) return null;
-                const pct = Math.round((total / maxCatSpend) * 100);
-                return (
-                  <div key={cat.id} style={catRowStyle}>
-                    <div style={catIconWrapStyle}>
-                      <CategoryIcon icon={cat.icon} categoryName={cat.name} size={15} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 4 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                        <span style={catNameStyle}>{cat.name}</span>
-                        <span style={catAmtStyle}><Money value={total} /></span>
-                      </div>
-                      <div style={barTrackStyle}>
-                        <div style={{ ...barFillStyle, width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         )}
 
         </div>
@@ -939,12 +929,14 @@ export function AccountDetailsSheet({
 
 function ActionBtn({
   icon,
+  label,
   ariaLabel,
   onClick,
   bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
   ink = "var(--text2)",
 }: {
   icon: React.ReactNode;
+  label: string;
   ariaLabel: string;
   onClick: () => void;
   bg?: string;
@@ -957,7 +949,8 @@ function ActionBtn({
       aria-label={ariaLabel}
       style={{ ...actionBtnStyle, background: bg, color: ink }}
     >
-      <span style={actionIconStyle}>{icon}</span>
+      <span style={actionIconStyle} aria-hidden="true">{icon}</span>
+      <span style={actionLabelStyle}>{label}</span>
     </button>
   );
 }
@@ -1042,9 +1035,12 @@ const heroTopRowStyle: CSSProperties = {
 };
 
 const chartToggleBtnStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 8,
+  minHeight: 32,
+  padding: "0 10px",
+  gap: 5,
+  fontSize: 12,
+  fontWeight: 600,
+  borderRadius: 999,
   border: "none",
   cursor: "pointer",
   display: "inline-flex",
@@ -1156,14 +1152,24 @@ const actionsRowStyle: CSSProperties = {
 };
 
 const actionBtnStyle: CSSProperties = {
-  height: 52,
+  minHeight: 64,
+  padding: "8px 6px",
   borderRadius: 14,
   border: "none",
   cursor: "pointer",
   display: "inline-flex",
+  flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
+  gap: 4,
   transition: "background 0.15s ease, color 0.15s ease",
+};
+
+const actionLabelStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: 1.2,
+  textAlign: "center",
 };
 
 const actionIconStyle: CSSProperties = {
@@ -1272,16 +1278,10 @@ const reconcileCurrencyStyle: CSSProperties = { flexShrink: 0 };
 const differenceBandStyle = (diff: number): CSSProperties => ({
   minHeight: 40,
   borderRadius: 999,
-  background: diff === 0
-    ? "color-mix(in srgb, var(--success) 10%, var(--surface))"
-    : diff > 0
-    ? "var(--surface2)"
-    : "color-mix(in srgb, var(--danger) 8%, var(--surface))",
-  color: diff === 0
-    ? "var(--success)"
-    : diff > 0
-    ? "var(--text2)"
-    : "var(--danger)",
+  background: diff < 0
+    ? "color-mix(in srgb, var(--danger) 8%, var(--surface))"
+    : "var(--surface2)",
+  color: diff < 0 ? "var(--danger)" : "var(--text2)",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",

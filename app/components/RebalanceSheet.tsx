@@ -3,8 +3,6 @@ import { categoryIconSource } from "../../lib/category-icons";
 import "./finance-ai.css";
 import { ReallocationAssistant } from "./ReallocationAssistant";
 
-import { Money } from "./Money";
-
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, today } from "./app-utils";
@@ -154,11 +152,13 @@ export function RebalanceSheet({
 
   const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [usedSuggestion, setUsedSuggestion] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setAllocations(Object.fromEntries(allItems.map((f) => [f.id, f.original])));
     setUsedSuggestion(false);
+    setAssistantOpen(false);
   }, [open, allItems, budgetScope]);
 
   // Savings is money set aside, not this month's money: it never enters the pool,
@@ -252,39 +252,28 @@ export function RebalanceSheet({
     return rows;
   }, [liveTransfers, liveTopUps, liveReleases, catById]);
 
-  const unallocatedHint = unallocatedForGroup > 0 ? (
-    <div style={unallocatedHintStyle}>
-      <span>Unassigned</span>
-      <span style={unallocatedHintTextStyle}><Money value={Math.round(unallocatedForGroup)} /></span>
-    </div>
-  ) : null;
-
-  const flowPreview = (!unallocatedHint && flowRows.length === 0) ? undefined : (
+  // The hero already shows what is unassigned, so the preview only lists the moves.
+  const flowPreview = flowRows.length === 0 ? undefined : (
     <div style={flowWrapStyle}>
-      {unallocatedHint}
-      {flowRows.length > 0 && (
-        <>
-          <span style={flowHeadStyle}>Moving</span>
-          <div style={flowListStyle}>
-            {flowRows.slice(0, 5).map((row) => (
-              <div key={row.key} style={flowRowStyle}>
-                <div style={flowFromStyle}>
-                  {row.fromIcon && <CategoryIcon icon={row.fromIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
-                  <span style={flowNameStyle}>{row.fromLabel}</span>
-                </div>
-                <span style={flowArrowStyle}>→ {row.amount}</span>
-                <div style={flowToStyle}>
-                  <span style={flowNameStyle}>{row.toLabel}</span>
-                  {row.toIcon && <CategoryIcon icon={row.toIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
-                </div>
-              </div>
-            ))}
-            {flowRows.length > 5 && (
-              <span style={flowMoreStyle}>+{flowRows.length - 5} more moves</span>
-            )}
+      <span style={flowHeadStyle}>Moving</span>
+      <div style={flowListStyle}>
+        {flowRows.slice(0, 5).map((row) => (
+          <div key={row.key} style={flowRowStyle}>
+            <div style={flowFromStyle}>
+              {row.fromIcon && <CategoryIcon icon={row.fromIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
+              <span style={flowNameStyle}>{row.fromLabel}</span>
+            </div>
+            <span style={flowArrowStyle}>→ {row.amount}</span>
+            <div style={flowToStyle}>
+              <span style={flowNameStyle}>{row.toLabel}</span>
+              {row.toIcon && <CategoryIcon icon={row.toIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
+            </div>
           </div>
-        </>
-      )}
+        ))}
+        {flowRows.length > 5 && (
+          <span style={flowMoreStyle}>+{flowRows.length - 5} more moves</span>
+        )}
+      </div>
     </div>
   );
 
@@ -325,13 +314,16 @@ export function RebalanceSheet({
       saveButtonLabel="Apply"
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}
-      flowPreview={<>{!isReadOnly && open && <ReallocationAssistant scope={budgetScope} month={homeMonth}
-        categories={visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original }))}
-        onUse={suggestion => {
-          const next = Object.fromEntries(allItems.map(item => [item.id, item.original]));
-          for (const move of suggestion.moves) { next[move.fromId] -= move.amount; next[move.toId] += move.amount; }
-          setAllocations(next); setUsedSuggestion(true);
-        }} />}{flowPreview}</>}
+      flowPreview={<>{!isReadOnly && open && <>
+        <button type="button" style={assistantToggleStyle} aria-expanded={assistantOpen} onClick={() => setAssistantOpen(value => !value)}>{assistantOpen ? "Hide suggestions" : "Suggest moves"}</button>
+        {assistantOpen && <ReallocationAssistant scope={budgetScope} month={homeMonth}
+          categories={visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original }))}
+          onUse={suggestion => {
+            const next = Object.fromEntries(allItems.map(item => [item.id, item.original]));
+            for (const move of suggestion.moves) { next[move.fromId] -= move.amount; next[move.toId] += move.amount; }
+            setAllocations(next); setUsedSuggestion(true);
+          }} />}
+      </>}{flowPreview}</>}
       heroPool
       metaLabel="Before"
       rebalanceMode
@@ -489,18 +481,15 @@ const flowMoreStyle: CSSProperties = {
   textAlign: "center",
 };
 
-const unallocatedHintStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "baseline",
-  justifyContent: "space-between",
-  gap: 12,
-  padding: "8px 0",
-  fontSize: 14,
+const assistantToggleStyle: CSSProperties = {
+  justifySelf: "center",
+  minHeight: 44,
+  padding: "0 12px",
+  border: 0,
+  borderRadius: "var(--radius-control)",
+  background: "transparent",
   color: "var(--text2)",
-};
-
-const unallocatedHintTextStyle: CSSProperties = {
-  fontWeight: 600,
-  color: "var(--text)",
-  fontVariantNumeric: "tabular-nums",
+  fontSize: 13,
+  fontWeight: 650,
+  cursor: "pointer",
 };

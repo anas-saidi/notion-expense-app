@@ -71,8 +71,8 @@ export function CategoryOptionList({ id, categories, selectedId, lastUsedId, onS
                   {meta && <div style={pickerMetaStyle}>{meta}</div>}
                 </div>
                 {cat.available !== null && (
-                  <span style={{ ...monoSmallStyle, color: cat.available > 0 ? "var(--success)" : "var(--danger)", paddingLeft: 8 }}>
-                    {cat.available > 0 ? "+" : ""}<Money value={cat.available} />
+                  <span style={{ ...monoSmallStyle, color: cat.available < 0 ? "var(--danger)" : cat.available === 0 ? "var(--muted)" : "var(--text2)", paddingLeft: 8 }}>
+                    <Money value={cat.available} />
                   </span>
                 )}
               </button>

@@ -37,14 +37,14 @@ export function TransactionDetailsSheet({ transaction, accounts, categories, onC
           <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.15 }}>{transaction.name || type}</h2>
           <button type="button" className="sheet-close-button" aria-label="Close transaction details" onClick={onClose}><XIcon size={20} /></button>
         </SheetHeader>
-        <strong style={{ display: "block", fontSize: 32, fontVariantNumeric: "tabular-nums" }}><Money value={transaction.amount} currency animated animateOnMount /></strong>
+        <strong style={{ display: "block", fontSize: 32, fontVariantNumeric: "tabular-nums" }}><Money value={transaction.amount} currency /></strong>
         <dl style={{ display: "grid", gap: 12, margin: 0 }}>
-          <Detail label="Type" value={type} />
+          {transaction.name && <Detail label="Type" value={type} />}
           <Detail label="Date" value={fmtDate(transaction.date)} />
           {type === "Expense" ? <><Detail label="Category" value={categoryName(transaction.category)} /><Detail label="Account" value={accountName(transaction.accountId)} /></> : <Detail label="Flow" value={relationships} />}
         </dl>
-        {type === "Transfer" ? <UndoSavingsDeposit key={transaction.id} operationId={transaction.savingsFundingOperation} transactionId={transaction.id} onUndone={onUndone} /> : type !== "Expense" && <p style={{ margin: 0, padding: 14, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", fontSize: 14, lineHeight: 1.45 }}>
-          {`Editing is unavailable for this ${type.toLowerCase()}.`}
+        {type === "Transfer" ? <UndoSavingsDeposit key={transaction.id} operationId={transaction.savingsFundingOperation} transactionId={transaction.id} onUndone={onUndone} /> : type !== "Expense" && <p style={{ margin: 0, color: "var(--muted)", fontSize: 13, lineHeight: "18px" }}>
+          {`Editing is unavailable for this ${type.toLowerCase()}`}
         </p>}
 
       </SheetBody>

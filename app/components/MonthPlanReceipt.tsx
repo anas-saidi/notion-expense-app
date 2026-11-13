@@ -25,9 +25,9 @@ export function MonthPlanReceipt({ receipt, onDone, onReview, title: heading = "
       <div className="plan-receipt-slot" aria-hidden="true" />
       <div className="plan-receipt-feed">
         <article className="plan-receipt-paper" aria-label={`${label} saved plan`}>
-          <header><p>Monthly plan</p><h3>{label}</h3></header>
+          <header><h3>{label}</h3></header>
           <dl className="plan-receipt-lines">
-            {top.map(item => <div key={item.id}><dt>{item.name}{showOwners && <small>{BUDGET_SCOPE_LABELS[item.scope]}</small>}</dt><dd><Money value={item.amount} /></dd></div>)}
+            {top.map(item => <div key={item.id}><dt>{item.name}</dt><dd><Money value={item.amount} /></dd></div>)}
             {remaining.length > 0 && <div><dt>{remaining.length} other {remaining.length === 1 ? "category" : "categories"}</dt><dd><Money value={remaining.reduce((sum, item) => sum + item.amount, 0)} /></dd></div>}
           </dl>
           <div className="plan-receipt-total"><span>Total planned</span><strong><Money value={receipt.total} currency /></strong></div>
@@ -46,7 +46,7 @@ export function MonthPlanReceipt({ receipt, onDone, onReview, title: heading = "
     {receipt.warning && <Banner role="alert" tone="warning" compact>{receipt.warning}</Banner>}
     <div className="plan-receipt-actions">
       <button type="button" className="plan-primary" onClick={onDone}>Done</button>
-      {onReview && <button type="button" className="plan-receipt-review" onClick={onReview}>{receipt.warning ? "Set monthly contributions" : "Back to plan"}</button>}
+      {onReview && <button type="button" className="plan-receipt-review" onClick={onReview}>{receipt.warning ? "Back to plan to set contributions" : "Back to plan"}</button>}
     </div>
   </section>;
 }

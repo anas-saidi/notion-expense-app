@@ -2,13 +2,13 @@
 
 import { SheetBody, SheetHeader } from "./ui/SheetLayout";
 
-import { assignableOf } from "./app-utils";
+import { assignableOf, fmt } from "./app-utils";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, Category } from "./app-types";
 import { Money, Currency } from "./Money";
 import { Banner } from "./ui/Banner";
 import { BottomSheet } from "./ui/BottomSheet";
-import { ScaleIcon, XIcon } from "./ui/icons";
+import { XIcon } from "./ui/icons";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { accountIconSource } from "../../lib/category-icons";
 import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
@@ -73,9 +73,9 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
 
   if (!open) return null;
   return (
-    <BottomSheet open onClose={onClose} label="Adjust available" detent="content" layered size="standard" zIndex={120} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+    <BottomSheet open onClose={onClose} label={`${category.name} available`} detent="content" layered size="standard" zIndex={120} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
       <SheetBody style={wrapStyle}>
-        <SheetHeader style={headerStyle}><div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={iconStyle}><ScaleIcon size={18} /></span><h2 style={titleStyle}>Adjust available</h2></div><button type="button" className="sheet-close-button" onClick={onClose} aria-label="Close available editor"><XIcon /></button></SheetHeader>
+        <SheetHeader style={headerStyle}><h2 style={titleStyle}>{category.name} available</h2><button type="button" className="sheet-close-button" onClick={onClose} aria-label="Close available editor"><XIcon /></button></SheetHeader>
         <div style={{ textAlign: "center" }}>
           <span style={labelStyle}>Target available</span>
           <div style={heroStyle}>
@@ -84,7 +84,7 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
           </div>
         </div>
         <SteppedAmountSlider min={minimum} max={maximum} value={Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : currentAvailable} onChange={(value) => setTarget(String(value))} label={`Adjust available for ${category.name}`} />
-        <div style={sourceStyle}><span>Default account</span><strong>{source ? <><CategoryIcon icon={accountIconSource(source.type)} size={18} /> {source.label}</> : "Not configured"}</strong><span>Available to assign</span><strong><Money value={sourceCapacity} /></strong></div>
+        {source && <p style={sourceStyle}><CategoryIcon icon={accountIconSource(source.type)} size={18} /><span>Unassigned in {source.label}: <strong style={sourceAmountStyle}><Money value={sourceCapacity} /></strong></span></p>}
         {delta !== 0 && valid && (
           <p role="status" style={adjustmentSummaryStyle}>
             {delta > 0
@@ -92,9 +92,9 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
               : <><strong>{Math.abs(delta).toLocaleString("en-US")}</strong> will return to {source?.label ?? "the default account"}.</>}
           </p>
         )}
-        {!source ? <Banner tone="warning" compact>Choose a default account in category settings first.</Banner> : target.trim() !== "" && delta !== 0 && !valid && <Banner tone="danger" compact>Adjustment exceeds the available balance.</Banner>}
+        {!source ? <Banner tone="warning" compact>Choose a default account in category settings first.</Banner> : target.trim() !== "" && delta !== 0 && !valid && <Banner tone="danger" compact>Only {fmt(Math.round(sourceCapacity))} unassigned in {source.label}</Banner>}
         {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
-        <button type="button" disabled={!valid || saving} onClick={submit} style={{ ...saveStyle, opacity: valid && !saving ? 1 : .45 }}>{saving ? "Applying…" : "Apply adjustment"}</button>
+        <button type="button" disabled={!valid || saving} onClick={submit} style={{ ...saveStyle, opacity: valid && !saving ? 1 : .45 }}>{saving ? "Applying…" : delta > 0 ? `Add ${fmt(Math.round(Math.abs(delta)))}` : delta < 0 ? `Return ${fmt(Math.round(Math.abs(delta)))} to ${source?.label ?? "account"}` : "Apply adjustment"}</button>
       </SheetBody>
     </BottomSheet>
   );
@@ -102,11 +102,11 @@ export function CategoryAvailableSheet({ open, category, currentAvailable, month
 
 const wrapStyle: CSSProperties = { minHeight: "100%", boxSizing: "border-box", padding: "8px 16px 24px", display: "flex", flexDirection: "column", gap: 24 };
 const headerStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 };
-const iconStyle: CSSProperties = { width: 36, height: 36, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--accent-foreground)", background: "color-mix(in srgb, var(--accent) 18%, var(--surface))" };
 const titleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: 1.2 };
 const labelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 700, };
 const heroStyle: CSSProperties = { position: "relative", minHeight: 112, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
 const heroInputStyle: CSSProperties = { minWidth: "1ch", maxWidth: "calc(100% - 52px)", height: 88, minHeight: 44, padding: 0, border: 0, outline: 0, background: "transparent", color: "var(--text)", caretColor: "var(--text)", textAlign: "right", fontFamily: "inherit", fontSize: "clamp(48px, 15vw, 72px)", lineHeight: 1, fontWeight: 500, letterSpacing: "-.03em", fontVariantNumeric: "tabular-nums", boxSizing: "content-box" };
-const sourceStyle: CSSProperties = { padding: 16, borderRadius: "var(--radius-card)", background: "var(--surface2)", display: "grid", gridTemplateColumns: "1fr auto", gap: "8px 16px", color: "var(--muted)", fontSize: 13 };
+const sourceStyle: CSSProperties = { margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--text2)", fontSize: 13, lineHeight: 1.45 };
+const sourceAmountStyle: CSSProperties = { color: "var(--text)", fontWeight: 600, fontVariantNumeric: "tabular-nums" };
 const adjustmentSummaryStyle: CSSProperties = { margin: "-4px 0 0", color: "var(--muted)", fontSize: 13, lineHeight: 1.45, textAlign: "center" };
 const saveStyle: CSSProperties = { marginTop: "auto", minHeight: 52, cursor: "pointer", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", font: "inherit", fontWeight: 750 };

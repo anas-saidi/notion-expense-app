@@ -54,7 +54,7 @@ export function ReallocationAssistant({ scope, month, categories, onUse }: Props
         <div className="ai-move-heading"><span>{categories.find(c => c.id === move.fromId)?.name} → {categories.find(c => c.id === move.toId)?.name}</span><span aria-label={`${move.amount} MAD`}><Money value={move.amount} /></span></div>
         <p className="ai-helper">{move.reason}</p>
       </div>)}
-      {suggestion.moves.length > 0 && <><button type="button" className="ai-action" onClick={() => { onUse(suggestion); setSuggestion(null); }}>Use suggestion</button><p className="ai-helper">Review these moves in Rebalance. Apply saves the transfers.</p></>}
+      {suggestion.moves.length > 0 && <><button type="button" className="ai-action" onClick={() => { onUse(suggestion); setSuggestion(null); }}>Use suggestion</button><p className="ai-helper">Apply saves these moves.</p></>}
     </div>}
     <span className="sr-only" role="status">{busy ? "Preparing reallocation suggestions" : ""}</span>
   </section>;

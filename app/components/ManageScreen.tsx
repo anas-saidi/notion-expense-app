@@ -60,12 +60,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
         </span>
       </section>
 
-      <section aria-labelledby="account-list-heading" style={accountsSectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <h2 id="account-list-heading" style={sectionTitleStyle}>Accounts</h2>
-          <span style={accountCountStyle}>{scopedAccounts.length}</span>
-        </div>
-
+      <section aria-label="Account list" style={accountsSectionStyle}>
         {scopedAccounts.length > 0 ? (
           // Same anatomy as transaction rows elsewhere: flat, emoji, name over type,
           // the figure on the right with its secondary line beneath.
@@ -82,13 +77,15 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
                 <CategoryIcon icon={accountIconSource(account.type)} size={24} />
                 <span style={accountCopyStyle}>
                   <span style={rowTitleStyle}>{account.label}</span>
-                  <span style={rowMetaStyle}>{account.type ?? "Account"}</span>
+                  {account.type && <span style={rowMetaStyle}>{account.type}</span>}
                 </span>
                 <span style={amountStackStyle}>
                   <span style={balanceStyle}><Money value={account.balance ?? 0} /></span>
-                  <span style={readyStyle((assignableOf(account) ?? 0) < 0)}>
-                    Ready <Money value={assignableOf(account) ?? 0} />
-                  </span>
+                  {Math.abs(assignableOf(account) ?? 0) >= 0.005 && (
+                    <span style={readyStyle((assignableOf(account) ?? 0) < 0)}>
+                      Unassigned <Money value={assignableOf(account) ?? 0} />
+                    </span>
+                  )}
                 </span>
               </button>
             ))}
@@ -128,9 +125,6 @@ const readyMetricStyle = (negative: boolean): CSSProperties => ({
 });
 
 const accountsSectionStyle: CSSProperties = { display: "grid", gap: 12 };
-const sectionHeaderStyle: CSSProperties = { minHeight: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 };
-const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: 15, lineHeight: 1.2, fontWeight: 750, color: "var(--text)" };
-const accountCountStyle: CSSProperties = { minWidth: 28, height: 28, padding: "0 8px", borderRadius: 999, background: "var(--surface2)", color: "var(--text2)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 };
 const listStyle: CSSProperties = { display: "grid" };
 
 // Mirrors ui/TransactionRow so account rows read like every other list in the app.

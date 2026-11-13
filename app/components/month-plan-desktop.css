@@ -30,7 +30,6 @@
 .plan-group { padding:24px 0 8px; color:var(--muted); font-size:12px; line-height:16px; font-weight:600; }
 .plan-table-row { min-height:56px; padding-block:8px; border-radius:var(--radius-control); border-bottom:1px solid color-mix(in srgb, var(--border) 45%, transparent); font-size:14px; font-variant-numeric:tabular-nums; }
 .plan-table-row:hover { background:color-mix(in srgb, var(--surface2) 45%, transparent); }
-.plan-table-row > [data-over] { color:var(--danger); }
 .plan-category { display:flex; align-items:center; gap:12px; min-width:0; font-weight:600; }
 .plan-category-name { display:grid; gap:2px; min-width:0; }
 .plan-category-name > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -110,7 +109,8 @@
 .plan-gaps { display:grid; gap:4px; margin:0; padding:0; list-style:none; }
 .plan-gap { display:flex; align-items:center; gap:12px; width:100%; min-height:44px; padding:0; border:0; background:transparent; color:var(--text2); font:inherit; font-size:13px; line-height:20px; text-align:left; cursor:pointer; }
 .plan-gap-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.plan-gap-amount { color:var(--danger); font-weight:600; font-variant-numeric:tabular-nums; }
+/* Last month is history, not a warning: the gap reads neutral. */
+.plan-gap-amount { color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
 .plan-gap-value { color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
 .plan-gap:disabled { cursor:default; }
 @media (hover: hover) and (pointer: fine) { .plan-gap:hover .plan-gap-name { color:var(--text); text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--text) 25%, transparent); text-underline-offset:4px; } }
@@ -140,8 +140,8 @@
 .plan-partner-remaining dd { margin:0; color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
 .plan-partner-remaining dd[data-short] { color:var(--danger); }
 .plan-partner-remaining .plan-remaining-short { font-size:12px; font-weight:400; }
-.plan-draft-status { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; color:var(--muted); font-size:13px; }
-.planner-wrap > .plan-draft-status { padding:0 24px; }
+.plan-draft-banner { margin-bottom:16px; }
+.planner-wrap > .plan-draft-banner { width:auto !important; margin:0 16px 16px; }
 .plan-save-draft { min-height:44px; width:100%; }
 .planner-wrap .plan-partner-remaining { width:100%; }
 

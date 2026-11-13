@@ -141,7 +141,7 @@ export function CategoryManageSheet({
 
   // Funding a savings category reads as adding to savings.
   const addingToSavings = !isEdit && !isCreate && !!category && isSavingsCategory(category);
-  const title = isEdit ? "Edit category" : isCreate ? "New category" : addingToSavings ? `Add to ${category?.name}` : `Fund ${category?.name ?? "category"}`;
+  const title = isEdit ? "Edit category" : isCreate ? "New category" : addingToPlan ? `Add to ${category?.name} plan` : addingToSavings ? `Add to ${category?.name}` : `Fund ${category?.name ?? "category"}`;
   const actionLabel = useMemo(() => {
     if (status === "saving" && addingToPlan) return "Adding to plan…";
     if (status === "saving") return isEdit ? "Saving..." : isCreate ? "Creating..." : "Funding...";
@@ -266,6 +266,14 @@ export function CategoryManageSheet({
 
   if (!open) return null;
 
+  const spendingPatternField = <label style={fieldStyle}>
+    <span style={labelStyle}>Spending pattern</span>
+    <ChoicePicker aria-label="Spending pattern" value={spendingPattern} disabled={status === "saving"} onChange={(event) => setSpendingPattern(event.target.value as SpendingPattern | "")}>
+      <option value="">Not set</option>
+      {SPENDING_PATTERNS.map(pattern => <option key={pattern} value={pattern}>{pattern}</option>)}
+    </ChoicePicker>
+  </label>;
+
   return (
     <BottomSheet
       open={open}
@@ -304,29 +312,21 @@ export function CategoryManageSheet({
               />
             </label>
 
-            <div style={twoColStyle}>
-              <div style={fieldStyle}>
-                <span style={labelStyle}>Category image</span>
-                <CategoryIcon icon={icon} categoryName={name} size={44} decorative={false} label={`${name || "New category"} image`} />
-              </div>
-              <label style={fieldStyle}>
-                <span style={labelStyle}>Type</span>
-                <ChoicePicker aria-label="Category type" value={categoryType} onChange={(event) => setCategoryType(event.target.value)}>
-                  {[...new Set([...(availableTypes ?? []), ...(category?.type ?? [])])].map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                  <option value="">No type</option>
-                </ChoicePicker>
-              </label>
-            </div>
-
             <label style={fieldStyle}>
-              <span style={labelStyle}>Spending pattern</span>
-              <ChoicePicker aria-label="Spending pattern" value={spendingPattern} disabled={status === "saving"} onChange={(event) => setSpendingPattern(event.target.value as SpendingPattern | "")}>
-                <option value="">Not set</option>
-                {SPENDING_PATTERNS.map(pattern => <option key={pattern} value={pattern}>{pattern}</option>)}
+              <span style={labelStyle}>Type</span>
+              <ChoicePicker aria-label="Category type" value={categoryType} onChange={(event) => setCategoryType(event.target.value)}>
+                {[...new Set([...(availableTypes ?? []), ...(category?.type ?? [])])].map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+                <option value="">No type</option>
               </ChoicePicker>
             </label>
+
+            {/* A new category rarely needs a pattern on day one, so it waits behind More options. */}
+            {isCreate ? <details style={moreOptionsStyle}>
+              <summary style={moreOptionsSummaryStyle}>More options</summary>
+              {spendingPatternField}
+            </details> : spendingPatternField}
 
           </section>
         )}
@@ -363,22 +363,18 @@ export function CategoryManageSheet({
             Update agreed contributions
           </label>}
           {addedContributions && <div aria-live="polite" style={{ display: "grid", gap: 8, fontSize: 14 }}>
-            <div style={accountHintStyle}><span>Added to plan</span><strong><Money value={parsedAmount} currency /></strong></div>
             <div style={accountHintStyle}><span>Anas contribution increase</span><strong>+<Money value={addedContributions.anas} /></strong></div>
             <div style={accountHintStyle}><span>Salma contribution increase</span><strong>+<Money value={addedContributions.salma} /></strong></div>
-            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Uses your agreed split. Contributions already paid stay recorded. No money moves.</p>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>No money moves now.</p>
           </div>}
 
-          {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Uses the account’s owners.</p>}
-          {!addingToPlan && !isEdit && selectedAssignable !== null && selectedAccount && (
-            <div style={accountHintStyle}>
-              <span>Unassigned in {selectedAccount.label}</span>
-              <strong><Money value={selectedAssignable} /></strong>
-            </div>
-          )}
-          {/* What the partner owes Joint is kept back, so say so when it changes the figure. */}
-          {!addingToPlan && !isEdit && selectedAccount && keptForJoint > 0 && (
-            <p style={keptNoteStyle}>{fmt(keptForJoint)} is kept back for your Couple contribution.</p>
+          {isEdit && <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>Owner follows this account.</p>}
+          {/* What the partner owes Joint is kept back, so the line says so when it changes the figure. */}
+          {!addingToPlan && !isEdit && (!isCreate || parsedAmount > 0) && selectedAssignable !== null && selectedAccount && (
+            <p style={accountLineStyle}>
+              Unassigned in {selectedAccount.label}: <strong style={accountLineAmountStyle}><Money value={selectedAssignable} /></strong>
+              {keptForJoint > 0 && <> ({fmt(keptForJoint)} kept for contributions due)</>}
+            </p>
           )}
           {moveNeeded && holdingAccount && selectedAccount && (
             <p style={moveNoteStyle}>
@@ -470,11 +466,8 @@ const labelStyle: CSSProperties = {
   color: "var(--text2)",
 };
 
-const twoColStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 0.72fr) minmax(0, 1fr)",
-  gap: 10,
-};
+const moreOptionsStyle: CSSProperties = { display: "grid", gap: 10 };
+const moreOptionsSummaryStyle: CSSProperties = { minHeight: 44, display: "flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 650, cursor: "pointer" };
 
 const amountWrapStyle: CSSProperties = {
   minHeight: 56,
@@ -504,6 +497,8 @@ const moveNoteStyle: CSSProperties = { margin: 0, padding: "10px 12px", borderRa
 const sameId = (a: string, b: string | null | undefined) => !!b && a.replace(/-/g, "") === b.replace(/-/g, "");
 
 const keptNoteStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.35, color: "var(--muted)" };
+const accountLineStyle: CSSProperties = { margin: 0, fontSize: 13, lineHeight: 1.45, color: "var(--text2)" };
+const accountLineAmountStyle: CSSProperties = { color: "var(--text)", fontWeight: 600, fontVariantNumeric: "tabular-nums" };
 
 const accountHintStyle: CSSProperties = {
   minHeight: 42,

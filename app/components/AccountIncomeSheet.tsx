@@ -9,11 +9,11 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
-import { BanknoteIcon, CheckIcon, XIcon } from "./ui/icons";
+import { BanknoteIcon, CheckIcon, ChevronDownIcon, XIcon } from "./ui/icons";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
-import { parseAmount, today } from "./app-utils";
+import { fmtDate, parseAmount, today } from "./app-utils";
 
 type AccountIncomeSheetProps = {
   open: boolean;
@@ -29,6 +29,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [error, setError] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -38,9 +39,12 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
     setDate(today());
     setStatus("idle");
     setError("");
+    setDetailsOpen(false);
   }, [open, account?.id]);
 
   const parsedAmount = parseAmount(amount) ?? 0;
+  const showDetails = detailsOpen || name.trim() === "";
+  const dateLabel = date === today() ? "Today" : fmtDate(date);
   const canSubmit = Boolean(account?.id && name.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0 && (status === "idle" || status === "error"));
 
   const submit = async () => {
@@ -98,17 +102,12 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
         </SheetHeader>
 
         <div style={{ minHeight: 0, overflowY: "auto", display: "grid", gap: 16 }}>
-        <section style={balanceCardStyle}>
-          <span>Current balance</span>
-          <strong><Money value={account.balance ?? 0} /></strong>
-        </section>
+        {account.balance != null && <section style={balanceCardStyle}>
+          <span>{parsedAmount > 0 ? "Balance after" : "Current balance"}</span>
+          <strong><Money value={parsedAmount > 0 ? account.balance + parsedAmount : account.balance} /></strong>
+        </section>}
 
         <section style={formStyle}>
-          <label style={fieldStyle}>
-            <span style={labelStyle}>Description</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} style={inputStyle} />
-          </label>
-
           <label style={fieldStyle}>
             <span style={labelStyle}>Amount</span>
             <div style={amountWrapStyle}>
@@ -123,10 +122,22 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
             </div>
           </label>
 
-          <label style={fieldStyle}>
-            <span style={labelStyle}>Date</span>
-            <DatePicker value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
-          </label>
+          {showDetails ? <>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>Description</span>
+              <input value={name} onChange={(event) => setName(event.target.value)} style={inputStyle} />
+            </label>
+
+            <label style={fieldStyle}>
+              <span style={labelStyle}>Date</span>
+              <DatePicker value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
+            </label>
+          </> : (
+            <button type="button" aria-expanded={false} aria-label={`Edit description and date: ${name.trim()}, ${dateLabel}`} onClick={() => setDetailsOpen(true)} style={summaryRowStyle}>
+              <span style={summaryTextStyle}>{name.trim()} · {dateLabel}</span>
+              <ChevronDownIcon size={16} aria-hidden="true" />
+            </button>
+          )}
         </section>
 
         {isJointIncomeAccount(account.label) && <IncomeUseControl value={incomeUse} onChange={setIncomeUse} disabled={status === "saving"} />}
@@ -144,6 +155,30 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
     </BottomSheet>
   );
 }
+
+const summaryRowStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  border: "none",
+  borderRadius: 12,
+  background: "transparent",
+  color: "var(--text2)",
+  padding: "0 4px",
+  fontSize: 14,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const summaryTextStyle: CSSProperties = {
+  minWidth: 0,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
 
 const sheetStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",

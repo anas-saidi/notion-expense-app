@@ -4,13 +4,12 @@ import { SheetBody, SheetHeader } from "./ui/SheetLayout";
 import { DatePicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { Account } from "./app-types";
-import { parseAmount, today } from "./app-utils";
+import { fmtDate, parseAmount, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
-import { CheckIcon, TransferIcon, XIcon } from "./ui/icons";
-import { CategoryIcon } from "./ui/CategoryIcon";
+import { CheckIcon, ChevronDownIcon, TransferIcon, XIcon } from "./ui/icons";
 import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
 
@@ -33,6 +32,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
   const [date, setDate] = useState(today());
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [error, setError] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -46,6 +46,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
     setDate(today());
     setStatus("idle");
     setError("");
+    setDetailsOpen(false);
   }, [account?.id, accounts, initialAmount, initialNote, initialToAccountId, open]);
 
   const fromAccount = useMemo(
@@ -59,6 +60,9 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
 
   const destinationAccounts = accounts.filter((entry) => entry.id !== fromAccountId);
   const parsedAmount = parseAmount(amount) ?? 0;
+  const amountTyped = parsedAmount > 0;
+  const showDetails = detailsOpen || note.trim() === "";
+  const dateLabel = date === today() ? "Today" : fmtDate(date);
   const canSubmit = Boolean(
     fromAccountId
     && toAccountId
@@ -121,16 +125,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
         </SheetHeader>
 
         <section style={balanceGridStyle}>
-          <BalanceTile label="From" account={fromAccount} nextBalance={fromAccount?.balance != null && parsedAmount > 0 ? fromAccount.balance - parsedAmount : null} />
-          <BalanceTile label="To" account={toAccount} nextBalance={toAccount?.balance != null && parsedAmount > 0 ? toAccount.balance + parsedAmount : null} />
-        </section>
-
-        {fromAccount?.estimatedActualBalance != null && parsedAmount > fromAccount.estimatedActualBalance && <Banner tone="warning" role="alert" compact>
-          Exceeds estimated actual funds by <Money value={parsedAmount - fromAccount.estimatedActualBalance} />.
-        </Banner>}
-        <section style={formStyle}>
-          <label style={fieldStyle}>
-            <span style={labelStyle}>From account</span>
+          <BalanceTile label="From" account={fromAccount} amountTyped={amountTyped} nextBalance={fromAccount?.balance != null && amountTyped ? fromAccount.balance - parsedAmount : null}>
             <ChoicePicker aria-label="From account"
               value={fromAccountId}
               onChange={(event) => {
@@ -140,25 +135,28 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
                   setToAccountId(accounts.find((entry) => entry.id !== nextFrom)?.id ?? "");
                 }
               }}
-              style={inputStyle}
+              style={tilePickerStyle}
             >
               <option value="" disabled>Choose source</option>
               {accounts.map((entry) => (
-                <option key={entry.id} value={entry.id}>{entry.label}</option>
+                <option key={entry.id} value={entry.id} data-icon={accountIconSource(entry.type)}>{entry.label}</option>
               ))}
             </ChoicePicker>
-          </label>
-
-          <label style={fieldStyle}>
-            <span style={labelStyle}>To account</span>
-            <ChoicePicker aria-label="To account" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} style={inputStyle}>
+          </BalanceTile>
+          <BalanceTile label="To" account={toAccount} amountTyped={amountTyped} nextBalance={toAccount?.balance != null && amountTyped ? toAccount.balance + parsedAmount : null}>
+            <ChoicePicker aria-label="To account" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} style={tilePickerStyle}>
               <option value="" disabled>Choose destination</option>
               {destinationAccounts.map((entry) => (
-                <option key={entry.id} value={entry.id}>{entry.label}</option>
+                <option key={entry.id} value={entry.id} data-icon={accountIconSource(entry.type)}>{entry.label}</option>
               ))}
             </ChoicePicker>
-          </label>
+          </BalanceTile>
+        </section>
 
+        {fromAccount?.estimatedActualBalance != null && parsedAmount > fromAccount.estimatedActualBalance && <Banner tone="warning" role="alert" compact>
+          Exceeds actual funds by <Money value={parsedAmount - fromAccount.estimatedActualBalance} />
+        </Banner>}
+        <section style={formStyle}>
           <label style={fieldStyle}>
             <span style={labelStyle}>Amount</span>
             <div style={amountWrapStyle}>
@@ -173,15 +171,22 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
             </div>
           </label>
 
-          <label style={fieldStyle}>
-            <span style={labelStyle}>Note</span>
-            <input value={note} onChange={(event) => setNote(event.target.value)} style={inputStyle} />
-          </label>
+          {showDetails ? <>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>Note</span>
+              <input value={note} onChange={(event) => setNote(event.target.value)} style={inputStyle} />
+            </label>
 
-          <label style={fieldStyle}>
-            <span style={labelStyle}>Date</span>
-            <DatePicker value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
-          </label>
+            <label style={fieldStyle}>
+              <span style={labelStyle}>Date</span>
+              <DatePicker value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
+            </label>
+          </> : (
+            <button type="button" aria-expanded={false} aria-label={`Edit note and date: ${dateLabel}, ${note.trim()}`} onClick={() => setDetailsOpen(true)} style={summaryRowStyle}>
+              <span style={summaryTextStyle}>{dateLabel} · {note.trim()}</span>
+              <ChevronDownIcon size={16} aria-hidden="true" />
+            </button>
+          )}
         </section>
 
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
@@ -196,13 +201,15 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
   );
 }
 
-function BalanceTile({ label, account, nextBalance }: { label: string; account: Account | null; nextBalance: number | null }) {
+function BalanceTile({ label, account, amountTyped, nextBalance, children }: { label: string; account: Account | null; amountTyped: boolean; nextBalance: number | null; children: ReactNode }) {
   return (
     <div style={balanceTileStyle}>
       <span style={balanceLabelStyle}>{label}</span>
-      <strong style={balanceAccountStyle}>{account ? <><CategoryIcon icon={accountIconSource(account.type)} size={18} /> {account.label}</> : "Choose account"}</strong>
+      {children}
       <span style={balanceAmountStyle}>
-        {nextBalance !== null ? <Money value={nextBalance} /> : account?.balance != null ? <Money value={account.balance} /> : "TBD"}
+        {account?.balance == null ? "No balance"
+          : amountTyped && nextBalance !== null ? <>After <Money value={nextBalance} /></>
+          : <>Now <Money value={account.balance} /></>}
       </span>
     </div>
   );
@@ -263,10 +270,39 @@ const balanceTileStyle: CSSProperties = {
   gap: 7,
 };
 
-const balanceAccountStyle: CSSProperties = {
-  minHeight: 18,
-  fontSize: 13,
+const tilePickerStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  borderRadius: 12,
+  border: "1px solid transparent",
+  background: "transparent",
   color: "var(--text2)",
+  padding: "0 4px",
+  fontSize: 13,
+  fontWeight: 700,
+  justifyContent: "space-between",
+  boxSizing: "border-box",
+};
+
+const summaryRowStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 44,
+  border: "none",
+  borderRadius: 12,
+  background: "transparent",
+  color: "var(--text2)",
+  padding: "0 4px",
+  fontSize: 14,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const summaryTextStyle: CSSProperties = {
+  minWidth: 0,
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",

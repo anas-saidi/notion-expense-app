@@ -59,8 +59,5 @@
 /* The same partner colors as the global scope picker identify the two debts. */
 .contribution-sheet [data-partner="anas"] { --contribution-person-color:var(--partner-husband); }
 .contribution-sheet [data-partner="salma"] { --contribution-person-color:var(--partner-wife); }
-.contribution-split { display:flex; width:100%; height:12px; margin:8px 0 4px; overflow:hidden; border-radius:999px; }
-.contribution-split-part { display:block; position:relative; flex-basis:0; min-width:0; overflow:hidden; background:var(--contribution-person-color); }
-.contribution-split-part + .contribution-split-part::before { content:""; position:absolute; left:0; top:0; bottom:0; width:2px; background:var(--surface); }
 .contribution-person-name > strong { display:flex; align-items:center; gap:8px; }
 .contribution-person-name > strong::before { content:""; display:block; width:4px; height:16px; flex-shrink:0; border-radius:2px; background:var(--contribution-person-color); }

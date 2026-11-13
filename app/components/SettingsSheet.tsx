@@ -13,14 +13,12 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
         <LiquidButton type="button" className="settings-close-button sheet-close-button" aria-label="Close settings" onClick={onClose}><XIcon size={20} /></LiquidButton>
       </SheetHeader>
       <section aria-label="Preferences" style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Preferences</h3>
         <div style={settingRowStyle}>
           <span style={rowLabelStyle}>Appearance</span>
           <ThemeToggle theme={theme} onSelectTheme={onSelectTheme} />
         </div>
       </section>
       {onOpenAccounts && <section aria-label="Finances" style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Finances</h3>
         {onOpenAccounts && <button type="button" className="settings-navigation-row" onClick={onOpenAccounts} style={navigationRowStyle}>
           Accounts <ChevronRightIcon size={18} aria-hidden="true" />
         </button>}
