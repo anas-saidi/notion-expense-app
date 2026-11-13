@@ -15,6 +15,8 @@ export function parseTransactionLines(text: string, reference = new Date(), defa
     const fail = (error: string): ParsedTransactionLine[] => [{ ...base, error }];
     let remaining = source.trim();
     if (/\b(?:every|recurs?|weekly|monthly|yearly)\b/i.test(remaining)) return fail("Repeating transactions aren't supported yet. Enter each payment separately.");
+    // "split 4 ways" holds a number that isn't the amount; leave the share for the AI read to work out.
+    if (/\bsplit\b/i.test(remaining)) return fail("Read works out your share of a split.");
     let date = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate(), 12);
     const dates = [...remaining.matchAll(/\b(?:day before yesterday|today|yesterday|tomorrow|\d+ days? ago|(?:last |on )?(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday)|\d{4}-\d{2}-\d{2})\b/gi)];
     if (dates.length > 1) return fail("Use just one date per line.");

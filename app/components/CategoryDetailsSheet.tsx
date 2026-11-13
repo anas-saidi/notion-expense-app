@@ -96,6 +96,32 @@ export function CategoryDetailsSheet({
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [confirmingFreeze, setConfirmingFreeze] = useState(false);
   const moreActionsRef = useRef<HTMLDivElement>(null);
+  // Savings goal due date, edited here and kept locally so the change shows before the list refreshes.
+  const [goalDate, setGoalDate] = useState<string | null>(category?.goalDate ?? null);
+  const [savingGoalDate, setSavingGoalDate] = useState(false);
+  const [goalError, setGoalError] = useState<string | null>(null);
+  useEffect(() => { setGoalDate(category?.goalDate ?? null); setGoalError(null); }, [open, category?.id, category?.goalDate]);
+  const changeGoalMonth = async (monthValue: string) => {
+    if (!category || !/^\d{4}-\d{2}$/.test(monthValue)) return;
+    const [year, monthNumber] = monthValue.split("-").map(Number);
+    // A goal is due by the end of its month.
+    const next = `${monthValue}-${String(new Date(year, monthNumber, 0).getDate()).padStart(2, "0")}`;
+    const previous = goalDate;
+    setGoalDate(next);
+    setSavingGoalDate(true);
+    setGoalError(null);
+    try {
+      const res = await fetch("/api/categories", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: category.id, goalDate: next }) });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || "Could not change the due date");
+      await onTransactionsChanged?.();
+    } catch (err) {
+      setGoalDate(previous);
+      setGoalError(err instanceof Error ? err.message : "Could not change the due date");
+    } finally {
+      setSavingGoalDate(false);
+    }
+  };
 
   // When the sheet opens or the external month changes, reset to that month
   useEffect(() => {
@@ -199,6 +225,23 @@ export function CategoryDetailsSheet({
             </div>
           )}
         </section>
+
+        {onTakeOut && ((category.goal ?? 0) > 0 || goalDate) && (() => {
+          const goal = Math.max(0, category.goal ?? 0);
+          const reached = goal > 0 && available >= goal;
+          const past = !reached && !!goalDate && goalDate.slice(0, 7) < new Date().toISOString().slice(0, 7);
+          return <section aria-label="Savings goal" style={goalRowStyle}>
+            {goal > 0 && <span style={supportingStatStyle}>
+              <span style={supportingLabelStyle}>Goal</span>
+              <span style={supportingValueStyle}><Money value={goal} /></span>
+            </span>}
+            <span style={{ ...supportingStatStyle, alignItems: "center" }}>
+              <span style={{ ...supportingLabelStyle, ...(past ? { color: "var(--danger)", fontWeight: 600 } : {}) }}>{reached ? "Reached" : past ? "Past due" : "Due"}</span>
+              <MonthPicker value={goalDate?.slice(0, 7) ?? ""} onChange={(event) => void changeGoalMonth(event.target.value)} disabled={savingGoalDate} aria-label={goalDate ? "Change goal due month" : "Set goal due month"} />
+            </span>
+            {goalError && <span role="alert" style={{ flexBasis: "100%", textAlign: "center", fontSize: 13, color: "var(--danger)" }}>{goalError}</span>}
+          </section>;
+        })()}
 
         {/* ── Actions ── */}
         <div style={{ ...actionsRowStyle, ...(onTakeOut ? { gridTemplateColumns: "repeat(4, minmax(0, 1fr))" } : {}) }}>
@@ -466,6 +509,14 @@ const availableValueStyle: CSSProperties = {
   lineHeight: 1,
   color: "var(--text)",
   fontVariantNumeric: "tabular-nums",
+};
+
+const goalRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: "8px 24px",
 };
 
 const supportingStatsStyle: CSSProperties = {

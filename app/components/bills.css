@@ -1,5 +1,6 @@
 .bills-section { margin: 24px 0; }
 .bills-section-heading, .bills-list-controls, .bills-sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bills-list-actions { display: flex; align-items: center; gap: 4px; }
 .bills-section h2, .bills-sheet h2 { overflow-wrap: anywhere; margin: 0; font-size: 20px; line-height: 24px; }
 .bills-quiet-action, .bills-icon-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px; background: transparent; border: 0; color: var(--text); font-size: 13px; cursor: pointer; }
 .bills-icon-action { min-width: 44px; flex-shrink: 0; border-radius: 50%; background: var(--surface2); color: var(--text2); }

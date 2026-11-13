@@ -73,6 +73,11 @@ const RECENT_TRANSACTIONS_URL = "/api/transactions?page_size=100";
 
 export default function App() {
   const [showContributions, setShowContributions] = useState(false);
+  // Which partner Contributions opens on: the one whose figure was tapped, else the signed-in person.
+  // Adding starts by writing; openers that arrive with something chosen (a category, a restored draft) start in the form.
+  const [addInForm, setAddInForm] = useState(false);
+  const [contributionsPartner, setContributionsPartner] = useState<"anas" | "salma" | undefined>();
+  const openContributions = (partner?: "anas" | "salma") => { setContributionsPartner(partner); setShowContributions(true); };
   const [showPlanReceipt, setShowPlanReceipt] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -1146,7 +1151,7 @@ export default function App() {
     restartFinancialReads();
     setLoadAttempt(value => value + 1);
   };
-  const recovery = <LoadingRecovery key={tab} loading={screenIsLoading({ tab, core: loading, home: secondaryLoading, month: monthLoading, budget: budgetRefreshing, bills: billsLoading, history: historyLoading })} onRetry={retryLoading} />;
+  const recovery = <LoadingRecovery key={tab} loading={screenIsLoading({ tab, core: loading, home: secondaryLoading, month: monthLoading, budget: budgetRefreshing, bills: billsLoading, history: historyLoading, refreshing: refreshState === "updating" || budgetRefreshing })} onRetry={retryLoading} />;
 
   // Not yet mounted: server and first client render must match — show a neutral shell
   if (!mounted || loading) return <AppLoadingSkeleton recovery={recovery} />;
@@ -1195,6 +1200,7 @@ export default function App() {
         setEditingTransactionId(null);
         setTransactionType("Expense");
         setIncomeUse("contributions");
+        setAddInForm(false);
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
@@ -1235,7 +1241,7 @@ export default function App() {
         onClose={() => setShowMonthStartPlanner(false)}
         // Over-assignment is money already committed, not this plan: it's fixed on the account that holds
         // more assigned than it has (a balance check, or undoing a savings deposit), so open that account.
-        onOpenContributions={() => { setShowMonthStartPlanner(false); setShowContributions(true); }}
+        onOpenContributions={partner => { setShowMonthStartPlanner(false); openContributions(partner); }}
         onOpenOverAssigned={partner => {
           const account = accounts
             .filter(a => scopeFromAccountLabel(a.label) === partner && (a.readyToAssign ?? 0) < 0)
@@ -1266,7 +1272,7 @@ export default function App() {
           contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : null)}
           savingsGap={savingsGap ?? undefined}
           contributionLeft={contributionLeft}
-          onOpenContributions={() => setShowContributions(true)}
+          onOpenContributions={openContributions}
           balanceReviews={balanceChecksToReview(balanceChecks.checks, balanceChecks.reviewCounts, accounts, budgetScope)}
           onReviewBalance={account => { setStartBalanceCheck(true); setDetailsAccount(account); }}
           balanceChecks={<PendingBalanceChecks onRetry={() => void balanceChecks.refresh()} error={balanceChecks.error} paused={balanceChecks.paused} loading={balanceChecks.loading} />}
@@ -1367,6 +1373,7 @@ export default function App() {
           onAddExpense={() => {
             setEditingTransactionId(null);
             setTransactionType("Expense");
+            setAddInForm(false);
             setShowAddModal(true);
           }}
           onClickTransaction={editTransaction}
@@ -1525,6 +1532,21 @@ export default function App() {
           setShowDatePicker(false);
         }}
         onSelectCategory={selectCategory}
+        startInForm={addInForm}
+        onUseRecent={(transaction) => {
+          // Prefill from a recent one; the date stays today so it saves as a new entry.
+          setAmount(String(Math.abs(transaction.amount)));
+          setName(transaction.name);
+          setSuggestedCatId(null);
+          const recentCategory = transaction.category ? categories.find(category => category.id === transaction.category) : undefined;
+          if (recentCategory) selectCategory(recentCategory);
+          if (transaction.accountId) setAccountId(transaction.accountId);
+          setShowCatPicker(false);
+          setShowAccountPicker(false);
+          setShowDatePicker(false);
+          setStatus("idle");
+          setErrorMsg("");
+        }}
         onSelectAccount={(id) => {
           setAccountId(id);
           setShowAccountPicker(false);
@@ -1557,6 +1579,7 @@ export default function App() {
           setTransactionType("Expense");
           setIncomeUse("contributions");
           setShowCategoryDetails(false);
+          setAddInForm(true);
           setShowAddModal(true);
         }}
         onEdit={() => {
@@ -1599,10 +1622,10 @@ export default function App() {
 
 
       {showPlanReceipt && <SavedPlanReceiptSheet month={homeMonth} scope={budgetScope} summary={monthlySummary} categories={[...categories, ...frozenCategories]} accounts={accounts} onClose={() => setShowPlanReceipt(false)} />}
-      <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} scope={budgetScope} status={contribStatus} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
+      <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} personalScope={mode === "wife" ? "salma" : "anas"} initialPartner={contributionsPartner} status={contribStatus} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
 
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
-        contributions={!monthLoading && !monthError && !monthlySummary.contributionError && detailsAccount && !/saving/i.test(detailsAccount.label) && <ContributionEntry status={contribStatus} scope={scopeFromAccountLabel(detailsAccount.label) ?? budgetScope} onOpen={() => { setDetailsAccount(null); setShowContributions(true); }} />}
+        contributions={!monthLoading && !monthError && !monthlySummary.contributionError && detailsAccount && !/saving/i.test(detailsAccount.label) && <ContributionEntry status={contribStatus} scope={scopeFromAccountLabel(detailsAccount.label) ?? budgetScope} onOpen={() => { const owner = scopeFromAccountLabel(detailsAccount.label); setDetailsAccount(null); openContributions(owner === "anas" || owner === "salma" ? owner : undefined); }} />}
         open={detailsAccount !== null}
         startBalanceCheck={startBalanceCheck}
         savedCountForReview={balanceChecks.reviewCounts.find(count => count.accountId === accountKey(detailsAccount?.id ?? ""))?.actualBalance}
@@ -1660,6 +1683,7 @@ export default function App() {
           refreshBudgetData("Rebalance applied");
           if (rebalanceReturnToAdd.current) {
             rebalanceReturnToAdd.current = false;
+            setAddInForm(true);
             setShowAddModal(true);
           }
         }}
@@ -1681,7 +1705,7 @@ export default function App() {
             <p style={{ color: "var(--text2)", lineHeight: 1.45 }}>A draft from {new Date(draftOffer.timestamp).toLocaleDateString()} is available. It will not be submitted automatically.</p>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" onClick={() => { try { localStorage.removeItem(`expenseDraft:v1:${mode}`); } catch {} setDraftOffer(null); }} style={draftSecondaryButtonStyle}>Discard</button>
-              <button type="button" onClick={() => { setAmount(draftOffer.amount); setName(draftOffer.name); setAccountId(accounts.some(a => a.id === draftOffer.accountId) ? draftOffer.accountId : ""); setCategoryId(categories.some(c => c.id === draftOffer.categoryId) ? draftOffer.categoryId : ""); setDate(draftOffer.date || today()); setRecurringRepeat(draftOffer.repeat === "Monthly" || draftOffer.repeat === "Yearly" ? draftOffer.repeat : "None"); setBudgetScope(draftOffer.scope); setDraftOffer(null); setShowAddModal(true); }} style={draftPrimaryButtonStyle}>Restore</button>
+              <button type="button" onClick={() => { setAmount(draftOffer.amount); setName(draftOffer.name); setAccountId(accounts.some(a => a.id === draftOffer.accountId) ? draftOffer.accountId : ""); setCategoryId(categories.some(c => c.id === draftOffer.categoryId) ? draftOffer.categoryId : ""); setDate(draftOffer.date || today()); setRecurringRepeat(draftOffer.repeat === "Monthly" || draftOffer.repeat === "Yearly" ? draftOffer.repeat : "None"); setBudgetScope(draftOffer.scope); setDraftOffer(null); setAddInForm(true); setShowAddModal(true); }} style={draftPrimaryButtonStyle}>Restore</button>
             </div>
           </div>
         </div>

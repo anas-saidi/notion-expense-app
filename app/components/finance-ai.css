@@ -41,3 +41,120 @@
 .ai-move { display: grid; gap: 4px; }
 .ai-move-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .ai-move-heading > :last-child { flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Typed transactions, written like a margin note: your words on the left, the figure in the margin,
+   small mono tags below. Two marked kinds of word (which day, which account), each in its own colour. */
+.typed {
+  --typed-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  --typed-day: #b45309;
+  --typed-account: #2563c9;
+  --typed-wait: #d97706;
+  flex-direction: column; flex: 1 1 auto; min-height: 0;
+}
+html[data-theme="dark"] .typed { --typed-day: #f0a35a; --typed-account: #7cb2f5; --typed-wait: #fbbf24; }
+.typed-scroll { flex: 1 1 auto; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; padding-top: 16px; }
+.typed-lines { display: grid; gap: 20px; }
+.typed-line-main { display: flex; align-items: flex-start; gap: 12px; }
+.typed-input-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+.typed-marks, .typed-entry-line {
+  margin: 0; padding: 2px 0; border: 0; font: inherit; font-size: 17px; line-height: 1.45; letter-spacing: 0;
+  white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal;
+}
+.typed-marks { position: absolute; inset: 0; color: var(--text); pointer-events: none; }
+.typed-marks mark { background: none; color: inherit; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.typed-marks mark[data-kind="day"] { color: var(--typed-day); text-decoration-color: color-mix(in srgb, var(--typed-day) 55%, transparent); }
+.typed-marks mark[data-kind="account"] { color: var(--typed-account); text-decoration-color: color-mix(in srgb, var(--typed-account) 55%, transparent); }
+/* The textarea sits on top with clear text, so the marked copy underneath shows through; the caret stays visible. */
+.typed-entry-line {
+  position: relative; display: block; width: 100%; min-width: 0; background: transparent; border-radius: 0; resize: none; overflow: hidden;
+  color: transparent; caret-color: var(--accent-foreground); outline: none;
+}
+.typed-entry-line::placeholder { color: var(--muted); }
+.typed-entry-line::selection { background: var(--select-wash); color: transparent; }
+.typed-margin { flex-shrink: 0; display: inline-flex; align-items: center; gap: 8px; min-height: 28px; padding-top: 1px; }
+button.typed-amount { padding: 4px 6px; margin: -4px -6px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+button.typed-amount, button.typed-amount:not(:disabled):hover { transform: none; }
+@media (hover: hover) and (pointer: fine) { button.typed-amount:not(:disabled):hover { background: var(--surface2); } }
+button.typed-amount:not(:disabled):active { opacity: .7; }
+button.typed-amount:disabled { cursor: default; opacity: 1; }
+button.typed-amount:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 2px; }
+.typed-amount { font-family: var(--typed-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+.typed-amount[data-income] { color: var(--success); }
+.typed-hint { font-family: var(--typed-mono); font-size: 12px; color: var(--muted); }
+.typed-reading { color: var(--muted); }
+.typed-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text); flex-shrink: 0; }
+.typed-dot[data-waiting] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--typed-wait); }
+.typed-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.typed-tag {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px;
+  background: var(--surface2); color: var(--text2); font-family: var(--typed-mono); font-size: 12px; line-height: 1; white-space: nowrap;
+}
+button.typed-tag { cursor: pointer; }
+button.typed-tag, button.typed-tag:not(:disabled):hover { transform: none; }
+.typed-tag[data-empty] { background: transparent; color: var(--typed-wait); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--typed-wait) 60%, transparent); }
+.typed-tag[data-kind="day"] { background: transparent; padding: 0 2px; color: var(--typed-day); }
+.typed-tag[data-kind="account"] { background: transparent; padding: 0 2px; color: var(--typed-account); }
+@media (hover: hover) and (pointer: fine) { button.typed-tag:not(:disabled):hover { background: var(--track); } }
+button.typed-tag:not(:disabled):active { opacity: .7; }
+.typed-tag:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 2px; }
+.typed-note { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.typed-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.typed-total { font-family: var(--typed-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+.typed-total > span { font-family: inherit; font-size: 12px; font-weight: 400; color: var(--muted); }
+.typed-primary {
+  min-height: 44px; padding: 0 18px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px;
+  background: var(--text); color: var(--bg); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.typed-primary[data-quiet], .typed-primary:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; }
+.typed-primary:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 3px; }
+
+/* Typing-mode header: "Today" as a title, the date in small mono capitals underneath (no chip, no icon). */
+button.typed-day { display: grid; justify-items: start; gap: 2px; min-height: 44px; padding: 2px 8px 2px 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+button.typed-day, button.typed-day:not(:disabled):hover { transform: none; }
+.typed-day-title { display: inline-flex; align-items: center; gap: 6px; font-size: 20px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em; }
+.typed-day-title svg { color: var(--muted); transition: transform var(--motion-fast) var(--ease-standard); }
+.typed-day-title svg[data-open] { transform: rotate(180deg); }
+.typed-day-date { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+button.typed-day:not(:disabled):active { opacity: .7; }
+button.typed-day:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 4px; border-radius: 8px; }
+button.typed-switch, button.typed-back { min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--text2); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+button.typed-switch, button.typed-switch:not(:disabled):hover, button.typed-back, button.typed-back:not(:disabled):hover { transform: none; }
+@media (hover: hover) and (pointer: fine) { button.typed-switch:not(:disabled):hover { background: var(--surface2); } }
+button.typed-switch:not(:disabled):active { opacity: .7; }
+button.typed-switch:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 2px; }
+.typed-hint-line { margin: 20px 0 0; font-size: 12px; line-height: 16px; color: var(--muted); }
+button.typed-back { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px 0 4px; margin-left: -4px; }
+@media (hover: hover) and (pointer: fine) { button.typed-back:not(:disabled):hover { background: var(--surface2); } }
+button.typed-back:not(:disabled):active { opacity: .7; }
+button.typed-back:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 2px; }
+
+/* Switching between writing and the form: the incoming view settles up 8px out of a slight blur, so the line
+   reads as becoming the form (and back). Occasional, so standard timing; opacity-only with Reduce Motion. */
+.composer-pane { transition: opacity var(--motion-standard) var(--ease-standard), transform var(--motion-standard) var(--ease-standard), filter var(--motion-standard) var(--ease-standard); }
+@starting-style { .composer-pane { opacity: 0; transform: translateY(8px); filter: blur(2px); } }
+/* Leaving is quicker than arriving: the system is just clearing the way. */
+.sheet-body[data-leaving] .composer-pane { opacity: 0; transform: translateY(-4px); transition-duration: var(--motion-fast); }
+@media (prefers-reduced-motion: reduce) {
+  .composer-pane { transition: opacity var(--motion-standard) ease; }
+  @starting-style { .composer-pane { transform: none; filter: none; } }
+  .sheet-body[data-leaving] .composer-pane { transform: none; }
+}
+
+/* Thinking on each line (prompt-kit's Text Shimmer): a light band sweeps across your words while the AI reads them.
+   The marked copy under the transparent textarea carries the sweep, so the caret and selection stay put. */
+.typed-line[data-reading] .typed-marks, .typed-line[data-reading] .typed-reading {
+  color: transparent;
+  background: linear-gradient(90deg, var(--muted) 0%, var(--muted) 40%, var(--text) 50%, var(--muted) 60%, var(--muted) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  animation: typed-shimmer 1.6s linear infinite;
+}
+.typed-line[data-reading] .typed-marks mark { color: inherit; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+@keyframes typed-shimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+/* As each line settles, its figure and tags arrive the way the views do. */
+.typed-margin > .typed-amount, .typed-margin > .typed-dot, .typed-tags { transition: opacity var(--motion-standard) var(--ease-standard), transform var(--motion-standard) var(--ease-standard); }
+@starting-style { .typed-margin > .typed-amount, .typed-margin > .typed-dot, .typed-tags { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .typed-line[data-reading] .typed-marks, .typed-line[data-reading] .typed-reading { animation: none; background: none; color: var(--muted); }
+  @starting-style { .typed-margin > .typed-amount, .typed-margin > .typed-dot, .typed-tags { transform: none; } }
+}

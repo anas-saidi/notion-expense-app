@@ -58,19 +58,22 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   const reached = goal > 0 && saved >= goal;
   const pct = goal > 0 ? Math.min(1, saved / goal) : 0;
   const when = goalLabel(cat.goalDate);
+  // A goal that missed its date gets its own line, in the colour for money that's short.
+  const pastDue = goal > 0 && !reached && when?.past ? `Past due · ${when.label}` : null;
   const line = goal > 0
-    ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(Math.round(goal))}${when ? ` ${when}` : ""}`
+    ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(Math.round(goal))}${when && !when.past ? ` by ${when.label}` : ""}`
     : Math.round(planned) > 0 ? `+${fmt(Math.round(planned))} this month`
     : Math.round(spent) > 0 ? `${fmt(Math.round(spent))} used`
     : null;
   // Without a goal, keep funded artwork clear.
   const level = goal > 0 ? pct : saved > 0 ? 1 : 0;
   return (
-    <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}`}>
+    <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}${pastDue ? `, goal past due since ${when!.label}` : ""}`}>
       <BudgetCategoryArtwork level={level} state={saved > 0 ? "normal" : "unfunded"} icon={categoryIconSource(cat.icon, cat.name)} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {line && <span style={{ ...lineStyle, color: reached ? "var(--status-good)" : "var(--muted)", fontWeight: reached ? 600 : 500 }}>{line}</span>}
+        {pastDue && <span style={{ ...lineStyle, color: "var(--danger)", fontWeight: 600 }}>{pastDue}</span>}
       </span>
       <TableCols planned={planned} spent={spent} />
       <span style={{ ...amountStyle, color: "var(--text2)" }}>{fmt(Math.round(saved))}</span>
@@ -105,12 +108,12 @@ function TableCols({ planned, spent }: { planned: number; spent: number }) {
   );
 }
 
-/** "by Dec 2026" for a future goal date, "due Dec 2025" once it has passed. */
-function goalLabel(date: string | null | undefined): string | null {
+/** The goal month ("Dec 2026") and whether that month has already ended. */
+function goalLabel(date: string | null | undefined): { label: string; past: boolean } | null {
   if (!date || !/^\d{4}-\d{2}/.test(date)) return null;
   const [year, month] = date.split("-").map(Number);
   const label = new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(new Date(year, month - 1, 1));
-  return date.slice(0, 7) < new Date().toISOString().slice(0, 7) ? `due ${label}` : `by ${label}`;
+  return { label, past: date.slice(0, 7) < new Date().toISOString().slice(0, 7) };
 }
 
 const rowStyle: CSSProperties = {

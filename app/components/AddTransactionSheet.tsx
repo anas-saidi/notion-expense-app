@@ -20,8 +20,8 @@ import { TransactionRow } from "./ui/TransactionRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { PickerPopover } from "./PickerPopover";
 import { Banner, bannerActionStyle } from "./ui/Banner";
-import { DateCalendar, DatePickerTrigger } from "./DatePicker";
-import { ArrowDownIcon, ArrowUpIcon, AlertTriangleIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, WriteIcon, XIcon } from "./ui/icons";
+import { DateCalendar } from "./DatePicker";
+import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, AlertTriangleIcon, CalendarIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, XIcon } from "./ui/icons";
 import { AccountOptionList, CategoryOptionList, pickerIconStyle, pickerChipIconStyle, pickerChipLabelStyle, pickerChipStyle } from "./TransactionPickers";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
@@ -84,6 +84,10 @@ type AddTransactionSheetProps = {
   onSelectDate: (value: string) => void;
   onSelectCategory: (category: Category) => void;
   onSelectAccount: (id: string) => void;
+  /** Fill the form from a recent transaction (amount, description, category, account). */
+  onUseRecent?: (transaction: Transaction) => void;
+  /** Open on the form instead of writing (e.g. arriving with a category already chosen). */
+  startInForm?: boolean;
   onCatSearchChange: (value: string) => void;
   repeat?: BillRepeat;
   onRepeatChange?: (repeat: BillRepeat) => void;
@@ -102,6 +106,33 @@ type AddTransactionSheetProps = {
 export function AddTransactionSheet(props: AddTransactionSheetProps) {
   const { haptic } = useAppHaptics();
   const [entryMode, setEntryMode] = useState<"form" | "type">("form");
+  // A written line opened in the form: put back if you return to writing without saving it.
+  const [movedLine, setMovedLine] = useState<{ source: string; date: string; accountId: string | null } | null>(null);
+  const [restoreLine, setRestoreLine] = useState<{ source: string; id: number } | null>(null);
+  // Switching views: the current one fades out (--motion-fast), then the next fades in (see .composer-pane).
+  const [leavingMode, setLeavingMode] = useState(false);
+  const leaveTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (leaveTimer.current) window.clearTimeout(leaveTimer.current); }, []);
+  const switchMode = (next: "form" | "type", apply?: () => void) => {
+    if (leaveTimer.current) return;
+    setLeavingMode(true);
+    leaveTimer.current = window.setTimeout(() => {
+      leaveTimer.current = null;
+      apply?.();
+      setEntryMode(next);
+      setLeavingMode(false);
+    }, 120);
+  };
+  const backToWriting = () => switchMode("type", () => {
+    // An unsaved line goes back to the list, and the writing defaults it changed are put back.
+    if (movedLine) {
+      setRestoreLine({ source: movedLine.source, id: Date.now() });
+      props.onSelectDate(movedLine.date);
+      props.onSelectAccount(movedLine.accountId ?? "");
+      setMovedLine(null); props.onAmountChange(""); props.onNameChange("");
+    }
+    setShowKeypad(false); props.onCloseDatePicker(); props.onCloseCatPicker(); props.onCloseAccountPicker();
+  });
   const [typedBusy, setTypedBusy] = useState(false);
   const [fundingSourceId, setFundingSourceId] = useState<string | null>(null);
   const [showFundPicker, setShowFundPicker] = useState(false);
@@ -119,6 +150,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
   useEffect(() => {
     if (props.open) {
+      // Adding starts by writing; editing and pre-chosen openers use the form.
+      setEntryMode(props.modeVariant === "edit" || props.startInForm || !props.onSaveTyped ? "form" : "type");
+      setMovedLine(null);
       requestAnimationFrame(() => {
         if (sheetContentRef.current) sheetContentRef.current.scrollTop = 0;
       });
@@ -138,7 +172,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     const previousStatus = previousStatusRef.current;
     previousStatusRef.current = props.status;
     if (!props.open || previousStatus === props.status) return;
-    if (props.status === "success") { haptic("success"); setRepeat("None"); setShowRepeat(false); }
+    if (props.status === "success") { haptic("success"); setRepeat("None"); setShowRepeat(false); setMovedLine(null); }
     if (props.status === "error") haptic("error");
   }, [haptic, props.open, props.status]);
 
@@ -229,25 +263,33 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
       panelStyle={panelStyle}
       contentStyle={{ paddingTop: 0, overflow: "hidden" }}
     >
-      <div className="sheet-body" ref={sheetContentRef} style={{ ...sheetInnerStyle, ...(entryMode === "type" ? { padding: "12px max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom))" } : {}), overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget || props.actualAfterSpending != null || props.balanceCheckUnavailable) ? "auto" : "hidden" }}>
+      <div className="sheet-body" ref={sheetContentRef} data-leaving={leavingMode || undefined} style={{ ...sheetInnerStyle, ...(entryMode === "type" ? { padding: "12px max(24px, env(safe-area-inset-left)) max(24px, env(safe-area-inset-bottom))" } : {}), overflowY: entryMode !== "type" && (amountFocused || showKeypad || props.categoryUnfunded || props.categoryOverBudget || props.actualAfterSpending != null || props.balanceCheckUnavailable) ? "auto" : "hidden" }}>
 
         {/* ── Header ── */}
         <SheetHeader style={topBarStyle}>
           {entryMode === "type" && !isEditMode ? <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div ref={props.dateRef}>
-              <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} className="typed-date-trigger" ariaLabel="Choose default date" onClick={props.onToggleDatePicker} style={{ ...pickerChipStyle, border: 0, paddingLeft: 0, fontSize: 20 }} showChevron={false} />
+              {/* Written-page header: the day as a title, the full date small underneath; tap to change the default day. */}
+              <button type="button" className="typed-day" aria-label={`Default date: ${props.selectedDateLabel}. Change`} aria-haspopup="dialog" aria-expanded={props.showDatePicker} onClick={props.onToggleDatePicker}>
+                <span className="typed-day-title">{props.selectedDateLabel}<ChevronDownIcon size={14} aria-hidden="true" data-open={props.showDatePicker || undefined} /></span>
+                <span className="typed-day-date">{new Date(`${props.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</span>
+              </button>
               <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="left" placement="bottom" size="calendar" zIndex={140} anchorRef={props.dateRef}>
                 <DateCalendar value={props.date} onChange={props.onSelectDate} />
               </PickerPopover>
             </div>
-          </div> : isEditMode ? <h2 style={dialogTitleStyle}>{isIncome ? "Edit income" : "Edit expense"}</h2> : <span aria-hidden="true" />}
-          <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
-            <XIcon strokeWidth={2.2} />
-          </button>
+          </div> : isEditMode ? <h2 style={dialogTitleStyle}>{isIncome ? "Edit income" : "Edit expense"}</h2>
+            : props.onSaveTyped ? <button type="button" className="typed-back" aria-label={movedLine ? "Back to writing, keeping this line" : "Back to writing"} disabled={props.status === "saving"} onClick={backToWriting}><ArrowLeftIcon size={18} aria-hidden="true" />Write</button>
+            : <span aria-hidden="true" />}
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
+              <XIcon strokeWidth={2.2} />
+            </button>
+          </div>
         </SheetHeader>
 
         {!isEditMode && entryMode === "form" && (
-          <div role="tablist" aria-label="Transaction type" style={typeSwitcherStyle}>
+          <div role="tablist" aria-label="Transaction type" className="composer-pane" style={typeSwitcherStyle}>
             <LiquidButton type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" disabled={typedBusy} onClick={() => selectTransactionType("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></LiquidButton>
             <LiquidButton type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" disabled={typedBusy} onClick={() => selectTransactionType("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></LiquidButton>
           </div>
@@ -265,8 +307,18 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           onSave={props.onSaveTyped}
           onComplete={props.onTypedComplete ?? (() => {})}
           onBusyChange={setTypedBusy}
+          restoreLine={restoreLine}
+          onOpenInForm={(line, row) => {
+            // The line moves into the form with everything it already knows.
+            props.onTransactionTypeChange(row.type);
+            props.onUseRecent?.({ id: `typed-${Date.now()}`, name: row.name, amount: row.amount, date: row.date, category: row.categoryId ?? null, accountId: row.accountId ?? null, type: row.type });
+            props.onSelectDate(row.date);
+            // Remember the writing defaults so coming back doesn't inherit this line's day and account.
+            setMovedLine({ source: line, date: props.date, accountId: props.selectedAccount?.id ?? null });
+            switchMode("form");
+          }}
         />}
-        {(isEditMode || entryMode === "form") && <div style={{ display: "contents" }}>
+        {(isEditMode || entryMode === "form") && <div className={isEditMode ? undefined : "composer-pane"} style={formPaneStyle}>
         {/* ── Amount hero ── */}
         <section style={{ ...heroWrapStyle, minHeight: showKeypad ? 96 : 120 }}>
           <AutoscaleAmountInput
@@ -379,16 +431,20 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </div>}
             </div>
 
-            {/* Date picker and writing mode */}
+            {/* Date picker: the same chip as account and category */}
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <div style={datePickerSlotStyle} ref={props.dateRef}>
-              <DatePickerTrigger label={props.selectedDateLabel} open={props.showDatePicker} ariaLabel="Choose date" onClick={props.onToggleDatePicker} style={pickerChipStyle} className="composer-picker-chip" showChevron={false} />
+              <LiquidButton onClick={props.onToggleDatePicker} aria-haspopup="dialog" aria-expanded={props.showDatePicker} aria-controls="date-picker" aria-label={`Date: ${props.selectedDateLabel}`}
+                style={{ ...pickerChipStyle, color: props.showDatePicker ? "var(--text2)" : "var(--muted)" }}>
+                <span style={pickerChipIconStyle}><CalendarIcon size={18} aria-hidden="true" /></span>
+                <span style={pickerChipLabelStyle}>{props.selectedDateLabel}</span>
+              </LiquidButton>
 
               <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="right" placement="top" size="calendar" zIndex={140} anchorRef={props.dateRef}>
                 <div id="date-picker"><DateCalendar value={props.date} onChange={props.onSelectDate} /></div>
               </PickerPopover>
             </div>
-            {!isEditMode && props.onSaveTyped && <button type="button" aria-label="Type it" aria-pressed={false} title="Type it" disabled={props.status === "saving"} onClick={() => { setEntryMode("type"); setShowKeypad(false); props.onCloseDatePicker(); props.onCloseCatPicker(); props.onCloseAccountPicker(); }} style={entryModeButtonStyle}><WriteIcon size={20} aria-hidden="true" /></button>}
+
             </div>
           </div>
 
@@ -534,7 +590,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
           {!showKeypad && !isEditMode && props.recentTransactions.length > 0 && (
             <section aria-label="Recent transactions" style={recentSectionStyle}>
-              <div style={recentHeaderStyle}>Recent</div>
+              <div style={recentHeaderStyle}>Recent · tap to reuse</div>
               <div className="row-list" style={recentListStyle}>
                 {props.recentTransactions.map((transaction) => {
                   const recentCategory = props.allCategories?.find((category) => category.id === transaction.category);
@@ -550,6 +606,11 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       prefix={isRecentIncome ? "+" : "−"}
                       date={transaction.date ? fmtDate(transaction.date) : undefined}
                       icon={isRecentIncome ? <BanknoteIcon size={13} /> : <CategoryIcon icon={recentCategory?.icon ?? null} categoryName={recentCategory?.name} size={22} />}
+                      onClick={props.onUseRecent ? () => {
+                        haptic("selection");
+                        props.onUseRecent?.(transaction);
+                        sheetContentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                      } : undefined}
                     />
                   );
                 })}
@@ -675,6 +736,9 @@ const panelStyle: CSSProperties = {
   flexDirection: "column",
   borderRadius: "var(--radius-sheet)",
 };
+
+/** The form's own column inside the sheet body: grows with its content, the sheet body scrolls. */
+const formPaneStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 8, flex: "1 0 auto", minHeight: 0 };
 
 const sheetInnerStyle: CSSProperties = {
   padding: "4px max(16px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-bottom))",
@@ -937,4 +1001,3 @@ const exprPreviewStyle: CSSProperties = {
   animation: "fadeUp 0.15s ease both",
 };
 
-const entryModeButtonStyle: CSSProperties = { width: 44, height: 44, flexShrink: 0, display: "grid", placeItems: "center", border: 0, borderRadius: 999, background: "transparent", color: "var(--text2)", cursor: "pointer" };

@@ -14,7 +14,7 @@ import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { Money } from "./Money";
 import { Banner } from "./ui/Banner";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { ChevronRightIcon, ChevronLeftIcon, PlusIcon, XIcon, ReceiptIcon, EditIcon, MoreIcon } from "./ui/icons";
+import { CalendarIcon, ChevronRightIcon, ChevronLeftIcon, PlusIcon, XIcon, ReceiptIcon, EditIcon, MoreIcon } from "./ui/icons";
 import { SkeletonRows } from "./ui/Skeleton";
 import { DatePicker, MonthPicker } from "./DatePicker";
 import { PickerPopover } from "./PickerPopover";
@@ -47,6 +47,8 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
   const moreRef = useRef<HTMLButtonElement>(null);
   const [search, setSearch] = useState("");
   const [day, setDay] = useState<string | null>(null);
+  // The list already shows each bill and its date; the calendar is there when you want it by day.
+  const [showCalendar, setShowCalendar] = useState(false);
   const categoryRef = useRef<HTMLButtonElement>(null); const accountRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (busy.current) return;
@@ -141,9 +143,9 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
         {saveError && <Banner role="alert" tone="danger" compact>{saveError}{savedPendingRefresh && <button type="button" className="bills-quiet-action" disabled={saving} onClick={retrySaved}>Refresh balances</button>}</Banner>}
         {loading ? <SkeletonRows /> : error ? <Banner role="alert" tone="danger" compact action={<button type="button" onClick={onRetry}>Retry</button>}>{error}</Banner> : <>
         {view === "list" && <>
-          <div className="bills-list-controls"><MonthPicker triggerClassName="composer-picker-chip" value={activeMonth} onChange={e => { setMonth(e.target.value); setDay(null); }} aria-label="Bill month" /><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div>
+          <div className="bills-list-controls"><MonthPicker triggerClassName="composer-picker-chip" value={activeMonth} onChange={e => { setMonth(e.target.value); setDay(null); }} aria-label="Bill month" /><div className="bills-list-actions"><button type="button" className="bills-quiet-action" aria-pressed={showCalendar} onClick={() => { setShowCalendar(!showCalendar); setDay(null); haptic("selection"); }}><CalendarIcon size={16} /> {showCalendar ? "Hide calendar" : "Calendar"}</button><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div></div>
           {billsSummary.length > 0 && <Summary>{joinClauses(billsSummary)}.</Summary>}
-          {activeMonth && <BillsCalendar month={activeMonth} today={data?.today ?? ""} bills={monthBills} categoryOf={categoryOf} selectedDay={day} onSelectDay={value => { setDay(day === value ? null : value); haptic("selection"); }} onOpenBill={details} />}
+          {activeMonth && showCalendar && <BillsCalendar month={activeMonth} today={data?.today ?? ""} bills={monthBills} categoryOf={categoryOf} selectedDay={day} onSelectDay={value => { setDay(day === value ? null : value); haptic("selection"); }} onOpenBill={details} />}
           {day ? <div className="bills-day-heading"><span>{new Date(`${day}T12:00:00`).toLocaleDateString("en", { weekday: "long", day: "numeric", month: "long" })}</span><button type="button" className="bills-quiet-action" onClick={() => setDay(null)}>Show all</button></div>
             : <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", ...(filter === "Overdue" ? ["Overdue" as const] : []), "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>}
           {shown.length ? <div className="row-list">{shown.map(bill => <BillRow key={bill.id} bill={bill} category={categoryOf(bill)} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={!day && filter === "Paid" ? activeMonth : undefined} hideDate={!!day} />)}</div> : <p className="bills-empty">No {filter.toLowerCase()} bills for this month.</p>}

@@ -112,16 +112,12 @@ export function AccountDetailsSheet({
   const [chartTxns, setChartTxns] = useState<Transaction[]>([]);
   const [chartLoading, setChartLoading] = useState(false);
 
-  // Activity list toggle
-  const [showAllActivity, setShowAllActivity] = useState(false);
-
   // Reset when sheet opens for a (possibly different) account
   useEffect(() => {
     if (open) {
       setChartMonth(homeMonth);
       setShowChart(false);
       setChartTxns([]);
-      setShowAllActivity(false);
       setLiveBalance(account?.balance ?? 0);
       setShowReconcile(startBalanceCheck);
       setCheckVersion(balanceCheck?.version ?? null);
@@ -221,7 +217,6 @@ export function AccountDetailsSheet({
     setReconcileError("");
     setShowChart(false);
     setChartTxns([]);
-    setShowAllActivity(false);
     setShowAddTxn(false);
     setAddedTxns([]);
     setTxnError("");
@@ -238,14 +233,6 @@ export function AccountDetailsSheet({
     setAddedTxns([]);
     setTxnError("");
   };
-
-  // All loaded transactions for this account (for recent activity list)
-  const accountTxns = useMemo(() => {
-    if (!account) return [];
-    return transactions
-      .filter(t => t.accountId === account.id)
-      .slice(0, 20);
-  }, [account, transactions]);
 
   // homeMonth transactions involving this account — expenses/income by accountId,
   // transfers by fromAccountId or toAccountId
@@ -828,45 +815,55 @@ export function AccountDetailsSheet({
             {reconcileError && (
               <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
             )}
-            <button type="button" onClick={() => void changeCheck("save")}
-              disabled={!Number.isFinite(parsedActual) || checkSaving || txnSaving || reconcileStatus === "saving"}
-              style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)", opacity: checkSaving || !Number.isFinite(parsedActual) ? 0.42 : 1 }}>
-              {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : savedCountForReview != null ? "Confirm balance" : "Save for later"}
-            </button>
-            {checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0 && <button type="button"
-              onClick={() => void changeCheck("close")} disabled={checkSaving || txnSaving || reconcileStatus === "saving"}
-              style={{ ...reconcileSubmitStyle, background: "var(--surface2)", color: "var(--text)" }}>Mark resolved</button>}
-
-            <button
-              type="button"
-              onClick={submitReconcile}
-              disabled={!Number.isFinite(parsedActual) || checkSaving || txnSaving || reconcileStatus === "saving" || reconcileStatus === "success"}
-              style={{
-                ...reconcileSubmitStyle,
-                opacity: !Number.isFinite(parsedActual) ? 0.42 : 1,
-                background: reconcileStatus === "success"
-                  ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
-                  : reconcileStatus === "error"
-                  ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
-                  : "var(--surface2)",
-                color: reconcileStatus === "success"
-                  ? "var(--success)"
-                  : reconcileStatus === "error"
-                  ? "var(--danger)"
-                  : "var(--text)",
-              }}
-            >
-              {reconcileStatus === "saving" && (
-                <span style={spinnerStyle} />
-              )}
-              {reconcileStatus === "success" && <CheckIcon size={15} />}
-              {reconcileStatus === "saving" ? "Saving..." :
-               reconcileStatus === "success" ? "Reconciled" :
-               reconcileStatus === "error" ? "Retry" :
-               isFullyReconciled ? "Mark as reconciled" :
-               difference !== null ? "Reconcile difference" :
-               "Reconcile ledger"}
-            </button>
+            {(() => {
+              // One main button that follows the difference; saving the count for later stays a quiet link.
+              const busy = checkSaving || txnSaving || reconcileStatus === "saving";
+              const canResolve = Boolean(checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0);
+              const showSaveLink = Number.isFinite(parsedActual) && !isFullyReconciled && reconcileStatus !== "success";
+              return <>
+                {canResolve ? (
+                  <button type="button" onClick={() => void changeCheck("close")} disabled={busy}
+                    style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)" }}>
+                    {checkSaving ? "Saving…" : "Mark resolved"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={submitReconcile}
+                    disabled={!Number.isFinite(parsedActual) || busy || reconcileStatus === "success"}
+                    style={{
+                      ...reconcileSubmitStyle,
+                      opacity: !Number.isFinite(parsedActual) ? 0.42 : 1,
+                      background: reconcileStatus === "success"
+                        ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
+                        : reconcileStatus === "error"
+                        ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
+                        : "var(--accent)",
+                      color: reconcileStatus === "success"
+                        ? "var(--success)"
+                        : reconcileStatus === "error"
+                        ? "var(--danger)"
+                        : "var(--accent-ink)",
+                    }}
+                  >
+                    {reconcileStatus === "saving" && (
+                      <span style={spinnerStyle} />
+                    )}
+                    {reconcileStatus === "success" && <CheckIcon size={15} />}
+                    {reconcileStatus === "saving" ? "Saving..." :
+                     reconcileStatus === "success" ? "Reconciled" :
+                     reconcileStatus === "error" ? "Retry" :
+                     isFullyReconciled ? "Mark as reconciled" :
+                     "Reconcile difference"}
+                  </button>
+                )}
+                {showSaveLink && (
+                  <button type="button" onClick={() => void changeCheck("save")} disabled={busy} style={saveForLaterLinkStyle}>
+                    {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : savedCountForReview != null ? "Confirm balance" : "Save for later"}
+                  </button>
+                )}
+              </>;
+            })()}
           </SheetBody>
           </BottomSheet>
         )}
@@ -875,24 +872,16 @@ export function AccountDetailsSheet({
         <div className="account-desktop-activity">
         {/* Activity list */}
         {(() => {
-          const shownTxns = showAllActivity ? allActivityTxns : accountTxns;
+          // One list for the month: expenses, income and transfers in or out of this account.
+          const shownTxns = allActivityTxns;
           const acctId = account.id;
           return (
             <div style={sectionStyle}>
               <div style={sectionHeaderStyle}>
-                <p style={sectionLabelStyle}>
-                  {showAllActivity ? `Activity in ${fmtMonth(homeMonth)}` : "Recent activity"}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowAllActivity(v => !v)}
-                  style={seeAllBtnStyle}
-                >
-                  {showAllActivity ? "Recent" : "All"}
-                </button>
+                <p style={sectionLabelStyle}>Activity in {fmtMonth(homeMonth)}</p>
               </div>
               {shownTxns.length === 0 ? (
-                <p style={emptyStyle}>No activity{showAllActivity ? ` in ${fmtMonth(homeMonth)}` : ""}.</p>
+                <p style={emptyStyle}>No activity in {fmtMonth(homeMonth)}.</p>
               ) : (
                 <div className="row-list" style={{ display: "grid", gap: 6 }}>
                   {shownTxns.map(t => {
@@ -1476,14 +1465,15 @@ const sectionHeaderStyle: CSSProperties = {
   justifyContent: "space-between",
 };
 
-const seeAllBtnStyle: CSSProperties = {
+const saveForLaterLinkStyle: CSSProperties = {
+  justifySelf: "center",
   border: "none",
   background: "transparent",
-  fontSize: 12,
+  padding: "4px 8px",
+  fontSize: 14,
   fontWeight: 600,
   color: "var(--text2)",
   cursor: "pointer",
-  padding: "2px 0",
 };
 
 // Category breakdown

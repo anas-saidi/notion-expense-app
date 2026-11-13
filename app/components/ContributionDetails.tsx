@@ -2,10 +2,11 @@
 
 import { SheetHeader } from "./ui/SheetLayout";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { BudgetScope } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
-import { contributionDue } from "./contribution-utils";
+import { contributionDue, type DirectSpend } from "./contribution-utils";
+import { CategoryIcon } from "./ui/CategoryIcon";
 import type { ContributionAgreement, ContributionLedger, Partner, PartnerAmounts } from "../../lib/contribution-agreements";
 import { money } from "../../lib/contribution-agreements";
 import { fmt, parseAmount, today } from "./app-utils";
@@ -13,9 +14,25 @@ import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
 import { DatePicker, MonthPicker } from "./DatePicker";
-import { XIcon, ChevronRightIcon, ChevronDownIcon } from "./ui/icons";
+import { XIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
+import { MascotHero } from "./mascot/MascotHero";
+import { Summary, Fact } from "./ui/Summary";
+
+const MASCOT_SIZE = 200;
 import { SkeletonRows } from "./ui/Skeleton";
 import "./contributions.css";
+
+/**
+ * Opens content in place: the space grows while the content fades and settles 4px down.
+ * Always mounted so closing can animate too; closed content is inert (no focus, no screen reader).
+ */
+function Reveal({ open, children, label }: { open: boolean; children: ReactNode; label?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (open) ref.current?.removeAttribute("inert"); else ref.current?.setAttribute("inert", ""); }, [open]);
+  return <div ref={ref} className="contribution-reveal" data-open={open || undefined} aria-label={label} aria-hidden={!open}>
+    <div className="contribution-reveal-inner">{children}</div>
+  </div>;
+}
 
 export const contributionMonthName = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleDateString("en", { month: "long", year: "numeric" });
 const person = (partner: Partner) => partner === "anas" ? "Anas" : "Salma";
@@ -31,15 +48,23 @@ export function ContributionEntry({ status, scope, onOpen, advancesOnly = false 
   </button>;
 }
 
-export function ContributionAgreementEditor({ month, agreement, proposed, shares, disabled = false, showHeading = true, onSaved }: {
-  month: string; agreement?: ContributionAgreement; proposed: PartnerAmounts; shares: PartnerAmounts; disabled?: boolean; showHeading?: boolean; onSaved: () => void;
+export function ContributionAgreementEditor({ month, agreement, proposed, shares, disabled = false, showHeading = true, showAmounts = true, onSaved, editing: controlledEditing, onEditingChange }: {
+  month: string; agreement?: ContributionAgreement; proposed: PartnerAmounts; shares: PartnerAmounts; disabled?: boolean; showHeading?: boolean;
+  /** Off where the agreed amounts are already shown next to each partner. */
+  showAmounts?: boolean; onSaved: () => void;
+  /** Controlled: something else (a tappable fact) opens the editor, so no trigger button is drawn. */
+  editing?: boolean; onEditingChange?: (editing: boolean) => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [ownEditing, setOwnEditing] = useState(false);
+  const controlled = controlledEditing !== undefined;
+  const editing = controlled ? controlledEditing : ownEditing;
+  const setEditing = (value: boolean) => { if (controlled) onEditingChange?.(value); else setOwnEditing(value); };
   const [anas, setAnas] = useState("");
   const [salma, setSalma] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { setEditing(false); setError(""); }, [month, agreement?.version]);
+  useEffect(() => { setEditing(false); setError(""); }, [month, agreement?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (controlled && controlledEditing) { setAnas(String(agreement?.targets.anas ?? money(proposed.anas))); setSalma(String(agreement?.targets.salma ?? money(proposed.salma))); setError(""); } }, [controlled, controlledEditing]); // eslint-disable-line react-hooks/exhaustive-deps
   const edit = () => { setAnas(String(agreement?.targets.anas ?? money(proposed.anas))); setSalma(String(agreement?.targets.salma ?? money(proposed.salma))); setEditing(true); setError(""); };
   const save = async () => {
     const a = parseAmount(anas), s = parseAmount(salma);
@@ -55,7 +80,7 @@ export function ContributionAgreementEditor({ month, agreement, proposed, shares
   };
   return <section className="contribution-agreement" aria-label="Monthly contribution agreement">
     {showHeading && <h3>Agreed contributions</h3>}
-    {editing ? <>
+    {editing || controlled ? <>
       <div className="contribution-fields">
         <label>Anas<input className="field-input" inputMode="decimal" value={anas} onChange={e => setAnas(e.target.value)} disabled={saving} /></label>
         <label>Salma<input className="field-input" inputMode="decimal" value={salma} onChange={e => setSalma(e.target.value)} disabled={saving} /></label>
@@ -63,15 +88,19 @@ export function ContributionAgreementEditor({ month, agreement, proposed, shares
       <p className="contribution-note">Extra contributions are repayable advances.</p>
       <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving || disabled} onClick={() => void save()}>{saving ? "Confirming…" : "Confirm"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setEditing(false)}>Cancel</button></div>
     </> : <>
-      {agreement && <dl className="contribution-rows"><div><dt>Anas</dt><dd><Money value={agreement.targets.anas} /></dd></div><div><dt>Salma</dt><dd><Money value={agreement.targets.salma} /></dd></div></dl>}
-      <button type="button" className="contribution-text" disabled={disabled} onClick={edit}>{agreement ? "Change" : "Set contributions"}</button>
+      {agreement && showAmounts && <dl className="contribution-rows"><div><dt>Anas</dt><dd><Money value={agreement.targets.anas} /></dd></div><div><dt>Salma</dt><dd><Money value={agreement.targets.salma} /></dd></div></dl>}
+      {!controlled && <button type="button" className="contribution-text" disabled={disabled} onClick={edit}>{agreement ? showAmounts ? "Change" : "Change agreed amounts" : "Set contributions"}</button>}
     </>}
     {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
   </section>;
 }
 
-export function ContributionDetails({ open, month, scope, status, currentAdvances, loading, error, onClose, onChanged, onRetry, onMonthChange }: {
-  open: boolean; month: string; scope: BudgetScope; status: ContributionStatus | null; loading: boolean; error: boolean;
+export function ContributionDetails({ open, month, personalScope, initialPartner, status, currentAdvances, loading, error, onClose, onChanged, onRetry, onMonthChange }: {
+  open: boolean; month: string;
+  /** The signed-in person: the sheet answers for them only. */
+  personalScope: Partner;
+  /** The partner whose figure was tapped to open this; their jar starts in front. */
+  initialPartner?: Partner; status: ContributionStatus | null; loading: boolean; error: boolean;
   currentAdvances: ContributionLedger | null; onMonthChange: (month: string) => void;
   onClose: () => void; onChanged: () => void; onRetry: () => void;
 }) {
@@ -84,14 +113,13 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
   const [success, setSuccess] = useState("");
   const requestId = useRef("");
   const [applying, setApplying] = useState<Partner | null>(null);
+  // Tapping the agreed amount opens the editor in place. The partner in front is the one shown.
+  const [shown, setShown] = useState<Partner>(initialPartner ?? personalScope);
+  const [editingAgreement, setEditingAgreement] = useState(false);
   const applyIds = useRef<Partial<Record<Partner, string>>>({});
-  useEffect(() => { if (open) { setRepaying(null); setSaveError(""); setSuccess(""); setUncertain(false); } }, [open, month]);
+  useEffect(() => { if (open) { setShown(initialPartner ?? personalScope); setEditingAgreement(false); setRepaying(null); setSaveError(""); setSuccess(""); setUncertain(false); } }, [open, month]);
   const ledger = currentAdvances;
-  const current = ledger?.months.find(m => m.month === month);
   const outstanding = ledger?.outstanding ?? { anas: 0, salma: 0 };
-  const partners: Partner[] = scope === "joint" ? ["anas", "salma"] : [scope];
-  const scopedOwed = money(partners.reduce((sum, partner) => sum + outstanding[partner], 0));
-  const scopedDue = money(partners.reduce((sum, partner) => sum + (status ? contributionDue(status, partner) : 0), 0));
   // An advance comes off this month's contribution: the offset is dated today, so only the current month can take it.
   const canApply = month === today().slice(0, 7);
   const applicable = (partner: Partner) => canApply && status ? money(Math.min(outstanding[partner], contributionDue(status, partner))) : 0;
@@ -121,58 +149,93 @@ export function ContributionDetails({ open, month, scope, status, currentAdvance
     } catch (e) { if (e instanceof TypeError) setUncertain(true); setSaveError(e instanceof Error ? e.message : "Could not verify the repayment. Retry with the same details to check it safely."); }
     finally { setSaving(false); }
   };
-  // The hero already says "No agreed amounts" in this case, so the editor heading would repeat it.
-  const heroSaysNoAgreement = !!status && !status.agreement && scopedOwed <= 0 && scopedDue <= 0;
-  const agreementEditor = status ? <ContributionAgreementEditor showHeading={!status.agreement && !heroSaysNoAgreement} month={month} agreement={status.agreement}
+  // The hero already shows the agreed amount, so the editor is only the action beside it.
+  const agreementEditor = status ? <ContributionAgreementEditor showHeading={false} showAmounts={false} editing={editingAgreement} onEditingChange={setEditingAgreement} month={month} agreement={status.agreement}
     proposed={{ anas: Math.max(0, money(status.anasPlan - status.anasPersonalDebt)), salma: Math.max(0, money(status.salmaPlan - status.salmaPersonalDebt)) }}
     shares={status.agreement?.shares ?? { anas: .65, salma: .35 }} disabled={saving || !!repaying} onSaved={onChanged} /> : null;
   return <BottomSheet open={open} onClose={() => { if (!saving) onClose(); }} label="Monthly contributions" size="standard" detent="content">
     <div className="contribution-sheet sheet-body">
-      <SheetHeader className="contribution-header"><h2>Contributions</h2><button type="button" className="contribution-close" aria-label="Close contributions" disabled={saving} onClick={onClose}><XIcon size={20} /></button></SheetHeader>
-      <MonthPicker value={month} onChange={event => onMonthChange(event.target.value)} aria-label="Contribution month" />
+      <SheetHeader className="contribution-header"><h2>Contributions</h2>
+        <button type="button" className="contribution-close" aria-label="Close contributions" disabled={saving} onClick={onClose}><XIcon size={20} /></button></SheetHeader>
+      {/* The same month chip as the Budget screen: past months stay reviewable for advances and repayments. */}
+      <div className="contribution-toolbar"><MonthPicker value={month} max={today().slice(0, 7)} onChange={event => event.target.value && onMonthChange(event.target.value)} aria-label="Contribution month" triggerClassName="composer-picker-chip" showChevron={false} /></div>
       {loading ? <SkeletonRows label="Loading contributions" count={4} /> : error || !status ? <Banner tone="danger" role="alert" title="Contributions unavailable" action={<button className="contribution-text" type="button" onClick={onRetry}>Retry</button>} /> : <>
-        <section className="contribution-overview" aria-label="Contribution summary">
-          {scopedOwed > 0 ? <><span>Advances to apply</span><p className="contribution-hero-amount"><Money value={scopedOwed} currency /></p>
-            <span className="contribution-note">{partners.some(partner => applicable(partner) > 0) ? "Apply an advance to reduce that person’s contribution. No money moves." : "Reduces a future monthly contribution."}</span></>
-            : scopedDue > 0 ? <><span>Contributions due</span><p className="contribution-hero-amount"><Money value={scopedDue} currency /></p></>
-            : <p className="contribution-all-settled">{status.agreement ? "All settled" : "No agreed amounts"}</p>}
-        </section>
-        <div className="contribution-people">
-        {partners.map(partner => {
-          const actual = partner === "anas" ? status.anasActual : status.salmaActual;
-          const target = status.agreement?.targets[partner];
-          const due = contributionDue(status, partner);
-          return <section className="contribution-person" data-partner={partner} key={`${month}-${partner}`} aria-label={`${person(partner)} contributions`}>
-            <div className="contribution-person-main">
-              <div className="contribution-person-summary">
-                <span className="contribution-person-name"><strong>{person(partner)}</strong>{due > 0.005 ? <span>{fmt(due)} due to Joined</span> : null}</span>
-              </div>
-              <details className="contribution-breakdown">
-                <summary aria-label={`View breakdown for ${person(partner)}`}><span>View breakdown</span><ChevronDownIcon size={16} aria-hidden="true" /></summary>
-              <dl className="contribution-rows">
-                {status.agreement && <div><dt>Original</dt><dd><Money value={status.agreement.original[partner]} /></dd></div>}
-                {target != null && target !== status.agreement?.original[partner] && <div><dt>Agreed</dt><dd><Money value={target} /></dd></div>}
-                <div><dt>Contributed</dt><dd><Money value={actual} /></dd></div>
-                {current && <div><dt>Above original</dt><dd><Money value={current.aboveOriginal[partner]} /></dd></div>}
-                {current && current.repaid[partner] > 0 && <div><dt>Repaid</dt><dd><Money value={current.repaid[partner]} /></dd></div>}
-                {outstanding[partner] > 0 && <div><dt>Advance</dt><dd><Money value={outstanding[partner]} /></dd></div>}
-              </dl>
-              {outstanding[partner] > 0 && <button className="contribution-text" type="button" disabled={saving || !!repaying || !!applying} onClick={() => startRepayment(partner)}>Record repayment</button>}
-              </details>
-            </div>
-            {applicable(partner) > 0 && <button className="contribution-primary" type="button" disabled={saving || !!repaying || !!applying} aria-label={`Apply ${fmt(applicable(partner))} MAD of ${person(partner)}'s advance to this month`} onClick={() => void applyAdvance(partner)}>{applying === partner ? "Applying…" : <>Apply <Money value={applicable(partner)} /></>}</button>}
-          </section>;
-        })}
-        </div>
+        {(() => {
+          // Both jars; the one in front is whose answers show (the partner tapped to get here, else you).
+          const me = shown;
+          const actual = me === "anas" ? status.anasActual : status.salmaActual;
+          const directTotal = me === "anas" ? status.anasDirectSpend : status.salmaDirectSpend;
+          const direct = Math.min(Math.max(0, directTotal), Math.max(0, actual));
+          const target = status.agreement?.targets[me] ?? (me === "anas" ? status.anasPlan : status.salmaPlan);
+          const left = Math.max(0, money(contributionDue(status, me)));
+          const levelFor = (partner: Partner) => {
+            const goal = status.agreement?.targets[partner] ?? (partner === "anas" ? status.anasPlan : status.salmaPlan);
+            const due = Math.max(0, contributionDue(status, partner));
+            return goal > 0 ? Math.min(1, Math.max(0, (goal - due) / goal)) : 1;
+          };
+          return <ContributionSummary key={`${month}-${me}`} partner={me} agreed={!!status.agreement} target={target}
+            contributed={Math.max(0, actual)} sent={Math.max(0, money(actual - direct))} left={left} categories={status.directByCategory?.[me] ?? []}
+            advance={outstanding[me]} applicable={applicable(me)} busy={saving || !!repaying || !!applying} applying={applying === me}
+            onApply={() => void applyAdvance(me)} onRepay={() => startRepayment(me)} agreementAction={agreementEditor}
+            onEditAgreement={() => setEditingAgreement(value => !value)} editingAgreement={editingAgreement}
+            isMe={me === personalScope} levels={{ anas: levelFor("anas"), salma: levelFor("salma") }} onShow={partner => { setShown(partner); setEditingAgreement(false); }} />;
+        })()}
         {ledger && ledger.unappliedRepayments.anas + ledger.unappliedRepayments.salma > 0 && <Banner tone="warning" role="alert">A corrected agreement or transaction left a repayment above the advance. Review repayment activity.</Banner>}
         {repaying && <section className="contribution-repay"><h3>Record repayment</h3><label>Repayment amount<input autoFocus className="field-input" inputMode="decimal" value={amount} disabled={saving || uncertain} onChange={e => { setAmount(e.target.value); requestId.current = crypto.randomUUID(); }} /></label>{uncertain || saving ? <span className="contribution-note">Repayment date: {date}</span> : <DatePicker value={date} max={today()} onChange={event => { setDate(event.target.value); requestId.current = crypto.randomUUID(); }} aria-label="Date money was returned" />}
           <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving} onClick={() => void repay()}>{saving ? "Recording…" : uncertain ? "Check repayment" : "Save repayment"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setRepaying(null)}>Cancel</button></div>
         </section>}
         {saveError && <Banner tone="danger" role="alert">{saveError}</Banner>}{success && <p role="status">{success}</p>}
-        {status.agreement ? <details className="contribution-disclosure" key={`agreement-${month}`}><summary><span>Agreed contributions</span><ChevronDownIcon size={16} aria-hidden="true" /></summary>
-          {agreementEditor}
-        </details> : agreementEditor}
       </>}
     </div>
   </BottomSheet>;
+}
+
+/**
+ * What's left to cover up front, one sentence, then where the paid amount went: sent to Joined,
+ * or Joint spending paid directly. Tap the agreed amount to change it.
+ */
+function ContributionSummary({ partner, target, agreed, contributed, sent, left, categories, advance, applicable, busy, applying, onApply, onRepay, agreementAction, onEditAgreement, editingAgreement, levels, onShow, isMe }: {
+  partner: Partner; target: number; agreed: boolean; contributed: number; sent: number; left: number; categories: DirectSpend[];
+  advance: number; applicable: number; busy: boolean; applying: boolean; onApply: () => void; onRepay: () => void;
+  /** The agreement editor, opened by tapping the agreed amount. */
+  agreementAction?: ReactNode;
+  onEditAgreement: () => void; editingAgreement: boolean;
+  /** Each partner's jar level (share of their agreed amount in), and switching who's in front. */
+  levels: { anas: number; salma: number }; onShow: (partner: Partner) => void;
+  /** The signed-in person is in front: the sentence says "You". */
+  isMe: boolean;
+}) {
+  const whole$ = (value: number) => fmt(Math.round(value));
+  const level = target > 0 ? Math.min(1, Math.max(0, (target - left) / target)) : 1;
+  return <>
+    <section className="contribution-left" aria-label="Left to cover">
+      {/* Both of you, cuddled up; the one whose figures show sits in front, the other steps back. Tap the back jar to switch. */}
+      <MascotHero variant="pool" scope="joint" size={MASCOT_SIZE} spentPct={null} level={level} warn={null} levels={levels} front={partner} style={{ marginBottom: -8 }}
+        wrapJar={(jarPartner, jar) => <button type="button" className="contribution-jar" data-front={jarPartner === partner || undefined} aria-pressed={jarPartner === partner}
+          aria-label={jarPartner === partner ? `Showing ${person(jarPartner)}` : `Show ${person(jarPartner)}`} onClick={() => jarPartner !== partner && onShow(jarPartner)}>{jar}</button>} />
+      <span className="contribution-who">{person(partner)}</span>
+      <span>Left to cover</span>
+      {left >= 0.5
+        ? <strong className="contribution-due"><Money value={Math.round(left)} currency /></strong>
+        : <strong>All covered</strong>}
+      <Summary className="contribution-summary">
+        {isMe ? "You" : person(partner)} paid <Fact>{whole$(contributed)}</Fact> of{" "}
+        <Fact onClick={onEditAgreement} label={agreed ? `Change agreed amounts, ${whole$(target)} MAD agreed` : `Set contributions, ${whole$(target)} MAD planned`}>{whole$(target)} {agreed ? "agreed" : "planned"}</Fact>.
+      </Summary>
+      <Reveal open={editingAgreement}>{agreementAction}</Reveal>
+      {/* Advances change what's left, so their actions sit with it. */}
+      {(advance > 0 || applicable > 0) && <div className="contribution-advance">
+        {advance > 0 && <span>Advance {whole$(advance)}</span>}
+        {applicable > 0 && <button className="contribution-primary" type="button" disabled={busy} aria-label={`Apply ${fmt(applicable)} MAD of ${person(partner)}'s advance to this month`} onClick={onApply}>{applying ? "Applying…" : <>Apply <Money value={applicable} /></>}</button>}
+        {advance > 0 && <button className="contribution-text" type="button" disabled={busy} onClick={onRepay}>Record repayment</button>}
+      </div>}
+    </section>
+    {contributed >= 0.5 && <section className="contribution-in" aria-label="Where your contribution went">
+      <ul>
+        {sent >= 0.5 && <li><span className="contribution-in-icon" aria-hidden="true"><TransferIcon size={14} /></span><span className="contribution-in-name">Sent to Joined</span><span>{whole$(sent)}</span></li>}
+        {categories.length > 0 && <li className="contribution-in-group">Paid directly</li>}
+        {categories.map(category => <li key={category.categoryId}><CategoryIcon icon={category.icon} categoryName={category.name} size={24} /><span className="contribution-in-name">{category.name}</span><span>{whole$(category.amount)}</span></li>)}
+      </ul>
+    </section>}
+  </>;
 }

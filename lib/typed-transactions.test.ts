@@ -45,3 +45,15 @@ it("supports mixed types and a default date without changing relative dates", ()
   expect(rows.map(row => [row.transaction?.type, row.transaction?.date])).toEqual([["Expense", "2026-09-01"], ["Income", "2026-09-26"]]);
 });
 it.each(["salary -5000", "paid +20 taxi", "netflix 15 every month"])("rejects conflicting or unsupported instructions: %s", line => expect(parse(line)[0].error).toBeTruthy());
+
+it("leaves split bills for the AI read instead of taking the head count as the amount", () => {
+  const [row] = parseTransactionLines("dinner w the team split 4 ways 136");
+  expect(row.transaction).toBeUndefined();
+  expect(row.error).toMatch(/split/i);
+});
+
+it("reads a plain weekday as the most recent past one, so dates written as weekdays round-trip", () => {
+  const friday = new Date(2026, 10, 13, 12);
+  const [row] = parseTransactionLines("pizza 14 wednesday", friday);
+  expect(row.transaction?.date).toBe("2026-11-11");
+});

@@ -25,7 +25,11 @@ export type ContributionStatus = {
   salmaDirectSpend: number;
   anasTransferred: number;
   salmaTransferred: number;
+  /** Joint spending each partner paid from their own account, by category, largest first. */
+  directByCategory?: { anas: DirectSpend[]; salma: DirectSpend[] };
 };
+
+export type DirectSpend = { categoryId: string; name: string; icon: string | null; amount: number };
 
 export function contributionDue(status: ContributionStatus, partner: "anas" | "salma") {
   return partner === "anas" ? status.anasDue ?? Math.max(0, status.anasPlan - status.anasActual) : status.salmaDue ?? Math.max(0, status.salmaPlan - status.salmaActual);
@@ -87,6 +91,7 @@ export function calculateContributionStatus({
   let salmaTransferred = 0;
   let anasDirectSpend = 0;
   let salmaDirectSpend = 0;
+  const direct = { anas: new Map<string, DirectSpend>(), salma: new Map<string, DirectSpend>() };
 
   for (const transaction of transactions) {
     if (transaction.type === "Transfer") {
@@ -120,9 +125,16 @@ export function calculateContributionStatus({
     const category = historicalCategories.find((candidate) => normalizeId(candidate.id) === normalizeId(transaction.category));
     if (!category || isSavingsCategory(category) || !categoryMatchesScope(category, "joint", accounts)) continue;
     const payerLabel = accountLabel(accounts, transaction.accountId);
-    if (payerLabel.includes("hubb")) anasDirectSpend += transaction.amount;
-    else if (payerLabel.includes("wife")) salmaDirectSpend += transaction.amount;
+    const payer = payerLabel.includes("hubb") ? "anas" : payerLabel.includes("wife") ? "salma" : null;
+    if (!payer) continue;
+    if (payer === "anas") anasDirectSpend += transaction.amount;
+    else salmaDirectSpend += transaction.amount;
+    const key = normalizeId(category.id);
+    const entry = direct[payer].get(key) ?? { categoryId: category.id, name: category.name, icon: category.icon ?? null, amount: 0 };
+    entry.amount += transaction.amount;
+    direct[payer].set(key, entry);
   }
+  const byAmount = (map: Map<string, DirectSpend>) => [...map.values()].filter(entry => entry.amount >= 0.005).sort((a, b) => b.amount - a.amount);
 
   const openingJointBalance = (joinedAccount.balance ?? 0) - joinedInflows + joinedOutflows;
   // Current ledger availability includes carry-over and category rebalancing.
@@ -170,5 +182,6 @@ export function calculateContributionStatus({
     salmaDirectSpend,
     anasTransferred,
     salmaTransferred,
+    directByCategory: { anas: byAmount(direct.anas), salma: byAmount(direct.salma) },
   };
 }

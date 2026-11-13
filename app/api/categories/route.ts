@@ -110,6 +110,13 @@ async function handlePATCH(req: NextRequest) {
     if (body.spendingPattern !== null && !isSpendingPattern(body.spendingPattern)) return NextResponse.json({ error: "Choose a valid spending pattern" }, { status: 400 });
     properties[SPENDING_PATTERN_PROPERTY] = { select: body.spendingPattern === null ? null : { name: body.spendingPattern } };
   }
+  const updatingGoalDate = "goalDate" in body;
+  if (updatingGoalDate) {
+    if (body.goalDate !== null && (typeof body.goalDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.goalDate) || Number.isNaN(Date.parse(body.goalDate)))) {
+      return NextResponse.json({ error: "Choose a valid goal date" }, { status: 400 });
+    }
+    properties["Goal Date"] = { date: body.goalDate === null ? null : { start: body.goalDate } };
+  }
   if (typeof body.snoozed === "boolean") properties.Snooze = { checkbox: body.snoozed };
   if (typeof body.archived === "boolean") properties.Archived = { checkbox: body.archived };
   const editing = ["name", "icon", "type", "accountId"].some(key => key in body);
@@ -122,7 +129,7 @@ async function handlePATCH(req: NextRequest) {
   if (!editing && !Object.keys(properties).length) return NextResponse.json({ error: "No category updates provided" }, { status: 400 });
 
   try {
-    if (editing || updatingPattern) {
+    if (editing || updatingPattern || updatingGoalDate) {
       const categoryRes = await fetch(`https://api.notion.com/v1/pages/${id}`, { headers: notionHeaders(token), cache: "no-store" });
       const category = await categoryRes.json();
       if (!categoryRes.ok) return NextResponse.json({ error: category.message || "Could not read category" }, { status: categoryRes.status });

@@ -96,7 +96,7 @@ type MonthPlanSheetProps = {
   /** Opens the partner's over-assigned account, where the commitment behind a blocker can actually be fixed. */
   onOpenOverAssigned?: (partner: "anas" | "salma") => void;
   /** Opens Contributions, where each person's advance and its repayment live. */
-  onOpenContributions?: () => void;
+  onOpenContributions?: (partner?: "anas" | "salma") => void;
   personalScope: Exclude<BudgetScope, "joint">;
   categories: Category[];
   frozenCategories: Category[];
@@ -315,7 +315,9 @@ export function MonthPlanSheet({
   // Never "for this plan": with nothing planned, every shortfall is one that already exists.
   const name = (partner: "anas" | "salma") => BUDGET_SCOPE_LABELS[partner];
   const roundUp = (value: number) => fmt(Math.ceil(value - 0.005));
-  const jointCovered = capacity.due.anas + capacity.due.salma > 0.005;
+  // Once contributions are agreed and the plan is unchanged, the "due" rows are the only contribution figure shown.
+  const agreedSettled = !!agreement && changed.length === 0;
+  const jointCovered = !agreedSettled && capacity.due.anas + capacity.due.salma > 0.005;
   const jointReason = planningCapacity.joint < 0 && totals.joint > 0 ? "Couple is already short and its plan needs more"
     : planningCapacity.joint < 0 ? "Couple is already short" : "Couple's plan needs more than it holds";
   // Each view only talks about its own money: Joint names who covers its gap; a partner's view adds their own shortfall.
@@ -340,20 +342,20 @@ export function MonthPlanSheet({
   </Summary>;
 
   const capacityLabel = left < 0 ? "Over capacity" : "Unassigned";
-  const partnerRemaining = contributionsReady
+  const partnerRemaining = scope !== "joint" ? null : contributionsReady
     ? <PlanPartnerRemaining scope={scope} left={capacity.left} />
     : <SkeletonRegion label="Loading remaining amounts"><Skeleton style={{ width: 140, height: 14, marginBottom: 12 }} /><Skeleton style={{ height: 40 }} /></SkeletonRegion>;
 
   // After Joint's plan is saved, each partner sees what's left of their share, kept current by every transfer to
   // Joined and every Joint bill they pay from their own account. Advances are applied from Contributions.
   const monthLedger = advances?.months.find((m) => m.month === planningMonth);
-  const contributionRows = scope !== "joint" || !agreement || changed.length > 0 ? [] : (["anas", "salma"] as const).flatMap((partner) => {
+  const contributionRows = !agreedSettled ? [] : (scope === "joint" ? ["anas", "salma"] as const : [scope]).flatMap((partner) => {
     const left = Math.max(0, Math.round((agreement.targets[partner] - (monthLedger?.contributed[partner] ?? 0)) * 100) / 100);
     return left >= 0.5 ? [{ partner, left }] : [];
   });
   const settleList = contributionRows.length > 0 && <div className="plan-settle">
     {contributionRows.map((row) => <div key={row.partner} className="plan-settle-row">
-      <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact onClick={onOpenContributions} label={`Review ${name(row.partner)}’s contribution: ${fmt(Math.round(row.left))} MAD due`}>{fmt(Math.round(row.left))} due</Fact></Summary>
+      <Summary className="plan-shortfall"><Fact>{name(row.partner)}</Fact> has <Fact onClick={() => onOpenContributions?.(row.partner)} label={`Review ${name(row.partner)}’s contribution: ${fmt(Math.round(row.left))} MAD due`}>{fmt(Math.round(row.left))} due</Fact></Summary>
     </div>)}
   </div>;
 
@@ -528,11 +530,11 @@ export function MonthPlanSheet({
   const invalidExpressions = Object.values(expressions).some((text) => text.trim() !== "" && parseAmount(text) === null);
   const advanceMonths = advances?.months.filter(m => m.outstanding.anas + m.outstanding.salma > 0) ?? [];
   // Phone: one row for every advance, opening Contributions like the desktop rows.
-  const contributionReservation = advanceReserve > 0 ? <div className="plan-gaps plan-mobile-advances"><button type="button" className="plan-gap" disabled={!onOpenContributions} onClick={onOpenContributions} aria-label={`Advances to apply, ${fmt(Math.round(advanceReserve))} MAD. Open contributions.`}>
+  const contributionReservation = advanceReserve > 0 ? <div className="plan-gaps plan-mobile-advances"><button type="button" className="plan-gap" disabled={!onOpenContributions} onClick={() => onOpenContributions?.()} aria-label={`Advances to apply, ${fmt(Math.round(advanceReserve))} MAD. Open contributions.`}>
     <span className="plan-gap-name">Advances to apply</span><span className="plan-gap-value">{fmt(Math.round(advanceReserve))}</span>
   </button></div> : null;
   // Desktop: the advance is a row you can act on (opens Contributions, who's owed what and the repayments).
-  const advanceRows = advanceReserve > 0 && <div className="plan-gaps">{advanceMonths.map(m => <button key={m.month} type="button" className="plan-gap" disabled={!onOpenContributions} onClick={onOpenContributions} aria-label={`${monthName(m.month)} advances to apply, ${fmt(Math.round(m.outstanding.anas + m.outstanding.salma))} MAD. Open contributions.`}>
+  const advanceRows = advanceReserve > 0 && <div className="plan-gaps">{advanceMonths.map(m => <button key={m.month} type="button" className="plan-gap" disabled={!onOpenContributions} onClick={() => onOpenContributions?.()} aria-label={`${monthName(m.month)} advances to apply, ${fmt(Math.round(m.outstanding.anas + m.outstanding.salma))} MAD. Open contributions.`}>
     <span className="plan-gap-name">{monthName(m.month)} advances</span><span className="plan-gap-value">{fmt(Math.round(m.outstanding.anas + m.outstanding.salma))}</span>
   </button>)}</div>;
   const contributionAgreement = <ContributionAgreementEditor month={planningMonth} agreement={agreement} proposed={{ anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }} shares={split} disabled={loading || saving || changed.length > 0 || !!loadError || !!capacityError || !contributionsReady || totals.joint <= 0} onSaved={() => { void loadPlan(); onSaved(); }} />;
@@ -632,7 +634,7 @@ export function MonthPlanSheet({
             {confirmingAgreement && <p className="contribution-note">Saving the plan confirms {planLabel}'s contributions.</p>}
             {advanceRows}
             {insights}
-            {(agreement || totals.joint > 0) && contributionAgreement}
+            {!agreement && totals.joint > 0 && contributionAgreement}
             </div>
             <div className="plan-summary-actions">
               {planCompare}
@@ -729,7 +731,7 @@ export function MonthPlanSheet({
 
           {partnerRemaining}
           {contributionReservation}
-          {(agreement || totals.joint > 0) && contributionAgreement}
+          {!agreement && totals.joint > 0 && contributionAgreement}
           {[
             ...(savingsCategories.length ? [{ key: "savings", label: "Savings", items: savingsCategories, savings: true }] : []),
             ...budgetGroups.map((g) => ({ ...g, savings: false })),

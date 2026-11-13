@@ -22,7 +22,8 @@ type HomeScreenProps = {
   /** A savings account holding less than its categories promise (personal views only). */
   savingsGap?: { account: Account; gap: number; source?: Account; onFix: () => void };
   /** Each partner's share still to put into Joined this month (opens Contributions). */
-  onOpenContributions: () => void;
+  /** Opens Contributions on the partner whose figure was tapped. */
+  onOpenContributions: (partner?: "anas" | "salma") => void;
   contributionLeft?: { partner: "anas" | "salma"; left: number }[];
   categories: Category[];
   monthlyLoading?: boolean;
@@ -186,8 +187,8 @@ export function HomeScreen({
       const name = partner === "anas" ? "Anas" : "Salma";
       // Beyond the agreement is an advance Couple owes back; it reads as extra, not as a row of its own.
       return left > 0
-        ? <span key={`left-${partner}`}><Fact>{name}</Fact> has <Fact tone="danger" onClick={onOpenContributions} label={`Open monthly contributions: ${name} has ${fmt(left)} MAD left to put in`}>{fmt(left)} due</Fact></span>
-        : <span key={`left-${partner}`}><Fact>{name}</Fact> put in <Fact tone="success" onClick={onOpenContributions} label={`Open monthly contributions: ${name} put in ${fmt(-left)} MAD beyond the agreement`}>{fmt(-left)} extra</Fact></span>;
+        ? <span key={`left-${partner}`}><Fact>{name}</Fact> has <Fact tone="danger" onClick={() => onOpenContributions(partner)} label={`Open monthly contributions: ${name} has ${fmt(left)} MAD left to put in`}>{fmt(left)} due</Fact></span>
+        : <span key={`left-${partner}`}><Fact>{name}</Fact> put in <Fact tone="success" onClick={() => onOpenContributions(partner)} label={`Open monthly contributions: ${name} put in ${fmt(-left)} MAD beyond the agreement`}>{fmt(-left)} extra</Fact></span>;
     }),
     // Below zero is money already wrong, so it comes before what's about to run out. Opens Rebalance to cover it.
     overspentCategories.length > 0 && (overspentCategories.length === 1

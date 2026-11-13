@@ -1662,9 +1662,8 @@ html[data-theme="dark"] .bottom-sheet-panel {
 .transaction-type:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 
 /* Type it is a writing canvas; retain larger writing text above iOS's zoom threshold. */
-textarea.typed-entry-line { font-size: 22px !important; }
+textarea.typed-entry-line { font-size: 17px !important; } /* matches .typed-marks so the marked words sit under the typed ones */
 textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
-.date-picker-trigger.typed-date-trigger { border: 0 !important; background: transparent !important; padding: 0 !important; font-size: 20px !important; }
 
 /* Desktop workspaces keep the primary task beside its supporting context. */
 .home-desktop-panels, .home-bills-panel, .reflect-desktop-panels, .account-desktop-overview, .account-desktop-activity { display:contents; }

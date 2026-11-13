@@ -1,19 +1,16 @@
 "use client";
-import { LiquidButton } from "./ui/LiquidGlass";
-import { CategoryIcon } from "./ui/CategoryIcon";
-import { accountIconSource } from "../../lib/category-icons";
 import "./finance-ai.css";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { parseTransactionLines, reconcileTypedChoices, saveTypedBatch, type TypedTransactionDraft } from "@/lib/typed-transactions";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import type { Account, Category } from "./app-types";
-import { expenseBudgetGate, fmtDate, shiftDate, today } from "./app-utils";
+import { expenseBudgetGate, fmt, fmtDate, shiftDate, today } from "./app-utils";
 import { Money } from "./Money";
 import { PickerPopover } from "./PickerPopover";
-import { AccountOptionList, CategoryOptionList, filterCategories, pickerChipIconStyle, pickerChipLabelStyle, pickerChipStyle } from "./TransactionPickers";
+import { DateCalendar } from "./DatePicker";
+import { AccountOptionList, CategoryOptionList, filterCategories } from "./TransactionPickers";
 import { Banner } from "./ui/Banner";
-import { signedAmountColor } from "./ui/TransactionRow";
 import { CheckIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { validateParsing, type AIDraft } from "@/lib/finance-ai";
@@ -29,9 +26,13 @@ type Props = {
   onSave: (transaction: TypedTransactionDraft) => Promise<void>;
   onComplete: (count: number) => void;
   onBusyChange: (busy: boolean) => void;
+  /** Move one line into the form for all its fields; the line leaves the written list. */
+  onOpenInForm?: (source: string, row: { type: "Expense" | "Income"; name: string; amount: number; date: string; categoryId?: string; accountId?: string }) => void;
+  /** A line coming back from the form unsaved: appended to what's written. */
+  restoreLine?: { source: string; id: number } | null;
 };
 
-type Choice = { categoryId?: string; accountId?: string; transaction?: AIDraft };
+type Choice = { categoryId?: string; accountId?: string; date?: string; transaction?: AIDraft };
 
 export function TypeItComposer(props: Props) {
   const [text, setText] = useState("");
@@ -40,16 +41,22 @@ export function TypeItComposer(props: Props) {
   const [parsing, setParsing] = useState(false);
   const parseAbort = useRef<AbortController | null>(null);
   const [progress, setProgress] = useState(0);
+  // Lines being read right now (by their text); each settles when its own answer comes back.
+  const [readingLines, setReadingLines] = useState<Set<string>>(new Set());
+  const textRef = useRef(text);
+  const choicesRef = useRef(choices);
   const [feedback, setFeedback] = useState<{ error: boolean; message: string } | null>(null);
   const lock = useRef(false);
   const inputs = useRef<(HTMLTextAreaElement | null)[]>([]);
   const [focusedLine, setFocusedLine] = useState<number | null>(0);
   // The line being worked on: it also shows its account chip.
   const [activeLine, setActiveLine] = useState<number | null>(null);
-  const [picker, setPicker] = useState<{ line: number; kind: "category" | "account" } | null>(null);
+  const [picker, setPicker] = useState<{ line: number; kind: "category" | "account" | "date" } | null>(null);
   const pickerAnchor = useRef<HTMLElement | null>(null);
   const [catSearch, setCatSearch] = useState("");
   const nextFocus = useRef<number | null>(null);
+  // Where the caret lands after a join (the old end of the line above).
+  const caretAt = useRef<number | null>(null);
   const remainingBudgets = useRef<Record<string, number>>({});
   const { haptic } = useAppHaptics();
   useEffect(() => () => { parseAbort.current?.abort(); }, []);
@@ -66,8 +73,15 @@ export function TypeItComposer(props: Props) {
   }, [props.draftKey]);
 
   useEffect(() => { if (props.active) inputs.current[0]?.focus(); }, [props.active]);
+  useEffect(() => {
+    if (!props.restoreLine) return;
+    const restored = text.trim() ? `${text.replace(/\n+$/, "")}\n${props.restoreLine.source}` : props.restoreLine.source;
+    updateDraft(restored, reconcileTypedChoices(text, restored, choices));
+  }, [props.restoreLine?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateDraft = (value: string, nextChoices: Record<number, Choice>) => {
+    textRef.current = value;
+    choicesRef.current = nextChoices;
     setText(value);
     setChoices(nextChoices);
     try {
@@ -78,7 +92,12 @@ export function TypeItComposer(props: Props) {
 
   useLayoutEffect(() => {
     inputs.current.forEach(input => { if (input) { input.style.height = "auto"; input.style.height = `${input.scrollHeight}px`; } });
-    if (nextFocus.current !== null) { inputs.current[nextFocus.current]?.focus(); nextFocus.current = null; }
+    if (nextFocus.current !== null) {
+      const input = inputs.current[nextFocus.current];
+      input?.focus();
+      if (input && caretAt.current !== null) input.setSelectionRange(caretAt.current, caretAt.current);
+      nextFocus.current = null; caretAt.current = null;
+    }
   }, [text, props.active]);
 
   useEffect(() => {
@@ -100,6 +119,8 @@ export function TypeItComposer(props: Props) {
     }
     // An explicit choice wins, then the category learned from past transactions. With neither,
     // the line waits for a pick rather than silently landing in the form's category.
+    const dateChoice = choices[row.line]?.date;
+    if (dateChoice && row.transaction) row = { ...row, transaction: { ...row.transaction, date: dateChoice } };
     const categoryId = choices[row.line]?.categoryId || (row.transaction ? suggest(row.transaction.name, props.categories) : null) || "";
     const category = props.categories.find(item => item.id === categoryId);
     const categoryDefault = props.accounts.find(a => a.id.replaceAll("-", "") === category?.defaultAccount?.replaceAll("-", ""))?.id;
@@ -120,8 +141,25 @@ export function TypeItComposer(props: Props) {
   });
   // Lines that don't fit are still real spending: they save once confirmed and the category goes below zero.
   const overspentIds = new Set(budgetErrors.map(({ category }) => category.id));
-  const ready = rows.length > 0 && rows.length <= 50 && rows.every(row => row.transaction && row.account && (row.transaction.type === "Income" || row.category));
+  // A line is ready once it has an amount, an account and (for spending) a category. Ready lines save on their own;
+  // the rest stay written until their tags are picked.
+  const isReady = (row: (typeof rows)[number]) => !!row.transaction && !!row.account && (row.transaction.type === "Income" || !!row.category);
+  const readyRows = rows.filter(isReady);
+  const waitingCount = rows.length - readyRows.length;
+  const ready = readyRows.length > 0 && readyRows.length <= 50;
   const total = rows.reduce((sum, row) => sum + ((row.transaction?.amount ?? 0) * (row.transaction?.type === "Income" ? 1 : -1)), 0);
+
+  // Save with nothing ready: instead of a dead button, open the first tag still to pick.
+  const showWhatsMissing = () => {
+    const first = rows.find(row => !isReady(row));
+    if (!first?.transaction) { inputs.current[(first?.line ?? 1) - 1]?.focus(); return; }
+    const index = first.line - 1;
+    const kind = first.transaction.type === "Expense" && !first.category ? "category" : "account";
+    const tag = document.querySelector<HTMLElement>(`[aria-label^="${kind === "category" ? "Category" : "Account"} for line ${first.line}:"]`);
+    setActiveLine(index);
+    haptic("warning");
+    if (tag) { pickerAnchor.current = tag; setCatSearch(""); setPicker({ line: index, kind }); tag.focus(); }
+  };
 
   const save = async () => {
     if (!ready || lock.current) return;
@@ -131,7 +169,18 @@ export function TypeItComposer(props: Props) {
     setFeedback(null);
     setProgress(0);
     let confirmed = 0;
-    const result = await saveTypedBatch(rows, async row => {
+    const toSave = readyRows;
+    // What stays written after `count` of the ready lines are saved: every other line, in its original order.
+    const keptAfter = (count: number) => {
+      const saved = new Set(toSave.slice(0, count).map(row => row.line));
+      return rows.filter(row => !saved.has(row.line));
+    };
+    const keptChoices = (kept: typeof rows) => {
+      const next: Record<number, Choice> = {};
+      kept.forEach((item, index) => { next[index + 1] = { ...choices[item.line], categoryId: item.category?.id, accountId: item.account?.id }; });
+      return next;
+    };
+    const result = await saveTypedBatch(toSave, async row => {
       await props.onSave({ ...row.transaction!, accountId: row.account!.id, categoryId: row.transaction!.type === "Expense" ? row.category!.id : "", ...(row.category && overspentIds.has(row.category.id) ? { overspend: true } : {}) });
     }, row => {
       if (row.transaction?.type === "Expense" && row.category) {
@@ -139,9 +188,8 @@ export function TypeItComposer(props: Props) {
         if (current !== null) remainingBudgets.current[row.category.id] = current - row.transaction!.amount;
       }
       confirmed++;
-      const pending = rows.slice(confirmed);
-      const pendingChoices: Record<number, Choice> = {};
-      pending.forEach((item, index) => { pendingChoices[index + 1] = { ...choices[item.line], categoryId: item.category?.id, accountId: item.account?.id }; });
+      const pending = keptAfter(confirmed);
+      const pendingChoices = keptChoices(pending);
       try {
         if (pending.length) localStorage.setItem(props.draftKey, JSON.stringify({ text: pending.map(item => item.source).join("\n"), choices: pendingChoices }));
         else localStorage.removeItem(props.draftKey);
@@ -149,13 +197,11 @@ export function TypeItComposer(props: Props) {
       setProgress(confirmed);
     });
     // Confirmed saves leave the draft immediately. Failed and unattempted rows retain their choices.
-    const remaining = rows.slice(result.saved);
-    const nextChoices: Record<number, Choice> = {};
-    remaining.forEach((row, index) => { nextChoices[index + 1] = { ...choices[row.line], categoryId: row.category?.id, accountId: row.account?.id }; });
-    updateDraft(remaining.map(row => row.source).join("\n"), nextChoices);
+    const remaining = keptAfter(result.saved);
+    updateDraft(remaining.map(row => row.source).join("\n"), keptChoices(remaining));
     setFeedback({ error: Boolean(result.error), message: result.error
       ? `${result.saved ? `${result.saved} saved. ` : ""}${result.error} Remaining lines are kept. Check History before retrying if the connection was interrupted.`
-      : `${result.saved} ${result.saved === 1 ? "transaction" : "transactions"} saved.` });
+      : `${result.saved} ${result.saved === 1 ? "transaction" : "transactions"} saved.${remaining.length ? ` ${remaining.length} ${remaining.length === 1 ? "line is" : "lines are"} kept.` : ""}` });
     haptic(result.error ? "error" : "success");
     setBusy(false);
     props.onBusyChange(false);
@@ -164,34 +210,55 @@ export function TypeItComposer(props: Props) {
   };
 
   const lines = text.split(/\r?\n/);
+  // Only lines nothing has read yet: the phone couldn't parse them and no AI draft is attached.
+  const unread = lines.flatMap((source, index) => source.trim() && !rows.find(row => row.line === index + 1)?.transaction ? [source] : []);
+  const readLine = async (source: string, signal: AbortSignal) => {
+    const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal,
+      body: JSON.stringify({ action: "parse", text: source, defaultDate: props.defaultDate, categories: props.categories.map(c => ({ id: c.id, name: c.name, defaultAccountId: c.defaultAccount })), accounts: props.accounts.map(a => ({ id: a.id, name: a.label })), defaultAccountId: props.defaultAccountId }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not read this line.");
+    return validateParsing(data, props.categories.map(c => ({ id: c.id, name: c.name })), props.accounts.map(a => ({ id: a.id, name: a.label })));
+  };
   const parseWithGemini = async () => {
-    if (!text.trim() || lock.current || !props.accounts.length || !props.categories.length) return;
+    const targets = [...new Set(unread)];
+    if (!targets.length || lock.current || !props.accounts.length || !props.categories.length) return;
     lock.current = true;
     setParsing(true);
     setPicker(null);
     setFeedback(null);
+    setReadingLines(new Set(targets));
     const controller = new AbortController();
     parseAbort.current = controller;
-    try {
-      const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        body: JSON.stringify({ action: "parse", text, defaultDate: props.defaultDate, categories: props.categories.map(c => ({ id: c.id, name: c.name, defaultAccountId: c.defaultAccount })), accounts: props.accounts.map(a => ({ id: a.id, name: a.label })), defaultAccountId: props.defaultAccountId }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not create transaction drafts.");
-      const result = validateParsing(data, props.categories.map(c => ({ id: c.id, name: c.name })), props.accounts.map(a => ({ id: a.id, name: a.label })));
-      if (result.questions.length) { setFeedback({ error: true, message: result.questions.join(" ") }); return; }
-      const nextChoices: Record<number, Choice> = {};
-      result.transactions.forEach((transaction, index) => { nextChoices[index + 1] = { transaction, categoryId: transaction.categoryId ?? suggest(transaction.name, props.categories) ?? undefined, accountId: transaction.accountId ?? undefined }; });
-      updateDraft(result.transactions.map(t => `${t.name} ${t.type === "Income" ? "+" : ""}${t.amount} ${t.date}`).join("\n"), nextChoices);
-      const needsSelection = result.transactions.some((t, index) => {
-        const choice = nextChoices[index + 1];
-        const category = props.categories.find(c => c.id === choice.categoryId);
-        const accountId = choice.accountId ?? category?.defaultAccount ?? props.defaultAccountId;
-        return (t.type === "Expense" && !category) || !props.accounts.some(a => a.id.replaceAll("-", "") === accountId?.replaceAll("-", ""));
-      });
-      setFeedback({ error: needsSelection, message: needsSelection ? "Choose the missing category or account before saving." : `${result.transactions.length} ${result.transactions.length === 1 ? "transaction" : "transactions"} ready to save.` });
-    } catch (error) {
-      if (!controller.signal.aborted) setFeedback({ error: true, message: error instanceof Error ? error.message : "Could not reach Gemini. Your text is kept." });
-    } finally { setParsing(false); lock.current = false; }
+    const problems: string[] = [];
+    // A few lines at a time; each one is replaced in place as soon as its answer arrives.
+    const queue = [...targets];
+    const worker = async () => {
+      for (let source = queue.shift(); source !== undefined; source = queue.shift()) {
+        try {
+          const result = await readLine(source, controller.signal);
+          if (result.questions.length) problems.push(result.questions.join(" "));
+          else if (result.transactions.length) {
+            const current = textRef.current.split(/\r?\n/);
+            const at = current.indexOf(source);
+            if (at >= 0) {
+              const replacement = result.transactions.map(t => [t.name, `${t.type === "Income" ? "+" : ""}${t.amount}`, writtenDate(t.date, props.defaultDate)].filter(Boolean).join(" "));
+              const nextText = [...current.slice(0, at), ...replacement, ...current.slice(at + 1)].join("\n");
+              const nextChoices = reconcileTypedChoices(textRef.current, nextText, choicesRef.current);
+              result.transactions.forEach((transaction, offset) => { nextChoices[at + offset + 1] = { transaction, categoryId: transaction.categoryId ?? suggest(transaction.name, props.categories) ?? undefined, accountId: transaction.accountId ?? undefined }; });
+              updateDraft(nextText, nextChoices);
+            }
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) problems.push(error instanceof Error ? error.message : "Could not reach Gemini. Your text is kept.");
+        }
+        setReadingLines(current => { const next = new Set(current); next.delete(source!); return next; });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, targets.length) }, worker));
+    if (!controller.signal.aborted && problems.length) setFeedback({ error: true, message: [...new Set(problems)].join(" ") });
+    setReadingLines(new Set());
+    setParsing(false);
+    lock.current = false;
   };
   const editLine = (index: number, value: string) => {
     const updated = [...lines];
@@ -202,7 +269,7 @@ export function TypeItComposer(props: Props) {
     updateDraft(nextText, reconcileTypedChoices(text, nextText, choices));
     setFeedback(null);
   };
-  const openPicker = (event: MouseEvent<HTMLElement>, line: number, kind: "category" | "account") => {
+  const openPicker = (event: MouseEvent<HTMLElement>, line: number, kind: "category" | "account" | "date") => {
     pickerAnchor.current = event.currentTarget;
     setCatSearch("");
     setPicker(current => current?.line === line && current.kind === kind ? null : { line, kind });
@@ -220,51 +287,82 @@ export function TypeItComposer(props: Props) {
     input?.setSelectionRange(input.value.length, input.value.length);
   };
 
-  return <div style={{ display: props.active ? "flex" : "none", flexDirection: "column", flex: "1 1 auto", minHeight: 0 }}>
-    <p id="typed-help" className="sr-only">Write in MAD, then choose Create transactions. Use salary, received, or + for income. For local parsing, put each transaction on a new line. Use today, yesterday, a weekday, or YYYY-MM-DD for dates. Review categories and accounts before saving.</p>
-    <div style={{ flex: "1 1 auto", overflowY: "auto", minHeight: 0, display: "flex", flexDirection: "column", paddingTop: 24 }}>
-      <div role="group" aria-label="Write transactions" style={{ display: "grid", gap: 28 }}>
+  const settled = (row: (typeof rows)[number] | undefined) => !!row?.transaction && !!row.account && (row.transaction.type === "Income" || !!row.category);
+  return <div className="typed composer-pane" style={{ display: props.active ? "flex" : "none" }}>
+    <p id="typed-help" className="sr-only">Write in MAD, one transaction per line, then choose Read. Use salary, received, or + for income. Use today, yesterday, a weekday, or YYYY-MM-DD for dates. Review categories and accounts before saving.</p>
+    <div className="typed-scroll">
+      <div role="group" aria-label="Write transactions" className="typed-lines">
         {lines.map((source, index) => {
           const row = rows.find(item => item.line === index + 1);
           const transaction = row?.transaction;
           const income = transaction?.type === "Income";
-          return <div key={index} onFocus={() => setActiveLine(index)}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <textarea className="typed-entry-line" ref={element => { inputs.current[index] = element; }} aria-label={`Transaction line ${index + 1}`} aria-describedby="typed-help" rows={1} disabled={busy || parsing} value={source}
-                placeholder={index === 0 ? "Yesterday I spent 120 on groceries and 35 on coffee" : "Another transaction…"}
-                onFocus={() => setFocusedLine(index)} onBlur={() => setFocusedLine(null)}
-                onChange={event => editLine(index, event.target.value)}
-                onKeyDown={event => {
-                  if (event.nativeEvent.isComposing) return;
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    const element = event.currentTarget;
-                    editLine(index, `${source.slice(0, element.selectionStart)}\n${source.slice(element.selectionEnd)}`);
-                  } else if (event.key === "Backspace" && !source && index > 0) {
-                    event.preventDefault();
-                    const nextText = lines.filter((_, line) => line !== index).join("\n");
-                    nextFocus.current = index - 1;
-                    updateDraft(nextText, reconcileTypedChoices(text, nextText, choices));
-                  }
-                }}
-                style={{ display: "block", flex: "1 1 auto", width: "100%", minWidth: 0, background: "transparent", border: 0, borderRadius: 0, padding: "4px 0", margin: 0, resize: "none", overflow: "hidden", color: "var(--text2)", font: "inherit", fontSize: 22, lineHeight: 1.4, outline: "none", caretColor: "var(--accent-foreground)" }} />
-              {transaction && <span aria-label={`${income ? "Income" : "Expense"} ${transaction.amount} MAD`} style={{ flexShrink: 0, paddingTop: 6, fontSize: 20, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: signedAmountColor(income ? "income" : "expense") }}>{income ? "+" : "−"}<Money value={transaction.amount} /></span>}
+          // Thinking: a line shimmers while the AI reads it, and settles when its own answer comes back.
+          const reading = !!source.trim() && readingLines.has(source);
+          const waiting = !!source.trim() && (!transaction || !settled(row));
+          const otherAccount = !!row?.account && row.account.id !== props.defaultAccountId;
+          return <div key={index} className="typed-line" data-reading={reading || undefined} onFocus={() => setActiveLine(index)}>
+            <div className="typed-line-main">
+              {/* Your words stay as written; the words that move an entry are marked where you wrote them. */}
+              <div className="typed-input-wrap">
+                <div className="typed-marks" aria-hidden="true">{markWords(source, props.accounts)}{"\u200b"}</div>
+                <textarea className="typed-entry-line" ref={element => { inputs.current[index] = element; }} aria-label={`Transaction line ${index + 1}`} aria-describedby="typed-help" rows={1} disabled={busy || reading} value={source}
+                  placeholder={index === 0 ? "coffee 25 yesterday" : ""}
+                  onFocus={() => setFocusedLine(index)} onBlur={() => setFocusedLine(null)}
+                  onChange={event => editLine(index, event.target.value)}
+                  onKeyDown={event => {
+                    if (event.nativeEvent.isComposing) return;
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      const element = event.currentTarget;
+                      editLine(index, `${source.slice(0, element.selectionStart)}\n${source.slice(element.selectionEnd)}`);
+                    } else if (event.key === "Backspace" && index > 0 && event.currentTarget.selectionStart === 0 && event.currentTarget.selectionEnd === 0) {
+                      // At the start of a line, Backspace joins it to the line above (an empty line just goes).
+                      event.preventDefault();
+                      const previous = lines[index - 1];
+                      const joined = [...lines.slice(0, index - 1), previous + source, ...lines.slice(index + 1)].join("\n");
+                      nextFocus.current = index - 1;
+                      caretAt.current = previous.length;
+                      updateDraft(joined, reconcileTypedChoices(text, joined, choices));
+                    } else if ((event.key === "ArrowUp" && index > 0 && event.currentTarget.selectionStart === 0) || (event.key === "ArrowDown" && index < lines.length - 1 && event.currentTarget.selectionEnd === source.length)) {
+                      // Arrows move between lines from a line's edges, like one text field.
+                      event.preventDefault();
+                      const target = inputs.current[index + (event.key === "ArrowUp" ? -1 : 1)];
+                      target?.focus();
+                      const end = event.key === "ArrowUp" ? target?.value.length ?? 0 : 0;
+                      target?.setSelectionRange(end, end);
+                    }
+                  }} />
+              </div>
+              {/* The margin: the amount, then a dot. Solid = settled, hollow amber = waiting on you. */}
+              <span className="typed-margin">
+                {reading ? <span className="typed-hint typed-reading">reading</span>
+                  : transaction
+                  ? <button type="button" className="typed-amount" data-income={income || undefined} disabled={busy || parsing || !props.onOpenInForm} aria-label={`${income ? "Income" : "Expense"} ${transaction.amount} MAD. Open all fields`}
+                      onClick={() => {
+                        const remaining = lines.filter((_, line) => line !== index).join("\n");
+                        props.onOpenInForm?.(source, { type: transaction.type, name: transaction.name, amount: transaction.amount, date: transaction.date, categoryId: row?.category?.id, accountId: row?.account?.id });
+                        updateDraft(remaining, reconcileTypedChoices(text, remaining, choices));
+                      }}>{income ? "+" : "−"}{fmt(transaction.amount)}</button>
+                  : focusedLine === index && source.trim() ? <span className="typed-hint">return</span> : null}
+                {source.trim() && !reading && <span className="typed-dot" data-waiting={waiting || undefined} aria-label={waiting ? "Needs your input" : "Ready"} />}
+              </span>
             </div>
-            {transaction && <div style={metaRowStyle}>
-              {!income && <LiquidButton type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "category"} aria-label={`Category for line ${index + 1}: ${row?.category?.name ?? "none"}`} onClick={event => openPicker(event, index, "category")} style={{ ...pickerChipStyle, color: row?.category ? "var(--text2)" : "var(--muted)" }}>
-                <span style={pickerChipIconStyle}><CategoryIcon icon={row?.category?.icon} categoryName={row?.category?.name} size={24} /></span>
-                <span style={pickerChipLabelStyle}>{row?.category?.name ?? "Category"}</span>
-              </LiquidButton>}
-              {(activeLine === index || row?.account?.id !== props.defaultAccountId) && <LiquidButton type="button" disabled={busy || parsing} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "account"} aria-label={`Account for line ${index + 1}: ${row?.account?.label ?? "none"}`} onClick={event => openPicker(event, index, "account")} style={{ ...pickerChipStyle, color: "var(--muted)" }}>
-                <span style={pickerChipIconStyle}><CategoryIcon icon={accountIconSource(row?.account?.type)} size={24} /></span>
-                <span style={pickerChipLabelStyle}>{row?.account?.label ?? "Account"}</span>
-              </LiquidButton>}
-              {transaction.date !== props.defaultDate && <span style={dateNoteStyle}>{dayLabel(transaction.date)}</span>}
+            {transaction && !reading && <div className="typed-tags">
+              {!income && <button type="button" className="typed-tag" data-empty={!row?.category || undefined} disabled={busy || reading} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "category"} aria-label={`Category for line ${index + 1}: ${row?.category?.name ?? "none"}`} onClick={event => openPicker(event, index, "category")}>
+                {row?.category?.name ?? "category?"}
+              </button>}
+              {(activeLine === index || otherAccount || !row?.account) && <button type="button" className="typed-tag" data-empty={!row?.account || undefined} data-kind={otherAccount ? "account" : undefined} disabled={busy || reading} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "account"} aria-label={`Account for line ${index + 1}: ${row?.account?.label ?? "none"}`} onClick={event => openPicker(event, index, "account")}>
+                {row?.account?.label ?? "account?"}
+              </button>}
+              {(activeLine === index || transaction.date !== props.defaultDate) && <button type="button" className="typed-tag" data-kind={transaction.date !== props.defaultDate ? "day" : undefined} disabled={busy || reading} aria-haspopup="dialog" aria-expanded={picker?.line === index && picker.kind === "date"} aria-label={`Date for line ${index + 1}: ${dayLabel(transaction.date)}`} onClick={event => openPicker(event, index, "date")}>
+                {dayLabel(transaction.date).toLowerCase()}
+              </button>}
             </div>}
-            {row?.error && focusedLine !== index && <p style={helperStyle}>{row.error} Create transactions to review this text.</p>}
+            {row?.error && focusedLine !== index && !parsing && <p className="typed-note">{row.error}</p>}
           </div>;
         })}
       </div>
+      {rows.some(row => row.transaction) && <p className="typed-hint-line">Tap a tag to fix it, tap the amount for all fields</p>}
       <div onClick={focusEnd} aria-hidden="true" style={{ flex: "1 0 80px", cursor: "text" }} />
 
       {rows.length > 50 && <Banner tone="danger" role="alert" compact>Add up to 50 transactions at a time.</Banner>}
@@ -277,26 +375,52 @@ export function TypeItComposer(props: Props) {
       })}
       {feedback && <Banner tone={feedback.error ? "danger" : "success"} role={feedback.error ? "alert" : "status"} compact style={{ marginTop: 12 }}>{feedback.message}</Banner>}
     </div>
-    <div style={{ flexShrink: 0, paddingTop: 12 }}>
-      <button type="button" className="ai-action" aria-busy={parsing} disabled={!text.trim() || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? "Creating…" : "Create transactions"}</button>
-      <p style={helperStyle}>Google processes your text. Avoid sensitive details.</p>
+    {/* One action: Read while any line still needs reading, then Save. */}
+    <div className="typed-footer">
+      <span className="typed-total">{rows.length > 0 && waitingCount > 0 && readyRows.length > 0 && !parsing ? <span>{waitingCount} waiting</span> : rows.length > 0 ? <>{total < 0 ? "−" : total > 0 ? "+" : ""}{fmt(Math.abs(Math.round(total)))} <span>total</span></> : <span>Google reads what your phone can't</span>}</span>
+      {/* Read only while some line hasn't been read; after that it's Save, waiting on any tag still to pick. */}
+      {unread.length > 0 || parsing || !rows.length
+        ? <button type="button" className="typed-primary" data-quiet={!unread.length || undefined} aria-busy={parsing} disabled={!unread.length || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? `Reading ${readingLines.size}…` : unread.length ? `Read ${unread.length}` : "Read"}</button>
+        : <button type="button" className="typed-primary" data-quiet={!ready || undefined} disabled={busy} onClick={ready ? save : showWhatsMissing}>{busy ? `Saving ${progress}/${readyRows.length}…` : <><CheckIcon size={16} />{budgetErrors.length ? "Save anyway" : `Save ${readyRows.length}`}</>}</button>}
     </div>
-    {rows.length > 0 && <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 0 0" }}>
-      <div style={{ color: "var(--text2)", fontSize: 16, fontVariantNumeric: "tabular-nums" }}><Money value={total} currency /><span style={{ ...helperStyle, marginLeft: 8 }}>net</span></div>
-      <button type="button" disabled={!ready || busy || parsing} onClick={save} style={{ minHeight: 44, padding: "0 16px", display: "inline-flex", alignItems: "center", gap: 8, border: 0, borderRadius: "var(--radius-control)", background: ready && !busy ? "var(--accent)" : "var(--surface2)", color: ready && !busy ? "var(--accent-ink)" : "var(--muted)", font: "inherit", fontSize: 14, fontWeight: 600, cursor: ready && !busy ? "pointer" : "not-allowed" }}>
-        {busy ? `Saving ${progress}/${rows.length}…` : <><CheckIcon size={16} />{budgetErrors.length ? "Save anyway" : `Save ${rows.length}`}</>}
-      </button>
-    </div>}
-    <PickerPopover open={picker !== null} title={picker?.kind === "account" ? "Account" : "Category"} onClose={() => setPicker(null)} align="left" placement="bottom" size="choice" zIndex={140} anchorRef={pickerAnchor}>
+    <PickerPopover open={picker !== null} title={picker?.kind === "account" ? "Account" : picker?.kind === "date" ? "Date" : "Category"} onClose={() => setPicker(null)} align="left" placement="bottom" size={picker?.kind === "date" ? "calendar" : "choice"} zIndex={140} anchorRef={pickerAnchor}>
+      {picker?.kind === "date" && <DateCalendar value={pickerRow?.transaction?.date ?? props.defaultDate} onChange={date => choose(picker.line, { date })} />}
       {picker?.kind === "account" && <AccountOptionList accounts={props.accounts} selectedId={pickerRow?.account?.id} onSelect={accountId => choose(picker.line, { accountId })} />}
       {picker?.kind === "category" && <CategoryOptionList categories={filterCategories(props.categories, catSearch)} selectedId={pickerRow?.category?.id} onSelect={category => choose(picker.line, { categoryId: category.id })} search={catSearch} onSearchChange={setCatSearch} />}
     </PickerPopover>
-    <span role="status" className="sr-only">{parsing ? "Parsing your transactions" : busy ? `${progress} transactions saved` : ""}</span>
+    <span role="status" className="sr-only">{parsing ? "Reading your transactions" : busy ? `${progress} transactions saved` : ""}</span>
   </div>;
 }
-const helperStyle: CSSProperties = { color: "var(--muted)", fontSize: 13, lineHeight: 1.5, margin: "8px 0 12px" };
-const metaRowStyle: CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 };
-const dateNoteStyle: CSSProperties = { fontSize: 13, color: "var(--muted)", padding: "0 4px" };
+
+/** Day and account words, marked in place with their colour. Amounts, merchants and categories stay plain. */
+const DAY_WORDS = /\b(?:day before yesterday|today|yesterday|tomorrow|\d+ days? ago|(?:last |on )?(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday)|\d{4}-\d{2}-\d{2})\b/gi;
+function markWords(source: string, accounts: Account[]) {
+  const names = accounts.map(account => account.label.split(/\s+/)[0]).filter(word => word.length >= 3).map(word => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`${DAY_WORDS.source}${names.length ? `|\\b(?:(?:from|on|with) )?(?:${names.join("|")})\\b` : ""}`, "gi");
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const match of source.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > last) parts.push(source.slice(last, start));
+    parts.push(<mark key={start} data-kind={new RegExp(`^${DAY_WORDS.source}$`, "i").test(match[0]) ? "day" : "account"}>{match[0]}</mark>);
+    last = start + match[0].length;
+  }
+  if (last < source.length) parts.push(source.slice(last));
+  return parts;
+}
+
+/** A date the way you'd write it, so it can be edited by typing: left out on the default day, then today,
+ * yesterday or a weekday within the last week, and only further back as YYYY-MM-DD. */
+function writtenDate(date: string, defaultDate: string) {
+  if (date === defaultDate) return "";
+  const now = today();
+  if (date === now) return "today";
+  if (date === shiftDate(now, -1)) return "yesterday";
+  for (let back = 2; back <= 6; back++) {
+    if (date === shiftDate(now, -back)) return new Date(`${date}T12:00:00`).toLocaleDateString("en", { weekday: "long" }).toLowerCase();
+  }
+  return date;
+}
 
 const dayLabel = (date: string) =>
   date === today() ? "Today" : date === shiftDate(today(), -1) ? "Yesterday" : date === shiftDate(today(), 1) ? "Tomorrow" : fmtDate(date);

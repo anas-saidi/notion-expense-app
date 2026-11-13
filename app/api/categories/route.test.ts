@@ -127,3 +127,19 @@ it("creates a category with its explicit pattern and returns it", async () => {
   expect((await response.json()).category.spendingPattern).toBe("Scheduled");
   expect(JSON.parse(mock.mock.calls[1][1].body).properties["Spending pattern"]).toEqual({ select: { name: "Scheduled" } });
 });
+it("sets or clears a savings goal date", async () => {
+  vi.stubEnv("NOTION_TOKEN", "test");
+  const mock = vi.fn()
+    .mockResolvedValueOnce(Response.json({ parent: { database_id: categoryDb }, properties: {} }))
+    .mockResolvedValueOnce(Response.json({ id: "fund", properties: {} }))
+    .mockResolvedValueOnce(Response.json({ parent: { database_id: categoryDb }, properties: {} }))
+    .mockResolvedValueOnce(Response.json({ id: "fund", properties: {} }));
+  vi.stubGlobal("fetch", mock);
+  const patch = (goalDate: unknown) => PATCH(new NextRequest("http://localhost/api/categories", { method: "PATCH", body: JSON.stringify({ id: "fund", goalDate }) }));
+  expect((await patch("2027-06-30")).status).toBe(200);
+  expect(JSON.parse(mock.mock.calls[1][1].body)).toEqual({ properties: { "Goal Date": { date: { start: "2027-06-30" } } } });
+  expect((await patch(null)).status).toBe(200);
+  expect(JSON.parse(mock.mock.calls[3][1].body)).toEqual({ properties: { "Goal Date": { date: null } } });
+  expect((await patch("June")).status).toBe(400);
+  expect(mock).toHaveBeenCalledTimes(4);
+});

@@ -42,6 +42,8 @@ type Common = {
   wrapJar?: (scope: "anas" | "salma", jar: ReactNode, size: number) => ReactNode;
   /** Couple only: what drops into each partner's jar, instead of dealing `items` between them. */
   pairItems?: Partial<Record<"anas" | "salma", JarItem[]>>;
+  /** Couple only: whose jar sits in front of the other (defaults to Salma's). */
+  front?: "anas" | "salma";
 };
 
 export type MascotHeroProps =
@@ -94,7 +96,7 @@ function CouplePair(props: MascotHeroProps) {
   // The overlap and stacking live on an upright wrapper; only the jar itself tilts.
   const slot = (scope: "anas" | "salma"): CSSProperties => ({
     position: "relative",
-    zIndex: scope === "salma" ? 1 : 0,
+    zIndex: scope === (props.front ?? "salma") ? 1 : 0,
     ...(scope === "anas" ? { marginRight: -Math.round(jar * PAIR_OVERLAP / 2) } : { marginLeft: -Math.round(jar * PAIR_OVERLAP / 2) }),
   });
   const lean = (scope: "anas" | "salma"): CSSProperties => ({

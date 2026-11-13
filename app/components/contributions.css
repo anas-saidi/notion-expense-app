@@ -6,6 +6,7 @@
 .contribution-sheet { display:grid; gap:16px; padding:8px 24px 24px; color:var(--text); }
 .contribution-agreement { color:var(--text); margin-top:16px; }
 .contribution-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.contribution-toolbar { display:flex; }
 .contribution-header h2 { margin:0; font-size:20px; line-height:24px; color:var(--text); }
 .contribution-sheet h3,.contribution-agreement h3 { margin:0; font-size:15px; line-height:22px; font-weight:600; color:var(--text); }
 .contribution-close { display:grid; place-items:center; width:44px; height:44px; border:0; border-radius:50%; background:var(--surface2); color:var(--text); cursor:pointer; flex-shrink:0; }
@@ -27,37 +28,58 @@
 .contribution-primary:disabled,.contribution-text:disabled,.contribution-close:disabled { opacity:.5; cursor:default; }
 .contribution-entry:focus-visible,.contribution-text:focus-visible,.contribution-primary:focus-visible,.contribution-close:focus-visible { outline:3px solid var(--focus-ring); outline-offset:4px; }
 
-/* Lead with the remaining obligation; keep its audit trail one disclosure away. */
-.contribution-overview { display:grid; justify-items:start; gap:8px; padding:8px 0; }
-.contribution-overview > span:first-child { color:var(--muted); font-size:14px; }
-.contribution-hero-amount { margin:0; color:var(--text); font-size:36px; line-height:40px; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
-.contribution-overview .contribution-note { margin:0; }
-.contribution-all-settled { margin:0; font-size:24px; line-height:32px; font-weight:600; }
-.contribution-people { display:grid; gap:8px; }
-.contribution-person { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; column-gap:16px; }
-.contribution-person-main { min-width:0; }
-.contribution-person-summary { display:flex; align-items:center; gap:12px; min-height:60px; }
-.contribution-breakdown { min-width:0; }
-.contribution-breakdown > summary { display:flex; align-items:center; gap:8px; width:fit-content; max-width:100%; min-height:44px; list-style:none; cursor:pointer; color:var(--muted); font-size:13px; }
-@media (hover: hover) and (pointer: fine) { .contribution-breakdown > summary:hover { color:var(--text); } }
-.contribution-person-name { display:grid; gap:4px; margin-right:auto; min-width:0; }
-.contribution-person-name > strong { font-size:15px; font-weight:600; }
-.contribution-person-name > span { color:var(--muted); font-size:12px; line-height:16px; }
-.contribution-person-amount { font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.contribution-breakdown > summary > svg,.contribution-disclosure > summary > svg { flex-shrink:0; color:var(--muted); }
-.contribution-breakdown[open] > summary > svg,.contribution-disclosure[open] > summary > svg { transform:rotate(180deg); }
-.contribution-breakdown > summary::-webkit-details-marker,.contribution-disclosure > summary::-webkit-details-marker { display:none; }
-.contribution-breakdown > .contribution-rows { margin:8px 0 16px; }
-.contribution-repay-shortcut { display:grid; place-items:center; width:44px; height:44px; padding:0; margin-top:8px; border-radius:50%; background:var(--surface2); color:var(--text); box-shadow:var(--elevation-card),inset 0 1px 0 color-mix(in srgb,var(--text) 8%,transparent); }
-.contribution-disclosure { min-width:0; }
-.contribution-disclosure > summary { display:flex; align-items:center; gap:12px; min-height:44px; list-style:none; cursor:pointer; font-size:13px; font-weight:500; }
-.contribution-disclosure > summary > :first-child { margin-right:auto; }
-.contribution-coverage-shortfall { color:var(--danger); font-size:12px; font-weight:400; text-align:right; }
-.contribution-disclosure .contribution-agreement { margin:0; }
-.contribution-breakdown > summary:focus-visible,.contribution-disclosure > summary:focus-visible { outline:3px solid var(--focus-ring); outline-offset:4px; border-radius:var(--radius-control); }
 
-/* The same partner colors as the global scope picker identify the two debts. */
-.contribution-sheet [data-partner="anas"] { --contribution-person-color:var(--partner-husband); }
-.contribution-sheet [data-partner="salma"] { --contribution-person-color:var(--partner-wife); }
-.contribution-person-name > strong { display:flex; align-items:center; gap:8px; }
-.contribution-person-name > strong::before { content:""; display:block; width:4px; height:16px; flex-shrink:0; border-radius:2px; background:var(--contribution-person-color); }
+
+/* What's left, then where what's already in went. */
+.contribution-left { display:grid; justify-items:center; gap:4px; padding:8px 0; text-align:center; }
+.contribution-left > span { font-size:13px; color:var(--muted); }
+.contribution-left > strong { font-size:36px; line-height:44px; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.contribution-left > .contribution-due { color:var(--danger); }
+.contribution-in { display:grid; gap:8px; }
+.contribution-in h3 { display:flex; justify-content:space-between; gap:16px; font-variant-numeric:tabular-nums; }
+.contribution-in ul { display:grid; margin:0; padding:0; list-style:none; }
+.contribution-in li { display:grid; grid-template-columns:24px minmax(0,1fr) auto; align-items:center; gap:12px; min-height:44px; font-size:14px; font-variant-numeric:tabular-nums; }
+.contribution-in-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
+.contribution-advance { display:flex; flex-wrap:wrap; align-items:center; gap:12px; font-size:13px; color:var(--text2); }
+.contribution-advance > span { margin-right:auto; font-variant-numeric:tabular-nums; }
+.contribution-in > .contribution-note { margin:0; }
+.contribution-left .contribution-agreement { margin:0; display:grid; justify-items:center; }
+.contribution-left .contribution-text { min-height:32px; padding:4px 8px; color:var(--text2); }
+.contribution-left .contribution-advance { justify-content:center; margin-top:8px; }
+.contribution-left .contribution-advance > span { margin-right:0; }
+.contribution-summary { margin:4px 0 0; text-align:center; }
+.contribution-in-icon { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:var(--surface2); color:var(--text2); }
+.contribution-in li.contribution-in-group { display:block; min-height:0; padding:12px 0 4px; font-size:12px; color:var(--muted); }
+.contribution-left .contribution-agreement { width:100%; }
+
+/* Reveal: the row grows open (accordion, the one place height is fair game) while the content fades and settles.
+   Opening takes --motion-standard; closing is quicker (--motion-fast) because the system is just responding. */
+.contribution-reveal { display:grid; grid-template-rows:0fr; transition:grid-template-rows var(--motion-fast) var(--ease-standard); }
+.contribution-reveal[data-open] { grid-template-rows:1fr; transition-duration:var(--motion-standard); }
+.contribution-reveal-inner { min-height:0; overflow:hidden; opacity:0; transform:translateY(-4px); transition:opacity var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard); }
+.contribution-reveal[data-open] > .contribution-reveal-inner { opacity:1; transform:none; transition-duration:var(--motion-standard); }
+/* A new month's figures fade in instead of popping in after the skeleton. */
+.contribution-left, .contribution-in { transition:opacity var(--motion-standard) var(--ease-standard); }
+@starting-style { .contribution-left, .contribution-in { opacity:0; } }
+@media (prefers-reduced-motion: reduce) {
+  .contribution-reveal, .contribution-reveal[data-open] { transition:none; }
+  .contribution-reveal-inner { transform:none; }
+}
+
+/* The partner whose figures show sits closer; the other steps back. State indication, so transform + opacity only.
+   Selectors repeat button and :hover/:active so the app-wide button lift (translateY on hover) can't replace the depth. */
+button.contribution-jar { display:grid; place-items:center; padding:0; border:0; background:transparent; color:inherit; cursor:pointer; border-radius:24px; transform-origin:50% 90%;
+  transition:transform var(--motion-standard) var(--ease-standard), opacity var(--motion-standard) var(--ease-standard); }
+button.contribution-jar, button.contribution-jar:not(:disabled):hover, button.contribution-jar:not(:disabled):active { transform:scale(.84) translateY(6px); opacity:.6; }
+button.contribution-jar[data-front], button.contribution-jar[data-front]:not(:disabled):hover, button.contribution-jar[data-front]:not(:disabled):active { transform:scale(1.06); opacity:1; cursor:default; }
+@media (hover: hover) and (pointer: fine) {
+  /* The back jar answers hover by coming forward a little, so it reads as tappable. */
+  button.contribution-jar:not([data-front]):not(:disabled):hover { transform:scale(.88) translateY(4px); opacity:.85; }
+}
+button.contribution-jar:not([data-front]):not(:disabled):active { transform:scale(.8) translateY(6px); transition-duration:var(--motion-fast); }
+button.contribution-jar:focus-visible { outline:3px solid var(--focus-ring); outline-offset:2px; }
+.contribution-who { font-size:15px; font-weight:600; color:var(--text); margin-bottom:-2px; }
+@media (prefers-reduced-motion: reduce) {
+  button.contribution-jar, button.contribution-jar:not(:disabled):hover, button.contribution-jar:not(:disabled):active,
+  button.contribution-jar[data-front], button.contribution-jar[data-front]:not(:disabled):hover { transform:none; transition:opacity var(--motion-standard) ease; }
+}

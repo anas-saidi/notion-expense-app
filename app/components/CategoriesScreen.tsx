@@ -375,12 +375,14 @@ const wrapStyle: CSSProperties = {
 const sectionStyle: CSSProperties = { display: "grid", gap: 4, minWidth: 0 };
 
 /** One shared surface per section; rows inside stay flat. */
-const listSurfaceStyle: CSSProperties = { display: "grid", padding: "4px 0", borderRadius: "var(--radius-card)", background: "var(--surface)", border: "1px solid color-mix(in srgb, var(--border) 60%, transparent)" };
+// No box: the group header and the space between groups already group the rows.
+// Rows keep their inner padding for the tap and hover fill; the negative margin lines the art and amounts up with the header.
+const listSurfaceStyle: CSSProperties = { display: "grid", margin: "0 -24px 0 -10px" };
 
 
-const emptyFoldStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 56, padding: "0 16px 0 24px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
+const emptyFoldStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 56, padding: "0 24px 0 10px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
 const emptyFoldIconsStyle: CSSProperties = { display: "inline-flex", gap: 4, flexShrink: 0 };
-const addRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, minHeight: 48, padding: "0 16px 0 24px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
+const addRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, minHeight: 48, padding: "0 24px 0 10px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
 
 /** Once this month is planned, next month's planning opens in the last week, not straight after saving. */
 function nextMonthPlanningOpen() {

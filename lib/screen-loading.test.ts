@@ -11,3 +11,8 @@ it("keeps essential failures visible and scopes Budget recovery to its data", ()
   expect(screenIsLoading({ ...idle, tab: "budget", month: true })).toBe(true);
   expect(screenIsLoading({ ...idle, tab: "home", home: true })).toBe(true);
 });
+it("stays quiet while a refresh after a save reloads data already on screen", () => {
+  expect(screenIsLoading({ ...idle, tab: "home", month: true, bills: true, refreshing: true })).toBe(false);
+  expect(screenIsLoading({ ...idle, tab: "budget", month: true, budget: true, refreshing: true })).toBe(false);
+  expect(screenIsLoading({ ...idle, tab: "home", core: true, refreshing: true })).toBe(true);
+});
