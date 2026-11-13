@@ -1,7 +1,9 @@
 /* Icon hover for BudgetRow */
-.budget-row-icon:hover {
-  transform: scale(1.1) rotate(-6deg);
-  transition: transform 0.15s ease-out;
+@media (hover: hover) and (pointer: fine) {
+  .budget-row-icon:hover {
+    transform: scale(1.1) rotate(-6deg);
+    transition: transform 0.15s ease-out;
+  }
 }
 
 /* Skeleton shimmer */
@@ -288,14 +290,14 @@ button {
     filter 0.2s ease;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   button:not(:disabled):hover {
     transform: translateY(-1px);
   }
 }
 
 /* Rows and list options sit beside their neighbours, so they answer hover with a fill instead of the lift. */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   :is(.budget-row, .settings-navigation-row, .picker-option, .bill-date-row, .tx-row):not(:disabled):hover {
     transform: none;
   }
@@ -567,7 +569,7 @@ html {
   isolation: isolate;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .cta-save:not(:disabled):hover {
     transform: scale(1.03);
     box-shadow:
@@ -586,9 +588,11 @@ html {
 }
 
 /* Rebalance button — sliders icon tilts on hover */
-button:hover .rebalance-btn-icon {
-  transform: rotate(-20deg) scale(1.1);
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+@media (hover: hover) and (pointer: fine) {
+  button:hover .rebalance-btn-icon {
+    transform: rotate(-20deg) scale(1.1);
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
 }
 .rebalance-btn-icon {
   transition: transform 0.15s ease;
@@ -786,7 +790,7 @@ button:hover .rebalance-btn-icon {
 .row-list .tx-row, .row-list .bill-date-row { padding-inline: var(--row-bleed); border-radius: var(--radius-control); }
 .row-list button.tx-row:active { border-bottom-color: transparent; }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   button.tx-row:not(:disabled):hover {
     transform: none;
     background: var(--surface2);
@@ -845,7 +849,7 @@ button:hover .rebalance-btn-icon {
   transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .fab-add:hover {
     transform: scale(1.06);
     box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 22%, transparent);
@@ -947,9 +951,11 @@ html { scrollbar-gutter: stable; }
   color: var(--select-ink);
 }
 
-.appearance-theme-button:hover,
-.appearance-system-button:hover {
-  filter: brightness(0.95);
+@media (hover: hover) and (pointer: fine) {
+  .appearance-theme-button:hover,
+  .appearance-system-button:hover {
+    filter: brightness(0.95);
+  }
 }
 
 .appearance-theme-button:active,
@@ -963,8 +969,10 @@ html { scrollbar-gutter: stable; }
   outline-offset: 3px;
 }
 
-.settings-navigation-row:hover {
-  color: var(--text2) !important;
+@media (hover: hover) and (pointer: fine) {
+  .settings-navigation-row:hover {
+    color: var(--text2) !important;
+  }
 }
 
 .settings-navigation-row:active {
@@ -1011,7 +1019,7 @@ html { scrollbar-gutter: stable; }
     box-shadow 0.18s ease;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .app-top-action:hover {
     background: var(--surface2) !important;
     box-shadow: none !important;
@@ -1407,7 +1415,7 @@ button[aria-label^="Close" i]:focus-visible {
     border-color 0.16s ease;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .budget-empty-action:hover {
     border-color: var(--border2) !important;
     background: var(--surface2) !important;
@@ -1531,8 +1539,10 @@ button[aria-label^="Close" i]:focus-visible {
   .budget-row > :last-child {
     text-align: right;
   }
-  .budget-row:hover {
-    background: color-mix(in srgb, var(--surface2) 60%, transparent) !important;
+  @media (hover: hover) and (pointer: fine) {
+    .budget-row:hover {
+      background: color-mix(in srgb, var(--surface2) 60%, transparent) !important;
+    }
   }
   .budget-col {
     display: block;
@@ -1629,7 +1639,7 @@ html[data-theme="dark"] .bottom-sheet-panel {
 .picker-options { padding: 8px; max-height: 320px; overflow: auto; }
 .picker-option { width: 100%; min-height: 48px !important; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px !important; border: 0; border-radius: var(--radius-control); background: transparent !important; box-shadow: none !important; color: var(--text); text-align: left; font-size: 15px; cursor: pointer; }
 .picker-option[aria-pressed="true"] { background: var(--select-wash) !important; color: var(--select-ink); }
-@media (hover: hover) { .picker-option:not(:disabled):not([aria-pressed="true"]):hover { background: var(--surface2) !important; } }
+@media (hover: hover) and (pointer: fine) { .picker-option:not(:disabled):not([aria-pressed="true"]):hover { background: var(--surface2) !important; } }
 .picker-option:disabled { opacity: .45; cursor: default; }
 .picker-search { width: calc(100% - 16px); margin: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface2); color: var(--text); }
 .date-calendar { padding: 8px; }
@@ -1714,7 +1724,7 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 
 .loading-recovery { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-3); padding-block:var(--space-3); color:var(--text2); font-size:var(--type-body); }
 .loading-recovery button { min-width:var(--control-min); min-height:var(--control-min); padding-inline:var(--space-3); border:0; border-radius:var(--radius-control); background:var(--surface2); color:var(--text); font:inherit; cursor:pointer; }
-@media (hover:hover) { .loading-recovery button:hover { background:var(--track); } }
+@media (hover: hover) and (pointer: fine) { .loading-recovery button:hover { background:var(--track); } }
 .loading-recovery button:active { opacity:.7; }
 
 
@@ -1775,10 +1785,13 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
 }
 .couple-picker-person:not([data-included]) .couple-picker-art { opacity: .45; transform: scale(.8); }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .couple-picker-person:not([data-included]):hover .couple-picker-art { opacity: .75; }
 }
 .couple-picker :is(.couple-picker-person, .couple-picker-join):not(:disabled):is(:hover, :active) { transform: none; }
+/* Touch gets a press instead of a hover: the face dips while held. */
+.couple-picker-person:active .couple-picker-art { transform: scale(.9); }
+.couple-picker-person:not([data-included]):active .couple-picker-art { transform: scale(.72); }
 .couple-picker :is(.couple-picker-person, .couple-picker-join):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .couple-picker-label { display: none; }
 @media (min-width: 900px) {

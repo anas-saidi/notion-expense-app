@@ -57,7 +57,7 @@
 .bill-date-alert { color: var(--danger); }
 .bill-date-amount { font-size: 15px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
 .bill-date-row:active { background: var(--surface2); }
-@media (hover: hover) { .bill-date-row:hover { background: var(--surface2); } }
+@media (hover: hover) and (pointer: fine) { .bill-date-row:hover { background: var(--surface2); } }
 
 .bills-pay-summary { background: var(--surface2); border-radius: var(--radius-card); padding: 16px; }
 .bills-pay-overview { display: grid; gap: 8px; }
@@ -87,4 +87,4 @@ button.bills-calendar-day[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var
 
 /* The date tile shares the row fill colour, so it lifts to the card surface while the row is filled. */
 .bill-date-row:active .bill-date-tile { background: var(--surface); }
-@media (hover: hover) { .bill-date-row:hover .bill-date-tile { background: var(--surface); } }
+@media (hover: hover) and (pointer: fine) { .bill-date-row:hover .bill-date-tile { background: var(--surface); } }

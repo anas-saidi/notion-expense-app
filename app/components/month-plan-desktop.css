@@ -42,14 +42,14 @@
 .plan-amount { width:100%; min-height:32px !important; height:32px; padding:0 8px !important; border:1px solid transparent !important; border-radius:var(--radius-control) !important; background:transparent !important; color:var(--text); font-size:14px !important; font-weight:400; text-align:right; font-variant-numeric:tabular-nums; transition:border-color 120ms ease, background-color 120ms ease; }
 .plan-amount::placeholder { color:var(--muted); opacity:.6; }
 .plan-amount:focus::placeholder { color:transparent; }
-@media (hover:hover) { .plan-table-row:hover .plan-amount:not(:focus) { background:var(--surface2) !important; } }
+@media (hover: hover) and (pointer: fine) { .plan-table-row:hover .plan-amount:not(:focus) { background:var(--surface2) !important; } }
 .plan-amount:focus { background:var(--surface) !important; border-color:color-mix(in srgb, var(--select-ink) 45%, var(--border)) !important; box-shadow:0 0 0 3px color-mix(in srgb, var(--select-ink) 10%, transparent); outline:none; }
 .plan-amount[data-changed] { background:var(--select-wash) !important; font-weight:600; }
 .plan-amount[aria-invalid="true"] { outline:2px solid var(--danger); }
 .plan-freeze { width:44px; height:44px; display:grid; place-items:center; border:0; border-radius:var(--radius-control); background:transparent; color:var(--text2); cursor:pointer; }
 .plan-freeze:hover, .plan-freeze:focus-visible { color:var(--text); background:var(--surface2); }
 .plan-frozen { margin-top:24px; }
-@media (hover:hover) {
+@media (hover: hover) and (pointer: fine) {
   /* Quiet rather than invisible, so the last column never reads as dead space. */
   .plan-freeze { opacity:.35; }
   .plan-table-row:hover .plan-freeze, .plan-table-row:focus-within .plan-freeze { opacity:1; }
@@ -113,7 +113,7 @@
 .plan-gap-amount { color:var(--danger); font-weight:600; font-variant-numeric:tabular-nums; }
 .plan-gap-value { color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
 .plan-gap:disabled { cursor:default; }
-@media (hover:hover) { .plan-gap:hover .plan-gap-name { color:var(--text); text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--text) 25%, transparent); text-underline-offset:4px; } }
+@media (hover: hover) and (pointer: fine) { .plan-gap:hover .plan-gap-name { color:var(--text); text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--text) 25%, transparent); text-underline-offset:4px; } }
 .plan-gap:active { opacity:.6; }
 .plan-gap:focus-visible { outline:2px solid var(--select-ink); outline-offset:2px; border-radius:var(--radius-control); }
 .plan-compare { display:grid; gap:8px; }

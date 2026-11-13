@@ -21,7 +21,7 @@
 .contribution-fields label,.contribution-repay > label { display:grid; gap:8px; font-size:13px; color:var(--text); }
 .contribution-fields input,.contribution-repay input { width:100%; min-width:0; min-height:44px; font-size:16px; font-variant-numeric:tabular-nums; }
 .contribution-repay { display:grid; gap:16px; }
-.contribution-entry:hover,.contribution-text:hover { color:var(--strong); }
+@media (hover: hover) and (pointer: fine) { .contribution-entry:hover,.contribution-text:hover { color:var(--strong); } }
 .contribution-entry:active,.contribution-text:active { opacity:.7; }
 .contribution-primary:active { transform:translateY(1px); }
 .contribution-primary:disabled,.contribution-text:disabled,.contribution-close:disabled { opacity:.5; cursor:default; }
@@ -39,7 +39,7 @@
 .contribution-person-summary { display:flex; align-items:center; gap:12px; min-height:60px; }
 .contribution-breakdown { min-width:0; }
 .contribution-breakdown > summary { display:flex; align-items:center; gap:8px; width:fit-content; max-width:100%; min-height:44px; list-style:none; cursor:pointer; color:var(--muted); font-size:13px; }
-.contribution-breakdown > summary:hover { color:var(--text); }
+@media (hover: hover) and (pointer: fine) { .contribution-breakdown > summary:hover { color:var(--text); } }
 .contribution-person-name { display:grid; gap:4px; margin-right:auto; min-width:0; }
 .contribution-person-name > strong { font-size:15px; font-weight:600; }
 .contribution-person-name > span { color:var(--muted); font-size:12px; line-height:16px; }

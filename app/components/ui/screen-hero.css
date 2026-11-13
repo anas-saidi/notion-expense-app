@@ -80,7 +80,7 @@
 }
 
 /* Hero taps reveal detail; the visual stays anchored to its shared frame. */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .screen-hero-mascot button:hover:not(:disabled) { transform: none; }
 }
 .screen-hero-mascot button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: var(--radius-control); }
