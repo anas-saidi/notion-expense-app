@@ -1,5 +1,6 @@
 "use client";
 import "./finance-ai.css";
+import "./ui/prompt-input.css";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { parseTransactionLines, reconcileTypedChoices, saveTypedBatch, type TypedTransactionDraft } from "@/lib/typed-transactions";
@@ -30,6 +31,8 @@ type Props = {
   onOpenInForm?: (source: string, row: { type: "Expense" | "Income"; name: string; amount: number; date: string; categoryId?: string; accountId?: string }) => void;
   /** A line coming back from the form unsaved: appended to what's written. */
   restoreLine?: { source: string; id: number } | null;
+  /** Example lines shown as pills above an empty canvas (prompt-kit's Prompt Suggestion); tapping fills the line. */
+  suggestions?: string[];
 };
 
 type Choice = { categoryId?: string; accountId?: string; date?: string; transaction?: AIDraft };
@@ -291,6 +294,15 @@ export function TypeItComposer(props: Props) {
   return <div className="typed composer-pane" style={{ display: props.active ? "flex" : "none" }}>
     <p id="typed-help" className="sr-only">Write in MAD, one transaction per line, then choose Read. Use salary, received, or + for income. Use today, yesterday, a weekday, or YYYY-MM-DD for dates. Review categories and accounts before saving.</p>
     <div className="typed-scroll">
+      {/* Outside the writing lines, like prompt-kit: only while nothing is written. */}
+      {!text.trim() && (props.suggestions?.length ?? 0) > 0 && <div className="prompt-suggestions typed-suggestions" role="group" aria-label="Suggestions">
+        {props.suggestions!.map(suggestion => <button key={suggestion} type="button" className="prompt-suggestion" onClick={() => {
+          haptic("selection");
+          updateDraft(suggestion, {});
+          nextFocus.current = 0;
+          caretAt.current = suggestion.length;
+        }}>{suggestion}</button>)}
+      </div>}
       <div role="group" aria-label="Write transactions" className="typed-lines">
         {lines.map((source, index) => {
           const row = rows.find(item => item.line === index + 1);

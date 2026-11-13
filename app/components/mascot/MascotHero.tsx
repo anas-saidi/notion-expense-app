@@ -34,6 +34,12 @@ type Common = {
    * animates changes. On by default; off for flows that open on fresh data.
    */
   remember?: boolean;
+  /**
+   * The level isn't known yet (its data is still loading): the jar shows at
+   * the level it last showed on this device, and moves to the real one once
+   * `pending` clears. `level` is only the fallback for a first visit.
+   */
+  pending?: boolean;
   style?: CSSProperties;
   /**
    * Couple only: wrap each partner's jar, e.g. to make it its own button. Gets the
@@ -123,11 +129,11 @@ function CouplePair(props: MascotHeroProps) {
  * time, the emoji jar fills once as a welcome. Reduce Motion always starts settled.
  */
 function HeroJar(props: MascotHeroProps & { memoryKey?: string }) {
-  const { memoryKey, scope, spentPct, unassigned = 0, lookYaw, size = MASCOT_HERO_SIZE, mood, remember = true, style } = props;
+  const { memoryKey, scope, spentPct, unassigned = 0, lookYaw, size = MASCOT_HERO_SIZE, mood, remember = true, pending = false, style } = props;
   const pool = props.variant === "pool";
   const animate = !useReducedMotion();
   const level = pool ? Math.round(Math.max(0, Math.min(1, props.level)) * 1000) / 1000 : 0;
-  const shownLevel = useRememberedJar(pool && remember ? `pool:${memoryKey ? `${memoryKey}-` : ""}${scope}` : null, "level", level, animate);
+  const shownLevel = useRememberedJar(pool && remember ? `pool:${memoryKey ? `${memoryKey}-` : ""}${scope}` : null, "level", level, animate, pending);
   const shownItems = useRememberedJar(!pool && remember ? `split-v2:${memoryKey ? `${memoryKey}-` : ""}${scope}` : null, "items", pool ? EMPTY : props.items, animate);
   // A pool always carries a (usually empty) pile, so showing what's in it never rebuilds the jar.
   const poolItems = pool ? props.items ?? EMPTY : EMPTY;

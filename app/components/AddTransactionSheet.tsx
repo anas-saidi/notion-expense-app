@@ -95,6 +95,8 @@ type AddTransactionSheetProps = {
   onDelete?: () => Promise<boolean>;
   typedCategories?: Category[];
   typedHistory?: { description: string; categoryId: string }[];
+  /** Habit pills for an empty writing view (lib/suggestions.ts). */
+  typedSuggestions?: string[];
   typedDraftKey?: string;
   onSaveTyped?: (transaction: TypedTransactionDraft) => Promise<void>;
   onTypedComplete?: (count: number) => void;
@@ -308,6 +310,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           onComplete={props.onTypedComplete ?? (() => {})}
           onBusyChange={setTypedBusy}
           restoreLine={restoreLine}
+          suggestions={props.typedSuggestions}
           onOpenInForm={(line, row) => {
             // The line moves into the form with everything it already knows.
             props.onTransactionTypeChange(row.type);

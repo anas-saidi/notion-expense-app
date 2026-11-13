@@ -60,3 +60,38 @@ export const reallocationSchema = { type: "object", required: ["explanation", "m
     fromId: string, toId: string, amount: { type: "integer" }, reason: string,
   } } },
 } };
+
+const fold = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/**
+ * What Suggest moves sends Gemini: only the categories that matter to this ask, not the whole budget.
+ * Extra categories are noise the model can latch onto. In order, up to `max`:
+ * 1. Named: categories the request mentions (by name or a word of it, 3+ letters, accents and plurals ignored).
+ * 2. Short: categories below zero, the likely receivers.
+ * 3. Givers: categories with money to spare after their unpaid bills, most spare first.
+ * Categories with nothing to give and no part in the ask stay out. Names and figures only.
+ */
+export function pickReallocationContext(text: string, budget: BudgetOption[], max = 12): BudgetOption[] {
+  const words = new Set(fold(text).split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 3));
+  const said = fold(text);
+  const named = budget.filter(c => {
+    const name = fold(c.name);
+    // "repair" names "Repairs": a shared stem of 4+ letters counts, as does an exact short word.
+    const sameWord = (a: string, b: string) => a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a)) && Math.abs(a.length - b.length) <= 2);
+    return said.includes(name) || name.split(/[^\p{L}\p{N}]+/u).some(word => word.length >= 3 && [...words].some(w => sameWord(w, word)));
+  });
+  const short = budget.filter(c => c.available < -0.5).sort((a, b) => a.available - b.available);
+  const spare = (c: BudgetOption) => c.available - c.reserved;
+  const givers = budget.filter(c => spare(c) >= 1).sort((a, b) => spare(b) - spare(a));
+  const picked: BudgetOption[] = [];
+  const add = (c: BudgetOption) => { if (picked.length < max && !picked.some(p => p.id === c.id)) picked.push(c); };
+  named.forEach(add);
+  short.forEach(add);
+  // Keep room for at least a few givers even when many categories are named or short.
+  const reserveForGivers = Math.min(3, givers.length);
+  while (picked.length > max - reserveForGivers && picked.length > 0 && givers.some(g => !picked.some(p => p.id === g.id))) picked.pop();
+  givers.forEach(add);
+  // A move needs two categories; top up from the largest balances, never the whole budget.
+  for (const c of [...budget].sort((a, b) => b.available - a.available)) { if (picked.length >= 2) break; add(c); }
+  return picked;
+}

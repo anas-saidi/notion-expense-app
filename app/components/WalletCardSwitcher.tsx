@@ -1,4 +1,3 @@
-import { HeroSkeleton } from "./ui/Skeleton";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { BudgetScope, Category, MonthlySummary } from "./app-types";
 import type { ContributionStatus } from "./contribution-utils";
@@ -35,6 +34,8 @@ type WalletCardSwitcherProps = {
 };
 
 const HOME_POOL_SIZE = MASCOT_HERO_SIZE;
+/** Where a jar sits while its level is loading, on a device that hasn't shown it before. */
+const PENDING_LEVEL = 0.5;
 export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = false, monthlyError = false, categoryAvailableByScope, balanceByScope, contribStatus, categories = [], overspent: overspentProp = 0, balanceDetail, summary, feedback }: WalletCardSwitcherProps) {
   const currentSummary = monthlySummary;
   // Hero number: real account balance by scope (from Notion accounts database)
@@ -87,32 +88,38 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
   }) : null;
   const [openPartner, setOpenPartner] = useState<"anas" | "salma" | null>(null);
   const spentSummary = `${Math.round(Math.max(0, Math.min(100, 100 - (spentPct ?? 0))))}% of the monthly budget remaining` + (overspent > 0 ? `, ${fmt(overspent)} MAD overspent` : "");
+  // The jar shows with the balance, before the monthly figures arrive: it holds the
+  // level it last showed on this device (or a neutral one the first time), then
+  // moves to the real level and becomes tappable once they're in.
+  const pending = monthlyLoading;
   // Couple: each jar is its own button and tells only its own figure.
-  const couplePool = contribution && (
+  const couplePool = isJoint && (pending || contribution) && (
     <MascotHero
       variant="pool" size={HOME_POOL_SIZE} scope={value} spentPct={spentPct} balance={balance} available={available ?? 0}
-      level={1 - spent / (planned ?? 1)} warn={null}
-      levels={{ anas: contribution[0].level, salma: contribution[1].level }}
-      pairItems={openPartner ? { [openPartner]: [contribution.find(entry => entry.partner === openPartner)!.token] } : undefined}
+      pending={pending}
+      level={pending ? PENDING_LEVEL : 1 - spent / (planned ?? 1)} warn={null}
+      levels={contribution && !pending ? { anas: contribution[0].level, salma: contribution[1].level } : { anas: PENDING_LEVEL, salma: PENDING_LEVEL }}
+      pairItems={openPartner && contribution && !pending ? { [openPartner]: [contribution.find(entry => entry.partner === openPartner)!.token] } : undefined}
       wrapJar={(partner, jar, jarSize) => {
-        const c = contribution.find(entry => entry.partner === partner)!;
-        return <PartnerTap size={jarSize} open={openPartner === partner} onToggle={() => setOpenPartner(open => open === partner ? null : partner)} label={c.label}>{jar}</PartnerTap>;
+        const c = pending ? undefined : contribution?.find(entry => entry.partner === partner);
+        const label = c?.label ?? `${partner === "anas" ? "Anas" : "Salma"}: loading contribution`;
+        return <PartnerTap size={jarSize} pending={!c} open={!!c && openPartner === partner} onToggle={() => setOpenPartner(open => open === partner ? null : partner)} label={label}>{jar}</PartnerTap>;
       }}
     />
   );
-  const pool = couplePool || hasPlan && (
+  const pool = couplePool || (pending || hasPlan) && (
     <MascotSpill
       size={HOME_POOL_SIZE}
-     
+      pending={pending}
       hintKey="mascot-spill-hint"
-      label={`This month: ${spentSummary} (${fmt(spent)} MAD spent of ${fmt(planned ?? 0)} MAD planned)${topSpentLabel}`}
+      label={pending ? "Loading monthly details" : `This month: ${spentSummary} (${fmt(spent)} MAD spent of ${fmt(planned ?? 0)} MAD planned)${topSpentLabel}`}
       onOpenChange={setPoolOpen}
       details={<>
         {Math.round(Math.max(0, Math.min(100, 100 - (spentPct ?? 0))))}% budget left
         {overspent > 0 && <span style={{ color: "var(--danger)", display: "block" }}><Money value={overspent} /> overspent</span>}
       </>}
     >
-      <MascotHero variant="pool" size={HOME_POOL_SIZE} items={poolOpen ? topSpent : undefined} scope={value} level={1 - spent / (planned ?? 1)} warn={poolWarn} spentPct={spentPct} balance={balance} available={available ?? 0} />
+      <MascotHero variant="pool" size={HOME_POOL_SIZE} items={poolOpen && !pending ? topSpent : undefined} scope={value} pending={pending} level={pending ? PENDING_LEVEL : 1 - spent / (planned ?? 1)} warn={poolWarn} spentPct={spentPct} balance={balance} available={available ?? 0} />
     </MascotSpill>
   );
 
@@ -120,7 +127,7 @@ export function WalletCardSwitcher({ value, monthlySummary, monthlyLoading = fal
     <div style={switcherStyle}>
       <section className="wallet-overview-card" aria-label="Wallet overview">
         <ScreenHero
-          mascot={monthlyLoading ? <HeroSkeleton size={HOME_POOL_SIZE} /> : monthlyError
+          mascot={monthlyError
             ? <span role="status" style={captionStyle}>Monthly details unavailable</span>
             : pool || <span style={captionStyle}>No monthly plan</span>}
           label="Balance"

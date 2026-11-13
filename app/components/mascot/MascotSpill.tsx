@@ -23,6 +23,8 @@ type MascotSpillProps = {
   side?: "below" | "left" | "right";
   /** Told whenever the details open or close (tap or first-time hint). */
   onOpenChange?: (open: boolean) => void;
+  /** Its details are still loading: the jar shows but doesn't open yet. */
+  pending?: boolean;
   style?: CSSProperties;
 };
 
@@ -38,7 +40,7 @@ const EASE_OUT = [0.22, 1, 0.36, 1] as const;
  * are shown, and always carries them in its accessible name. Under Reduce
  * Motion the details simply fade.
  */
-export function MascotSpill({ children, details, label, size, hintKey, initiallyOpen = false, side = "below", onOpenChange, style }: MascotSpillProps) {
+export function MascotSpill({ children, details, label, size, hintKey, initiallyOpen = false, side = "below", onOpenChange, pending = false, style }: MascotSpillProps) {
   const [open, setOpen] = useState(initiallyOpen);
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
@@ -48,6 +50,7 @@ export function MascotSpill({ children, details, label, size, hintKey, initially
   const { haptic } = useAppHaptics();
 
   const toggle = () => {
+    if (pending) return;
     // A light tap as the jar squishes open; a softer tick as it closes.
     haptic(open ? "selection" : "light");
     setOpen(o => !o);
@@ -57,7 +60,7 @@ export function MascotSpill({ children, details, label, size, hintKey, initially
 
   // First time ever: show the details once by themselves, so people learn the jar holds more.
   useEffect(() => {
-    if (!hintKey) return;
+    if (!hintKey || pending) return;
     try {
       if (window.localStorage.getItem(hintKey)) return;
     } catch {
@@ -69,7 +72,7 @@ export function MascotSpill({ children, details, label, size, hintKey, initially
       try { window.localStorage.setItem(hintKey, "1"); } catch { /* storage blocked: may show again */ }
     }, 900);
     return () => window.clearTimeout(id);
-  }, [hintKey]);
+  }, [hintKey, pending]);
 
   // The jar's visible bottom sits this far above its box (the jar is about two thirds of the box).
   const jarGap = Math.round(size * 0.16);
@@ -87,8 +90,9 @@ export function MascotSpill({ children, details, label, size, hintKey, initially
         ref={jar}
         type="button"
         onClick={toggle}
-        aria-expanded={open}
-        aria-label={`${label}. ${open ? "Hide" : "Show"} details.`}
+        aria-expanded={pending ? undefined : open}
+        aria-disabled={pending || undefined}
+        aria-label={pending ? label : `${label}. ${open ? "Hide" : "Show"} details.`}
         style={jarButtonStyle}
       >
         {children}

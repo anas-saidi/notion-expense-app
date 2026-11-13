@@ -2,12 +2,13 @@
 import { categoryIconSource } from "../../lib/category-icons";
 import "./finance-ai.css";
 import { ReallocationAssistant } from "./ReallocationAssistant";
+import { rebalanceSuggestions, type DueBill } from "@/lib/suggestions";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, today } from "./app-utils";
 import { AllocationFlow, type AllocationGroup } from "./AllocationFlow";
-import { isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
+import { isSavingsCategory } from "./wallet-utils";
 import { Fact, Summary } from "./ui/Summary";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Banner } from "./ui/Banner";
@@ -25,6 +26,8 @@ type RebalanceSheetProps = {
   // Unassigned money that can be pulled in on top of what's already allocated —
   // only meaningful (and only ever non-zero) for the current month.
   readyToAssignByScope?: Record<BudgetScope, number>;
+  /** Unpaid bills this month, for the "Fund {bill}" prompt pill. */
+  dueBills?: DueBill[];
   /** The scope is short outside this pool (over-assigned savings, advances owed back): never call that balanced. */
   shortfall?: { amount: number; onOpen?: () => void };
   jointUnassigned?: number;
@@ -112,6 +115,7 @@ export function RebalanceSheet({
   readyToAssignByScope,
   jointUnassigned = 0,
   shortfall,
+  dueBills = [],
 }: RebalanceSheetProps) {
   const monthCtx = useMemo(() => getMonthContext(homeMonth), [homeMonth]);
   const isReadOnly = monthCtx !== "current";
@@ -186,6 +190,13 @@ export function RebalanceSheet({
   }, [isReadOnly, budgetScope, jointUnassigned, readyToAssignByScope]);
 
   const poolForGroup = alreadyAllocatedForGroup + unallocatedForGroup;
+
+  // What unpaid bills this month still need from each category: Suggest moves can't take that money.
+  const billHolds = useMemo(() => {
+    const holds = new Map<string, number>();
+    for (const bill of dueBills) { const key = bill.categoryId.replace(/-/g, "").toLowerCase(); holds.set(key, (holds.get(key) ?? 0) + bill.amount); }
+    return holds;
+  }, [dueBills]);
 
   // ── Build AllocationFlow groups ──
   // `available = amount` keeps rangeMin = 0 so the user can reduce any category to zero.
@@ -285,12 +296,6 @@ export function RebalanceSheet({
     </Banner>
   ) : undefined;
 
-  // The jar's liquid is the scope's month, from the same figures as Home and Budget,
-  // so it looks the same here; only the emojis move as money is rebalanced.
-  const jarLevel = useMemo(() => {
-    const scoped = scopeMonthlySummary(monthlySummary, categories, accounts, budgetScope);
-    return scoped.totalAssigned > 0 ? 1 - scoped.totalSpent / scoped.totalAssigned : 1;
-  }, [monthlySummary, categories, accounts, budgetScope]);
 
   // The pool combines category allocations and unassigned money.
   const poolLabel = monthCtx === "past" ? "Leftover" : "Allocation pool";
@@ -298,7 +303,7 @@ export function RebalanceSheet({
   return (
     <AllocationFlow
       jarScope={budgetScope}
-      jarLevel={jarLevel}
+      jarShowsAssigned
       open={open}
       selectedMonth={homeMonth}
       onCancel={onClose}
@@ -314,14 +319,17 @@ export function RebalanceSheet({
       saveButtonLabel="Apply"
       readOnly={isReadOnly}
       readOnlyBanner={readOnlyBanner}
+      // One way to move money at a time: the prompt replaces the editor, and Use moves brings it back loaded.
+      editorHidden={assistantOpen}
       flowPreview={<>{!isReadOnly && open && <>
-        <button type="button" style={assistantToggleStyle} aria-expanded={assistantOpen} onClick={() => setAssistantOpen(value => !value)}>{assistantOpen ? "Hide suggestions" : "Suggest moves"}</button>
+        <button type="button" style={assistantToggleStyle} aria-expanded={assistantOpen} onClick={() => setAssistantOpen(value => !value)}>{assistantOpen ? "Edit by hand" : "Suggest moves"}</button>
         {assistantOpen && <ReallocationAssistant scope={budgetScope} month={homeMonth}
-          categories={visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original }))}
+          suggestions={rebalanceSuggestions({ categories: visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original })), bills: dueBills, today: today(), formatAmount: fmt })}
+          categories={visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original, reserved: billHolds.get(item.id.replace(/-/g, "").toLowerCase()) ?? 0 }))}
           onUse={suggestion => {
             const next = Object.fromEntries(allItems.map(item => [item.id, item.original]));
             for (const move of suggestion.moves) { next[move.fromId] -= move.amount; next[move.toId] += move.amount; }
-            setAllocations(next); setUsedSuggestion(true);
+            setAllocations(next); setUsedSuggestion(true); setAssistantOpen(false);
           }} />}
       </>}{flowPreview}</>}
       heroPool

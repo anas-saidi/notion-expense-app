@@ -10,6 +10,7 @@ import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { BillsSection } from "./components/BillsSection";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
+import { habitSuggestions, type DueBill } from "@/lib/suggestions";
 import { useBalanceChecks } from "./components/useBalanceChecks";
 import { PendingBalanceChecks, balanceChecksToReview } from "./components/BalanceChecks";
 import { accountKey, checkedFundsAfter } from "../lib/balance-checks";
@@ -973,6 +974,18 @@ export default function App() {
     [budgetScope, categories, transactions, accounts],
   );
 
+  // Writing-view pills: habits from this scope's history (rules in lib/suggestions.ts), not AI.
+  const typedSuggestions = useMemo(() => habitSuggestions(scopedTransactions, today()), [scopedTransactions]);
+  // Rebalance pills: unpaid bills due within the week, to compare with their categories.
+  const dueBills = useMemo<DueBill[]>(() => {
+    if (!billsData) return [];
+    try {
+      return deriveOccurrences(billsData.schedules, billsData.payments, billsData.today, billsData.today.slice(0, 7))
+        .filter(o => o.state === "Due" || o.state === "Overdue")
+        .map(o => ({ name: o.name, categoryId: o.categoryId, amount: o.amount, dueDate: o.dueDate }));
+    } catch { return []; }
+  }, [billsData]);
+
   const scopedPendingItems = useMemo(
     () => pendingItems.filter((item) => categoryIdMatchesScope(item.categoryId, categories, budgetScope)),
     [budgetScope, categories, pendingItems],
@@ -1389,6 +1402,7 @@ export default function App() {
         typedDraftKey={`typedDraft:v2:${mode}:${budgetScope}`}
         typedCategories={categories.filter(c => !isSavingsCategory(c) && !c.archived)}
         typedHistory={corpus}
+        typedSuggestions={typedSuggestions}
         onSaveTyped={async (transaction) => {
           const response = await fetch(transaction.type === "Income" ? "/api/monthly-income" : "/api/expense", {
             method: "POST",
@@ -1679,6 +1693,7 @@ export default function App() {
         budgetScope={budgetScope}
         readyToAssignByScope={readyToAssignByScope}
         jointUnassigned={jointUnassigned}
+        dueBills={dueBills}
         onSuccess={() => {
           refreshBudgetData("Rebalance applied");
           if (rebalanceReturnToAdd.current) {

@@ -1,0 +1,36 @@
+/* Prompt input (ported from prompt-kit): a rounded field with the send button inside, suggestion pills above. */
+.prompt { display: grid; gap: 10px; }
+.prompt-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prompt-suggestion {
+  min-height: 36px; padding: 0 14px; border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 999px;
+  background: var(--surface); color: var(--text2); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+button.prompt-suggestion, button.prompt-suggestion:not(:disabled):hover { transform: none; }
+@media (hover: hover) and (pointer: fine) { button.prompt-suggestion:not(:disabled):hover { background: var(--surface2); color: var(--text); } }
+button.prompt-suggestion:not(:disabled):active { transform: scale(0.97); transition: transform var(--motion-fast) var(--ease-standard); }
+.prompt-suggestion:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+.prompt-field {
+  display: grid; gap: 4px; padding: 8px; border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 24px;
+  background: var(--surface); cursor: text; transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+.prompt-field:focus-within { border-color: color-mix(in srgb, var(--text) 24%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 35%, transparent); }
+.prompt-field[data-disabled] { cursor: not-allowed; opacity: .6; }
+.prompt-field textarea {
+  display: block; width: 100%; min-height: 44px; margin: 0; padding: 6px 8px; border: 0; background: transparent; resize: none;
+  color: var(--text); font: inherit; font-size: 16px; line-height: 1.45; outline: none; overflow-y: auto;
+}
+.prompt-field textarea::placeholder { color: var(--muted); }
+.prompt-field textarea:disabled { color: var(--text2); cursor: not-allowed; }
+.prompt-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 8px; }
+.prompt-hint { min-width: 0; font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); }
+.prompt-send {
+  display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; padding: 0; border: 0; border-radius: 50%;
+  background: var(--text); color: var(--bg); cursor: pointer;
+}
+button.prompt-send, button.prompt-send:not(:disabled):hover { transform: none; }
+button.prompt-send:not(:disabled):active { transform: scale(0.94); transition: transform var(--motion-fast) var(--ease-standard); }
+.prompt-send:disabled { background: var(--surface2); color: var(--muted); cursor: default; }
+.prompt-send[aria-busy="true"]:disabled { background: var(--text); color: var(--bg); opacity: .5; }
+.prompt-send:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { button.prompt-suggestion:not(:disabled):active, button.prompt-send:not(:disabled):active { transform: none; } }

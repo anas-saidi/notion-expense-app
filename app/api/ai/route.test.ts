@@ -41,7 +41,8 @@ it("does not infer that unreadable bills mean no reservations", async () => {
   expect(generateFinanceJSON).not.toHaveBeenCalled();
 });
 it("passes minimal aliased budget context and restores IDs only after validation", async () => {
-  vi.mocked(generateFinanceJSON).mockResolvedValue({ explanation: "Cover repair", moves: [{ fromId: "c0", toId: "c1", amount: 300, reason: "Flexible spending" }] });
+  // The named category ("repair" → Repairs) is sent first, so it's c0 and Groceries is c1.
+  vi.mocked(generateFinanceJSON).mockResolvedValue({ explanation: "Cover repair", moves: [{ fromId: "c1", toId: "c0", amount: 300, reason: "Flexible spending" }] });
   const res = await POST(request({ action: "reallocate", text: "Cover repair", scope: "joint", month: "2026-10" }));
   expect(res.status).toBe(200); expect((await res.json()).moves[0].fromId).toBe(food);
   const context = JSON.stringify(vi.mocked(generateFinanceJSON).mock.calls[0][1]);
@@ -75,4 +76,25 @@ it("returns the category default account and preserves an explicitly matched acc
   expect(vi.mocked(generateFinanceJSON).mock.calls[0][1]).toMatchObject({ categories: [category] });
   vi.mocked(generateFinanceJSON).mockResolvedValue({ transactions: [{ ...draft, accountId: food }], questions: [] });
   expect((await (await POST(request(base))).json()).transactions[0].accountId).toBe(food);
+});
+it("suggests from the app's own budget without reading Notion, sending only what the ask needs", async () => {
+  vi.mocked(generateFinanceJSON).mockResolvedValue({ explanation: "Cover repair", moves: [{ fromId: "c1", toId: "c0", amount: 300, reason: "Most spare" }] });
+  const categories = [
+    { id: repair, name: "Repairs", available: 0, reserved: 0 },
+    { id: food, name: "Groceries", available: 1000, reserved: 0 },
+    { id: "zero", name: "Hobbies", available: 0, reserved: 0 },
+    { id: "held", name: "Rent", available: 3500, reserved: 3500 },
+  ];
+  const res = await POST(request({ action: "reallocate", text: "Cover repair", scope: "joint", month: "2026-10", categories }));
+  expect(res.status).toBe(200);
+  expect((await res.json()).moves[0]).toMatchObject({ fromId: food, toId: repair, amount: 300 });
+  expect(queryDatabaseAll).not.toHaveBeenCalled(); expect(readBills).not.toHaveBeenCalled();
+  const context = JSON.stringify(vi.mocked(generateFinanceJSON).mock.calls[0][1]);
+  expect(context).toContain("Repairs"); expect(context).toContain("Groceries");
+  expect(context).not.toContain("Hobbies"); expect(context).not.toContain("Rent"); expect(context).not.toContain(food);
+});
+it("rejects a malformed app budget before calling Gemini", async () => {
+  const res = await POST(request({ action: "reallocate", text: "Cover repair", scope: "joint", month: "2026-10", categories: [{ id: food, name: "Groceries", available: "lots", reserved: 0 }, { id: repair, name: "Repairs", available: 0, reserved: 0 }] }));
+  expect(res.status).toBe(400);
+  expect(generateFinanceJSON).not.toHaveBeenCalled();
 });

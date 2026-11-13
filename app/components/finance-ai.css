@@ -1,57 +1,13 @@
-.ai-assistant {
-  display: grid;
-  gap: 12px;
-  padding-block: 16px;
-  color: var(--text);
-  font-size: 15px;
-  line-height: 1.5;
-}
-.ai-assistant label { font-weight: 600; }
-.ai-request {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface2);
-  color: var(--text);
-  font: inherit;
-  font-size: 16px;
-  resize: vertical;
-  min-height: 88px;
-}
-.ai-helper { margin: 0; color: var(--text2); font-size: 13px; line-height: 1.5; }
-.ai-action {
-  min-height: 44px;
-  padding: 8px 16px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: var(--surface2);
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.ai-action:active:not(:disabled) { background: var(--select-wash); }
-.ai-action:disabled { color: var(--muted); cursor: not-allowed; }
-.ai-action:focus-visible, .ai-request:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 4px; }
-.ai-suggestion { display: grid; gap: 12px; overflow-wrap: anywhere; }
-.ai-suggestion > p { margin: 0; }
-.ai-move { display: grid; gap: 4px; }
-.ai-move-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.ai-move-heading > :last-child { flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-
 /* Typed transactions, written like a margin note: your words on the left, the figure in the margin,
    small mono tags below. Two marked kinds of word (which day, which account), each in its own colour. */
-.typed {
+.typed, .realloc {
   --typed-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
   --typed-day: #b45309;
   --typed-account: #2563c9;
   --typed-wait: #d97706;
-  flex-direction: column; flex: 1 1 auto; min-height: 0;
 }
-html[data-theme="dark"] .typed { --typed-day: #f0a35a; --typed-account: #7cb2f5; --typed-wait: #fbbf24; }
+.typed { flex-direction: column; flex: 1 1 auto; min-height: 0; }
+html[data-theme="dark"] :is(.typed, .realloc) { --typed-day: #f0a35a; --typed-account: #7cb2f5; --typed-wait: #fbbf24; }
 .typed-scroll { flex: 1 1 auto; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; padding-top: 16px; }
 .typed-lines { display: grid; gap: 20px; }
 .typed-line-main { display: flex; align-items: flex-start; gap: 12px; }
@@ -158,3 +114,18 @@ button.typed-back:focus-visible { outline: 2px solid var(--select-ink); outline-
   .typed-line[data-reading] .typed-marks, .typed-line[data-reading] .typed-reading { animation: none; background: none; color: var(--muted); }
   @starting-style { .typed-margin > .typed-amount, .typed-margin > .typed-dot, .typed-tags { transform: none; } }
 }
+
+/* Suggest moves (Rebalance), in the composer's language: a borderless writing line, a shimmering thinking line,
+   moves as rows with the amount in the margin and the reason underneath, one pill action. */
+.realloc { display: grid; gap: 16px; padding: 4px 0 8px; }
+.realloc .typed-line { display: grid; gap: 8px; }
+.realloc-thinking { margin: 0; font-size: 13px; line-height: 18px; }
+.realloc-explanation { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text2); }
+.realloc-result { display: grid; gap: 12px; }
+.realloc-moves { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.realloc-moves .typed-line-main { align-items: baseline; }
+.realloc-move { flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 1.4; color: var(--text); }
+.realloc-move > span[aria-hidden] { color: var(--muted); padding: 0 2px; }
+.realloc-moves .typed-note { margin-top: 2px; }
+.realloc-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.typed-suggestions { margin-bottom: 16px; }

@@ -12,7 +12,7 @@ const EASE_IN = [0.64, 0, 0.78, 0] as const;
  * the partner's figure into the jar) and keeps one jar open at a time. Given
  * `details`, the figure instead rises out from behind the jar's head.
  */
-export function PartnerTap({ open, onToggle, label, details, size, children }: {
+export function PartnerTap({ open, onToggle, label, details, size, pending = false, children }: {
   open: boolean;
   onToggle: () => void;
   /** Plain-text figure for the button's accessible name. */
@@ -21,19 +21,22 @@ export function PartnerTap({ open, onToggle, label, details, size, children }: {
   details?: ReactNode;
   /** The jar's box size in px. */
   size: number;
+  /** Its figure is still loading: the jar shows but doesn't open yet. */
+  pending?: boolean;
   children: ReactNode;
 }) {
   const [jar, animate] = useAnimate<HTMLButtonElement>();
   const reduce = useReducedMotion();
   const { haptic } = useAppHaptics();
   const toggle = () => {
+    if (pending) return;
     haptic(open ? "selection" : "light");
     onToggle();
     if (!reduce) animate(jar.current, { scaleX: [1, 1.04, 1], scaleY: [1, 0.95, 1] }, { duration: 0.28, ease: EASE_OUT });
   };
   return (
     <div style={{ position: "relative" }}>
-      <button ref={jar} type="button" onClick={toggle} aria-expanded={open} aria-label={`${label}. ${open ? "Hide" : "Show"} details.`} style={jarButtonStyle}>
+      <button ref={jar} type="button" onClick={toggle} aria-expanded={pending ? undefined : open} aria-disabled={pending || undefined} aria-label={pending ? label : `${label}. ${open ? "Hide" : "Show"} details.`} style={jarButtonStyle}>
         {children}
       </button>
       <AnimatePresence initial={false}>

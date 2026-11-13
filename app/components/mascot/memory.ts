@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { JarItem } from "./coinSimMatter";
 
 /**
@@ -59,33 +59,43 @@ export function startFrom<T>(kind: "items" | "level", seen: unknown, current: T)
  * jar appears, and remembers the current one for next time. A null key turns
  * it off; `animate: false` (Reduce Motion) still remembers but always shows
  * the current state.
+ *
+ * `pending` means the current state isn't known yet (its data is still
+ * loading): the jar holds what it last showed, or the remembered state on a
+ * fresh visit, so it can appear before the data does. Nothing is remembered
+ * until the real state arrives; then it moves there as usual.
  */
-export function useRememberedJar<T>(key: string | null, kind: "items" | "level", current: T, animate: boolean): T {
-  const [entry, setEntry] = useState(() => ({
-    key,
-    start: key && animate && typeof window !== "undefined" ? startFrom(kind, read(key), current) : current,
-  }));
+export function useRememberedJar<T>(key: string | null, kind: "items" | "level", current: T, animate: boolean, pending = false): T {
+  const startFor = (forKey: string | null) =>
+    forKey && (animate || pending) && typeof window !== "undefined" ? startFrom(kind, read(forKey), current) : current;
+  const [entry, setEntry] = useState(() => ({ key, start: startFor(key) }));
   const [revealed, setRevealed] = useState(entry.start === current);
+  const shown = useRef<T>(entry.start);
 
   // A different scope is a new context, not a deposit/spending event. Keep the
   // mascot mounted, but discard the old context's delayed reveal. Adjust state
   // before commit so even a switch during the first 350ms cannot show old items.
   if (entry.key !== key) {
-    setEntry({ key, start: current });
+    const start = pending ? startFor(key) : current;
+    shown.current = start;
+    setEntry({ key, start });
     if (!revealed) setRevealed(true);
   }
 
   useEffect(() => {
-    if (revealed) return;
+    if (revealed || pending) return;
     if (!animate) { setRevealed(true); return; }
     const id = window.setTimeout(() => setRevealed(true), REVEAL_DELAY_MS);
     return () => window.clearTimeout(id);
-  }, [revealed, animate, key]);
+  }, [revealed, animate, key, pending]);
 
   const serialised = JSON.stringify(current);
   useEffect(() => {
-    if (key && revealed) write(key, current);
-  }, [key, serialised, revealed]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (key && revealed && !pending) write(key, current);
+  }, [key, serialised, revealed, pending]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return !animate || entry.key !== key || revealed ? current : entry.start;
+  if (pending) return shown.current;
+  const result = !animate || entry.key !== key || revealed ? current : entry.start;
+  shown.current = result;
+  return result;
 }

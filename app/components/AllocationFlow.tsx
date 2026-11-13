@@ -43,6 +43,8 @@ type AllocationFlowProps = {
   readOnlyBanner?: ReactNode;
   headerControls?: ReactNode;
   flowPreview?: ReactNode;
+  /** Hide the category pills, amount and slider (e.g. while Suggest moves is open): one way to move money at a time. */
+  editorHidden?: boolean;
   title?: string;
   balancedLabel?: string;
   /** Replaces the balanced mark when the pool balances but the scope is still short outside it (savings, advances). */
@@ -61,6 +63,9 @@ type AllocationFlowProps = {
    * emojis move with the allocation. Unset keeps the emoji-only jar.
    */
   jarLevel?: number;
+  /** The jar shows what the screen is about: filled by the share of money assigned (full = nothing left
+   *  unassigned), with no category emojis inside. Overrides `jarLevel`. */
+  jarShowsAssigned?: boolean;
 };
 
 export function AllocationFlow({
@@ -78,6 +83,7 @@ export function AllocationFlow({
   readOnlyBanner,
   headerControls,
   flowPreview,
+  editorHidden = false,
   title = "Set monthly budget",
   balancedLabel = "Fully assigned",
   balancedNote,
@@ -86,6 +92,7 @@ export function AllocationFlow({
   rebalanceMode = false,
   jarScope,
   jarLevel,
+  jarShowsAssigned = false,
 }: AllocationFlowProps) {
   // Spent-floor per category, snapshotted on first activation.
   // Must NOT be recomputed from activeItem.amount after edits — that shifts the
@@ -222,13 +229,17 @@ export function AllocationFlow({
       <BlurScrollArea style={sheetScrollStyle}>
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
           {/* The jar fills as money is assigned: full when balanced, worried when over. */}
-          {jarScope && jarItems.length > 0 && (() => {
+          {jarScope && (jarItems.length > 0 || jarShowsAssigned) && (() => {
             // Same face vocabulary as every other jar: content ("happy", like a funded Joint)
             // when balanced, not the oversized "excited" eyes nothing else uses.
             const jarMood = isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle";
             const jarStyle = { marginBottom: heroPool ? -8 : 4 };
             // While editing, a smaller jar keeps the active amount and slider in view on a phone.
             const jarSize = heroPool && !readOnly ? 176 : undefined;
+            if (jarShowsAssigned) {
+              const assignedShare = availablePool > 0 ? Math.max(0, Math.min(1, (availablePool - Math.max(0, leftToAssign)) / availablePool)) : 1;
+              return <MascotTap label="Allocation details"><MascotHero variant="pool" scope={jarScope} level={assignedShare} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} /></MascotTap>;
+            }
             return jarLevel !== undefined ? (
               <MascotTap label="Allocation details"><MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} /></MascotTap>
             ) : (
@@ -278,7 +289,7 @@ export function AllocationFlow({
         {readOnlyBanner}
         {flowPreview}
 
-        <section className="planning-studio" aria-label="Budget allocation" style={studioStyle}>
+        {!editorHidden && <section className="planning-studio" aria-label="Budget allocation" style={studioStyle}>
           <div className="planning-scroll-rail planning-category-rail" style={categoryRailStyle} aria-label={`${active.label} categories`}>
             {active.items.map((item) => {
               const isActive = item.categoryId === activeItem?.categoryId;
@@ -297,9 +308,9 @@ export function AllocationFlow({
           </div>
 
           {!activeItem && <div style={emptyStyle}>No categories found for {active.label}.</div>}
-        </section>
+        </section>}
 
-        {activeItem && (
+        {activeItem && !editorHidden && (
           <div className="planning-editor" style={editorStyle}>
             <div key={activeItem.categoryId} className="planning-category-enter planning-amount-canvas" style={amountCanvasStyle}>
               <Currency style={amountCurrencyBigStyle} />
@@ -345,7 +356,7 @@ export function AllocationFlow({
         )}
       </BlurScrollArea>
 
-      {activeItem && !readOnly && (
+      {activeItem && !readOnly && !editorHidden && (
         <div className="sheet-footer sheet-inset" aria-label="Budget control" style={slimBarPanelStyle}>
           <div onPointerDownCapture={() => setDragging(true)}>
             <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
