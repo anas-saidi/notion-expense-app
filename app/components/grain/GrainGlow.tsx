@@ -16,7 +16,7 @@ const PAIR_OFFSET = 51;
  * Anas blue, Salma pink, Couple both side by side (never one blended lavender).
  * Strength follows the liquid level, so a fuller jar glows more. Dev study only.
  */
-export function GrainGlow({ direction, scope, level, edge = "soft", tones }: { direction: GlowDirection; scope: BudgetScope; level: number; edge?: GlowEdge; tones?: { anas: Tone; salma: Tone } }) {
+export function GrainGlow({ direction, scope, level, edge = "soft", tones, lights = true }: { direction: GlowDirection; scope: BudgetScope; level: number; edge?: GlowEdge; tones?: { anas: Tone; salma: Tone }; /** False when the hero shows no jar (a chart): the room keeps only its wash and grain. */ lights?: boolean }) {
   const blue = "var(--partner-husband)";
   const pink = "var(--partner-wife)";
   const couple = scope === "joint";
@@ -36,7 +36,7 @@ export function GrainGlow({ direction, scope, level, edge = "soft", tones }: { d
   useRoomUnderHeader(direction === "room", glow);
   return <>
     {edge === "wavy" && <WavyFilter />}
-    <div ref={glow} className="grain-glow" data-direction={direction} data-edge={edge} data-pair={couple || undefined} style={style} aria-hidden="true" />
+    <div ref={glow} className="grain-glow" data-direction={direction} data-edge={edge} data-pair={couple || undefined} data-lights={lights ? undefined : "off"} style={style} aria-hidden="true" />
     {/* Phones: the top edge of the content sheet, rising over the bottom of the room (design.md, Light). */}
     {direction === "room" && <div className="room-sheet-edge" aria-hidden="true" />}
   </>;

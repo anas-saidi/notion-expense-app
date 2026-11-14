@@ -137,6 +137,12 @@ html[data-grain-a11y="transparency"] .grain-glow[data-edge="wavy"]::before { fil
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 72px, #000 calc(100% - 150px), rgba(0,0,0,.55) calc(100% - 75px), transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 72px, #000 calc(100% - 150px), rgba(0,0,0,.55) calc(100% - 75px), transparent 100%);
 }
+/* No jar in the hero (Reflect's Activity chart): only the wash and the grain, without the bright cores a chart would sit on. */
+.grain-glow[data-direction="room"][data-lights="off"] {
+  --glow-shape:
+    radial-gradient(ellipse 95% 80% at var(--glow-x-a, 50%) var(--room-centre, 160px), var(--wash-a) 0, var(--wash-a-mid) 50%, transparent 100%),
+    radial-gradient(ellipse 95% 80% at var(--glow-x-b, 50%) var(--room-centre, 160px), var(--wash-b) 0, var(--wash-b-mid) 50%, transparent 100%);
+}
 /* The room ends in 64px of open space under the summary: the fade and its grain live there, never behind text. */
 .grain-stage:has(.grain-glow[data-direction="room"]) { padding-bottom: 96px; }
 /*
@@ -223,7 +229,7 @@ html[data-theme="dark"] .grain-glow[data-direction="room"]::after {
    * sheet painted over their unpositioned content (headers, rows) until a hover repainted it.
    * Lift the real boxes inside instead.
    */
-  .screen-layout:has(.grain-stage) :is(section, .home-content):not(.grain-stage):not(:has(.grain-stage)) { position: relative; z-index: 3; }
+  .screen-layout:has(.grain-stage) :is(section, .home-content):not(.grain-stage):not(:has(.grain-stage)):not(.grain-stage *) { position: relative; z-index: 3; }
   /*
    * Scroll: the hero sinks behind the sheet. Everything in the stage except the sheet moves down by
    * 45% of the scroll (--room-scroll, set by GrainGlow), so it drifts up at half speed while the sheet

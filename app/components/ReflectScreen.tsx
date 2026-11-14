@@ -177,7 +177,7 @@ export function ReflectScreen(props: Props) {
     <div className="reflect-desktop-panels">
       <section className="reflect-desktop-overview screen-overview grain-stage" aria-label="Spending breakdown">
         {/* The jar's light fills the hero, as bright as the period kept to its plan (design.md, Light). */}
-        <GrainGlow direction="room" scope={props.budgetScope} level={planMood?.level ?? 0.7} tones={PALETTES.partner} />
+        <GrainGlow direction="room" scope={props.budgetScope} level={planMood?.level ?? 0.7} tones={PALETTES.partner} lights={props.view !== "activity"} />
         <ScreenHero
           mascot={heroVisual}
           label="Spent" showMetric={props.view === "spending"} loading={props.transactionsLoading} value={props.transactionsLoading || props.error ? null : breakdown.total > 0 ? Math.max(1, Math.round(breakdown.total)) : 0}
