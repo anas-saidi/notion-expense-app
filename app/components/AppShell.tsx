@@ -8,6 +8,7 @@ import { SettingsSheet } from "./SettingsSheet";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { BUDGET_SCOPE_LABELS } from "./app-utils";
+import { Toast, type ToastMessage } from "./ui/Toast";
 import "./desktop-dashboard.css";
 
 export function AppShell({
@@ -45,7 +46,7 @@ export function AppShell({
   onBudgetRebalance?: () => void;
   theme?: "system" | "light" | "dark";
   onSelectTheme?: (theme: "system" | "light" | "dark") => void;
-  toast?: string | null;
+  toast?: ToastMessage | string | null;
   syncTimestamp?: string | null;
   syncing?: boolean;
   onSync?: () => void;
@@ -121,13 +122,13 @@ export function AppShell({
           <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} attention={scopeAttention} />
           <div className="app-header-actions">
             {tab === "budget" && onBudgetSearch && <LiquidButton className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
-              <SearchIcon size={18} />
+              <SearchIcon size={20} />
             </LiquidButton>}
             {tab === "history" && onReflectSearch && <LiquidButton className="app-top-action" type="button" onClick={onReflectSearch} aria-label="Search activity" style={menuButtonStyle}>
-              <SearchIcon size={18} />
+              <SearchIcon size={20} />
             </LiquidButton>}
             {onSelectTheme && <LiquidButton className="app-top-action" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings" style={menuButtonStyle}>
-              <SettingsIcon size={18} />
+              <SettingsIcon size={20} />
             </LiquidButton>}
           </div>
         </header>
@@ -175,7 +176,7 @@ export function AppShell({
               flexShrink: 0,
             }}
           >
-            <PlusIcon size={22} strokeWidth={2.5} />
+            <PlusIcon size={24} strokeWidth={2.5} />
           </LiquidButton>
         )}
       </div>
@@ -196,33 +197,7 @@ export function AppShell({
         />
       )}
 
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="app-toast"
-          style={{
-            position: "fixed",
-            left: "50%",
-            bottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
-            transform: "translateX(-50%)",
-            zIndex: 80,
-            background: "var(--surface2)",
-            border: "1px solid var(--border2)",
-            color: "var(--text2)",
-            borderRadius: 999,
-            padding: "8px 12px",
-            fontSize: 12,
-            fontFamily: "var(--font-body)",
-            letterSpacing: 0.4,
-            boxShadow: "var(--elevation-float)",
-            animation: "toastIn 0.2s ease both",
-            pointerEvents: "none",
-          }}
-        >
-          {toast}
-        </div>
-      )}
+      <Toast toast={toast} />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { Button } from "./ui/Button";
 
 type PlanChange = { id: string; name: string; icon: string | null; owner: string; before: number; after: number };
 
@@ -14,7 +15,7 @@ export function MonthPlanReview({ items, onEdit }: { items: PlanChange[]; onEdit
   return <>
     <div className="plan-desktop-heading">
       <h2 ref={heading} tabIndex={-1}>Review changes</h2>
-      <button type="button" className="plan-copy plan-review-edit" onClick={onEdit}>Edit plan</button>
+      <Button variant="secondary" size="compact" onClick={onEdit}>Edit plan</Button>
     </div>
     <div className="plan-table plan-review-table" role="table" aria-label="Monthly plan changes">
       <div className="plan-table-head plan-review-head" role="row">

@@ -51,6 +51,17 @@ const toneStyles: Record<BannerTone, { background: string; border: string; foreg
   },
 };
 
+/**
+ * The app's one inline message (design.md, Shared components): a persistent state on the surface it
+ * sits on, such as a failed read, a validation problem, a warning about the entry, or a write that failed.
+ * It stays until the state changes. A transient confirmation of something the user just did is a Toast.
+ *
+ *   <Banner tone="danger" role="alert" compact>{error}</Banner>
+ *   <Banner tone="danger" role="alert" title="Could not load this month" action={<Button variant="quiet" size="compact" onClick={retry}>Retry</Button>} />
+ *   <Banner tone="warning" compact>Short by <Money value={short} /> after bills</Banner>
+ *
+ * The action is one compact Button (quiet for Retry and links, secondary for a real alternative).
+ */
 export function Banner({ className, tone = "neutral", icon, title, children, action, role = "note", style, compact = false, desktopInline = role !== "alert" && tone !== "danger" }: BannerProps) {
   const colors = toneStyles[tone];
   // Contextual notices sit flat on the page at every width; only blocking alerts get a tinted surface.
@@ -74,7 +85,7 @@ export function Banner({ className, tone = "neutral", icon, title, children, act
     <>
       {icon && <span className="banner-icon" aria-hidden="true" style={{ display: "inline-flex", flexShrink: 0 }}>{icon}</span>}
       <span className="banner-content" style={{ minWidth: 0, display: "grid", gap: title && children ? 3 : 0 }}>
-        {title && <strong style={{ color: "var(--text)", fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{title}</strong>}
+        {title && <strong style={{ color: "var(--text)", fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{title}</strong>}
         {children && <span style={{ color: "inherit", fontSize: 12, lineHeight: 1.45 }}>{children}</span>}
       </span>
       {action && <span className="banner-action" style={{ flexShrink: 0, justifySelf: "end" }}>{action}</span>}
@@ -84,7 +95,10 @@ export function Banner({ className, tone = "neutral", icon, title, children, act
   return <div className={["app-banner", desktopInline && "app-banner--desktop-inline", className].filter(Boolean).join(" ")} data-tone={tone} role={role} style={sharedStyle}>{content}</div>;
 }
 
-/** Quiet text action for banners that sit under the hero, so they never outweigh the balance. */
+/**
+ * Quiet text action for banners that sit under the hero, so they never outweigh the balance.
+ * @deprecated Pass `<Button variant="quiet" size="compact">` as the Banner action instead.
+ */
 export const bannerTextActionStyle: CSSProperties = {
   minHeight: 44,
   margin: "-10px -8px -10px 0",
@@ -98,7 +112,10 @@ export const bannerTextActionStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-/** Neutral action for warning/error banners; shared with compact composer alerts. */
+/**
+ * Neutral action for warning/error banners; shared with compact composer alerts.
+ * @deprecated Pass `<Button variant="secondary" size="compact">` as the Banner action instead.
+ */
 export const bannerActionStyle: CSSProperties = {
   minHeight: 44,
   padding: "0 12px",

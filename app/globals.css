@@ -612,11 +612,6 @@ html {
   50% { opacity: 0.4; }
 }
 
-@keyframes toastIn {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-
 @keyframes inputPop {
   from { opacity: 0; transform: translateY(2px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -980,6 +975,9 @@ html { scrollbar-gutter: stable; }
   border-radius: var(--radius-control);
 }
 
+/* Section heading base (design.md: 12px sentence-case muted label). Screen rules below may adjust it. */
+.section-label { margin:0; font-size:12px; line-height:16px; font-weight:500; color:var(--muted); letter-spacing:0; text-transform:none; }
+
 @media (max-width: 600px) {
   .home-recent-header {
     margin-bottom: 14px !important;
@@ -990,11 +988,6 @@ html { scrollbar-gutter: stable; }
     letter-spacing: 0.8px !important;
   }
 
-  .home-recent-action {
-    min-height: 44px;
-    padding: 8px 0 8px 12px !important;
-    font-size: 13px !important;
-  }
 }
 
 .app-header-actions {
@@ -1216,12 +1209,6 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     color: var(--text2) !important;
     transform: none !important;
   }
-
-  /* Toast: center in content area (right of 220px sidebar) */
-  .app-toast {
-    left: var(--sheet-center-x) !important;
-    bottom: 24px !important;
-  }
 }
 
 /* ── Desktop (≥ 900px) — sidebar nav ─────────────────────── */
@@ -1402,29 +1389,7 @@ button[aria-label^="Close" i]:focus-visible {
   color: var(--text2);
 }
 
-.budget-empty-action {
-  transition:
-    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.16s ease,
-    border-color 0.16s ease;
-}
 
-@media (hover: hover) and (pointer: fine) {
-  .budget-empty-action:hover {
-    border-color: var(--border2) !important;
-    background: var(--surface2) !important;
-    transform: translateY(-1px);
-  }
-}
-
-.budget-empty-action:active {
-  transform: scale(0.98);
-}
-
-.budget-empty-action:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
 
 /* ── Insights screen — desktop (≥ 900px) ─────────────────── */
 @media (min-width: 900px) {
@@ -1723,10 +1688,6 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   .desktop-search-button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 }
 
-.loading-recovery { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-3); padding-block:var(--space-3); color:var(--text2); font-size:var(--type-body); }
-.loading-recovery button { min-width:var(--control-min); min-height:var(--control-min); padding-inline:var(--space-3); border:0; border-radius:var(--radius-control); background:var(--surface2); color:var(--text); font:inherit; cursor:pointer; }
-@media (hover: hover) and (pointer: fine) { .loading-recovery button:hover { background:var(--track); } }
-.loading-recovery button:active { opacity:.7; }
 
 
 .bottom-sheet-panel:focus { outline:none; }
@@ -1831,3 +1792,8 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   background: color-mix(in srgb, var(--text2) 40%, var(--surface2));
 }
 .soft-bar-fill[data-over]::before { background: var(--danger); }
+
+/* "Why short": one quiet line of working, then what fixes it. */
+.shortfall-breakdown { display:grid; gap:8px; justify-items:center; }
+.shortfall-line { margin:0; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; text-align:center; }
+.shortfall-fixes { display:flex; gap:8px; }

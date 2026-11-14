@@ -103,7 +103,7 @@ export function SlideToConfirm({ label, onConfirm, disabled = false, busyLabel, 
       style={{ ...trackStyle, opacity: disabled && !busy ? 0.5 : 1, cursor: inactive ? "default" : "grab" }}
     >
       {/* Fill trails the thumb, in the wallet's colour. */}
-      <span aria-hidden="true" style={{ ...fillStyle, transform: `translateX(calc(-100% + ${offset + THUMB + PAD * 2}px))`, transition: dragging || reduceMotion ? "none" : "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)" }} />
+      <span aria-hidden="true" style={{ ...fillStyle, transform: `translateX(calc(-100% + ${offset + THUMB + PAD * 2}px))`, transition: dragging || reduceMotion ? "none" : "transform var(--motion-standard) var(--ease-standard)" }} />
       <span aria-hidden="true" style={{ ...labelStyle, opacity: busy ? 1 : Math.max(0, 1 - p * 1.6) }}>
         {busy && busyLabel ? busyLabel : label}
       </span>
@@ -112,10 +112,10 @@ export function SlideToConfirm({ label, onConfirm, disabled = false, busyLabel, 
         style={{
           ...thumbStyle,
           transform: `translateX(${offset + (nudge ? 14 : 0)}px)`,
-          transition: dragging || reduceMotion ? "none" : "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+          transition: dragging || reduceMotion ? "none" : "transform var(--motion-standard) var(--ease-standard)",
         }}
       >
-        {done ? <CheckIcon size={20} strokeWidth={2.4} /> : <ChevronRightIcon size={22} strokeWidth={2.4} />}
+        {done ? <CheckIcon size={20} /> : <ChevronRightIcon size={20} />}
       </span>
     </div>
   );
@@ -150,13 +150,13 @@ const labelStyle: CSSProperties = {
   justifyContent: "center",
   padding: `0 ${THUMB / 2 + 12}px 0 ${THUMB + 16}px`,
   fontSize: 15,
-  fontWeight: 700,
+  fontWeight: 600,
   color: "var(--text2)",
   whiteSpace: "nowrap",
   overflow: "hidden",
   textOverflow: "ellipsis",
   pointerEvents: "none",
-  transition: "opacity 0.15s ease",
+  transition: "opacity var(--motion-fast) var(--ease-standard)",
 };
 
 const thumbStyle: CSSProperties = {

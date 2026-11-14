@@ -1,5 +1,4 @@
 "use client";
-import { LiquidButton } from "./ui/LiquidGlass";
 import { PlanPartnerRemaining } from "./PlanPartnerRemaining";
 import { clearUnchangedPlanDraft, parsePlanDraft, planDraftKey, restorePlanDraft, type LocalPlanDraft } from "./month-plan-draft";
 import { MonthPlanReview } from "./MonthPlanReview";
@@ -24,6 +23,7 @@ import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
+import { EmptyState } from "./ui/EmptyState";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { CheckIcon, FreezeIcon, XIcon } from "./ui/icons";
@@ -31,7 +31,10 @@ import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { freezeMonthPlanCategory } from "./month-plan-actions";
 import { SlideToConfirm } from "./SlideToConfirm";
 import { SectionToggle } from "./ui/SectionToggle";
-import { pickerChipStyle } from "./TransactionPickers";
+import { Button } from "./ui/Button";
+import { ScreenChip } from "./ui/ScreenChip";
+import { SheetHeader } from "./ui/SheetLayout";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import "./month-plan-desktop.css";
 import { ContributionAgreementEditor } from "./ContributionDetails";
@@ -175,7 +178,12 @@ export function MonthPlanSheet({
   const planPanel = useRef<HTMLDivElement>(null);
   const saveSession = useRef(0);
   const planRead = useRef(0);
-  const [saving, setSaving] = useState(false);
+  // Every write here (plan save, freeze, unfreeze) blocks the whole sheet until it settles (design.md, Saving).
+  const blocking = useBlockingSave();
+  // The contribution agreement editor saves on its own; its write blocks this sheet the same way.
+  const [agreementSaving, setAgreementSaving] = useState(false);
+  const saving = blocking.saving || agreementSaving;
+  const close = guardClose(saving, onClose);
   const [saveError, setSaveError] = useState("");
   // Once the hero number scrolls away, a compact bar keeps the jar and number in view.
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
@@ -392,14 +400,17 @@ export function MonthPlanSheet({
   };
 
   const unfreeze = async (cat: Category) => {
+    if (saving || unfreezing || freezeLock.current) return;
     setUnfreezing(cat.id);
     try {
-      const res = await fetch("/api/categories", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: cat.id, snoozed: false }),
+      await blocking.run(async () => {
+        const res = await fetch("/api/categories", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: cat.id, snoozed: false }),
+        });
+        if (!res.ok) throw new Error("Could not unfreeze");
       });
-      if (!res.ok) throw new Error("Could not unfreeze");
       setLocallyFrozen((prev) => prev.filter((c) => c.id !== cat.id));
       setRevived((prev) => [...prev, { ...cat, snoozed: false }]);
       onCategoriesChanged();
@@ -411,12 +422,12 @@ export function MonthPlanSheet({
   };
 
   const freeze = async (cat: Category): Promise<boolean> => {
-    if (freezeLock.current || loading || saving || loadError) return false;
+    if (freezeLock.current || loading || saving || unfreezing || loadError) return false;
     freezeLock.current = true;
     setFreezing(cat.id);
     setSaveError("");
     try {
-      await freezeMonthPlanCategory({
+      await blocking.run(() => freezeMonthPlanCategory({
         month: planningMonth,
         categoryId: cat.id,
         hasSavedAllocation: (saved.get(normId(cat.id)) ?? 0) > 0,
@@ -425,7 +436,7 @@ export function MonthPlanSheet({
           setAmount(cat, 0);
           onSaved();
         },
-      });
+      }));
       setAmount(cat, 0);
       setExpressions(prev => { const next = { ...prev }; delete next[normId(cat.id)]; return next; });
       setRevived((prev) => prev.filter((c) => c.id !== cat.id));
@@ -462,10 +473,10 @@ export function MonthPlanSheet({
     } catch { setSaveError("Could not remove the draft from this browser."); }
   };
   // One notice for the browser draft: what was restored (or why it needs review) and the way to drop it.
-  const draftBanner = (hasLocalDraft || draftNotice) && <Banner className="plan-draft-banner" tone={draftNotice ? "warning" : "neutral"} compact action={hasLocalDraft ? <button type="button" className="plan-copy" disabled={saving || !!freezing} onClick={discardDraft}>Discard draft</button> : undefined}>{draftNotice || "Browser draft restored"}</Banner>;
+  const draftBanner = (hasLocalDraft || draftNotice) && <Banner className="plan-draft-banner" tone={draftNotice ? "warning" : "neutral"} compact action={hasLocalDraft ? <Button variant="quiet" size="compact" onClick={discardDraft}>Discard draft</Button> : undefined}>{draftNotice || "Browser draft restored"}</Banner>;
 
   const save = async () => {
-    if (!changed.length || loading || saveLock.current || freezing || loadError || capacityError || !contributionsReady) return;
+    if (!changed.length || loading || saveLock.current || saving || freezing || unfreezing || loadError || capacityError || !contributionsReady) return;
     saveLock.current = true;
     const session = saveSession.current;
     let storedDraft: string | null = null;
@@ -474,10 +485,9 @@ export function MonthPlanSheet({
       const owner = getCategoryScope(cat, accounts);
       return owner ? [{ id: cat.id, name: cat.name, scope: owner, amount: amountFor(cat) }] : [];
     }));
-    setSaving(true);
     setSaveError("");
     try {
-      const result = await persistMonthPlan({
+      const result = await blocking.run(() => persistMonthPlan({
         month: planningMonth,
         allowClear: true,
         budgetItems: changed.map(c => ({ categoryId: c.id, amount: amountFor(c), defaultAccount: c.defaultAccount ?? null })),
@@ -486,7 +496,7 @@ export function MonthPlanSheet({
         targets: { anas: capacity.due.anas + (monthLedger?.contributed.anas ?? 0), salma: capacity.due.salma + (monthLedger?.contributed.salma ?? 0) },
         shares: split,
         expectedVersion: null,
-      } : undefined);
+      } : undefined));
       try { clearUnchangedPlanDraft(localStorage, draftKey, storedDraft); } catch { /* Keep a confirmed save successful even if browser storage becomes unavailable. */ }
       onSaved();
       // A response from a dismissed editor must not replace a newly opened month's draft.
@@ -507,12 +517,11 @@ export function MonthPlanSheet({
       if (session === saveSession.current) setSaveError(e instanceof Error ? e.message : "Could not save the plan");
     } finally {
       saveLock.current = false;
-      setSaving(false);
     }
   };
 
   const renderRow = (cat: Category, savings: boolean) => (
-    <SwipeToDelete key={cat.id} variant="freeze" deleteLabel={`Freeze ${cat.name} and clear its ${planLabel} allocation`} disabled={loading || saving || !!freezing || !!loadError} onDelete={() => freeze(cat)}>
+    <SwipeToDelete key={cat.id} variant="freeze" deleteLabel={`Freeze ${cat.name} and clear its ${planLabel} allocation`} disabled={loading || !!loadError} onDelete={() => freeze(cat)}>
     <PlanRow
       cat={cat}
       savings={savings}
@@ -521,7 +530,7 @@ export function MonthPlanSheet({
       currentSpent={currentSpent.get(normId(cat.id)) ?? 0}
       planLabel={monthName(planningMonth, "short")}
       planningMonth={planningMonth}
-      disabled={loading || saving || !!freezing}
+      disabled={loading}
       onChange={(value) => setAmount(cat, value)}
     />
     </SwipeToDelete>
@@ -537,7 +546,7 @@ export function MonthPlanSheet({
   const advanceRows = advanceReserve > 0 && <div className="plan-gaps">{advanceMonths.map(m => <button key={m.month} type="button" className="plan-gap" disabled={!onOpenContributions} onClick={() => onOpenContributions?.()} aria-label={`${monthName(m.month)} advances to apply, ${fmt(Math.round(m.outstanding.anas + m.outstanding.salma))} MAD. Open contributions.`}>
     <span className="plan-gap-name">{monthName(m.month)} advances</span><span className="plan-gap-value">{fmt(Math.round(m.outstanding.anas + m.outstanding.salma))}</span>
   </button>)}</div>;
-  const contributionAgreement = <ContributionAgreementEditor month={planningMonth} agreement={agreement} proposed={{ anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }} shares={split} disabled={loading || saving || changed.length > 0 || !!loadError || !!capacityError || !contributionsReady || totals.joint <= 0} onSaved={() => { void loadPlan(); onSaved(); }} />;
+  const contributionAgreement = <ContributionAgreementEditor month={planningMonth} agreement={agreement} proposed={{ anas: capacity.due.anas + (advances?.months.find(m => m.month === planningMonth)?.contributed.anas ?? 0), salma: capacity.due.salma + (advances?.months.find(m => m.month === planningMonth)?.contributed.salma ?? 0) }} shares={split} disabled={loading || changed.length > 0 || !!loadError || !!capacityError || !contributionsReady || totals.joint <= 0} onSaved={() => { void loadPlan(); onSaved(); }} onBusyChange={setAgreementSaving} />;
   // "From <last month>": only what the table can't say on its own (totals, gaps, a ranking). Spent and Last plan per
   // row are already in the table. Facts are tappable without looking like buttons: the category count filters the
   // table to the rows over plan, and a ranked gap jumps to its row's plan cell.
@@ -581,19 +590,19 @@ export function MonthPlanSheet({
     ...budgetGroups,
   ].map((group) => onlyOver ? { ...group, items: group.items.filter((cat) => overIds.has(normId(cat.id))) } : group).filter((group) => group.items.length > 0);
   if (receipt) return (
-    <BottomSheet lockBackground panelRef={planPanel} open={open} onClose={onClose} label="Plan saved" size="standard" desktopViewportCentered contentStyle={{ overflow: "auto" }}>
+    <BottomSheet lockBackground panelRef={planPanel} open={open} onClose={close} label="Plan saved" size="standard" desktopViewportCentered contentStyle={{ overflow: "auto" }}>
       <MonthPlanReceipt receipt={receipt} onDone={onClose} onReview={() => { setReceipt(null); requestAnimationFrame(() => planPanel.current?.focus({ preventScroll: true })); }} />
     </BottomSheet>
   );
   if (desktop) return (
-    <BottomSheet lockBackground panelRef={planPanel} open={open} onClose={onClose} label={`Plan ${planLabel}`} desktopViewportCentered size="planning" desktopHeight="fill" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
+    <BottomSheet lockBackground panelRef={planPanel} open={open} onClose={close} label={`Plan ${planLabel}`} desktopViewportCentered size="planning" desktopHeight="fill" maxHeight="calc(100dvh - 48px)" panelStyle={{ background: SHEET_BG }} contentStyle={contentStyle}>
       <div className="plan-desktop" data-plan-scope={scope}>
-        <header className="sheet-header plan-desktop-header">
-          <h1 className="plan-desktop-title">Plan {planLabel}</h1>
+        <SheetHeader className="plan-desktop-header">
+          <h2 className="plan-desktop-title">Plan {planLabel}</h2>
           <GlobalBudgetScopePicker label="Monthly plan wallet" value={scope} onChange={onScopeChange} personalScope={personalScope} />
-          <button type="button" className="plan-desktop-close" onClick={onClose} style={closeButtonStyle} aria-label="Close"><XIcon size={20} /></button>
-        </header>
-        {loading ? <SkeletonRegion label="Loading monthly plan" style={{ padding: "0 var(--dialog-inset)" }}><SkeletonRows label="Loading planned categories" count={4} iconSize={44} /></SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <div className="plan-desktop-body">
+          <button type="button" className="sheet-close-button plan-desktop-close" onClick={close} aria-label="Close monthly plan"><XIcon size={20} /></button>
+        </SheetHeader>
+        {loading ? <div style={{ padding: "0 var(--dialog-inset)" }}><SkeletonRows label="Loading monthly plan" count={4} iconSize={44} /></div> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<Button variant="quiet" size="compact" onClick={() => void loadPlan()}>Retry</Button>} /> : <div className="plan-desktop-body">
           <main className="plan-desktop-main">
             {draftBanner}
             {reviewing ? <>
@@ -607,7 +616,7 @@ export function MonthPlanSheet({
               }} />
             </> : <>
               <div className="plan-table" role="table" aria-label={`${BUDGET_SCOPE_LABELS[scope]} category plan`}>
-                <div className="plan-table-head" role="row"><span role="columnheader"><span className="sr-only">Category, </span>{desktopGroups[0]?.label}</span><span role="columnheader">{monthName(currentMonth, "short")} spent</span><span role="columnheader">{monthName(currentMonth, "short")} plan</span><span role="columnheader" className="plan-column-action"><span className="sr-only">{planLabel} plan</span>{hasCurrentPlan && <button type="button" className="plan-copy" disabled={saving || !!freezing} onClick={copyCurrentPlan}>Copy last month</button>}</span></div>
+                <div className="plan-table-head" role="row"><span role="columnheader"><span className="sr-only">Category, </span>{desktopGroups[0]?.label}</span><span role="columnheader">{monthName(currentMonth, "short")} spent</span><span role="columnheader">{monthName(currentMonth, "short")} plan</span><span role="columnheader" className="plan-column-action"><span className="sr-only">{planLabel} plan</span>{hasCurrentPlan && <Button variant="secondary" size="compact" onClick={copyCurrentPlan}>Copy last month</Button>}</span></div>
                 {desktopGroups.map((group, index) => <div key={group.key} role="rowgroup">{index > 0 && <div className="plan-group">{group.label}</div>}{group.items.map(cat => {
                   const id = normId(cat.id);
                   const changedRow = amountFor(cat) !== (saved.get(id) ?? 0);
@@ -615,13 +624,13 @@ export function MonthPlanSheet({
                     <div className="plan-category" role="cell"><CategoryIcon icon={cat.icon} categoryName={cat.name} size={32} /><span className="plan-category-name"><span>{cat.name}</span>{(spentSoFar.get(id) ?? 0) >= 0.5 && <small>{fmt(Math.round(spentSoFar.get(id)!))} spent so far</small>}</span></div>
                     {/* Spent, then the plan it's measured against, then the new plan: copy moves the middle column one step right. */}
                     <span role="cell">{fmt(Math.round(currentSpent.get(id) ?? 0))}</span><span role="cell">{fmt(Math.round(currentPlanned.get(id) ?? 0))}</span>
-                    <label role="cell" className="plan-amount-cell"><input className="field-input plan-amount" data-changed={changedRow || undefined} type="text" inputMode="decimal" placeholder="—" aria-label={`${planLabel} plan for ${cat.name}${changedRow ? ", changed" : ""}`} aria-invalid={expressions[id] != null && expressions[id].trim() !== "" && parseAmount(expressions[id]) === null} value={expressions[id] ?? (amountFor(cat) ? String(amountFor(cat)) : "")} disabled={saving || !!freezing} onFocus={e => e.currentTarget.select()} onChange={e => { const text = e.target.value.replace(/[^\d+\-*/, .()]/g, ""); setExpressions(prev => ({ ...prev, [id]: text })); const value = text.trim() ? parseAmount(text) : 0; if (value !== null) setAmount(cat, value); }} onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { const inputs = Array.from(e.currentTarget.closest(".plan-table")?.querySelectorAll<HTMLInputElement>("input:not(:disabled)") ?? []); const next = inputs[inputs.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)]; if (next) { e.preventDefault(); next.focus(); } else if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } } }} /></label>
-                    <button type="button" className="plan-freeze" disabled={saving || !!freezing} onClick={() => void freeze(cat)} aria-label={`Freeze ${cat.name} and clear its ${planLabel} allocation`} title={`Freeze ${cat.name}`}><FreezeIcon size={17} aria-hidden="true" /></button>
+                    <label role="cell" className="plan-amount-cell"><input className="field-input plan-amount" data-changed={changedRow || undefined} type="text" inputMode="decimal" placeholder="—" aria-label={`${planLabel} plan for ${cat.name}${changedRow ? ", changed" : ""}`} aria-invalid={expressions[id] != null && expressions[id].trim() !== "" && parseAmount(expressions[id]) === null} value={expressions[id] ?? (amountFor(cat) ? String(amountFor(cat)) : "")} onFocus={e => e.currentTarget.select()} onChange={e => { const text = e.target.value.replace(/[^\d+\-*/, .()]/g, ""); setExpressions(prev => ({ ...prev, [id]: text })); const value = text.trim() ? parseAmount(text) : 0; if (value !== null) setAmount(cat, value); }} onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { const inputs = Array.from(e.currentTarget.closest(".plan-table")?.querySelectorAll<HTMLInputElement>("input:not(:disabled)") ?? []); const next = inputs[inputs.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)]; if (next) { e.preventDefault(); next.focus(); } else if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } } }} /></label>
+                    <button type="button" className="plan-freeze" onClick={() => void freeze(cat)} aria-label={`Freeze ${cat.name} and clear its ${planLabel} allocation`} title={`Freeze ${cat.name}`}><FreezeIcon size={17} aria-hidden="true" /></button>
                   </div>;
                 })}</div>)}
               </div>
-              {!scopeCategories.length && <div style={emptyStyle}>No active {BUDGET_SCOPE_LABELS[scope]} categories.</div>}
-              {frozenInScope.length > 0 && <section className="plan-frozen"><SectionToggle id="desktop-plan-frozen" label="Frozen" count={frozenInScope.length} open={!collapsed.has("frozen")} onToggle={() => toggleSection("frozen")} />{!collapsed.has("frozen") && frozenInScope.map(cat => <div key={cat.id} style={frozenRowStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} /><span style={frozenNameStyle}>{cat.name}</span><button type="button" onClick={() => void unfreeze(cat)} disabled={!!unfreezing || !!freezing || saving} style={unfreezeButtonStyle}>{unfreezing === cat.id ? "…" : "Unfreeze"}</button></div>)}</section>}
+              {!scopeCategories.length && <EmptyState>No active {BUDGET_SCOPE_LABELS[scope]} categories.</EmptyState>}
+              {frozenInScope.length > 0 && <section className="plan-frozen"><SectionToggle id="desktop-plan-frozen" label="Frozen" count={frozenInScope.length} open={!collapsed.has("frozen")} onToggle={() => toggleSection("frozen")} />{!collapsed.has("frozen") && frozenInScope.map(cat => <div key={cat.id} style={frozenRowStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} /><span style={frozenNameStyle}>{cat.name}</span><Button variant="quiet" size="compact" onClick={() => void unfreeze(cat)}>Unfreeze</Button></div>)}</section>}
             </>}
           </main>
           <aside className="plan-summary" aria-label="Household summary">
@@ -640,12 +649,13 @@ export function MonthPlanSheet({
               {planCompare}
               {(saveError || invalidExpressions) && <Banner role="alert" tone="danger" compact>{saveError || "Complete the amount before reviewing."}</Banner>}
               {settleList}
-              {(hasLocalDraft || changed.length > 0 || Object.keys(expressions).length > 0) && <button type="button" className="plan-copy plan-save-draft" disabled={saving || !!freezing} onClick={saveDraft}>Save draft</button>}
-              {changed.length ? <button type="button" className="plan-primary" disabled={saving || !!freezing || !!capacityError || invalidExpressions || !contributionsReady} onClick={() => reviewing ? void save() : setReviewing(true)}>{saving ? "Saving…" : reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</button> : savedTotal > 0 && !settleList && <span role="status">Plan saved</span>}
+              {(hasLocalDraft || changed.length > 0 || Object.keys(expressions).length > 0) && <Button variant="secondary" size="compact" block onClick={saveDraft}>Save draft</Button>}
+              {changed.length ? <Button variant="primary" block disabled={!!capacityError || invalidExpressions || !contributionsReady} onClick={() => reviewing ? void save() : setReviewing(true)}>{reviewing ? "Save plan" : `Review ${changed.length} ${changed.length === 1 ? "change" : "changes"}`}</Button> : savedTotal > 0 && !settleList && <span role="status" style={savedStatusStyle}><CheckIcon size={16} aria-hidden="true" /> Plan saved</span>}
             </div>
           </aside>
         </div>}
       </div>
+      <SavingCover saving={saving} scope={scope} />
     </BottomSheet>
   );
 
@@ -654,7 +664,7 @@ export function MonthPlanSheet({
       lockBackground
       panelRef={planPanel}
       open={open}
-      onClose={onClose}
+      onClose={close}
       showHandle
       label={`Plan ${planLabel}`}
       detent="content"
@@ -662,14 +672,12 @@ export function MonthPlanSheet({
       contentStyle={contentStyle}
     >
       <div style={innerStyle} className="planner-wrap" data-plan-scope={scope}>
-        <header className="sheet-header" style={headerStyle}>
-          <div>
-            <h1 style={titleStyle}>Plan {planLabel}</h1>
-          </div>
-          <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close">
-            <XIcon size={16} />
+        <SheetHeader style={headerStyle}>
+          <h2 style={titleStyle}>Plan {planLabel}</h2>
+          <button type="button" className="sheet-close-button" onClick={close} aria-label="Close monthly plan">
+            <XIcon size={20} />
           </button>
-        </header>
+        </SheetHeader>
 
         {draftBanner}
         <div className="plan-mobile-scope"><GlobalBudgetScopePicker label="Monthly plan wallet" value={scope} onChange={onScopeChange} personalScope={personalScope} /></div>
@@ -690,7 +698,7 @@ export function MonthPlanSheet({
               ...stickyBarStyle,
               opacity: heroHidden && !loading && !loadError ? 1 : 0,
               transform: heroHidden ? "translateY(0)" : "translateY(-4px)",
-              transition: reduceMotion ? "none" : "opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+              transition: reduceMotion ? "none" : "opacity var(--motion-standard) var(--ease-standard), transform var(--motion-standard) var(--ease-standard)",
               pointerEvents: heroHidden ? "auto" : "none",
             }}
           >
@@ -714,7 +722,7 @@ export function MonthPlanSheet({
             <MascotHero look="light" variant="split" scope={scope} items={[]} spentPct={null} remember={false} style={{ marginBottom: -4, marginInline: "auto" }} />
             <Skeleton style={{ width: 160, height: 44, margin: "16px auto 32px" }} />
             <SkeletonRows label="Loading planned categories" count={4} iconSize={60} />
-          </SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <>
+          </SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<Button variant="quiet" size="compact" onClick={() => void loadPlan()}>Retry</Button>} /> : <>
           {/* Hero: the jar fills with the categories you plan; the number is what's still unassigned. */}
           <section aria-label={capacityLabel} style={heroStyle}>
             <MascotFrame><MascotHero look="light" variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotFrame>
@@ -754,7 +762,7 @@ export function MonthPlanSheet({
           })}
 
           {budgetGroups.length === 0 && (
-            <div style={emptyStyle}>No active {BUDGET_SCOPE_LABELS[scope]} categories.</div>
+            <EmptyState>No active {BUDGET_SCOPE_LABELS[scope]} categories.</EmptyState>
           )}
 
           {frozenInScope.length > 0 && (
@@ -772,9 +780,7 @@ export function MonthPlanSheet({
                     <div key={cat.id} style={frozenRowStyle}>
                       <CategoryIcon icon={cat.icon} categoryName={cat.name} size={20} style={{ opacity: 0.5, flexShrink: 0 }} />
                       <span style={frozenNameStyle}>{cat.name}</span>
-                      <button type="button" onClick={() => void unfreeze(cat)} disabled={!!unfreezing || !!freezing || saving} style={unfreezeButtonStyle}>
-                        {unfreezing === cat.id ? "…" : "Unfreeze"}
-                      </button>
+                      <Button variant="quiet" size="compact" onClick={() => void unfreeze(cat)}>Unfreeze</Button>
                     </div>
                   ))}
                 </div>
@@ -792,21 +798,22 @@ export function MonthPlanSheet({
           {!loading && !loadError && shortfallSummary}
           {!loading && !loadError && settleList}
           {!loading && !loadError && (hasCurrentPlan || hasLocalDraft || changed.length > 0) && <div className="plan-mobile-actions">
-            {hasCurrentPlan && <button type="button" onClick={copyCurrentPlan} disabled={saving || !!freezing} style={copyLinkStyle}>Copy last month</button>}
-            {(hasLocalDraft || changed.length > 0 || Object.keys(expressions).length > 0) && <button type="button" className="plan-copy plan-save-draft" disabled={saving || !!freezing} onClick={saveDraft}>Save draft</button>}
+            {hasCurrentPlan && <Button variant="secondary" size="compact" onClick={copyCurrentPlan}>Copy last month</Button>}
+            {(hasLocalDraft || changed.length > 0 || Object.keys(expressions).length > 0) && <Button variant="secondary" size="compact" onClick={saveDraft}>Save draft</Button>}
           </div>}
           <div style={footerRowStyle} className="planner-footer-row">
             {/* A month's plan is a big commitment: slide to save, so a stray tap never does. */}
             {loading ? <SkeletonRegion label="Loading plan status"><Skeleton style={{ width: 140, height: 18 }} /></SkeletonRegion> : loadError ? null : changed.length || saving ? (
-              <SlideToConfirm label={confirmingAgreement ? "Save plan and contributions" : "Slide to save plan"} busy={saving} busyLabel="Saving…" disabled={loading || !!freezing || !!loadError || !!capacityError || !contributionsReady} onConfirm={() => void save()} />
-            ) : (
+              <SlideToConfirm label={confirmingAgreement ? "Save plan and contributions" : "Slide to save plan"} busy={saving} busyLabel="Saving" disabled={loading || !!loadError || !!capacityError || !contributionsReady} onConfirm={() => void save()} />
+            ) : savedTotal > 0 ? (
               <span role="status" style={savedStatusStyle}>
-                <CheckIcon size={16} aria-hidden="true" /> {savedTotal > 0 ? "Plan saved" : "Nothing planned yet"}
+                <CheckIcon size={16} aria-hidden="true" /> Plan saved
               </span>
-            )}
+            ) : null}
           </div>
         </footer>
       </div>
+      <SavingCover saving={saving} scope={scope} />
     </BottomSheet>
   );
 }
@@ -889,7 +896,7 @@ function PlanRow({ cat, savings, amount, currentPlanned, currentSpent, planLabel
       onClick={(e) => { if (e.target === e.currentTarget || !(e.target as HTMLElement).closest("button, input")) inputRef.current?.focus(); }}
     >
       <div style={rowTopStyle}>
-        <div style={rowIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={18} /></div>
+        <CategoryIcon icon={cat.icon} categoryName={cat.name} size={32} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={rowNameStyle} title={cat.name}>{cat.name}</div>
           {details.map((detail, i) => <div key={i} style={rowMetaStyle}>{detail}</div>)}
@@ -925,19 +932,18 @@ function PlanRow({ cat, savings, amount, currentPlanned, currentSpent, planLabel
         </div>
       </div>
       {open && quickChoices.length > 0 && (
-        <div role="group" aria-label={`Quick amounts for ${cat.name}`} style={quickRowStyle}>
+        <div
+          role="group"
+          aria-label={`Quick amounts for ${cat.name}`}
+          style={quickRowStyle}
+          // Keep the input focused so the row stays open while filling.
+          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
+        >
           {quickChoices.map((q) => (
-            <LiquidButton
-              key={q.label}
-              type="button"
-              // Keep the input focused so the row stays open while filling.
-              onPointerDown={(e) => e.preventDefault()}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => fill(q.value)}
-              style={quickChipStyle}
-            >
+            <ScreenChip key={q.label} mode="action" onClick={() => fill(q.value)}>
               {q.label}
-            </LiquidButton>
+            </ScreenChip>
           ))}
         </div>
       )}
@@ -953,7 +959,7 @@ const SHEET_BG = "var(--surface)";
 
 const panelStyle: CSSProperties = {
   background: SHEET_BG,
-  borderRadius: "24px 24px 0 0",
+  borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0",
 };
 
 const contentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
@@ -964,31 +970,20 @@ const headerStyle: CSSProperties = {
   display: "flex",
   alignItems: "flex-start",
   justifyContent: "space-between",
-  padding: "18px 16px 4px 20px",
+  padding: "16px 16px 4px",
   flexShrink: 0,
 };
 
+/** Title role (design.md, Shared dialog anatomy): 20/24 semibold in the body face. */
 const titleStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: 30,
-  lineHeight: 1,
-  fontWeight: 800,
+  fontFamily: "var(--font-body)",
+  fontSize: 20,
+  lineHeight: "24px",
+  fontWeight: 600,
   color: "var(--text)",
   margin: 0,
 };
 
-const closeButtonStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
 
 const scrollAreaStyle: CSSProperties = { flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" };
 
@@ -1002,7 +997,7 @@ const stickyBarStyle: CSSProperties = {
   right: 0,
   height: STICKY_BAR_H,
   boxSizing: "border-box",
-  padding: "4px 20px 12px",
+  padding: "4px 16px 12px",
   display: "flex",
   alignItems: "center",
   gap: 12,
@@ -1012,14 +1007,13 @@ const stickyBarStyle: CSSProperties = {
 const stickyLabelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
-  
   color: "var(--muted)",
 };
 
 const stickyAmountStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
+  fontFamily: "var(--font-body)",
   fontSize: 24,
-  fontWeight: 800,
+  fontWeight: 600,
   lineHeight: 1,
   fontVariantNumeric: "tabular-nums",
 };
@@ -1043,7 +1037,7 @@ const scrollStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",
   alignContent: "start",
-  gap: 18,
+  gap: 16,
 };
 
 const heroStyle: CSSProperties = {
@@ -1054,20 +1048,24 @@ const heroStyle: CSSProperties = {
   paddingBottom: 4,
 };
 
+/** Metric label of the shared screen hero (ui/screen-hero.css): 13/20 semibold muted. */
 const heroLabelStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
+  lineHeight: "20px",
   fontWeight: 600,
-  
   color: "var(--muted)",
 };
 
+/** The shared screen hero number (ui/screen-hero.css), so the plan matches Home, Budget and Reflect. */
 const heroAmountStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: 48,
-  fontWeight: 800,
-  lineHeight: 1,
+  fontFamily: "var(--font-body)",
+  fontSize: "clamp(44px, 14vw, 72px)",
+  fontWeight: 400,
+  lineHeight: 0.9,
+  letterSpacing: "-0.022em",
   fontVariantNumeric: "tabular-nums",
-  transition: "color 0.2s ease",
+  fontFeatureSettings: '"tnum"',
+  transition: "color var(--motion-standard) var(--ease-standard)",
 };
 
 const heroSubStyle: CSSProperties = { fontSize: 13, color: "var(--text2)", fontVariantNumeric: "tabular-nums" };
@@ -1080,11 +1078,11 @@ const listStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax
 const rowStyle: CSSProperties = {
   borderRadius: 16,
   background: "var(--surface)",
-  padding: "10px 12px 10px 14px",
-  boxShadow: "0 1px 0 color-mix(in srgb, var(--ink-strong) 4%, transparent)",
+  padding: "12px 12px 12px 16px",
+  boxShadow: "none",
   display: "grid",
-  gap: 10,
-  transition: "box-shadow 0.18s ease",
+  gap: 8,
+  transition: "box-shadow var(--motion-fast) var(--ease-standard)",
 };
 
 /** The row you're typing in lifts slightly, like a focused card. */
@@ -1092,24 +1090,13 @@ const rowOpenStyle: CSSProperties = { boxShadow: "var(--elevation-card)" };
 
 const rowTopStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minWidth: 0 };
 
-const quickRowStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 48 };
+const quickRowStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, paddingLeft: 44 };
 
-const quickChipStyle: CSSProperties = { ...pickerChipStyle, fontWeight: 500, color: "var(--text2)" };
 
-const rowIconStyle: CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 11,
-  background: "color-mix(in srgb, var(--surface2) 55%, var(--surface))",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
 
 const rowNameStyle: CSSProperties = {
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: 500,
   color: "var(--text)",
   overflow: "hidden",
   whiteSpace: "nowrap",
@@ -1137,79 +1124,49 @@ const inputStyle: CSSProperties = {
 
 const startsStyle: CSSProperties = { fontSize: 12, color: "var(--muted)", fontVariantNumeric: "tabular-nums" };
 
-const emptyStyle: CSSProperties = { padding: "24px 0", textAlign: "center", fontSize: 13, color: "var(--muted)" };
 
 const frozenRowStyle: CSSProperties = {
   minHeight: 52,
-  borderRadius: 14,
+  borderRadius: 16,
   background: "var(--surface)",
   display: "flex",
   alignItems: "center",
   gap: 12,
-  padding: "0 6px 0 14px",
+  padding: "0 4px 0 16px",
 };
 
 const frozenNameStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  fontSize: 14,
-  fontWeight: 600,
+  fontSize: 15,
+  fontWeight: 500,
   color: "var(--text2)",
   overflow: "hidden",
   whiteSpace: "nowrap",
   textOverflow: "ellipsis",
 };
 
-const unfreezeButtonStyle: CSSProperties = {
-  minHeight: 44,
-  minWidth: 44,
-  padding: "0 12px",
-  border: "none",
-  background: "transparent",
-  color: "var(--accent-foreground)",
-  fontSize: 13,
-  fontWeight: 700,
-  cursor: "pointer",
-};
 
-const textButtonStyle: CSSProperties = {
-  minHeight: 44,
-  border: "none",
-  background: "transparent",
-  color: "inherit",
-  fontWeight: 700,
-  cursor: "pointer",
-};
 
 const footerStyle: CSSProperties = {
   padding: "12px 16px calc(env(safe-area-inset-bottom, 0px) + 16px)",
   flexShrink: 0,
   display: "grid",
-  gap: 10,
+  gap: 12,
 };
 
-const footerRowStyle: CSSProperties = { display: "flex", gap: 10, minHeight: 60, alignItems: "center" };
+const footerRowStyle: CSSProperties = { display: "flex", gap: 12, minHeight: 60, alignItems: "center" };
 
-const copyLinkStyle: CSSProperties = {
-  minHeight: 44,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-  justifySelf: "center",
-};
 
 const savedStatusStyle: CSSProperties = {
   flex: 1,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 6,
-  fontSize: 14,
-  fontWeight: 600,
-  color: "var(--muted)",
+  gap: 8,
+  fontSize: 13,
+  lineHeight: "20px",
+  color: "var(--text2)",
 };
 
 export default MonthPlanSheet;

@@ -9,7 +9,9 @@ import { ChoicePicker } from "./ChoicePicker";
 import { DatePicker } from "./DatePicker";
 import { Banner } from "./ui/Banner";
 import { BottomSheet } from "./ui/BottomSheet";
-import { DeleteIcon, FundIcon, XIcon } from "./ui/icons";
+import { Button } from "./ui/Button";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
+import { DeleteIcon, XIcon } from "./ui/icons";
 
 export type EditableFundTransaction = {
   id: string;
@@ -31,7 +33,8 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
   const [accountId, setAccountId] = useState("");
-  const [status, setStatus] = useState<"idle" | "saving" | "deleting">("idle");
+  const save = useBlockingSave();
+  const [saveLabel, setSaveLabel] = useState<"Saving" | "Deleting">("Saving");
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -40,7 +43,6 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
     setAmount(String(transaction.amount));
     setDate(transaction.date);
     setAccountId(transaction.accountId ?? "");
-    setStatus("idle");
     setError(null);
     setConfirmDelete(false);
   }, [transaction]);
@@ -52,23 +54,26 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
   const deleteBlocked = transaction.amount > transaction.categoryAvailable;
   const valid = Number.isFinite(parsedAmount) && parsedAmount > 0 && !reductionTooLarge && Boolean(date && accountId);
 
-  const save = async () => {
-    if (!valid || status !== "idle") return;
-    setStatus("saving");
+  const close = guardClose(save.saving, onClose);
+
+  const saveChanges = async () => {
+    if (!valid) return;
+    setSaveLabel("Saving");
     setError(null);
     try {
-      const response = await fetch("/api/monthly-planning/funds", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: transaction.id, planned: parsedAmount, date, accountId }),
+      await save.run(async () => {
+        const response = await fetch("/api/monthly-planning/funds", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: transaction.id, planned: parsedAmount, date, accountId }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not update funding transaction");
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not update funding transaction");
       onClose();
-      window.setTimeout(() => { void Promise.resolve(onChanged()).catch(() => undefined); }, 600);
+      void Promise.resolve(onChanged()).catch(() => undefined);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update funding transaction");
-      setStatus("idle");
     }
   };
 
@@ -77,33 +82,31 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
       setConfirmDelete(true);
       return;
     }
-    setStatus("deleting");
+    setSaveLabel("Deleting");
     setError(null);
     try {
-      const response = await fetch("/api/monthly-planning/funds", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: transaction.id }),
+      await save.run(async () => {
+        const response = await fetch("/api/monthly-planning/funds", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: transaction.id }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not delete funding transaction");
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not delete funding transaction");
       onClose();
-      window.setTimeout(() => { void Promise.resolve(onChanged()).catch(() => undefined); }, 600);
+      void Promise.resolve(onChanged()).catch(() => undefined);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not delete funding transaction");
-      setStatus("idle");
     }
   };
 
   return (
-    <BottomSheet open onClose={onClose} label="Edit funding transaction" layered size="standard" zIndex={120} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+    <BottomSheet open onClose={close} label="Edit funding transaction" layered size="standard" zIndex={120} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
       <SheetBody style={wrapStyle}>
         <SheetHeader style={headerStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={iconStyle}><FundIcon size={18} /></span>
-            <h2 style={titleStyle}>Edit funding</h2>
-          </div>
-          <button type="button" className="sheet-close-button" onClick={onClose} aria-label="Close funding editor"><XIcon /></button>
+          <h2 style={titleStyle}>Edit funding</h2>
+          <button type="button" className="sheet-close-button" onClick={close} aria-label="Close funding editor"><XIcon size={20} /></button>
         </SheetHeader>
 
         <label style={fieldStyle}>
@@ -128,31 +131,28 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
         </div>
 
         {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
-        {confirmDelete && <p role="status" style={confirmLineStyle}>Delete this funding transaction? Budget totals will be recalculated.</p>}
+        {confirmDelete && <Banner tone="warning" role="status" compact>Delete this funding transaction? Budget totals will be recalculated.</Banner>}
 
         <SheetFooter style={actionsStyle}>
-          <button type="button" onClick={remove} disabled={status !== "idle" || deleteBlocked} aria-describedby={deleteBlocked ? "fund-delete-blocked" : undefined} style={{ ...secondaryButtonStyle, color: "var(--danger)" }}>
-            <DeleteIcon size={17} />{status === "deleting" ? "Deleting…" : confirmDelete ? "Delete funding" : "Delete"}
-          </button>
-          <button type="button" onClick={save} disabled={!valid || status !== "idle"} style={primaryButtonStyle}>{status === "saving" ? "Saving…" : "Save changes"}</button>
+          <Button variant="destructive" onClick={remove} disabled={deleteBlocked} aria-describedby={deleteBlocked ? "fund-delete-blocked" : undefined} icon={<DeleteIcon size={20} />}>
+            {confirmDelete ? "Delete funding" : "Delete"}
+          </Button>
+          <Button variant="primary" onClick={saveChanges} disabled={!valid}>Save changes</Button>
           {deleteBlocked && <span id="fund-delete-blocked" style={deleteBlockedStyle}>Used funding prevents deletion</span>}
         </SheetFooter>
       </SheetBody>
+      <SavingCover saving={save.saving} label={saveLabel} />
     </BottomSheet>
   );
 }
 
-const wrapStyle: CSSProperties = { minHeight: "100%", boxSizing: "border-box", padding: "8px 20px 24px", display: "flex", flexDirection: "column", gap: 16 };
+const wrapStyle: CSSProperties = { minHeight: "100%", boxSizing: "border-box", padding: "8px 24px 24px", display: "flex", flexDirection: "column", gap: 16 };
 const headerStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 };
-const iconStyle: CSSProperties = { width: 36, height: 36, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--action-income)", background: "color-mix(in srgb, var(--action-income) 12%, var(--surface))" };
-const titleStyle: CSSProperties = { margin: "3px 0 0", fontSize: 20, lineHeight: 1.2 };
-const fieldStyle: CSSProperties = { display: "grid", gap: 7 };
-const labelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 700, };
-const controlStyle: CSSProperties = { width: "100%", minHeight: 48, padding: "0 14px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text)", font: "inherit" };
-const amountFieldStyle: CSSProperties = { minHeight: 112, padding: "0 4px", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 };
-const amountInputStyle: CSSProperties = { width: "min(260px, 68vw)", height: 88, padding: 0, border: 0, outline: 0, background: "transparent", color: "var(--text)", textAlign: "right", font: "700 clamp(48px, 15vw, 72px)/1 var(--font, inherit)", fontVariantNumeric: "tabular-nums", boxSizing: "border-box" };
-const actionsStyle: CSSProperties = { marginTop: "auto", display: "grid", gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.2fr)", gap: 8 };
-const secondaryButtonStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", font: "inherit", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7 };
-const confirmLineStyle: CSSProperties = { margin: 0, fontSize: 13, lineHeight: "18px", color: "var(--text2)" };
+const titleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: "24px", fontWeight: 600 };
+const fieldStyle: CSSProperties = { display: "grid", gap: 8 };
+const labelStyle: CSSProperties = { color: "var(--muted)", fontSize: 13, lineHeight: "16px", fontWeight: 600 };
+const controlStyle: CSSProperties = { width: "100%", minHeight: 48, padding: "0 12px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text)", font: "inherit" };
+const amountFieldStyle: CSSProperties = { minHeight: 112, padding: "0 4px", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+const amountInputStyle: CSSProperties = { width: "min(260px, 68vw)", height: 88, padding: 0, border: 0, outline: 0, background: "transparent", color: "var(--text)", textAlign: "right", fontFamily: "var(--font-body)", fontSize: "clamp(48px, 15vw, 72px)", lineHeight: 1, fontWeight: 500, letterSpacing: "-.03em", fontVariantNumeric: "tabular-nums", boxSizing: "border-box" };
+const actionsStyle: CSSProperties = { marginTop: "auto", display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8 };
 const deleteBlockedStyle: CSSProperties = { gridColumn: "1 / 2", fontSize: 12, lineHeight: "16px", color: "var(--muted)", textAlign: "center" };
-const primaryButtonStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", font: "inherit", fontWeight: 750 };

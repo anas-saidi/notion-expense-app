@@ -1,6 +1,8 @@
 .card-header { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
 .card-header-title { min-width:0; }
-.card-header-action { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:var(--control-min); min-height:var(--control-min); flex-shrink:0; cursor:pointer; }
+/* The header link ("All bills", "All activity"): quiet muted text with a chevron, styled here so no screen has to. */
+.card-header-action { display:inline-flex; align-items:center; justify-content:center; gap:4px; min-width:var(--control-min); min-height:var(--control-min); flex-shrink:0; padding:0 4px; border:0; border-radius:var(--radius-control); background:transparent; color:var(--muted); font:inherit; font-size:13px; line-height:20px; font-weight:400; cursor:pointer; }
+@media (hover:hover) and (pointer:fine) { .card-header-action:hover:not(:disabled) { color:var(--text); } }
 .card-header-action > svg { flex-shrink:0; }
 .card-header-action:disabled { opacity:.5; cursor:default; }
 .card-header-action:focus-visible { outline:3px solid var(--focus-ring); outline-offset:4px; border-radius:var(--radius-control); }

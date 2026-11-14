@@ -1,6 +1,6 @@
 import { withMirrorReads, withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
-import { createBill, deleteBill, payBill, readBills, undoBillPayment, updateBill } from "@/lib/notion-bills";
+import { createBill, deleteBill, linkBillPayment, payBill, readBills, undoBillPayment, updateBill } from "@/lib/notion-bills";
 
 export const dynamic = "force-dynamic";
 async function handle(operation: (token: string) => Promise<unknown>) {
@@ -12,8 +12,8 @@ async function handle(operation: (token: string) => Promise<unknown>) {
 async function handleGET() { return handle(readBills); }
 async function handlePOST(req: NextRequest) {
   const body = await req.json().catch(() => null);
-  if (!body || !["create", "pay"].includes(body.action)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  return handle(async token => ({ success: true, ...(body.action === "pay" ? { payment: await payBill(token, body) } : { schedule: await createBill(token, body) }) }));
+  if (!body || !["create", "pay", "link"].includes(body.action)) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  return handle(async token => ({ success: true, ...(body.action === "pay" ? { payment: await payBill(token, body) } : body.action === "link" ? { payment: await linkBillPayment(token, body) } : { schedule: await createBill(token, body) }) }));
 }
 async function handlePATCH(req: NextRequest) {
   const body = await req.json().catch(() => null);

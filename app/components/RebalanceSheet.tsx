@@ -12,6 +12,7 @@ import { isSavingsCategory } from "./wallet-utils";
 import { Fact, Summary } from "./ui/Summary";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
 import type { PlanningAllocationItem } from "./app-types";
 
 type RebalanceSheetProps = {
@@ -272,13 +273,13 @@ export function RebalanceSheet({
         {flowRows.slice(0, 5).map((row) => (
           <div key={row.key} style={flowRowStyle}>
             <div style={flowFromStyle}>
-              {row.fromIcon && <CategoryIcon icon={row.fromIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
+              {row.fromIcon && <CategoryIcon icon={row.fromIcon} size={16} style={{ flexShrink: 0 }} />}
               <span style={flowNameStyle}>{row.fromLabel}</span>
             </div>
-            <span style={flowArrowStyle}>→ {row.amount}</span>
+            <span style={flowArrowStyle}><span aria-hidden="true">→ </span>{fmt(row.amount)}</span>
             <div style={flowToStyle}>
               <span style={flowNameStyle}>{row.toLabel}</span>
-              {row.toIcon && <CategoryIcon icon={row.toIcon} size={13} style={{ flexShrink: 0, opacity: 0.7 }} />}
+              {row.toIcon && <CategoryIcon icon={row.toIcon} size={16} style={{ flexShrink: 0 }} />}
             </div>
           </div>
         ))}
@@ -303,8 +304,6 @@ export function RebalanceSheet({
 
   return (
     <AllocationFlow
-      // Rebalance is a big operation: a full-screen workspace, not a sheet (design.md, Light).
-      workspace
       jarScope={budgetScope}
       jarShowsAssigned
       jarSignal={thinking ? { kind: "thinking", label: "Finding moves" } : null}
@@ -316,9 +315,6 @@ export function RebalanceSheet({
       poolOverride={poolForGroup}
       poolLabel={poolLabel}
       title="Rebalance"
-      // The global mode already names the scope, so the header carries no scope pill.
-      headerControls={false}
-      balancedLabel="Balanced"
       balancedNote={shortfall && shortfall.amount >= 0.5 ? <Summary className="rebalance-short">Still <Fact tone="danger" onClick={shortfall.onOpen} label={`${fmt(Math.ceil(shortfall.amount - 0.005))} MAD short outside this pool. Open what fixes it.`}>{fmt(Math.ceil(shortfall.amount - 0.005))} short</Fact></Summary> : undefined}
       saveButtonLabel="Apply"
       readOnly={isReadOnly}
@@ -326,7 +322,7 @@ export function RebalanceSheet({
       // One way to move money at a time: the prompt replaces the editor, and Use moves brings it back loaded.
       editorHidden={assistantOpen}
       flowPreview={<>{!isReadOnly && open && <>
-        <button type="button" style={assistantToggleStyle} aria-expanded={assistantOpen} onClick={() => setAssistantOpen(value => !value)}>{assistantOpen ? "Edit by hand" : "Suggest moves"}</button>
+        <Button variant="quiet" size="compact" style={assistantToggleStyle} aria-expanded={assistantOpen} onClick={() => setAssistantOpen(value => !value)}>{assistantOpen ? "Edit by hand" : "Suggest moves"}</Button>
         {assistantOpen && <ReallocationAssistant scope={budgetScope} month={homeMonth} onBusyChange={setThinking}
           suggestions={rebalanceSuggestions({ categories: visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original })), bills: dueBills, today: today(), formatAmount: fmt })}
           categories={visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original, reserved: billHolds.get(item.id.replace(/-/g, "").toLowerCase()) ?? 0 }))}
@@ -336,7 +332,6 @@ export function RebalanceSheet({
             setAllocations(next); setUsedSuggestion(true); setAssistantOpen(false);
           }} />}
       </>}{flowPreview}</>}
-      heroPool
       metaLabel="Before"
       rebalanceMode
       onSave={async () => {
@@ -437,14 +432,14 @@ const flowWrapStyle: CSSProperties = {
 
 const flowHeadStyle: CSSProperties = {
   fontSize: 12,
-  fontWeight: 700,
-  
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--muted)",
 };
 
 const flowListStyle: CSSProperties = {
   display: "grid",
-  gap: 6,
+  gap: 8,
 };
 
 const flowRowStyle: CSSProperties = {
@@ -458,7 +453,7 @@ const flowFromStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "flex-end",
-  gap: 5,
+  gap: 4,
   minWidth: 0,
 };
 
@@ -466,7 +461,7 @@ const flowToStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "flex-start",
-  gap: 5,
+  gap: 4,
   minWidth: 0,
 };
 
@@ -481,6 +476,7 @@ const flowNameStyle: CSSProperties = {
 
 const flowArrowStyle: CSSProperties = {
   fontSize: 12,
+  fontVariantNumeric: "tabular-nums",
   fontWeight: 500,
   color: "var(--muted)",
   whiteSpace: "nowrap",
@@ -493,15 +489,4 @@ const flowMoreStyle: CSSProperties = {
   textAlign: "center",
 };
 
-const assistantToggleStyle: CSSProperties = {
-  justifySelf: "center",
-  minHeight: 44,
-  padding: "0 12px",
-  border: 0,
-  borderRadius: "var(--radius-control)",
-  background: "transparent",
-  color: "var(--text2)",
-  fontSize: 13,
-  fontWeight: 650,
-  cursor: "pointer",
-};
+const assistantToggleStyle: CSSProperties = { justifySelf: "center" };

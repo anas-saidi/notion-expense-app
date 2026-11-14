@@ -1,10 +1,18 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { LiquidButton } from "./LiquidGlass";
+import { LiquidButton, glassControlStyle } from "./LiquidGlass";
 
+/**
+ * The app's one chip (design.md, Shared components). Modes:
+ * - filter: a toggle that narrows what the screen shows (aria-pressed).
+ * - tab: one of a set of local tabs (role="tab", aria-selected); wrap the set in role="tablist".
+ * - action: a pill that opens or does something (a picker trigger, a quick amount, a fix link). No selected state;
+ *   pass ariaHasPopup/ariaExpanded when it opens a picker.
+ * Never use a chip for passive metadata: that is a badge or plain text.
+ */
 export function ScreenChip({
-  selected,
+  selected = false,
   onClick,
   children,
   badge,
@@ -12,31 +20,62 @@ export function ScreenChip({
   mode = "filter",
   ariaLabel,
   minHeight = 44,
+  icon,
+  disabled,
+  title,
+  ariaHasPopup,
+  ariaExpanded,
+  ariaControls,
+  style,
 }: {
-  selected: boolean;
+  selected?: boolean;
   onClick: () => void;
   children: ReactNode;
   badge?: ReactNode;
   badgeTone?: "neutral" | "metric";
-  mode?: "filter" | "tab";
+  mode?: "filter" | "tab" | "action";
   ariaLabel?: string;
   minHeight?: number;
+  /** Optional leading 16px Lucide icon; decorative. */
+  icon?: ReactNode;
+  disabled?: boolean;
+  /** Tooltip, e.g. why the chip is disabled. */
+  title?: string;
+  ariaHasPopup?: "dialog" | "listbox" | "menu" | boolean;
+  ariaExpanded?: boolean;
+  ariaControls?: string;
+  /** Layout only (margin, flex, maxWidth); material, colour and type stay the chip's. */
+  style?: CSSProperties;
 }) {
+  const shownSelected = mode !== "action" && selected;
   return (
     <LiquidButton
       type="button"
       className="screen-chip"
       variant="glass"
-      data-selected={selected ? "" : undefined}
+      data-selected={shownSelected ? "" : undefined}
       role={mode === "tab" ? "tab" : undefined}
       aria-selected={mode === "tab" ? selected : undefined}
       aria-pressed={mode === "filter" ? selected : undefined}
       aria-label={ariaLabel}
+      aria-haspopup={ariaHasPopup}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
+      disabled={disabled}
+      title={title}
       onClick={onClick}
-      style={{ ...chipStyle(selected), minHeight }}
+      style={{
+        ...chipStyle(shownSelected),
+        // Action chips sit in wrapping rows (composer pickers) and may shrink with an ellipsis; filters and tabs scroll.
+        ...(mode === "action" ? { flexShrink: 1, minWidth: 0, maxWidth: "100%" } : null),
+        minHeight,
+        ...(disabled ? { opacity: 0.45, cursor: "not-allowed" } : null),
+        ...glassControlStyle(style),
+      }}
     >
-      <span>{children}</span>
-      {badge !== undefined && <span aria-hidden="true" style={badgeStyle(selected, badgeTone)}>{badge}</span>}
+      {icon && <span aria-hidden="true" style={iconStyle}>{icon}</span>}
+      <span style={labelStyle}>{children}</span>
+      {badge !== undefined && <span aria-hidden="true" style={badgeStyle(shownSelected, badgeTone)}>{badge}</span>}
     </LiquidButton>
   );
 }
@@ -57,6 +96,10 @@ const chipStyle = (selected: boolean): CSSProperties => ({
   fontWeight: 600,
   cursor: "pointer",
 });
+
+const iconStyle: CSSProperties = { display: "inline-flex", flexShrink: 0, marginLeft: -2 };
+
+const labelStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
 const badgeStyle = (selected: boolean, tone: "neutral" | "metric"): CSSProperties => ({
   minWidth: 24,

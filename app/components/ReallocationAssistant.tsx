@@ -4,6 +4,7 @@ import type { BudgetScope } from "./app-types";
 import type { ReallocationSuggestion } from "@/lib/finance-ai";
 import { fmt } from "./app-utils";
 import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
 import { PromptInput } from "./ui/PromptInput";
 import "./finance-ai.css";
 
@@ -81,7 +82,7 @@ export function ReallocationAssistant({ scope, month, categories, onUse, suggest
 
     {suggestion && suggestion.moves.length > 0 && <div className="realloc-footer">
       <span className="typed-hint">Apply saves them</span>
-      <button type="button" className="typed-primary" onClick={() => { onUse(suggestion); setSuggestion(null); }}>Use moves</button>
+      <Button variant="primary" size="compact" onClick={() => { onUse(suggestion); setSuggestion(null); }}>Use moves</Button>
     </div>}
     <span className="sr-only" role="status">{busy ? "Preparing reallocation suggestions" : ""}</span>
   </section>;

@@ -48,7 +48,8 @@ export function habitSuggestions(transactions: SuggestionTransaction[], today: s
 }
 
 export type RebalanceCategory = { id: string; name: string; available: number };
-export type DueBill = { name: string; categoryId: string; amount: number; dueDate: string };
+/** `amount` is what the bill still needs; `paid` is what's already been paid toward it (part payments). */
+export type DueBill = { name: string; categoryId: string; amount: number; dueDate: string; paid?: number };
 
 /**
  * Rebalance prompt. Each pill fixes a real number Suggest moves can act on (it only moves money between
@@ -76,7 +77,8 @@ export function rebalanceSuggestions({ categories, bills, today, formatAmount }:
     const category = byId.get(key);
     if (!category || covered.has(key) || category.available >= need - 0.5) continue;
     covered.add(key);
-    pills.push(`Cover the ${formatAmount(Math.round(bill.amount))} ${bill.name} bill in ${category.name}`);
+    pills.push(bill.paid ? `Cover the ${formatAmount(Math.round(need - Math.max(0, category.available)))} left on the ${bill.name} bill in ${category.name}`
+      : `Cover the ${formatAmount(Math.round(bill.amount))} ${bill.name} bill in ${category.name}`);
   }
   return pills.slice(0, MAX);
 }
@@ -91,13 +93,13 @@ export function billShortfalls(bills: DueBill[], categories: { id: string; avail
   const norm = (id: string) => id.replace(/-/g, "").toLowerCase();
   const byCategory = new Map<string, DueBill[]>();
   for (const bill of bills) if (bill.dueDate <= limit) byCategory.set(norm(bill.categoryId), [...byCategory.get(norm(bill.categoryId)) ?? [], bill]);
-  const out = new Map<string, { name: string; dueDate: string; short: number }>();
+  const out = new Map<string, { name: string; dueDate: string; short: number; paid: number }>();
   for (const cat of categories) {
     const due = byCategory.get(norm(cat.id));
     if (!due) continue;
     const short = due.reduce((sum, bill) => sum + bill.amount, 0) - Math.max(0, cat.available ?? 0);
     const first = [...due].sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
-    if (short >= 0.5) out.set(cat.id, { name: first.name, dueDate: first.dueDate, short });
+    if (short >= 0.5) out.set(cat.id, { name: first.name, dueDate: first.dueDate, short, paid: due.reduce((sum, bill) => sum + (bill.paid ?? 0), 0) });
   }
   return out;
 }

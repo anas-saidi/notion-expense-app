@@ -13,8 +13,9 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, ShuffleIcon, PlusIcon } from "./ui/icons";
 import { SearchField } from "./ui/SearchField";
-import { Banner, bannerActionStyle } from "./ui/Banner";
-import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned, today } from "./app-utils";
+import { Banner } from "./ui/Banner";
+import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned, today, type ShortfallPart } from "./app-utils";
+import { ShortfallBreakdown } from "./ShortfallBreakdown";
 import { billShortfalls, type DueBill } from "@/lib/suggestions";
 import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
 import { planningMood, spendingMood } from "./light-mood";
@@ -28,6 +29,10 @@ import { budgetStatus, budgetStatusRank, monthProgress } from "./category-status
 import { runningLowCategories, runwayLabel } from "./category-runway";
 import { BudgetJarRow, SavingsJarRow } from "./CategoryJarRow";
 import { SectionToggle } from "./ui/SectionToggle";
+import { ScreenChip } from "./ui/ScreenChip";
+import { Button } from "./ui/Button";
+import { EmptyState } from "./ui/EmptyState";
+import { SavingCover, useBlockingSave } from "./ui/SavingCover";
 
 import { isPastMonth } from "./app-utils";
 
@@ -50,9 +55,13 @@ type Props = {
   onOpenRebalance: () => void;
   /** What actually fixes "Short by" when Rebalance can't (advances owed back, over-assigned savings). */
   shortfallAction?: { label: string; onClick: () => void };
+  /** The working behind "X short", and what fixes it (shown when the figure is tapped). */
+  shortfallParts?: ShortfallPart[];
+  shortfallFixes?: { label: string; onClick: () => void }[];
   /** A savings account holding less than its categories promise; the fix moves money in from the owner's checking. */
   savingsGap?: { account: Account; gap: number; source?: Account; onFix: () => void };
-  onReviveCategory: (cat: Category) => void;
+  /** Restoring is a write: the screen stays blocked until the returned promise settles. */
+  onReviveCategory: (cat: Category) => void | Promise<void>;
   onMoveContribution: () => void;
   onOpenNewCategory?: (defaultType: string) => void;
   monthError?: boolean;
@@ -94,6 +103,8 @@ export function CategoriesScreen({
   onOpenCategoryDetails,
   onOpenRebalance,
   shortfallAction,
+  shortfallParts,
+  shortfallFixes = [],
   savingsGap,
   onReviveCategory,
   onMoveContribution,
@@ -105,6 +116,7 @@ export function CategoriesScreen({
   planMonth,
   onOpenPlan,
 }: Props) {
+  const restore = useBlockingSave();
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -208,6 +220,8 @@ export function CategoriesScreen({
   const contributionRemaining = contributionRemainingByScope[budgetScope] ?? 0;
   // What the accounts can't cover: categories funded plus dues, beyond what's actually there.
   const shortBy = Math.max(0, -Math.round(assignBalanceByScope?.[budgetScope] ?? 0));
+  const [showWhyShort, setShowWhyShort] = useState(false);
+  useEffect(() => { setShowWhyShort(false); }, [budgetScope]);
   // Budget jar: an emoji per category with money left, sized by its share of Available.
   const jarItems = useMemo(
     () => budgetJarItems(monthCategories, budgetScope, accounts),
@@ -235,15 +249,16 @@ export function CategoriesScreen({
     : jointBudget ? spendingMood(availableInCategories, jointSpent, progress) : planningMood(availableInCategories, leftToAllocate);
   const lightLevel = planning?.level ?? 0.35;
   const poolWarn = planning?.warn ?? null;
-  const jarDetails = loading ? "Loading monthly details" : jarItems.length > 0
+  const jarDetails = loading ? "Loading monthly details" : monthError ? "Monthly details unavailable" : jarItems.length > 0
     ? `Money left in ${jarItems.length} categor${jarItems.length === 1 ? "y" : "ies"}`
     : "No category has money left";
   // Loading keeps the light itself at its remembered level (pending), not a glass skeleton blob.
-  const budgetJar = !loading && monthError ? (
-    <span role="status" style={{ minHeight: MASCOT_HERO_SIZE, display: "grid", placeItems: "center", color: "var(--text2)", fontSize: 12 }}>Monthly details unavailable</span>
-  ) : (
+  // A failed month keeps the light with an alert signal; the screen's Banner carries the message and Retry.
+  const monthFailed = !loading && !!monthError;
+  const budgetJar = (
     <MascotSpill size={MASCOT_HERO_SIZE} label={jarDetails} details={jarDetails} onOpenChange={setJarOpen}>
-      <MascotHero look="light" variant="pool" scope={budgetScope} level={lightLevel} warn={poolWarn} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={monthlySummary.contributionError ? undefined : leftToAllocate} once={moneyMoved} pending={loading} />
+      <MascotHero look="light" variant="pool" scope={budgetScope} level={lightLevel} warn={poolWarn} items={jarOpen && !monthFailed ? jarItems : undefined} spentPct={monthFailed ? null : jarSpentPct} unassigned={monthlySummary.contributionError || monthFailed ? undefined : leftToAllocate} once={moneyMoved} pending={loading}
+        signal={monthFailed ? { kind: "alert", label: "Monthly details unavailable" } : undefined} />
     </MascotSpill>
   );
   const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
@@ -261,12 +276,13 @@ export function CategoriesScreen({
                 done={!jointBudget && !loading && !monthError && !monthlySummary.contributionError && Math.round(leftToAllocate) === 0 ? "All assigned" : undefined}
                 tone={!loading && Math.round(jointBudget ? availableInCategories : leftToAllocate) < 0 ? "danger" : undefined}
                 summary={loading ? null : savingsGap ? <Summary><Fact>{savingsGap.account.label}</Fact> is <Fact tone="danger" onClick={savingsGap.onFix} label={savingsGap.source ? `Move money from ${savingsGap.source.label} to ${savingsGap.account.label}` : `Review ${savingsGap.account.label}`}>{fmt(savingsGap.gap)} short</Fact>.</Summary>
-                  : shortBy > 0 ? <Summary><Fact tone="danger" onClick={shortfallAction?.onClick ?? onOpenRebalance} label={`${shortfallAction?.label ?? "Rebalance"}: ${fmt(shortBy)} MAD short`}>{fmt(shortBy)} short</Fact>.</Summary>
+                  : shortBy > 0 ? <Summary><Fact tone="danger" onClick={() => setShowWhyShort(open => !open)} label={`${fmt(shortBy)} MAD short. ${showWhyShort ? "Hide" : "Show"} why`}>{fmt(shortBy)} short</Fact>.</Summary>
                   : firstLow ? <Summary>{runningLow.length === 1 ? <><Fact>{firstLow.category.name}</Fact> has <Fact tone="warning" onClick={onOpenRebalance} label={`Rebalance ${firstLow.category.name}`}>{runwayLabel(firstLow.daysCovered).toLowerCase()}</Fact></> : <><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenRebalance} label="Rebalance running low categories">running low</Fact></>}.</Summary>
                   : !monthlySummary.contributionError && Math.round(leftToAllocate) > 0 ? <Summary>{jointBudget ? <><Fact onClick={onOpenRebalance} label="Assign unassigned money">{fmt(Math.round(leftToAllocate))}</Fact> is <Fact>unassigned</Fact></> : <><Fact onClick={onOpenRebalance} label={`Assign ${fmt(Math.round(leftToAllocate))} MAD to categories`}>Assign it</Fact> to your categories</>}.</Summary>
                   : budgetScope !== "joint" && contributionRemaining > 0 ? <Summary><Fact onClick={onMoveContribution} label={`Contribute ${fmt(Math.round(contributionRemaining))} MAD to Couple`}>{fmt(Math.round(contributionRemaining))} due to Couple</Fact>.</Summary>
                   : null}
-                actions={monthlySummary.contributionError ? <Banner tone="neutral" compact>Confirmed contributions and repayment reserves unavailable</Banner> : null}
+                actions={monthlySummary.contributionError ? <Banner tone="neutral" compact>Confirmed contributions and repayment reserves unavailable</Banner>
+                  : shortBy > 0 && showWhyShort && !savingsGap && shortfallParts ? <ShortfallBreakdown id="budget-why-short" parts={shortfallParts} fixes={shortfallFixes} /> : null}
               />
             </section>
             <ScreenToolbar label="Budget period and planning" className="budget-desktop-controls">
@@ -278,14 +294,13 @@ export function CategoriesScreen({
               />
               {/* Next month's plan sits with the month it follows, and only appears in the month's last week. */}
               {planMonth && onOpenPlan && !past && (planMonth === homeMonth || nextMonthPlanningOpen()) && (
-                <LiquidButton type="button" className="composer-picker-chip" disabled={!!monthlySummary.contributionError} title={monthlySummary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`} style={planChipStyle}>
-                  <CalendarIcon size={16} aria-hidden="true" />
+                <ScreenChip mode="action" icon={<CalendarIcon size={16} />} disabled={!!monthlySummary.contributionError} title={monthlySummary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} ariaLabel={`Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}>
                   {/* The month picker beside it already names this month. */}
                   {planMonth === homeMonth ? "Plan" : `Plan ${new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(`${planMonth}-01T00:00:00`))}`}
-                </LiquidButton>
+                </ScreenChip>
               )}
               </div>
-              <button type="button" className="app-top-action budget-rebalance-control" onClick={onOpenRebalance} aria-label="Rebalance budget" title="Rebalance budget"><ShuffleIcon size={18} /></button>
+              <LiquidButton type="button" className="app-top-action budget-rebalance-control" onClick={onOpenRebalance} aria-label="Rebalance budget" title="Rebalance budget" style={topActionStyle}><ShuffleIcon size={20} aria-hidden="true" /></LiquidButton>
             </ScreenToolbar>
             </div>
             <div className="budget-category-workspace screen-content">
@@ -302,10 +317,12 @@ export function CategoriesScreen({
       )}
 
             {!loading && !monthError && activeGroups.length === 0 && (hasScopedCategories
-              ? <div style={emptyStyle}>No categories match “{search}”.</div>
-              : onOpenNewCategory ? <button type="button" className="budget-empty-action" style={emptyActionStyle} onClick={() => onOpenNewCategory("Other")}><PlusIcon size={15} />Add category</button> : null)}
+              ? <EmptyState announce>No categories match “{search}”.</EmptyState>
+              : <EmptyState variant="screen" title="No categories yet" action={onOpenNewCategory ? <Button variant="secondary" size="compact" icon={<PlusIcon size={16} />} onClick={() => onOpenNewCategory("Other")}>Add category</Button> : undefined}>
+                  Add a category to start planning.
+                </EmptyState>)}
             {monthError && !loading && (
-              <Banner tone="danger" title="Could not load this month" action={<button type="button" onClick={onRetryMonth} style={bannerActionStyle}>Retry</button>} />
+              <Banner tone="danger" role="alert" title="Could not load this month" action={<Button variant="quiet" size="compact" onClick={onRetryMonth}>Retry</Button>} />
             )}
 
             {loading && <div style={listSurfaceStyle}><SkeletonRows label="Loading budget categories" count={4} iconSize={60} /></div>}
@@ -333,19 +350,17 @@ export function CategoriesScreen({
                             ? <SavingsJarRow key={cat.id} cat={cat} scope={budgetScope} available={cat.available ?? 0} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />
                             : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} runwayDays={runway?.daysCovered} planned={planned} spent={spent} billShort={billShort.get(cat.id)} onOpen={() => onOpenCategoryDetails(cat)} />)}
                           {fold && (
-                            <button type="button" onClick={() => setShowEmpty(prev => new Set(prev).add(group.label))} style={emptyFoldStyle} aria-label={`Show ${empty.length} empty categories: ${empty.map(row => row.cat.name).join(", ")}`}>
-                              <span style={emptyFoldIconsStyle} aria-hidden="true">{empty.slice(0, 4).map(row => <CategoryIcon key={row.cat.id} icon={row.cat.icon} categoryName={row.cat.name} size={20} style={{ opacity: 0.55 }} />)}</span>
-                              <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>{empty.length} empty</span>
-                              <ChevronDownIcon size={16} aria-hidden="true" />
-                            </button>
+                            <Button variant="quiet" size="compact" block onClick={() => setShowEmpty(prev => new Set(prev).add(group.label))} style={rowActionStyle} aria-label={`Show ${empty.length} empty categories: ${empty.map(row => row.cat.name).join(", ")}`}
+                              icon={<span style={emptyFoldIconsStyle}>{empty.slice(0, 4).map(row => <CategoryIcon key={row.cat.id} icon={row.cat.icon} categoryName={row.cat.name} size={20} style={{ opacity: 0.55 }} />)}</span>}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>{empty.length} empty<ChevronDownIcon size={16} aria-hidden="true" /></span>
+                            </Button>
                           )}
                         </>;
                       })()}
                       {onOpenNewCategory && (
-                        <button type="button" onClick={() => onOpenNewCategory(group.label === "Savings" ? "Saving" : group.label)} style={addRowStyle} aria-label={`Add category to ${group.label}`}>
-                          <PlusIcon size={16} aria-hidden="true" />
+                        <Button variant="quiet" size="compact" block onClick={() => onOpenNewCategory(group.label === "Savings" ? "Saving" : group.label)} style={rowActionStyle} aria-label={`Add category to ${group.label}`} icon={<PlusIcon size={16} />}>
                           Add
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
@@ -359,9 +374,9 @@ export function CategoriesScreen({
                 {!collapsed.has("Frozen") && (
                   <div style={listSurfaceStyle}>
                     {frozenCategories.map((cat) => (
-                      <SwipeToDelete key={cat.id} variant="restore" deleteLabel={`Restore ${cat.name}`} onDelete={() => { onReviveCategory(cat); return true; }}>
+                      <SwipeToDelete key={cat.id} variant="restore" deleteLabel={`Restore ${cat.name}`} onDelete={() => { void restore.run(async () => { await onReviveCategory(cat); }).catch(() => undefined); return true; }}>
                         <button type="button" onClick={() => onOpenCategoryDetails(cat)} style={frozenRowStyle} aria-label={cat.name}>
-                          <CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} style={{ opacity: 0.5, flexShrink: 0 }} />
+                          <CategoryIcon icon={cat.icon} categoryName={cat.name} size={60} style={{ opacity: 0.5, flexShrink: 0 }} />
                           <span style={frozenNameStyle}>{cat.name}</span>
                           <ChevronRightIcon size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
                         </button>
@@ -372,7 +387,7 @@ export function CategoriesScreen({
               </section>
             )}
             </div>
-
+      <SavingCover saving={restore.saving} fill="screen" />
     </div>
   );
 }
@@ -386,7 +401,7 @@ export function CategoriesScreen({
 const wrapStyle: CSSProperties = {
   display: "grid",
   gap: 16,
-  paddingBottom: 80,
+  paddingBottom: 96,
   minWidth: 0,
 };
 
@@ -395,12 +410,12 @@ const sectionStyle: CSSProperties = { display: "grid", gap: 4, minWidth: 0 };
 /** One shared surface per section; rows inside stay flat. */
 // No box: the group header and the space between groups already group the rows.
 // Rows keep their inner padding for the tap and hover fill; the negative margin lines the art and amounts up with the header.
-const listSurfaceStyle: CSSProperties = { display: "grid", margin: "0 -24px 0 -10px" };
+const listSurfaceStyle: CSSProperties = { display: "grid", margin: "0 -24px 0 -12px" };
 
 
-const emptyFoldStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minHeight: 56, padding: "0 24px 0 10px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
-const emptyFoldIconsStyle: CSSProperties = { display: "inline-flex", gap: 4, flexShrink: 0 };
-const addRowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, minHeight: 48, padding: "0 24px 0 10px", border: "none", background: "transparent", color: "var(--muted)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)", width: "100%" };
+const emptyFoldIconsStyle: CSSProperties = { display: "inline-flex", gap: 4 };
+// Row-level quiet actions (Add, the empty fold) start where the jar rows' art starts.
+const rowActionStyle: CSSProperties = { justifyContent: "flex-start", padding: "0 24px 0 12px" };
 
 /** Once this month is planned, next month's planning opens in the last week, not straight after saving. */
 function nextMonthPlanningOpen() {
@@ -408,19 +423,18 @@ function nextMonthPlanningOpen() {
   return new Date(year, month, 0).getDate() - day < 7;
 }
 
-const planChipStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 14px",
-  borderRadius: 999,
+// Same geometry as the AppShell header icon actions.
+const topActionStyle: CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: "50%",
   border: 0,
-  background: "var(--lg-glass)",
   color: "var(--text2)",
-  fontSize: 13,
-  fontWeight: 600,
+  cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  gap: 7,
-  cursor: "pointer",
+  justifyContent: "center",
+  flexShrink: 0,
 };
 
 
@@ -434,54 +448,27 @@ const planChipStyle: CSSProperties = {
 // Flat, like the jar rows: the section's surface is the only container.
 const frozenRowStyle: CSSProperties = {
   width: "100%",
-  minHeight: 56,
-  padding: "8px 16px 8px 20px",
+  minHeight: 76,
+  padding: "8px 24px 8px 12px",
   border: "none",
   borderRadius: 0,
   background: "var(--surface)",
   boxShadow: "none",
   color: "var(--text2)",
-  display: "grid",
-  gridTemplateColumns: "32px minmax(0, 1fr) 20px",
+  display: "flex",
   alignItems: "center",
   gap: 12,
   textAlign: "left",
   cursor: "pointer",
+  fontFamily: "var(--font-body)",
 };
 
 const frozenNameStyle: CSSProperties = {
+  flex: 1,
   minWidth: 0,
   overflow: "hidden",
   whiteSpace: "nowrap",
   textOverflow: "ellipsis",
-  fontSize: 14,
-  fontWeight: 650,
+  fontSize: 15,
+  fontWeight: 500,
 };
-
-
-
-
-const emptyStyle: CSSProperties = {
-  padding: "22px 10px",
-  color: "var(--muted)",
-  fontSize: 14,
-  textAlign: "center",
-};
-
-const emptyActionStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 16px",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  background: "var(--surface)",
-  color: "var(--text2)",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 7,
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  fontWeight: 650,
-  cursor: "pointer",
-};
-

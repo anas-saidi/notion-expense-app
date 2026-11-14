@@ -153,6 +153,11 @@ export function WalletCardSwitcher({ value, personalScope = "anas", monthlySumma
   const heroValue = isJoint ? myDue : available != null ? Math.round(available) : null;
   const heroDone = isJoint && myDue != null && myDue <= 0 ? "All contributed" : undefined;
 
+  // No figures to show (failed read or no plan): the jar stays, dim, with a signal instead of a caption in its place.
+  const idleJar = (jarSignal: JarSignal) => (
+    <MascotHero look="light" variant="pool" size={HOME_POOL_SIZE} scope={value} spentPct={null} level={0.35} balance={balance} available={available ?? 0} signal={jarSignal.kind === "alert" ? jarSignal : signal ?? jarSignal} />
+  );
+
   return (
     <div style={switcherStyle}>
       {/* The room: the jar's light fills the hero, its strength following what's left of the plan (design.md, Light). */}
@@ -160,8 +165,9 @@ export function WalletCardSwitcher({ value, personalScope = "anas", monthlySumma
         <GrainGlow direction="room" scope={value} level={roomLevel} tones={PALETTES.partner} />
         <ScreenHero
           mascot={monthlyError
-            ? <span role="status" style={captionStyle}>Monthly details unavailable</span>
-            : pool || <span style={captionStyle}>No monthly plan</span>}
+            // A failed read keeps the hero footprint: the jar shows "!" and the reason is announced once.
+            ? <>{idleJar({ kind: "alert", label: "Monthly details unavailable" })}<span className="sr-only" role="status">Monthly details unavailable</span></>
+            : pool || idleJar({ kind: "sleep", label: "No monthly plan", caption: true })}
           label={heroLabel}
           value={heroValue}
           done={heroDone}
@@ -184,14 +190,6 @@ export function WalletCardSwitcher({ value, personalScope = "anas", monthlySumma
 
 /* ─── Styles ──────────────────────────────────────────────────── */
 
-const contribUnavailableStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.4, color: "var(--muted)", textAlign: "center" };
+const contribUnavailableStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: "16px", color: "var(--muted)", textAlign: "center" };
 
 const switcherStyle: CSSProperties = { display: "grid", gap: 16 };
-
-const captionStyle: CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: 12,
-  fontWeight: 600,
-  letterSpacing: "0.02em",
-  color: "var(--text2)",
-};

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Banner } from "./Banner";
+import { Button } from "./Button";
 
 /** Stay quiet for normal reads; give prolonged reads a keyboard-accessible restart. */
 export function LoadingRecovery({ loading, onRetry }: { loading: boolean; onRetry: () => void }) {
@@ -13,8 +15,8 @@ export function LoadingRecovery({ loading, onRetry }: { loading: boolean; onRetr
     return () => window.clearTimeout(timer);
   }, [loading, attempt]);
   if (!loading || !slow) return null;
-  return <div className="loading-recovery">
-    <span role="status">Still loading.</span>
-    <button type="button" onClick={() => { setSlow(false); setAttempt(value => value + 1); onRetry(); }}>Retry</button>
-  </div>;
+  return <Banner className="loading-recovery" tone="neutral" role="status" compact
+    action={<Button variant="quiet" size="compact" onClick={() => { setSlow(false); setAttempt(value => value + 1); onRetry(); }}>Retry</Button>}>
+    Still loading.
+  </Banner>;
 }

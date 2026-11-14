@@ -1,5 +1,5 @@
 "use client";
-import { SheetBody, SheetHeader } from "./ui/SheetLayout";
+import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
 
 import { SavingsFundingTargetPicker } from "./SavingsFundingTargetPicker";
 import type { SavingsFundingTarget } from "../../lib/savings-funding";
@@ -14,10 +14,13 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { CheckIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
+import { CheckIcon, ChevronDownIcon, FundIcon, PlusIcon, XIcon } from "./ui/icons";
+import { Button } from "./ui/Button";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import type { ContributionAgreement } from "../../lib/contribution-agreements";
 import { planAdditionAmounts, type PlanAdditionInput } from "../../lib/plan-addition";
 import { Banner } from "./ui/Banner";
+import { Switch } from "./ui/Switch";
 
 type CategoryManageSheetProps = {
   open: boolean;
@@ -60,8 +63,10 @@ export function CategoryManageSheet({
   const [categoryType, setCategoryType] = useState(defaultType ?? availableTypes?.[0] ?? "");
   const [accountId, setAccountId] = useState("");
   const [amount, setAmount] = useState("");
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const save = useBlockingSave();
   const [error, setError] = useState("");
+  // A new category rarely needs a pattern on day one, so it waits behind More options.
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   // A transfer already made for this funding (amount + accounts), so a retry after a
   // failed funding doesn't move the money a second time.
   const movedRef = useRef<string | null>(null);
@@ -74,8 +79,8 @@ export function CategoryManageSheet({
 
   useEffect(() => {
     if (!open) return;
-    setStatus("idle");
     setError("");
+    setMoreOptionsOpen(false);
     setName(mode === "edit" ? category?.name ?? "" : "");
     setIcon(category?.icon ?? (mode === "edit" ? "" : "🧾"));
     setSpendingPattern(mode === "edit" ? category?.spendingPattern ?? "" : "");
@@ -132,7 +137,6 @@ export function CategoryManageSheet({
   const moveNeeded = !addingToPlan && !!holdingAccount && !!selectedAccount && holdingAccount.id !== selectedAccount.id;
   const moveKey = moveNeeded ? `${selectedAccount.id}>${holdingAccount.id}:${parsedAmount}` : null;
   const canSubmit =
-    (status === "idle" || status === "error") &&
     (!addingToPlan || Boolean(agreement)) &&
     accountId &&
     (isMetadata ? name.trim().length > 0 && (!isEdit || Boolean(category?.id)) : Boolean(category?.id)) &&
@@ -142,20 +146,15 @@ export function CategoryManageSheet({
   // Funding a savings category reads as adding to savings.
   const addingToSavings = !isEdit && !isCreate && !!category && isSavingsCategory(category);
   const title = isEdit ? "Edit category" : isCreate ? "New category" : addingToPlan ? `Add to ${category?.name} plan` : addingToSavings ? `Add to ${category?.name}` : `Fund ${category?.name ?? "category"}`;
-  const actionLabel = useMemo(() => {
-    if (status === "saving" && addingToPlan) return "Adding to plan…";
-    if (status === "saving") return isEdit ? "Saving..." : isCreate ? "Creating..." : "Funding...";
-    if (status === "success") return isEdit ? "Saved" : isCreate ? "Created" : "Funded";
-    if (status === "error") return "Retry";
-    if (addingToPlan) return "Add to plan";
-    return isEdit ? "Save changes" : isCreate ? "Create category" : addingToSavings ? "Add to savings" : "Fund category";
-  }, [addingToSavings, addingToPlan, isCreate, isEdit, status]);
+  const actionLabel = addingToPlan ? "Add to plan"
+    : isEdit ? "Save changes" : isCreate ? "Create category" : addingToSavings ? "Add to savings" : "Fund category";
 
   const submit = async () => {
     if (!canSubmit) return;
-    setStatus("saving");
     setError("");
     try {
+      // Every call in this save (addition, category, deposit, move, funding) runs under one blocking cover.
+      const message = await save.run(async (): Promise<string> => {
       let categoryId = category?.id ?? "";
       let categoryName = category?.name ?? name.trim();
 
@@ -176,7 +175,7 @@ export function CategoryManageSheet({
         }
         try { localStorage.removeItem(`planAddition:${month}:${category.id}`); } catch {}
         additionDraft.current = null; setPendingAddition(false);
-        setStatus("success"); onSuccess(`${category.name} added to plan; contributions updated`); onClose(); return;
+        return `${category.name} added to plan; contributions updated`;
       }
 
       if (isMetadata) {
@@ -212,7 +211,7 @@ export function CategoryManageSheet({
         }
         try { localStorage.removeItem(`savingsFunding:${category.id}`); } catch {}
         savingsDraft.current = null; setPendingSavings(false);
-        setStatus("success"); onSuccess(`${category.name} funded`); onClose(); return;
+        return `${category.name} funded`;
       }
 
       if (!isEdit && parsedAmount > 0 && moveNeeded && moveKey && movedRef.current !== moveKey) {
@@ -255,20 +254,21 @@ export function CategoryManageSheet({
         }
       }
 
-      setStatus("success");
-      onSuccess(isEdit ? `${name.trim()} saved` : parsedAmount > 0 ? `${categoryName} funded` : `${categoryName} created`);
+      return isEdit ? `${name.trim()} saved` : parsedAmount > 0 ? `${categoryName} funded` : `${categoryName} created`;
+      });
+      onSuccess(message);
       onClose();
     } catch (err: unknown) {
-      setStatus("error");
       setError(err instanceof Error ? err.message : "Could not save");
     }
   };
 
   if (!open) return null;
+  const close = guardClose(save.saving, onClose);
 
   const spendingPatternField = <label style={fieldStyle}>
     <span style={labelStyle}>Spending pattern</span>
-    <ChoicePicker aria-label="Spending pattern" value={spendingPattern} disabled={status === "saving"} onChange={(event) => setSpendingPattern(event.target.value as SpendingPattern | "")}>
+    <ChoicePicker aria-label="Spending pattern" value={spendingPattern} onChange={(event) => setSpendingPattern(event.target.value as SpendingPattern | "")}>
       <option value="">Not set</option>
       {SPENDING_PATTERNS.map(pattern => <option key={pattern} value={pattern}>{pattern}</option>)}
     </ChoicePicker>
@@ -277,7 +277,7 @@ export function CategoryManageSheet({
   return (
     <BottomSheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       label={title}
       size="standard"
       detent="content"
@@ -294,8 +294,8 @@ export function CategoryManageSheet({
               <h2 style={titleStyle}>{title}</h2>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
-            <XIcon strokeWidth={2.2} />
+          <button type="button" className="sheet-close-button" onClick={close} aria-label="Close">
+            <XIcon size={20} />
           </button>
         </SheetHeader>
 
@@ -322,11 +322,13 @@ export function CategoryManageSheet({
               </ChoicePicker>
             </label>
 
-            {/* A new category rarely needs a pattern on day one, so it waits behind More options. */}
-            {isCreate ? <details style={moreOptionsStyle}>
-              <summary style={moreOptionsSummaryStyle}>More options</summary>
-              {spendingPatternField}
-            </details> : spendingPatternField}
+            {isCreate ? <div style={moreOptionsStyle}>
+              <Button variant="quiet" size="compact" aria-expanded={moreOptionsOpen} aria-controls="category-more-options" onClick={() => setMoreOptionsOpen(value => !value)} style={{ justifySelf: "start" }}
+                icon={<ChevronDownIcon size={16} style={{ transform: moreOptionsOpen ? "rotate(180deg)" : "none", transition: "transform var(--motion-standard) var(--ease-standard)" }} />}>
+                More options
+              </Button>
+              {moreOptionsOpen && <div id="category-more-options">{spendingPatternField}</div>}
+            </div> : spendingPatternField}
 
           </section>
         )}
@@ -334,7 +336,7 @@ export function CategoryManageSheet({
         <section style={sectionStyle}>
           <label style={fieldStyle}>
             <span style={labelStyle}>{isMetadata ? "Default account" : addingToPlan ? "Budget account" : "Funding account"}</span>
-            <ChoicePicker disabled={status === "saving" || pendingSavings || pendingAddition || addingToPlan}  aria-label={isMetadata ? "Default account" : addingToPlan ? "Budget account" : "Funding account"} value={addingToPlan ? holdingAccount?.id ?? accountId : accountId} onChange={(event) => setAccountId(event.target.value)}>
+            <ChoicePicker disabled={pendingSavings || pendingAddition || addingToPlan}  aria-label={isMetadata ? "Default account" : addingToPlan ? "Budget account" : "Funding account"} value={addingToPlan ? holdingAccount?.id ?? accountId : accountId} onChange={(event) => setAccountId(event.target.value)}>
               <option value="" disabled>Choose account</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.label}</option>
@@ -342,27 +344,29 @@ export function CategoryManageSheet({
             </ChoicePicker>
           </label>
 
-          {addingToSavings && holdingAccount && /joined|joint/i.test(holdingAccount.label) && <SavingsFundingTargetPicker value={savingsTarget} onChange={setSavingsTarget} disabled={status === "saving" || pendingSavings} />}
+          {addingToSavings && holdingAccount && /joined|joint/i.test(holdingAccount.label) && <SavingsFundingTargetPicker value={savingsTarget} onChange={setSavingsTarget} disabled={pendingSavings} />}
 
           {!isEdit && <label style={fieldStyle}>
             <span style={labelStyle}>{isCreate ? "Fund this month" : "Amount to add"}</span>
             <div style={amountWrapStyle}>
               <input
-                disabled={status === "saving" || pendingSavings || pendingAddition}
+                className="display-amount-input"
+                disabled={pendingSavings || pendingAddition}
                 value={amount}
                 onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
                 placeholder={isCreate ? "Optional" : "0"}
+                inputMode="decimal"
+                aria-label={`${isCreate ? "Fund this month" : "Amount to add"} in MAD`}
                 style={amountInputStyle}
               />
               <Currency />
             </div>
           </label>}
 
-          {canAddToPlan && <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, minHeight: 44 }}>
-            <input type="checkbox" checked={updateContributions || pendingAddition} disabled={status === "saving" || pendingAddition} onChange={event => setUpdateContributions(event.target.checked)} />
+          {canAddToPlan && <Switch checked={updateContributions || pendingAddition} disabled={pendingAddition} onChange={setUpdateContributions}>
             Update agreed contributions
-          </label>}
-          {addedContributions && <div aria-live="polite" style={{ display: "grid", gap: 8, fontSize: 14 }}>
+          </Switch>}
+          {addedContributions && <div aria-live="polite" style={{ display: "grid", gap: 4 }}>
             <div style={accountHintStyle}><span>Anas contribution increase</span><strong>+<Money value={addedContributions.anas} /></strong></div>
             <div style={accountHintStyle}><span>Salma contribution increase</span><strong>+<Money value={addedContributions.salma} /></strong></div>
             <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>No money moves now.</p>
@@ -385,35 +389,37 @@ export function CategoryManageSheet({
             </p>
           )}
           {!addingToPlan && !isEdit && selectedAssignable !== null && parsedAmount > Math.max(0, selectedAssignable) && (
-            <p role="alert" style={{ ...keptNoteStyle, color: "var(--danger)" }}>
+            <Banner tone="warning" role="alert" compact>
               This leaves {selectedAccount?.label} short by {fmt(Math.round(parsedAmount - Math.max(0, selectedAssignable)))}.
-            </p>
+            </Banner>
           )}
         </section>
 
-        {pendingAddition && status !== "saving" && !error && <Banner tone="warning" compact>Plan addition unfinished. Retry to complete the same addition.</Banner>}
-        {pendingSavings && status !== "saving" && !error && <Banner tone="warning" compact>Deposit unfinished. Retry to complete it.</Banner>}
+        {pendingAddition && !save.saving && !error && <Banner tone="warning" compact>Plan addition unfinished. Retry to complete the same addition.</Banner>}
+        {pendingSavings && !save.saving && !error && <Banner tone="warning" compact>Deposit unfinished. Retry to complete it.</Banner>}
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         </BlurScrollArea>
-        <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
-          {status === "success" && <CheckIcon size={16} />}
-          {status === "idle" && (isEdit ? <CheckIcon size={16} /> : isCreate ? <PlusIcon size={16} strokeWidth={2.3} /> : <FundIcon size={16} strokeWidth={2.3} />)}
-          {actionLabel}
-        </button>
+        <SheetFooter>
+          <Button variant="primary" block onClick={submit} disabled={!canSubmit}
+            icon={isEdit ? <CheckIcon size={20} /> : isCreate ? <PlusIcon size={20} /> : <FundIcon size={20} />}>
+            {actionLabel}
+          </Button>
+        </SheetFooter>
       </SheetBody>
+      <SavingCover saving={save.saving} />
     </BottomSheet>
   );
 }
 
 const sheetStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",
+  background: "var(--surface)",
   borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
 const innerStyle: CSSProperties = {
-  padding: "18px 18px 22px",
+  padding: "16px 24px 24px",
   display: "grid",
   gap: 16,
   gridTemplateRows: "auto minmax(0, 1fr) auto",
@@ -424,30 +430,19 @@ const innerStyle: CSSProperties = {
 
 const headerStyle: CSSProperties = {
   display: "flex",
-  alignItems: "flex-start",
+  alignItems: "center",
   justifyContent: "space-between",
   gap: 12,
 };
 
 
 const titleStyle: CSSProperties = {
-  margin: "4px 0 0",
-  fontFamily: "var(--font-display)",
-  fontSize: 26,
-  lineHeight: 1,
+  margin: 0,
+  fontFamily: "var(--font-body)",
+  fontSize: 20,
+  lineHeight: "24px",
+  fontWeight: 600,
   color: "var(--text)",
-};
-
-const closeStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
 };
 
 const sectionStyle: CSSProperties = {
@@ -457,74 +452,54 @@ const sectionStyle: CSSProperties = {
 
 const fieldStyle: CSSProperties = {
   display: "grid",
-  gap: 7,
+  gap: 8,
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  color: "var(--text2)",
+  fontSize: 13,
+  lineHeight: "16px",
+  fontWeight: 600,
+  color: "var(--muted)",
 };
 
-const moreOptionsStyle: CSSProperties = { display: "grid", gap: 10 };
-const moreOptionsSummaryStyle: CSSProperties = { minHeight: 44, display: "flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 650, cursor: "pointer" };
+const moreOptionsStyle: CSSProperties = { display: "grid", gap: 8 };
 
 const amountWrapStyle: CSSProperties = {
-  minHeight: 56,
-  borderRadius: "var(--radius-control)",
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
+  minHeight: 112,
   display: "flex",
-  alignItems: "center",
-  gap: 10,
-  padding: "0 14px",
-};
-
-const amountInputStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  border: "none",
-  outline: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  fontFamily: "var(--font-display)",
-  fontSize: 28,
-  fontWeight: 800,
-};
-
-
-const moveNoteStyle: CSSProperties = { margin: 0, padding: "10px 12px", borderRadius: 12, background: "var(--surface2)", fontSize: 12, lineHeight: 1.4, color: "var(--text2)" };
-const sameId = (a: string, b: string | null | undefined) => !!b && a.replace(/-/g, "") === b.replace(/-/g, "");
-
-const keptNoteStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: 1.35, color: "var(--muted)" };
-const accountLineStyle: CSSProperties = { margin: 0, fontSize: 13, lineHeight: 1.45, color: "var(--text2)" };
-const accountLineAmountStyle: CSSProperties = { color: "var(--text)", fontWeight: 600, fontVariantNumeric: "tabular-nums" };
-
-const accountHintStyle: CSSProperties = {
-  minHeight: 42,
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--accent) 8%, var(--surface))",
-  color: "var(--text2)",
-  padding: "0 12px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 10,
-  fontSize: 12,
-};
-
-const submitStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 52,
-  borderRadius: 14,
-  border: "none",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontWeight: 800,
-  fontSize: 15,
-  cursor: "pointer",
-  display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   gap: 8,
+};
+
+const amountInputStyle: CSSProperties = {
+  width: "min(260px, 68vw)",
+  height: 88,
+  padding: 0,
+  border: "none",
+  outline: "none",
+  background: "transparent",
+  color: "var(--text)",
+  textAlign: "right",
+  fontFamily: "var(--font-body)",
+  fontVariantNumeric: "tabular-nums",
+};
+
+
+const moveNoteStyle: CSSProperties = { margin: 0, padding: "8px 12px", borderRadius: "var(--radius-control)", background: "var(--surface2)", fontSize: 12, lineHeight: 1.4, color: "var(--text2)" };
+const sameId = (a: string, b: string | null | undefined) => !!b && a.replace(/-/g, "") === b.replace(/-/g, "");
+
+const accountLineStyle: CSSProperties = { margin: 0, fontSize: 13, lineHeight: 1.45, color: "var(--text2)" };
+const accountLineAmountStyle: CSSProperties = { color: "var(--text)", fontWeight: 600, fontVariantNumeric: "tabular-nums" };
+
+// Read-only figures are plain label/value rows, never boxed or tinted like inputs.
+const accountHintStyle: CSSProperties = {
+  minHeight: 44,
+  color: "var(--text2)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  fontSize: 13,
+  lineHeight: "16px",
 };

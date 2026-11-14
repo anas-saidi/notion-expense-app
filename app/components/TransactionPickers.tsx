@@ -6,6 +6,8 @@ import type { CSSProperties } from "react";
 import type { Account, Category } from "./app-types";
 import { Money } from "./Money";
 import { useAppHaptics } from "./ui/useAppHaptics";
+import { SearchIcon } from "./ui/icons";
+import { EmptyState } from "./ui/EmptyState";
 
 /**
  * The option lists inside the composer's anchored pickers. The Add transaction
@@ -62,13 +64,14 @@ export function CategoryOptionList({ id, categories, selectedId, lastUsedId, onS
         <div style={{ display: "grid", gap: 2 }}>
           {categories.map((cat) => {
             const selected = cat.id === selectedId;
-            const meta = [cat.type[0] ?? null, cat.id === lastUsedId ? "Last used" : null].filter(Boolean).join(" / ");
+            const type = cat.type[0] ?? null;
+            const lastUsed = cat.id === lastUsedId;
             return (
               <button className="picker-option" aria-pressed={selected} key={cat.id} onClick={() => { if (!selected) haptic("selection"); onSelect(cat); }} style={optionRowStyle(selected)}>
-                <div style={pickerIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={28} /></div>
+                <div style={pickerIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: selected ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
-                  {meta && <div style={pickerMetaStyle}>{meta}</div>}
+                  {(type || lastUsed) && <div style={{ ...pickerMetaStyle, display: "flex", gap: 8 }}>{type && <span>{type}</span>}{lastUsed && <span>Last used</span>}</div>}
                 </div>
                 {cat.available !== null && (
                   <span style={{ ...monoSmallStyle, color: cat.available < 0 ? "var(--danger)" : cat.available === 0 ? "var(--muted)" : "var(--text2)", paddingLeft: 8 }}>
@@ -79,15 +82,14 @@ export function CategoryOptionList({ id, categories, selectedId, lastUsedId, onS
             );
           })}
           {categories.length === 0 && (
-            <p style={{ padding: 18, color: "var(--muted)", fontSize: 14, textAlign: "center" }}>No categories found</p>
+            <EmptyState announce>{search.trim() ? <>No categories match “{search.trim()}”.</> : "No categories."}</EmptyState>
           )}
         </div>
       </div>
-      <div style={{ padding: "10px 10px 11px", borderTop: "1px solid color-mix(in srgb, var(--border) 36%, transparent)", background: "color-mix(in srgb, var(--surface2) 10%, var(--surface))" }}>
-        <div style={{ minHeight: 44, borderRadius: 12, border: "1px solid transparent", background: "color-mix(in srgb, var(--surface2) 42%, var(--surface))", display: "flex", alignItems: "center", gap: 8, padding: "0 12px" }}>
-          <span aria-hidden="true" style={{ fontSize: 12, color: "var(--muted)" }}>/</span>
-          <input type="text" aria-label="Search categories" value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search categories" autoFocus style={{ width: "100%", background: "transparent", border: "none", padding: 0, color: "var(--text2)", outline: "none", fontSize: 16 }} />
-        </div>
+      {/* The shared picker search (.picker-search, as in ChoicePicker) with a leading search icon. */}
+      <div style={{ position: "relative" }}>
+        <SearchIcon size={16} aria-hidden="true" style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
+        <input type="text" className="picker-search" aria-label="Search categories" value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search categories" autoFocus style={{ paddingLeft: 36, fontSize: 16, boxSizing: "border-box" }} />
       </div>
     </div>
   );
@@ -100,6 +102,8 @@ export function filterCategories(categories: Category[], search: string): Catego
 }
 
 /* ─── Composer picker chip (shared glass material) ──────────────────── */
+/* The composer chips are now ScreenChip mode="action" (design.md, Composer picker chip). These styles remain
+   only for callers outside the composer that have not moved to ScreenChip yet. */
 
 export const pickerChipStyle: CSSProperties = {
   minHeight: 44,
@@ -140,10 +144,10 @@ export const pickerChipLabelStyle: CSSProperties = {
 
 export const optionRowStyle = (selected: boolean): CSSProperties => ({
   width: "100%",
-  minHeight: 54,
-  padding: "12px 14px",
+  minHeight: 48,
+  padding: 12,
   border: "none",
-  borderRadius: 16,
+  borderRadius: "var(--radius-control)",
   color: "var(--text2)",
   display: "flex",
   alignItems: "center",
@@ -159,7 +163,7 @@ export const optionRowStyle = (selected: boolean): CSSProperties => ({
 export const pickerIconStyle: CSSProperties = {
   width: 34,
   height: 34,
-  borderRadius: 12,
+  borderRadius: "var(--radius-control)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -168,7 +172,7 @@ export const pickerIconStyle: CSSProperties = {
 };
 
 const pickerMetaStyle: CSSProperties = {
-  marginTop: 3,
+  marginTop: 4,
   fontFamily: "var(--font-body)",
   fontSize: 12,
   color: "var(--muted)",

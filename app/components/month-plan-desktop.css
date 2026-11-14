@@ -20,13 +20,8 @@
 .plan-table-head > :not(:first-child), .plan-table-row > span { text-align:right; }
 /* Spans the plan and freeze columns so Copy last month ends where the table ends. */
 .plan-column-action { grid-column:4 / span 2; display:flex; justify-content:flex-end; white-space:nowrap; }
-/* Copy last month is the plan column's one action: a quiet outlined pill, right-aligned, with a 44px target. */
-.plan-copy { min-height:36px; padding:0 12px; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; font-weight:600; cursor:pointer; position:relative; }
-.plan-copy::after { content:""; position:absolute; inset:-4px 0; }
+/* Copy last month is the plan column's one action: a compact secondary Button, right-aligned. */
 .plan-amount-cell { display:flex; align-items:center; min-height:44px; margin-right:-8px; cursor:text; }
-.plan-copy:hover { background:var(--surface2); }
-.plan-copy:active { opacity:.6; }
-.plan-copy:disabled { opacity:.5; cursor:not-allowed; }
 .plan-group { padding:24px 0 8px; color:var(--muted); font-size:12px; line-height:16px; font-weight:600; }
 .plan-table-row { min-height:56px; padding-block:8px; border-radius:var(--radius-control); border-bottom:1px solid color-mix(in srgb, var(--border) 45%, transparent); font-size:14px; font-variant-numeric:tabular-nums; }
 .plan-table-row:hover { background:color-mix(in srgb, var(--surface2) 45%, transparent); }
@@ -38,7 +33,7 @@
 /* Plan cells are inline-editable numbers, like a spreadsheet: at rest they read as the third number column
    (same size, right-aligned, tabular); hover hints they're editable; focus shows a clear field. The cell's
    -8px margin lines the digits up with Spent and Last plan despite the field's inner padding. */
-.plan-amount { width:100%; min-height:32px !important; height:32px; padding:0 8px !important; border:1px solid transparent !important; border-radius:var(--radius-control) !important; background:transparent !important; color:var(--text); font-size:14px !important; font-weight:400; text-align:right; font-variant-numeric:tabular-nums; transition:border-color 120ms ease, background-color 120ms ease; }
+.plan-amount { width:100%; min-height:32px !important; height:32px; padding:0 8px !important; border:1px solid transparent !important; border-radius:var(--radius-control) !important; background:transparent !important; color:var(--text); font-size:14px !important; font-weight:400; text-align:right; font-variant-numeric:tabular-nums; transition:border-color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard); }
 .plan-amount::placeholder { color:var(--muted); opacity:.6; }
 .plan-amount:focus::placeholder { color:transparent; }
 @media (hover: hover) and (pointer: fine) { .plan-table-row:hover .plan-amount:not(:focus) { background:var(--surface2) !important; } }
@@ -59,7 +54,7 @@
 /* Sections flow top-down with even 32px spacing (no forced gap); never scrolls sideways. */
 .plan-summary-content { min-height:0; flex:1; overflow-x:hidden; overflow-y:auto; display:flex; flex-direction:column; gap:32px; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
 .plan-summary-balance { display:grid; gap:4px; color:var(--text); font-size:15px; line-height:22px; font-weight:600; }
-.plan-summary-balance strong { color:var(--text); font-size:32px; line-height:1.1; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.plan-summary-balance strong { color:var(--text); font-size:32px; line-height:1.1; font-weight:400; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
 .plan-summary-balance strong .money-currency { font-size:12px; }
 .plan-summary-balance .plan-negative { color:var(--danger); --money-decimal-color:var(--danger); }
 .plan-summary-lines { display:grid; gap:8px; margin:0; }
@@ -73,8 +68,6 @@
 .plan-summary-line dt { color:var(--text2); }
 .plan-summary-line dd { margin:0; color:var(--text); font-weight:600; text-align:right; }
 .plan-summary-actions { flex-shrink:0; margin-top:auto; display:grid; gap:12px; padding-top:16px; color:var(--text2); font-size:13px; }
-.plan-primary { min-height:48px; border:0; border-radius:var(--radius-control); background:var(--accent); color:var(--accent-ink); font:inherit; font-weight:700; cursor:pointer; }
-.plan-primary:disabled { opacity:.5; cursor:not-allowed; }
 .plan-desktop button:focus-visible { outline:2px solid var(--select-ink); outline-offset:2px; }
 
 /* The shortfall sentence sits in a narrow panel or the phone footer, so it runs a size smaller. */
@@ -86,10 +79,7 @@
 .plan-review-row .plan-category-name > span { white-space:normal; overflow-wrap:anywhere; }
 .plan-review-before { color:var(--text2); }
 .plan-review-after { color:var(--text); font-weight:600; }
-.plan-review-edit { min-height:44px; }
 .plan-desktop-heading h2:focus { outline:none; }
-.plan-primary:hover:not(:disabled) { filter:brightness(.94); }
-.plan-primary:active:not(:disabled), .plan-copy:active:not(:disabled) { opacity:.8; }
 
 /* Keep the workspace usable before the viewport is wide enough for generous columns. */
 @media (min-width:1000px) and (max-width:1199px) {
@@ -118,7 +108,7 @@
 .plan-gap:focus-visible { outline:2px solid var(--select-ink); outline-offset:2px; border-radius:var(--radius-control); }
 .plan-compare { display:grid; gap:8px; }
 .plan-compare-track { height:8px; overflow:hidden; border-radius:4px; background:var(--track); }
-.plan-compare-track > span { display:block; height:100%; border-radius:4px; background:var(--text2); transition:width 200ms ease; }
+.plan-compare-track > span { display:block; height:100%; border-radius:4px; background:var(--text2); transition:width var(--motion-standard) var(--ease-standard); }
 @media (prefers-reduced-motion:reduce) { .plan-compare-track > span { transition:none; } }
 .plan-compare-labels { display:flex; justify-content:space-between; gap:12px; color:var(--text2); font-size:13px; line-height:20px; font-variant-numeric:tabular-nums; }
 .plan-compare-labels strong { color:var(--text); font-weight:600; }
@@ -133,7 +123,7 @@
 [data-plan-scope="salma"] { --select-color:var(--partner-wife); --select-ink:var(--partner-wife-strong); --select-wash:color-mix(in srgb, var(--partner-wife) 13%, var(--surface)); --select-edge:color-mix(in srgb, var(--partner-wife) 34%, transparent); }
 .plan-mobile-scope { display:flex; justify-content:center; flex-shrink:0; padding-bottom:16px; }
 
-.plan-partner-remaining h3 { margin:0 0 8px; color:var(--muted); font-size:13px; line-height:20px; font-weight:500; }
+.plan-partner-remaining h3 { margin:0 0 8px; color:var(--muted); font-size:12px; line-height:16px; font-weight:600; }
 .plan-partner-remaining dl { display:grid; gap:8px; margin:0; }
 .plan-partner-remaining dl > div { display:flex; align-items:baseline; justify-content:space-between; gap:16px; font-size:14px; line-height:20px; }
 .plan-partner-remaining dt { color:var(--text2); }
@@ -142,7 +132,6 @@
 .plan-partner-remaining .plan-remaining-short { font-size:12px; font-weight:400; }
 .plan-draft-banner { margin-bottom:16px; }
 .planner-wrap > .plan-draft-banner { width:auto !important; margin:0 16px 16px; }
-.plan-save-draft { min-height:44px; width:100%; }
 .planner-wrap .plan-partner-remaining { width:100%; }
 
 .plan-mobile-actions { display:flex; align-items:center; gap:12px; }

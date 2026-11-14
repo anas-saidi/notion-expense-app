@@ -1,13 +1,13 @@
 /* Typed transactions, written like a margin note: your words on the left, the figure in the margin,
    small mono tags below. Two marked kinds of word (which day, which account), each in its own colour. */
-.typed, .realloc {
-  --typed-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
-  --typed-day: #b45309;
-  --typed-account: #2563c9;
-  --typed-wait: #d97706;
+/* Marks come from the semantic tokens in globals.css, so light and dark both follow :root. */
+.typed, .realloc { --typed-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; }
+.typed {
+  --typed-day: var(--warning-ink);
+  --typed-account: color-mix(in srgb, var(--info) 58%, var(--text));
+  --typed-wait: var(--warning-ink);
 }
 .typed { flex-direction: column; flex: 1 1 auto; min-height: 0; }
-html[data-theme="dark"] :is(.typed, .realloc) { --typed-day: #f0a35a; --typed-account: #7cb2f5; --typed-wait: #fbbf24; }
 .typed-scroll { flex: 1 1 auto; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; padding-top: 16px; }
 .typed-lines { display: grid; gap: 20px; }
 .typed-line-main { display: flex; align-items: flex-start; gap: 12px; }
@@ -57,12 +57,6 @@ button.typed-tag:not(:disabled):active { opacity: .7; }
 .typed-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
 .typed-total { font-family: var(--typed-mono); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
 .typed-total > span { font-family: inherit; font-size: 12px; font-weight: 400; color: var(--muted); }
-.typed-primary {
-  min-height: 44px; padding: 0 18px; display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px;
-  background: var(--text); color: var(--bg); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0;
-}
-.typed-primary[data-quiet], .typed-primary:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; }
-.typed-primary:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 3px; }
 
 /* Typing-mode header: "Today" as a title, the date in small mono capitals underneath (no chip, no icon). */
 button.typed-day { display: grid; justify-items: start; gap: 2px; min-height: 44px; padding: 2px 8px 2px 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
@@ -122,7 +116,7 @@ button.typed-back:focus-visible { outline: 2px solid var(--select-ink); outline-
 .realloc-thinking { margin: 0; font-size: 13px; line-height: 18px; }
 .realloc-explanation { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text2); }
 .realloc-result { display: grid; gap: 12px; }
-.realloc-moves { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.realloc-moves { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
 .realloc-moves .typed-line-main { align-items: baseline; }
 .realloc-move { flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 1.4; color: var(--text); }
 .realloc-move > span[aria-hidden] { color: var(--muted); padding: 0 2px; }

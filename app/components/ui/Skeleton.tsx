@@ -1,14 +1,21 @@
+"use client";
+
 import "./screen-hero.css";
 import { SCREEN_HERO_MASCOT_SIZE } from "./hero-tokens";
-import type { CSSProperties, ReactNode } from "react";
+import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
 
 /** One visual treatment for pending content; decorative shapes stay out of the accessibility tree. */
 export function Skeleton({ style, blob = false }: { style?: CSSProperties; blob?: boolean }) {
   return <span aria-hidden="true" className={blob ? "skeleton skeleton--blob" : "skeleton"} style={{ display: "block", height: 14, width: "100%", ...style }} />;
 }
 
+const InsideRegion = createContext(false);
+
+/** One status region per loading area; a region inside another one renders as a plain wrapper, so it is announced once. */
 export function SkeletonRegion({ label, children, style }: { label: string; children: ReactNode; style?: CSSProperties }) {
-  return <div role="status" aria-label={label} aria-busy="true" style={style}>{children}</div>;
+  const nested = useContext(InsideRegion);
+  if (nested) return <div style={style}>{children}</div>;
+  return <InsideRegion.Provider value={true}><div role="status" aria-label={label} aria-busy="true" style={style}>{children}</div></InsideRegion.Provider>;
 }
 
 /**
@@ -24,9 +31,14 @@ export function HeroSkeleton({ label = "Loading monthly details", size = SCREEN_
   </SkeletonRegion>;
 }
 
+/**
+ * Rows shaped like TransactionRow (icon, title over subtitle, amount over date). One status region of its own:
+ * never wrap it in another SkeletonRegion. `iconSize` 44 or 60 matches plan and budget category rows.
+ */
 export function SkeletonRows({ label = "Loading activity", count = 3, iconSize = 24 }: { label?: string; count?: number; iconSize?: number }) {
   return <SkeletonRegion label={label}>
-    {Array.from({ length: count }, (_, index) => <div key={index} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0" }}>
+    {/* Each row keeps TransactionRow's 64px minimum, so loaded rows replace it without a shift. */}
+    {Array.from({ length: count }, (_, index) => <div key={index} style={{ boxSizing: "border-box", minHeight: 64, display: "flex", alignItems: "center", gap: 12, padding: "14px 0" }}>
       <Skeleton style={{ width: iconSize, height: iconSize, borderRadius: iconSize > 32 ? 18 : 6, flexShrink: 0 }} />
       <div style={{ flex: 1, display: "grid", gap: 7, minWidth: 0 }}>
         <Skeleton style={{ width: `${index % 2 ? 48 : 60}%`, height: 13 }} />

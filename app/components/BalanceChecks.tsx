@@ -1,6 +1,7 @@
 "use client";
 
-import { Banner, bannerTextActionStyle } from "./ui/Banner";
+import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
 import type { Account, BudgetScope } from "./app-types";
 import { accountKey } from "../../lib/balance-checks";
 import type { BalanceCheckView, BalanceCountReview } from "../../lib/balance-checks";
@@ -24,6 +25,6 @@ export function PendingBalanceChecks({ error, paused = false, loading, onRetry }
   return <section className="balance-check-notices" aria-label="Balance checks" style={{ display: "grid", gap: 12, marginBottom: 20 }}>
     {paused
       ? <Banner desktopInline tone="neutral" role="status" compact>{error}</Banner>
-      : <Banner desktopInline tone="warning" role="alert" compact action={<button type="button" style={bannerTextActionStyle} onClick={onRetry} disabled={loading}>Retry</button>}>{error}</Banner>}
+      : <Banner desktopInline tone="warning" role="alert" compact action={<Button variant="quiet" size="compact" onClick={onRetry} disabled={loading}>Retry</Button>}>{error}</Banner>}
   </section>;
 }

@@ -91,7 +91,11 @@ function sentence(answer: LedgerAnswer, categories: Category[]) {
   const subject = lookup.search ? `"${lookup.search}"` : names.length ? names.join(" and ") : lookup.type === "Income" ? "Money in" : "Spending";
   const period = when(lookup.period);
   const amount = (value: number) => <Fact>{fmt(Math.round(value))}</Fact>;
-  if (count === 0 && lookup.kind !== "compare") return <>Nothing found for {subject} {period}.</>;
+  if (count === 0 && lookup.kind !== "compare") {
+    const income = lookup.type === "Income";
+    const target = lookup.search ? `“${lookup.search}”` : names.join(" and ");
+    return <>No {income ? "income" : "spending"}{target ? ` ${income ? "from" : "on"} ${target}` : ""} {period}.</>;
+  }
   if (lookup.kind === "compare" && lookup.compare) {
     const other = when(lookup.compare);
     const before = compareTotal ?? 0;

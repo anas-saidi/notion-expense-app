@@ -6,7 +6,7 @@ import { SheetHeader } from "./ui/SheetLayout";
 import { changeBalanceCheck } from "../../lib/balance-check-actions";
 import { money, type BalanceCheckView } from "../../lib/balance-checks";
 import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
-import { DatePicker } from "./DatePicker";
+import { DatePicker, MonthPicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
 
 import { useState, useMemo, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
@@ -16,6 +16,11 @@ import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveCo
 import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
+import { ScreenChip } from "./ui/ScreenChip";
+import { EmptyState } from "./ui/EmptyState";
+import { LiquidSegments } from "./ui/LiquidGlass";
+import { SavingCover, useBlockingSave } from "./ui/SavingCover";
 import { TransactionRow } from "./ui/TransactionRow";
 import { Money, Currency } from "./Money";
 import type { Account, Category, Transaction } from "./app-types";
@@ -25,12 +30,8 @@ import {
   TransferIcon,
   ScaleIcon,
   XIcon,
-  CheckIcon,
   ArrowLeftIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
   ChevronLeftIcon,
-  ChevronRightIcon,
   PlusIcon,
   TrendingUpIcon,
 } from "./ui/icons";
@@ -55,8 +56,6 @@ type AccountDetailsSheetProps = {
   /** Desktop Accounts panel: render into this pane instead of opening a dialog. */
   embedIn?: HTMLElement | null;
 };
-
-type ReconcileStatus = "idle" | "saving" | "success" | "error";
 
 type AddedTxn = {
   id: string;
@@ -95,10 +94,11 @@ export function AccountDetailsSheet({
   const reducedMotion = useReducedMotion();
   const [showReconcile, setShowReconcile] = useState(false);
   const [checkVersion, setCheckVersion] = useState<string | null>(null);
-  const [checkSaving, setCheckSaving] = useState(false);
+  // Every write here (check save or resolve, reconcile, missed transaction, undo) blocks the sheet with one cover.
+  const save = useBlockingSave();
+  const [saveLabel, setSaveLabel] = useState("Saving");
   const [checkMessage, setCheckMessage] = useState<string | null>(null);
   const [actualBalance, setActualBalance] = useState("");
-  const [reconcileStatus, setReconcileStatus] = useState<ReconcileStatus>("idle");
   const [reconcileError, setReconcileError] = useState("");
   const [liveBalance, setLiveBalance] = useState(0);
   const [addedTxns, setAddedTxns] = useState<AddedTxn[]>([]);
@@ -108,7 +108,6 @@ export function AccountDetailsSheet({
   const [txnName, setTxnName] = useState("");
   const [txnCategoryId, setTxnCategoryId] = useState("");
   const [txnDate, setTxnDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [txnSaving, setTxnSaving] = useState(false);
   const [txnError, setTxnError] = useState("");
 
   // Balance history chart
@@ -128,7 +127,6 @@ export function AccountDetailsSheet({
       setCheckVersion(balanceCheck?.version ?? null);
       setCheckMessage(null);
       setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : savedCountForReview != null ? String(savedCountForReview) : "");
-      setReconcileStatus("idle");
       setReconcileError("");
       setAddedTxns([]);
       setShowAddTxn(false);
@@ -203,22 +201,13 @@ export function AccountDetailsSheet({
     return { points, daysInMonth, todayDay, netChange };
   }, [chartTxns, chartMonth, account]);
 
-  const shiftChartMonth = (delta: number) => {
-    const [y, m] = chartMonth.split("-").map(Number);
-    const d = new Date(y, m - 1 + delta, 1);
-    const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    if (delta > 0 && next > CURRENT_MONTH()) return;
-    setChartMonth(next);
-  };
-  const canGoNext = chartMonth < CURRENT_MONTH();
   const xTicks = [1, Math.round(chartData.daysInMonth / 2), chartData.daysInMonth]
     .filter(t => t <= chartData.todayDay);
 
   const handleClose = () => {
-    if (checkSaving || txnSaving || reconcileStatus === "saving") return;
+    if (save.saving) return;
     setShowReconcile(false);
     setActualBalance("");
-    setReconcileStatus("idle");
     setReconcileError("");
     setShowChart(false);
     setChartTxns([]);
@@ -230,12 +219,10 @@ export function AccountDetailsSheet({
 
   const reconcileBackRef = useRef<HTMLButtonElement>(null);
   const checkButtonRef = useRef<HTMLButtonElement>(null);
-  const reconcileBusy = checkSaving || txnSaving || reconcileStatus === "saving";
   const closeReconcile = () => {
-    if (checkSaving || txnSaving || reconcileStatus === "saving") return;
+    if (save.saving) return;
     setShowReconcile(false);
     setActualBalance("");
-    setReconcileStatus("idle");
     setReconcileError("");
     setShowAddTxn(false);
     setAddedTxns([]);
@@ -317,10 +304,10 @@ export function AccountDetailsSheet({
   const txnBelowZero = txnCategory?.available != null && txnParsed > txnCategory.available + 0.005 ? txnParsed - txnCategory.available : 0;
 
   const changeCheck = async (action: "save" | "close") => {
-    if (!account || checkSaving) return;
-    setCheckSaving(true); setReconcileError(""); setCheckMessage(null);
+    if (!account || save.saving) return;
+    setReconcileError(""); setCheckMessage(null); setSaveLabel("Saving");
     try {
-      await changeBalanceCheck({ action, accountId: account.id, actualBalance: parsedActual, expectedVersion: checkVersion }, {
+      await save.run(() => changeBalanceCheck({ action, accountId: account.id, actualBalance: parsedActual, expectedVersion: checkVersion }, {
         committed: check => {
           setCheckVersion(check?.version ?? null);
           onBalanceCheckSaved?.(account.id, check);
@@ -328,16 +315,15 @@ export function AccountDetailsSheet({
         },
         refresh: onBalanceCheckChanged,
         refreshFailed: () => setCheckMessage(action === "save" ? "Balance check saved. Refresh to update other checks." : "Balance check resolved. Refresh to update other checks."),
-      });
+      }));
     } catch (error) { setReconcileError(error instanceof Error ? error.message : "Could not save the check."); }
-    finally { setCheckSaving(false); }
   };
 
   const submitReconcile = async () => {
     if (!account || !Number.isFinite(parsedActual)) return;
-    setReconcileStatus("saving");
-    setReconcileError("");
+    setReconcileError(""); setSaveLabel("Saving");
     try {
+      await save.run(async () => {
       const res = await fetch("/api/reconciliations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -350,19 +336,18 @@ export function AccountDetailsSheet({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not reconcile");
-      setReconcileStatus("success");
+      // The reconciliation is saved; a failed refresh of other checks must not read as a failed save.
+      try { await onBalanceCheckChanged?.(); } catch { /* the page refresh reports its own errors */ }
+      });
+      // The page's toast is the only confirmation; the step closes straight away.
       onReconcileSuccess(`${account.label} reconciled`);
-      await onBalanceCheckChanged?.();
-      setTimeout(() => {
-        setShowReconcile(false);
-        setActualBalance("");
-        setReconcileStatus("idle");
-        setAddedTxns([]);
-        setShowAddTxn(false);
-      }, 1800);
+      setShowReconcile(false);
+      setActualBalance("");
+      setAddedTxns([]);
+      setShowAddTxn(false);
+      requestAnimationFrame(() => checkButtonRef.current?.focus({ preventScroll: true }));
     } catch (e: unknown) {
-      setReconcileStatus("error");
-      setReconcileError(e instanceof Error ? e.message : "Failed");
+      setReconcileError(e instanceof Error ? e.message : "Could not reconcile. The balance is unchanged.");
     }
   };
 
@@ -377,10 +362,10 @@ export function AccountDetailsSheet({
       setTxnError("Choose a category");
       return;
     }
-    setTxnSaving(true);
-    setTxnError("");
+    setTxnError(""); setSaveLabel("Saving");
     const name = txnName.trim() || (txnType === "Expense" ? "Missed expense" : "Missed income");
     try {
+      await save.run(async () => {
       const res = await fetch(txnType === "Expense" ? "/api/expense" : "/api/monthly-income", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -409,18 +394,18 @@ export function AccountDetailsSheet({
         await onBalanceCheckChanged?.();
       }
       onTransactionsChanged?.();
+      });
     } catch (e: unknown) {
       setTxnError(e instanceof Error ? e.message : "Could not add transaction");
-    } finally {
-      setTxnSaving(false);
     }
   };
 
   const undoAddedTxn = async (id: string) => {
     const removed = addedTxns.find(t => t.id === id);
-    if (!removed || txnSaving) return;
-    setTxnSaving(true); setTxnError("");
+    if (!removed || save.saving) return;
+    setTxnError(""); setSaveLabel("Deleting");
     try {
+      await save.run(async () => {
       const response = await fetch("/api/transactions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not undo the transaction.");
@@ -428,8 +413,8 @@ export function AccountDetailsSheet({
       setLiveBalance(prev => prev - (removed.type === "Income" ? removed.amount : -removed.amount));
       onTransactionsChanged?.();
       await onBalanceCheckChanged?.();
+      });
     } catch (error) { setTxnError(error instanceof Error ? error.message : "Could not undo the transaction."); }
-    finally { setTxnSaving(false); }
   };
 
   if (!account) return null;
@@ -442,14 +427,14 @@ export function AccountDetailsSheet({
         {/* Header */}
         <SheetHeader className="account-desktop-header" style={headerStyle}>
           <div style={acctIdentityStyle}>
-            <div style={iconCircleStyle}><CategoryIcon icon={accountIconSource(account.type)} size={30} /></div>
+            <div style={iconCircleStyle}><CategoryIcon icon={accountIconSource(account.type)} size={24} /></div>
             <div>
               <h2 style={acctNameStyle}>{account.label}</h2>
               {account.type && <p style={acctTypeStyle}>{account.type}</p>}
             </div>
           </div>
-          {!embedIn && <button onClick={handleClose} aria-label="Close" style={closeStyle}>
-            <XIcon strokeWidth={2.2} />
+          {!embedIn && <button type="button" className="sheet-close-button" onClick={handleClose} aria-label="Close">
+            <XIcon size={20} />
           </button>}
         </SheetHeader>
 
@@ -459,16 +444,15 @@ export function AccountDetailsSheet({
           // so the month's activity stays in view to spot a missing transaction.
           <motion.section key="check" aria-label="Check balance" style={reconcilePanelStyle}
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 16 }} animate={reducedMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
-            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}>
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
             <div style={reconcileHeaderStyle}>
-              <button type="button" ref={reconcileBackRef} onClick={closeReconcile} disabled={reconcileBusy} aria-label={`Back to ${account.label}`} style={reconcileBackStyle}><ChevronLeftIcon size={20} strokeWidth={2.2} /></button>
-              <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+              <button type="button" ref={reconcileBackRef} onClick={closeReconcile} aria-label={`Back to ${account.label}`} style={reconcileBackStyle}><ChevronLeftIcon size={20} /></button>
+              <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
                 <h3 style={reconcileTitleStyle}>Check balance</h3>
                 {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
               </div>
             </div>
-            {/* While a save runs, the whole form is read-only: a changed number would no longer match what is being saved. */}
-            <fieldset disabled={reconcileBusy} aria-busy={reconcileBusy || undefined} style={reconcileLockStyle}>
+            {/* While a save runs, SavingCover makes the whole sheet read-only: a changed number would no longer match what is being saved. */}
             <div style={reconcileRowStyle}>
               <label style={reconcileFieldStyle}>
                 <span style={reconcileLabelStyle}>App balance</span>
@@ -507,33 +491,17 @@ export function AccountDetailsSheet({
             {((difference !== null && difference !== 0) || showAddTxn || addedTxns.length > 0) && <div style={addTxnSectionStyle}>
               <div style={addTxnHeaderRowStyle}>
                 <p style={addTxnHintStyle}>Missing a transaction before this count?</p>
-                <button
-                  type="button"
-                  onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }}
-                  style={addTxnToggleStyle}
-                >
-                  {showAddTxn ? "Cancel" : <><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" />Add</>}
-                </button>
+                <Button variant="quiet" size="compact" icon={showAddTxn ? undefined : <PlusIcon />} onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }} style={{ flexShrink: 0 }}>
+                  {showAddTxn ? "Cancel" : "Add"}
+                </Button>
               </div>
 
               {showAddTxn && (
                 <div style={addTxnFormStyle}>
-                  <div style={txnTypeToggleStyle}>
-                    <button
-                      type="button"
-                      onClick={() => setTxnType("Expense")}
-                      style={txnTypePillStyle(txnType === "Expense")}
-                    >
-                      Expense
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTxnType("Income")}
-                      style={txnTypePillStyle(txnType === "Income")}
-                    >
-                      Income
-                    </button>
-                  </div>
+                  {/* The composer's transaction type control, so the choice is exposed as a selection. */}
+                  <LiquidSegments aria-label="Transaction type" value={txnType}
+                    onValueChange={value => { if (value === "Expense" || value === "Income") setTxnType(value); }}
+                    items={[{ value: "Expense", label: "Expense" }, { value: "Income", label: "Income" }]} />
 
                   <div style={reconcileInputWrapStyle}>
                     <input
@@ -542,6 +510,7 @@ export function AccountDetailsSheet({
                       value={txnAmount}
                       onChange={e => setTxnAmount(e.target.value)}
                       placeholder="Amount"
+                      aria-label="Amount"
                       style={reconcileInputStyle}
                     />
                     <Currency style={reconcileCurrencyStyle} />
@@ -552,14 +521,14 @@ export function AccountDetailsSheet({
                     value={txnName}
                     onChange={e => setTxnName(e.target.value)}
                     placeholder={txnType === "Expense" ? "What was it? (optional)" : "Source (optional)"}
-                    style={txnTextInputStyle}
+                    aria-label="Description"
+                    className="field-input"
                   />
 
                   {txnType === "Expense" && (
                     <ChoicePicker aria-label="Category"
                       value={txnCategoryId}
                       onChange={e => setTxnCategoryId(e.target.value)}
-                      style={txnSelectStyle}
                     >
                       <option value="">Category…</option>
                       {activeCategories.map(c => (
@@ -577,15 +546,9 @@ export function AccountDetailsSheet({
                   {txnBelowZero > 0 && txnCategory && <Banner tone="warning" compact><strong>{txnCategory.name}</strong> goes <strong>{fmt(Math.round(txnBelowZero))}</strong> below zero.</Banner>}
                   {txnError && <Banner role="alert" tone="danger" compact>{txnError}</Banner>}
 
-                  <button
-                    type="button"
-                    onClick={submitAddTxn}
-                    disabled={txnSaving || reconcileStatus === "saving" || reconcileStatus === "success"}
-                    style={{ ...txnAddBtnStyle, opacity: txnSaving ? 0.7 : 1 }}
-                  >
-                    {txnSaving && <span style={spinnerStyle} />}
-                    {txnSaving ? "Adding…" : txnBelowZero > 0 ? "Save anyway" : `Add ${txnType.toLowerCase()}`}
-                  </button>
+                  <Button variant="secondary" block onClick={() => void submitAddTxn()}>
+                    {txnBelowZero > 0 ? "Save anyway" : `Add ${txnType.toLowerCase()}`}
+                  </Button>
                 </div>
               )}
 
@@ -606,7 +569,7 @@ export function AccountDetailsSheet({
                         aria-label={`Remove ${t.name}`}
                         style={undoBtnStyle}
                       >
-                        <XIcon size={13} strokeWidth={2.2} />
+                        <XIcon size={16} />
                       </button>
                     </div>
                   ))}
@@ -619,77 +582,34 @@ export function AccountDetailsSheet({
               <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
             )}
             {(() => {
-              // One main button that follows the difference; saving the count for later stays a quiet link.
-              const busy = checkSaving || txnSaving || reconcileStatus === "saving";
+              // One main button that follows the difference; saving the count for later stays a quiet action.
               const canResolve = Boolean(checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0);
-              const showSaveLink = Number.isFinite(parsedActual) && !isFullyReconciled && reconcileStatus !== "success";
+              const showSaveLink = Number.isFinite(parsedActual) && !isFullyReconciled;
               return <>
                 {canResolve ? (
-                  <button type="button" onClick={() => void changeCheck("close")} disabled={busy}
-                    style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)" }}>
-                    {checkSaving ? "Saving…" : "Mark resolved"}
-                  </button>
+                  <Button variant="primary" block onClick={() => void changeCheck("close")} style={{ marginTop: 8 }}>Mark resolved</Button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={submitReconcile}
-                    disabled={!Number.isFinite(parsedActual) || busy || reconcileStatus === "success"}
-                    style={{
-                      ...reconcileSubmitStyle,
-                      opacity: !Number.isFinite(parsedActual) ? 0.42 : 1,
-                      background: reconcileStatus === "success"
-                        ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
-                        : reconcileStatus === "error"
-                        ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
-                        : "var(--accent)",
-                      color: reconcileStatus === "success"
-                        ? "var(--success)"
-                        : reconcileStatus === "error"
-                        ? "var(--danger)"
-                        : "var(--accent-ink)",
-                    }}
-                  >
-                    {reconcileStatus === "saving" && (
-                      <span style={spinnerStyle} />
-                    )}
-                    {reconcileStatus === "success" && <CheckIcon size={15} />}
-                    {reconcileStatus === "saving" ? "Saving..." :
-                     reconcileStatus === "success" ? "Reconciled" :
-                     reconcileStatus === "error" ? "Retry" :
-                     isFullyReconciled ? "Mark as reconciled" :
-                     "Reconcile difference"}
-                  </button>
+                  <Button variant="primary" block onClick={() => void submitReconcile()} disabled={!Number.isFinite(parsedActual)} style={{ marginTop: 8 }}>
+                    {isFullyReconciled ? "Mark as reconciled" : "Reconcile difference"}
+                  </Button>
                 )}
                 {showSaveLink && (
-                  <button type="button" onClick={() => void changeCheck("save")} disabled={busy} style={saveForLaterLinkStyle}>
-                    {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : savedCountForReview != null ? "Confirm balance" : "Save for later"}
-                  </button>
+                  <Button variant="quiet" size="compact" onClick={() => void changeCheck("save")} style={{ alignSelf: "center" }}>
+                    {checkVersion ? "Update actual balance" : savedCountForReview != null ? "Confirm balance" : "Save for later"}
+                  </Button>
                 )}
               </>;
             })()}
-            </fieldset>
           </motion.section>
         ) : (<>
         {/* Balance hero */}
         <div style={heroStyle}>
           <div style={heroTopRowStyle}>
             <p style={heroLabelStyle}>Current balance</p>
-            <button
-              type="button"
-              onClick={() => setShowChart(v => !v)}
-              aria-label={showChart ? "Hide balance history" : "Show balance history"}
-              aria-pressed={showChart}
-              style={{
-                ...chartToggleBtnStyle,
-                background: showChart
-                  ? "var(--select-wash)"
-                  : "transparent",
-                color: showChart ? "var(--select-ink)" : "var(--muted)",
-              }}
-            >
-              <TrendingUpIcon size={13} strokeWidth={2} />
+            <ScreenChip mode="filter" selected={showChart} onClick={() => setShowChart(v => !v)}
+              ariaLabel={showChart ? "Hide balance history" : "Show balance history"} icon={<TrendingUpIcon size={16} />}>
               History
-            </button>
+            </ScreenChip>
           </div>
           <p style={{ ...heroValueStyle, color: isNegative ? "var(--danger)" : "var(--text)" }}>
             <Money value={liveBalance} absolute={isNegative} currency animated />
@@ -705,30 +625,13 @@ export function AccountDetailsSheet({
         {/* Balance history chart */}
         {showChart && (
           <div style={chartPanelStyle}>
-            {/* Month nav */}
+            {/* Period filter inside a detail sheet: the shared month chip, not steppers. */}
             <div style={chartNavStyle}>
-              <button
-                type="button"
-                onClick={() => shiftChartMonth(-1)}
-                aria-label="Previous month"
-                style={chartNavBtnStyle}
-              >
-                <ChevronLeftIcon size={14} strokeWidth={2.5} />
-              </button>
-              <span style={chartMonthLabelStyle}>{fmtMonth(chartMonth)}</span>
-              <button
-                type="button"
-                onClick={() => shiftChartMonth(1)}
-                disabled={!canGoNext}
-                aria-label="Next month"
-                style={{ ...chartNavBtnStyle, opacity: canGoNext ? 1 : 0.28 }}
-              >
-                <ChevronRightIcon size={14} strokeWidth={2.5} />
-              </button>
+              <MonthPicker value={chartMonth} max={CURRENT_MONTH()} onChange={event => event.target.value && setChartMonth(event.target.value)} aria-label="Balance history month" variant="chip" />
             </div>
 
             {chartLoading ? (
-              <SkeletonRegion label="Loading account chart" style={chartLoadingStyle}>
+              <SkeletonRegion label="Loading account chart">
                 <Skeleton style={{ height: 148, borderRadius: 12 }} />
               </SkeletonRegion>
             ) : (
@@ -759,11 +662,11 @@ export function AccountDetailsSheet({
                     <Tooltip
                       contentStyle={{
                         background: "var(--surface)",
-                        border: "1px solid var(--border2)",
-                        borderRadius: 10,
+                        border: "none",
+                        borderRadius: "var(--radius-control)",
                         fontSize: 12,
                         color: "var(--text2)",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                        boxShadow: "var(--elevation-float)",
                       }}
                       formatter={(value) => [fmt(Number(value)), "Balance"]}
                       labelFormatter={day => `Day ${day}`}
@@ -798,36 +701,36 @@ export function AccountDetailsSheet({
           </div>
         )}
 
-        {/* Stat pills — only visible when chart is open */}
+        {/* Month totals: passive figures, so plain label and value (not pills). Only with the chart open. */}
         {showChart && (totalSpentFromAcct > 0 || totalIncomeToAcct > 0) && (
-          <div style={statsRowStyle}>
+          <dl style={statsRowStyle}>
             {totalSpentFromAcct > 0 && (
-              <div style={{ ...statPillStyle, background: "var(--surface2)" }}>
-                <ArrowDownIcon size={13} strokeWidth={2.5} style={{ color: "var(--muted)", flexShrink: 0 }} aria-label="Out" />
-                <strong style={{ ...statValueStyle, color: "var(--text2)" }}><Money value={totalSpentFromAcct} /></strong>
+              <div style={statItemStyle}>
+                <dt style={statLabelStyle}>Out</dt>
+                <dd style={statValueStyle}><Money value={totalSpentFromAcct} /></dd>
               </div>
             )}
             {totalIncomeToAcct > 0 && (
-              <div style={{ ...statPillStyle, background: "var(--surface2)" }}>
-                <ArrowUpIcon size={13} strokeWidth={2.5} style={{ color: "var(--muted)", flexShrink: 0 }} aria-label="In" />
-                <strong style={{ ...statValueStyle, color: "var(--text2)" }}><Money value={totalIncomeToAcct} /></strong>
+              <div style={statItemStyle}>
+                <dt style={statLabelStyle}>In</dt>
+                <dd style={statValueStyle}><Money value={totalIncomeToAcct} /></dd>
               </div>
             )}
-          </div>
+          </dl>
         )}
 
         {/* Category breakdown, history panel only */}
         {showChart && catBreakdown.length > 0 && (
           <div style={sectionStyle}>
             <p style={sectionLabelStyle}>Top categories</p>
-            <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "grid", gap: 12 }}>
               {catBreakdown.map(({ cat, total }) => {
                 if (!cat) return null;
                 const pct = Math.round((total / maxCatSpend) * 100);
                 return (
                   <div key={cat.id} style={catRowStyle}>
                     <div style={catIconWrapStyle}>
-                      <CategoryIcon icon={cat.icon} categoryName={cat.name} size={15} />
+                      <CategoryIcon icon={cat.icon} categoryName={cat.name} size={16} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 4 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
@@ -848,19 +751,19 @@ export function AccountDetailsSheet({
         {/* Action buttons */}
         <div style={actionsRowStyle}>
           <ActionBtn
-            icon={<TransferIcon size={18} strokeWidth={2.2} />}
+            icon={<TransferIcon size={20} />}
             label="Move"
             ariaLabel="Move money"
             onClick={() => { handleClose(); onMove(account); }}
           />
           <ActionBtn
-            icon={<BanknoteIcon size={18} strokeWidth={2.2} />}
+            icon={<BanknoteIcon size={20} />}
             label="Add income"
             ariaLabel="Add income"
             onClick={() => { handleClose(); onIncome(account); }}
           />
           <ActionBtn
-            icon={<ScaleIcon size={18} strokeWidth={2.2} />}
+            icon={<ScaleIcon size={20} />}
             label="Check balance"
             ariaLabel="Check balance"
             buttonRef={checkButtonRef}
@@ -883,9 +786,9 @@ export function AccountDetailsSheet({
                 <p style={sectionLabelStyle}>Activity in {fmtMonth(homeMonth)}</p>
               </div>
               {shownTxns.length === 0 ? (
-                <p style={emptyStyle}>No activity in {fmtMonth(homeMonth)}.</p>
+                <EmptyState>No activity in {fmtMonth(homeMonth)}.</EmptyState>
               ) : (
-                <div className="row-list" style={{ display: "grid", gap: 6 }}>
+                <div className="row-list" style={{ display: "grid", gap: 8 }}>
                   {shownTxns.map(t => {
                     const cat = t.category ? categories.find(c => c.id === t.category) : null;
                     const isIncome = t.type === "Income";
@@ -902,7 +805,7 @@ export function AccountDetailsSheet({
                         tone={isIncome ? "income" : isTransferIn || isTransferOut ? "transfer" : "expense"}
                         prefix={prefix}
                         date={t.date ? fmtDate(t.date) : undefined}
-                        icon={isIncome ? <BanknoteIcon size={15} /> : isTransferIn || isTransferOut ? <TransferIcon size={15} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={20} />}
+                        icon={isIncome ? <BanknoteIcon size={16} /> : isTransferIn || isTransferOut ? <TransferIcon size={16} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={20} />}
                       />
                     );
                   })}
@@ -917,7 +820,8 @@ export function AccountDetailsSheet({
   );
 
   // On desktop the Accounts panel shows this account beside the list: same content, no dialog of its own.
-  if (embedIn) return createPortal(body, embedIn);
+  // Embedded, the cover takes the whole screen so the Accounts list beside it is blocked too.
+  if (embedIn) return createPortal(<>{body}<SavingCover saving={save.saving} label={saveLabel} fill="screen" /></>, embedIn);
 
   return (
     <BottomSheet
@@ -934,6 +838,7 @@ export function AccountDetailsSheet({
       contentStyle={{ paddingTop: 0 }}
     >
       {body}
+      <SavingCover saving={save.saving} label={saveLabel} />
     </BottomSheet>
   );
 }
@@ -943,7 +848,7 @@ function ActionBtn({
   label,
   ariaLabel,
   onClick,
-  bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
+  bg = "var(--surface2)",
   ink = "var(--text2)",
   buttonRef,
 }: {
@@ -972,15 +877,14 @@ function ActionBtn({
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const panelStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 97%, var(--surface))",
   borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
 const innerStyle: CSSProperties = {
-  padding: "18px 18px 36px",
+  padding: "16px 24px calc(24px + env(safe-area-inset-bottom, 0px))",
   display: "grid",
-  gap: 20,
+  gap: 24,
 };
 
 const headerStyle: CSSProperties = {
@@ -999,41 +903,29 @@ const acctIdentityStyle: CSSProperties = {
 const iconCircleStyle: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
+  borderRadius: "var(--radius-control)",
+  background: "var(--surface2)",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 22,
   flexShrink: 0,
 };
 
 const acctNameStyle: CSSProperties = {
-  fontSize: 15,
-  fontWeight: 700,
-  color: "var(--text2)",
-  lineHeight: 1.2,
+  margin: 0,
+  fontSize: 20,
+  lineHeight: "24px",
+  fontWeight: 600,
+  color: "var(--text)",
 };
 
 const acctTypeStyle: CSSProperties = {
-  marginTop: 2,
-  fontSize: 12,
+  margin: "4px 0 0",
+  fontSize: 13,
+  lineHeight: "16px",
   color: "var(--muted)",
-  
-  fontWeight: 600,
 };
 
-const closeStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
 
 const heroStyle: CSSProperties = {
   display: "grid",
@@ -1048,21 +940,6 @@ const heroTopRowStyle: CSSProperties = {
   justifyContent: "space-between",
 };
 
-const chartToggleBtnStyle: CSSProperties = {
-  minHeight: 32,
-  padding: "0 10px",
-  gap: 5,
-  fontSize: 12,
-  fontWeight: 600,
-  borderRadius: 999,
-  border: "none",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  transition: "background 0.15s ease, color 0.15s ease",
-  flexShrink: 0,
-};
 
 const chartPanelStyle: CSSProperties = {
   display: "grid",
@@ -1073,50 +950,22 @@ const chartPanelStyle: CSSProperties = {
 const chartNavStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between",
-  gap: 8,
 };
 
-const chartNavBtnStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: 8,
-  border: "none",
-  background: "color-mix(in srgb, var(--surface2) 60%, var(--surface))",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
 
-const chartMonthLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  color: "var(--text2)",
-  flex: 1,
-  textAlign: "center",
-};
 
-const chartLoadingStyle: CSSProperties = {
-  height: 148,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
 
 const chartFooterStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  paddingTop: 2,
 };
 
 const heroLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  
+  margin: 0,
+  fontSize: 13,
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--muted)",
 };
 
@@ -1131,31 +980,35 @@ const heroValueStyle: CSSProperties = {
 };
 
 const heroSubStyle: CSSProperties = {
-  marginTop: 6,
-  fontSize: 12,
+  marginTop: 4,
+  fontSize: 13,
+  lineHeight: "16px",
   color: "var(--muted)",
   fontVariantNumeric: "tabular-nums",
 };
 
 const statsRowStyle: CSSProperties = {
   display: "flex",
-  gap: 8,
+  gap: 24,
+  margin: 0,
 };
 
-const statPillStyle: CSSProperties = {
-  flex: 1,
-  minHeight: 46,
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--surface2) 46%, var(--surface))",
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "0 14px",
+const statItemStyle: CSSProperties = {
+  display: "grid",
+  gap: 4,
+};
+
+const statLabelStyle: CSSProperties = {
+  fontSize: 13,
+  lineHeight: "16px",
+  color: "var(--muted)",
 };
 
 const statValueStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 700,
+  margin: 0,
+  fontSize: 15,
+  lineHeight: "22px",
+  fontWeight: 600,
   color: "var(--text2)",
   fontVariantNumeric: "tabular-nums",
 };
@@ -1168,8 +1021,8 @@ const actionsRowStyle: CSSProperties = {
 
 const actionBtnStyle: CSSProperties = {
   minHeight: 64,
-  padding: "8px 6px",
-  borderRadius: 14,
+  padding: 8,
+  borderRadius: "var(--radius-control)",
   border: "none",
   cursor: "pointer",
   display: "inline-flex",
@@ -1177,19 +1030,19 @@ const actionBtnStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: 4,
-  transition: "background 0.15s ease, color 0.15s ease",
+  transition: "background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard)",
 };
 
 const actionLabelStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
+  lineHeight: "16px",
   fontWeight: 600,
-  lineHeight: 1.2,
   textAlign: "center",
 };
 
 const actionIconStyle: CSSProperties = {
-  width: 22,
-  height: 22,
+  width: 20,
+  height: 20,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -1199,7 +1052,7 @@ const actionIconStyle: CSSProperties = {
 const reconcilePanelStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: 14,
+  gap: 16,
   minWidth: 0,
 };
 
@@ -1226,38 +1079,38 @@ const reconcileBackStyle: CSSProperties = {
 
 const reconcileTitleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 17,
-  lineHeight: 1.25,
-  fontWeight: 650,
+  fontSize: 15,
+  lineHeight: "22px",
+  fontWeight: 600,
   color: "var(--text)",
   overflowWrap: "anywhere",
 };
 
 const reconcileHintStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
   color: "var(--muted)",
-  lineHeight: 1.5,
+  lineHeight: "16px",
   margin: 0,
 };
 
 const reconcileRowStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-  gap: 10,
+  gap: 12,
   minWidth: 0,
 };
 
 const reconcileFieldStyle: CSSProperties = {
   display: "grid",
   minWidth: 0,
-  gap: 6,
+  gap: 8,
 };
 
 const reconcileLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
+  fontSize: 13,
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--muted)",
-  
 };
 
 /** A read-only figure: plain text on the sheet, never boxed like an input it isn't. Same height as the input beside it. */
@@ -1273,17 +1126,18 @@ const reconcileReadonlyStyle: CSSProperties = {
   fontVariantNumeric: "tabular-nums",
 };
 
+/** Same look as .field-input (border, radius, surface), with the currency inside. */
 const reconcileInputWrapStyle: CSSProperties = {
   minWidth: 0,
   width: "100%",
   minHeight: 48,
-  borderRadius: 12,
-  border: "1.5px solid color-mix(in srgb, var(--border2) 60%, transparent)",
+  borderRadius: "var(--radius-control)",
+  border: "1px solid var(--border)",
   background: "var(--surface)",
   display: "flex",
   alignItems: "center",
   gap: 4,
-  padding: "0 13px",
+  padding: "0 12px",
 };
 
 const reconcileInputStyle: CSSProperties = {
@@ -1292,10 +1146,9 @@ const reconcileInputStyle: CSSProperties = {
   minWidth: 0,
   background: "transparent",
   border: "none",
-  outline: "none",
   fontSize: 15,
   fontWeight: 600,
-  color: "var(--text2)",
+  color: "var(--text)",
   padding: 0,
 };
 
@@ -1314,106 +1167,45 @@ const differenceBandStyle = (diff: number): CSSProperties => ({
 });
 
 const differenceLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: 0.4,
-  opacity: 0.7,
+  fontSize: 13,
+  fontWeight: 600,
+  color: "var(--muted)",
 };
 
 // Add-transaction (inline, inside reconcile panel)
 const addTxnSectionStyle: CSSProperties = {
   display: "grid",
-  gap: 10,
+  gap: 12,
 };
 
 const addTxnHeaderRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: 10,
+  gap: 12,
 };
 
 const addTxnHintStyle: CSSProperties = {
-  fontSize: 12,
+  margin: 0,
+  fontSize: 13,
   color: "var(--muted)",
-  lineHeight: 1.4,
+  lineHeight: "20px",
 };
 
-/** A quiet text action, like the other secondary actions in sheets. */
-const addTxnToggleStyle: CSSProperties = {
-  minHeight: 44,
-  padding: "0 4px 0 8px",
-  border: "none",
-  background: "transparent",
-  color: "var(--text)",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-  flexShrink: 0,
-  whiteSpace: "nowrap",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-};
 
 const addTxnFormStyle: CSSProperties = {
   display: "grid",
   gap: 8,
 };
 
-const txnTypeToggleStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 6,
-};
 
-const txnTypePillStyle = (active: boolean): CSSProperties => ({
-  minHeight: 44,
-  borderRadius: 10,
-  border: active ? "none" : "1px solid color-mix(in srgb, var(--border2) 55%, transparent)",
-  background: active ? "var(--accent)" : "var(--surface)",
-  color: active ? "var(--accent-ink)" : "var(--text2)",
-  fontSize: 13,
-  fontWeight: 700,
-  cursor: "pointer",
-});
 
-const txnTextInputStyle: CSSProperties = {
-  minHeight: 44,
-  borderRadius: 12,
-  border: "1.5px solid color-mix(in srgb, var(--border2) 60%, transparent)",
-  background: "var(--surface)",
-  padding: "0 13px",
-  fontSize: 14,
-  fontWeight: 500,
-  color: "var(--text2)",
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box",
-};
 
-const txnSelectStyle: CSSProperties = {
-  ...txnTextInputStyle,
-};
 
-const txnAddBtnStyle: CSSProperties = {
-  minHeight: 44,
-  borderRadius: 12,
-  border: "none",
-  background: "color-mix(in srgb, var(--action) 12%, var(--surface))",
-  color: "var(--action)",
-  fontSize: 13,
-  fontWeight: 700,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-};
 
 const addedListStyle: CSSProperties = {
   display: "grid",
-  gap: 6,
+  gap: 8,
 };
 
 const addedRowStyle: CSSProperties = {
@@ -1421,14 +1213,14 @@ const addedRowStyle: CSSProperties = {
   alignItems: "center",
   gap: 8,
   minHeight: 44,
-  padding: "0 4px 0 10px",
-  borderRadius: 10,
-  background: "var(--surface)",
+  padding: "0 4px 0 12px",
+  borderRadius: "var(--radius-control)",
+  background: "var(--surface2)",
 };
 
 const addedNameStyle: CSSProperties = {
   flex: 1,
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 500,
   color: "var(--text2)",
   overflow: "hidden",
@@ -1437,8 +1229,8 @@ const addedNameStyle: CSSProperties = {
 };
 
 const addedAmtStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
+  fontSize: 13,
+  fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
   flexShrink: 0,
 };
@@ -1446,7 +1238,7 @@ const addedAmtStyle: CSSProperties = {
 const undoBtnStyle: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 8,
+  borderRadius: "var(--radius-control)",
   border: "none",
   background: "transparent",
   color: "var(--muted)",
@@ -1457,31 +1249,7 @@ const undoBtnStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-const reconcileSubmitStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 48,
-  marginTop: 8,
-  borderRadius: 14,
-  border: "none",
-  cursor: "pointer",
-  fontWeight: 700,
-  fontSize: 14,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-  transition: "all 0.2s ease",
-};
 
-const spinnerStyle: CSSProperties = {
-  width: 13,
-  height: 13,
-  border: "2px solid color-mix(in srgb, currentColor 26%, transparent)",
-  borderTopColor: "currentColor",
-  borderRadius: "50%",
-  animation: "spin 0.6s linear infinite",
-  flexShrink: 0,
-};
 
 // Sections
 const sectionStyle: CSSProperties = {
@@ -1490,9 +1258,10 @@ const sectionStyle: CSSProperties = {
 };
 
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  
+  margin: 0,
+  fontSize: 13,
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--muted)",
 };
 
@@ -1502,31 +1271,19 @@ const sectionHeaderStyle: CSSProperties = {
   justifyContent: "space-between",
 };
 
-/** A plain wrapper (no border or inset) whose only job is disabling every control inside while saving. Keeps the panel's gap. */
-const reconcileLockStyle: CSSProperties = { display: "contents", border: 0, margin: 0, padding: 0, minWidth: 0 };
-const saveForLaterLinkStyle: CSSProperties = {
-  justifySelf: "center",
-  border: "none",
-  background: "transparent",
-  padding: "4px 8px",
-  fontSize: 14,
-  fontWeight: 600,
-  color: "var(--text2)",
-  cursor: "pointer",
-};
 
 // Category breakdown
 const catRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 10,
+  gap: 12,
 };
 
 const catIconWrapStyle: CSSProperties = {
   width: 32,
   height: 32,
-  borderRadius: 9,
-  background: "color-mix(in srgb, var(--surface2) 64%, var(--surface))",
+  borderRadius: "var(--radius-control)",
+  background: "var(--surface2)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -1544,8 +1301,8 @@ const catNameStyle: CSSProperties = {
 };
 
 const catAmtStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
+  fontSize: 13,
+  fontWeight: 600,
   color: "var(--text2)",
   flexShrink: 0,
   fontVariantNumeric: "tabular-nums",
@@ -1563,13 +1320,7 @@ const barFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: 999,
   background: "var(--select-color)",
-  transition: "width 0.3s ease",
+  transition: "width var(--motion-standard) var(--ease-standard)",
 };
 
 // Transactions
-const emptyStyle: CSSProperties = {
-  textAlign: "center",
-  color: "var(--muted)",
-  fontSize: 13,
-  padding: "16px 0",
-};

@@ -1,10 +1,8 @@
 "use client";
-import { LiquidButton } from "./ui/LiquidGlass";
-
 import { useEffect, useId, useRef, useState } from "react";
 import type { IncomeUse } from "@/lib/joint-income";
 import { PickerPopover } from "./PickerPopover";
-import { optionRowStyle, pickerChipStyle, pickerChipIconStyle, pickerChipLabelStyle } from "./TransactionPickers";
+import { ScreenChip } from "./ui/ScreenChip";
 import { TargetIcon } from "./ui/icons";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
@@ -25,18 +23,16 @@ export function IncomeUseControl({ value, onChange, disabled = false, onOpen, di
   const selectedLabel = options.find(([use]) => use === value)![1];
   return (
     <div ref={anchorRef} style={{ position: "relative", minWidth: 0 }}>
-      <LiquidButton type="button" disabled={disabled} aria-label={`Income use: ${selectedLabel}`} title={`Income use: ${selectedLabel}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined}
-        style={{ ...pickerChipStyle, color: open ? "var(--text2)" : "var(--muted)", opacity: disabled ? 0.5 : 1 }}
+      <ScreenChip mode="action" icon={<TargetIcon size={16} />} disabled={disabled} ariaLabel={`Income use: ${selectedLabel}`} title={`Income use: ${selectedLabel}`} ariaHasPopup="dialog" ariaExpanded={open} ariaControls={open ? id : undefined}
         onClick={() => { if (!open) onOpen?.(); setOpen(!open); }}>
-        <span style={pickerChipIconStyle}><TargetIcon size={18} aria-hidden="true" /></span>
-        <span style={pickerChipLabelStyle}>{selectedLabel}</span>
-      </LiquidButton>
+        {selectedLabel}
+      </ScreenChip>
       <PickerPopover open={open} title="Income use" onClose={() => setOpen(false)} anchorRef={anchorRef} placement="top" size="choice" zIndex={140}>
-        <div id={id} style={{ padding: 8, display: "grid", gap: 2 }}>
+        <div id={id} className="picker-options">
           {options.map(([use, label]) => {
             const selected = value === use;
             return (
-              <button type="button" key={use} className="picker-option" aria-pressed={selected} style={optionRowStyle(selected)} onClick={() => {
+              <button type="button" key={use} className="picker-option" aria-pressed={selected} onClick={() => {
                 if (!selected) haptic("selection");
                 onChange(use); setOpen(false); anchorRef.current?.querySelector("button")?.focus();
               }}>

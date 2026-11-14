@@ -1,27 +1,27 @@
 "use client";
-import { LiquidButton } from "./ui/LiquidGlass";
-import { ChoicePicker } from "./ChoicePicker";
-
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Save } from "lucide-react";
 import { XIcon } from "./ui/icons";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { BottomSheet } from "./ui/BottomSheet";
 import { Workspace } from "./ui/Workspace";
+import { Button } from "./ui/Button";
+import { ScreenChip } from "./ui/ScreenChip";
+import { SheetHeader } from "./ui/SheetLayout";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { GrainGlow } from "./grain/GrainGlow";
 import { PALETTES } from "./grain/palettes";
 import { planningMood } from "./light-mood";
 import "./allocation-workspace.css";
-import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
+import { EmptyState } from "./ui/EmptyState";
 import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
-import type { Account, BudgetScope, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
+import type { BudgetScope, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
 import { MascotFrame } from "./mascot/MascotFrame";
 import { MascotHero, type JarSignal } from "./mascot/MascotHero";
 import { allocationJarItems } from "./mascot/budgetJar";
-import { fmt, getLeftToAssignByScope } from "./app-utils";
+import { fmt } from "./app-utils";
 
 export type BudgetGroupKey = "household" | "wife" | "husband" | "savings" | string;
 
@@ -37,24 +37,21 @@ type AllocationFlowProps = {
   selectedMonth: string;
   onCancel: () => void;
   onComplete?: () => void;
-  accounts?: Account[];
   groups: AllocationGroup[];
   onSave?: (payload: { month: string; budgetItems: PlanningAllocationItem[]; savingsItems: PlanningAllocationItem[]; snapshot: MonthlyPlanningSnapshot }) => Promise<void>;
   // extension props (used by RebalanceSheet and other wrappers)
-  poolOverride?: number;
+  /** The money being placed: category allocations plus unassigned money in this scope. */
+  poolOverride: number;
   poolLabel?: string;
   saveButtonLabel?: string;
   readOnly?: boolean;
   readOnlyBanner?: ReactNode;
-  headerControls?: ReactNode;
   flowPreview?: ReactNode;
   /** Hide the category pills, amount and slider (e.g. while Suggest moves is open): one way to move money at a time. */
   editorHidden?: boolean;
   title?: string;
-  balancedLabel?: string;
   /** Replaces the balanced mark when the pool balances but the scope is still short outside it (savings, advances). */
   balancedNote?: ReactNode;
-  heroPool?: boolean;
   metaLabel?: string;
   rebalanceMode?: boolean;
   /**
@@ -73,12 +70,6 @@ type AllocationFlowProps = {
   jarShowsAssigned?: boolean;
   /** A signal on the jar, e.g. thinking while Suggest moves works. */
   jarSignal?: JarSignal | null;
-  /**
-   * Open as a full-screen workspace instead of a sheet (Rebalance): the mascot and the number sit in a
-   * room lit by To assign, the categories on a content sheet below; desktop splits into two panes with
-   * amounts typed inline (design.md, Light).
-   */
-  workspace?: boolean;
 };
 
 /** Matches the desktop breakpoint, for the parts that differ in structure (not just style). */
@@ -99,7 +90,6 @@ export function AllocationFlow({
   selectedMonth,
   onCancel,
   onComplete,
-  accounts = [],
   groups,
   onSave,
   poolOverride,
@@ -107,20 +97,16 @@ export function AllocationFlow({
   saveButtonLabel = "Save",
   readOnly = false,
   readOnlyBanner,
-  headerControls,
   flowPreview,
   editorHidden = false,
-  title = "Set monthly budget",
-  balancedLabel = "Fully assigned",
+  title = "Rebalance",
   balancedNote,
-  heroPool = false,
   metaLabel = "Last month",
   rebalanceMode = false,
   jarScope,
   jarLevel,
   jarShowsAssigned = false,
   jarSignal = null,
-  workspace = false,
 }: AllocationFlowProps) {
   const wide = useWide();
   const [rowDrafts, setRowDrafts] = useState<Record<string, string>>({});
@@ -130,7 +116,8 @@ export function AllocationFlow({
   const spentFloorRef = useRef<Record<string, number>>({});
   const [activeGroup, setActiveGroup] = useState<BudgetGroupKey>(groups[0]?.key ?? "household");
   const [activeCategoryId, setActiveCategoryId] = useState<string>(groups[0]?.items[0]?.categoryId ?? "");
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  // Apply blocks the whole workspace until the writes settle (design.md, Saving).
+  const blockingSave = useBlockingSave();
   const [saveError, setSaveError] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(null);
@@ -164,16 +151,7 @@ export function AllocationFlow({
   // Discard any in-progress draft when the active category changes.
   useEffect(() => { setDraftValue(null); setConfirming(false); }, [activeCategoryId]);
 
-  const monthLabel = useMemo(() => {
-    if (!/^\d{4}-\d{2}$/.test(selectedMonth)) return "Selected month";
-    const [year, month] = selectedMonth.split("-").map(Number);
-    const date = new Date(year, month - 1, 1);
-    if (Number.isNaN(date.getTime())) return "Selected month";
-    return new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(date);
-  }, [selectedMonth]);
-
-  const poolFromAccounts = useMemo(() => getLeftToAssignByScope(accounts).joint, [accounts]);
-  const availablePool = poolOverride ?? poolFromAccounts;
+  const availablePool = poolOverride;
 
   const active = groups.find((g) => g.key === activeGroup) ?? groups[0];
   const activeIndex = Math.max(0, active.items.findIndex((item) => item.categoryId === activeCategoryId));
@@ -194,7 +172,6 @@ export function AllocationFlow({
   const isOver = availablePool > 0 && leftToAssign < 0;
   const canSave =
     totalCategories > 0 &&
-    saveState !== "saving" &&
     typeof onSave === "function" &&
     !readOnly;
 
@@ -233,36 +210,29 @@ export function AllocationFlow({
   const mood = settled.current.mood;
   const faceLeft = settled.current.left;
 
-  const selectGroup = (groupKey: BudgetGroupKey) => {
-    const nextGroup = groups.find((group) => group.key === groupKey);
-    setActiveGroup(groupKey);
-    setActiveCategoryId(nextGroup?.items[0]?.categoryId ?? "");
-  };
+  // Close, Cancel, Escape and the backdrop do nothing while Apply's writes run.
+  const close = guardClose(blockingSave.saving, onCancel);
 
   const savePlan = async () => {
     if (!canSave || !onSave) return;
+    setSaveError("");
     try {
-      setSaveState("saving");
-      setSaveError("");
-      await onSave({ month: selectedMonth, budgetItems: allBudgetItems, savingsItems, snapshot });
-      setSaveState("idle");
-      onComplete?.();
-      onCancel();
+      await blockingSave.run(() => onSave({ month: selectedMonth, budgetItems: allBudgetItems, savingsItems, snapshot }));
     } catch (error: unknown) {
-      setSaveState("error");
       setSaveError(error instanceof Error ? error.message : "Could not save plan");
+      return;
     }
+    onComplete?.();
+    onCancel();
   };
 
   const headerEl = (
-        <header className="sheet-header" style={sheetHeaderStyle}>
+        <SheetHeader style={sheetHeaderStyle}>
           <h2 style={sheetTitleStyle}>{title}</h2>
-          <button onClick={onCancel} aria-label="Close" style={closeButtonStyle}>
-            <XIcon size={14} />
+          <button type="button" className="sheet-close-button" onClick={close} aria-label={`Close ${title.toLowerCase()}`} style={closeButtonPlacementStyle}>
+            <XIcon size={20} />
           </button>
-          {!rebalanceMode && <span style={monthLabelFallbackStyle}>{monthLabel}</span>}
-          {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
-        </header>
+        </SheetHeader>
   );
   const balanceEl = (
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
@@ -271,12 +241,12 @@ export function AllocationFlow({
             // Same face vocabulary as every other jar: content ("happy", like a funded Joint)
             // when balanced, not the oversized "excited" eyes nothing else uses.
             const jarMood = availablePool > 0 && faceLeft < 0 ? "worried" : availablePool > 0 && faceLeft === 0 ? "happy" : faceLeft > 0.5 ? "curious" : "idle";
-            const jarStyle = { marginBottom: heroPool ? -8 : 4 };
+            const jarStyle = { marginBottom: -8 };
             // While editing, a smaller jar keeps the active amount and slider in view on a phone.
-            const jarSize = heroPool && !readOnly ? 176 : undefined;
+            const jarSize = !readOnly ? 176 : undefined;
             if (jarShowsAssigned) {
               const assignedShare = availablePool > 0 ? Math.max(0, Math.min(1, (availablePool - Math.max(0, leftToAssign)) / availablePool)) : 1;
-              return <MascotFrame><MascotHero look="light" variant="pool" scope={jarScope} level={workspace ? mood?.level ?? assignedShare : assignedShare} warn={workspace ? mood?.warn ?? null : undefined} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotFrame>;
+              return <MascotFrame><MascotHero look="light" variant="pool" scope={jarScope} level={mood?.level ?? assignedShare} warn={mood?.warn ?? null} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotFrame>;
             }
             return jarLevel !== undefined ? (
               <MascotFrame><MascotHero look="light" variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotFrame>
@@ -284,79 +254,70 @@ export function AllocationFlow({
               <MascotFrame><MascotHero look="light" variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotFrame>
             );
           })()}
-          {heroPool && readOnly ? (
+          {readOnly ? (
             // A closed or future month has nothing to assign: the hero is the pool itself.
             <div style={heroPoolWrapStyle}>
-              <span style={{ ...heroPoolLabelStyle, ...(workspace ? onRoomLabelStyle : null) }}>{poolLabel}</span>
+              <span style={{ ...heroPoolLabelStyle, ...onRoomLabelStyle }}>{poolLabel}</span>
               <span style={heroPoolNumberStyle}>
                 <Money value={availablePool} currency animated />
               </span>
             </div>
-          ) : heroPool ? (
+          ) : (
             // The hero is what is left to place; the pool it comes from is a quiet line under it.
             <div style={heroPoolWrapStyle}>
-              <span style={{ ...heroPoolLabelStyle, ...(workspace ? onRoomLabelStyle : null) }}>{isOver ? "Over-assigned" : "Unassigned"}</span>
+              <span style={{ ...heroPoolLabelStyle, ...onRoomLabelStyle }}>{isOver ? "Over-assigned" : "Unassigned"}</span>
               <span style={{ ...heroPoolNumberStyle, color: isOver ? "var(--danger)" : heroPoolNumberStyle.color }}>
-                {workspace && isBalanced ? <span style={allAssignedStyle}>All assigned</span> : <>{isOver && "−"}<Money value={Math.abs(Math.round(leftToAssign))} currency animated={!dragging} /></>}
+                {isBalanced ? <span style={allAssignedStyle}>All assigned</span> : <>{isOver && "−"}<Money value={Math.abs(Math.round(leftToAssign))} currency animated={!dragging} /></>}
               </span>
               {/* "Unassigned 0" already says it's balanced; only a caller's own note adds anything. */}
               {isBalanced && balancedNote && <div style={heroPoolMetaStyle}>{balancedNote}</div>}
-            </div>
-          ) : (
-            <div style={{ ...quietAvailableRowStyle, alignItems: "flex-start" }}>
-              <span style={balanceLabelStyle}>{poolLabel}</span>
-              <div style={valueColumnStyle}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={quietAvailableValueStyle}>
-                    <Money value={availablePool} currency />
-                  </span>
-                </div>
-                {isBalanced && balancedNote ? balancedNote : isBalanced ? (
-                  <span key="balanced" style={{ ...balancedTextStyle, animation: "balancedIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-                    ✓ {balancedLabel}
-                  </span>
-                ) : (
-                  <span key={isOver ? "over" : "under"} style={{ ...deltaChipStyle(isOver), animation: "chipIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-                    <Money value={Math.abs(Math.round(leftToAssign))} /> {isOver ? "over-assigned" : "unassigned"}
-                  </span>
-                )}
-              </div>
             </div>
           )}
         </section>
   );
   const editorEls = (<>
         {!editorHidden && <section className="planning-studio" aria-label="Budget allocation" style={studioStyle}>
-          <div className="planning-scroll-rail planning-category-rail" style={categoryRailStyle} aria-label={`${active.label} categories`}>
+          <div className="planning-scroll-rail planning-category-rail" role="tablist" style={categoryRailStyle} aria-label={`${active.label} categories`}>
             {active.items.map((item) => {
               const isActive = item.categoryId === activeItem?.categoryId;
+              // Rebalancing: each category's live available, so you can see where money is without tapping.
+              // The active one is already the big number below.
+              const showAmount = rebalanceMode && !isActive && Math.round(item.amount) !== 0;
               return (
-                <LiquidButton key={item.categoryId} type="button" onClick={() => setActiveCategoryId(item.categoryId)} style={{ ...(isActive ? categoryPillActiveStyle : categoryPillStyle) }} aria-pressed={isActive}>
-                  <CategoryIcon icon={item.icon} categoryName={item.name} size={17} style={categoryIconStyle(isActive)} />
-                  <span style={categoryNameStyle}>{item.name}</span>
-                  {/* Rebalancing: each category's live available, so you can see where money is without tapping. */}
-                  {/* The active one is already the big number below. */}
-                  {rebalanceMode && !isActive && Math.round(item.amount) !== 0 && (
-                    <span style={categoryAmountStyle(isActive, item.amount < 0)}>{fmt(Math.round(item.amount))}</span>
-                  )}
-                </LiquidButton>
+                <ScreenChip
+                  key={item.categoryId}
+                  mode="tab"
+                  selected={isActive}
+                  onClick={() => setActiveCategoryId(item.categoryId)}
+                  icon={<CategoryIcon icon={item.icon} categoryName={item.name} size={16} />}
+                  badge={showAmount ? (item.amount < 0 ? <span style={negativeBadgeStyle}>{fmt(Math.round(item.amount))}</span> : fmt(Math.round(item.amount))) : undefined}
+                  badgeTone="metric"
+                  ariaLabel={showAmount ? `${item.name}, ${fmt(Math.round(item.amount))} MAD available` : item.name}
+                  style={categoryChipLayoutStyle}
+                >
+                  {item.name}
+                </ScreenChip>
               );
             })}
           </div>
 
-          {!activeItem && <div style={emptyStyle}>No categories found for {active.label}.</div>}
+          {!activeItem && <EmptyState minHeight={220}>No {active.label} categories.</EmptyState>}
         </section>}
 
         {activeItem && !editorHidden && (
           <div className="planning-editor" style={editorStyle}>
             <div key={activeItem.categoryId} className="planning-category-enter planning-amount-canvas" style={amountCanvasStyle}>
-              <Currency style={amountCurrencyBigStyle} />
               <label style={amountEditorStyle}>
                 <span style={srOnlyStyle}>Planned amount for {activeItem.name}</span>
-                {draftValue === null && (dragging
-                  ? <span aria-hidden="true" style={{ ...amountCounterStyle, display: "flex", alignItems: "center", fontVariantNumeric: "tabular-nums", color: isOver ? "var(--danger)" : "var(--text2)" }}>{formatCounter(activeItem.amount)}</span>
-                  : <AnimatedCounter value={activeItem.amount} separator="." style={{ ...amountCounterStyle, color: isOver ? "var(--danger)" : "var(--text2)" }} />
-                )}
+                {/* The currency follows the number on its baseline (design.md, Typography). */}
+                {draftValue === null && <span aria-hidden="true" style={amountCounterRowStyle}>
+                  <span style={amountCounterLineStyle}>
+                    {dragging
+                      ? <span style={{ ...amountCounterStyle, fontVariantNumeric: "tabular-nums", color: isOver ? "var(--danger)" : "var(--text2)" }}>{formatCounter(activeItem.amount)}</span>
+                      : <AnimatedCounter value={activeItem.amount} separator="." style={{ ...amountCounterStyle, color: isOver ? "var(--danger)" : "var(--text2)" }} />}
+                    <Currency />
+                  </span>
+                </span>}
                 <input
                   className="planning-amount-input"
                   type="text"
@@ -402,104 +363,85 @@ export function AllocationFlow({
           </div>
           {saveError && <Banner role="alert" tone="danger" compact>{saveError}</Banner>}
           {confirming && (
-            <div role="status" style={confirmationStyle}>
-              <span>
-                <strong style={confirmationTitleStyle}>Apply this rebalance?</strong>
-                <span style={confirmationCopyStyle}>{isBalanced ? "All available money stays assigned." : `${fmt(Math.abs(Math.round(leftToAssign)))} will remain unassigned.`}</span>
-              </span>
-              <button type="button" onClick={() => setConfirming(false)} style={confirmationBackStyle}>Back</button>
-            </div>
+            <Banner
+              tone="neutral"
+              role="status"
+              compact
+              title="Apply this rebalance?"
+              action={<Button variant="secondary" size="compact" onClick={() => setConfirming(false)}>Back</Button>}
+            >
+              {isBalanced ? "All available money stays assigned." : <><Money value={Math.abs(Math.round(leftToAssign))} currency /> will remain unassigned.</>}
+            </Banner>
           )}
-          <button type="button" onClick={() => confirming ? savePlan() : setConfirming(true)} disabled={!canSave} className={isBalanced ? "planning-save--balanced" : undefined} style={{ ...saveButtonStyle, opacity: canSave ? 1 : 0.55, cursor: canSave ? "pointer" : "not-allowed" }}>
-            <Save size={15} />
-            {saveState === "saving" ? "Saving..." : confirming ? "Confirm" : saveButtonLabel}
-          </button>
+          <Button variant="primary" block className="ws-apply" icon={<Save />} onClick={() => confirming ? savePlan() : setConfirming(true)} disabled={!canSave}>
+            {confirming ? "Confirm" : saveButtonLabel}
+          </Button>
         </div>
       )}
   </>);
 
-  const innerContent = (
-    <>
-      {headerEl}
-      <BlurScrollArea style={sheetScrollStyle}>
-        {balanceEl}
-        {readOnlyBanner}
-        {flowPreview}
-
-        {editorEls}
-      </BlurScrollArea>
-
-      {footerEl}
-    </>
+  // Rebalance is a big operation: a full-screen workspace, not a sheet (design.md, Light).
+  // Desktop: every category of the group as a row with its amount typed inline (faster than a slider with a mouse).
+  const commitRow = (item: PlanningAllocationItem) => {
+    const draft = rowDrafts[item.categoryId];
+    if (draft === undefined) return;
+    updateItemAmount(item, parseFloat(draft.replace(/[^0-9.]/g, "")) || 0);
+    setRowDrafts(drafts => { const next = { ...drafts }; delete next[item.categoryId]; return next; });
+  };
+  const rowsEl = !editorHidden && (
+    <section className="ws-rows" aria-label={`${active.label} categories`}>
+      {active.items.map(item => {
+        const isActive = item.categoryId === activeItem?.categoryId;
+        return <div key={item.categoryId} className="ws-row" data-active={isActive || undefined} onClick={() => setActiveCategoryId(item.categoryId)}>
+          <CategoryIcon icon={item.icon} categoryName={item.name} size={24} />
+          <span className="ws-row-name">{item.name}</span>
+          <span className="ws-row-meta">{metaLabel} <Money value={item.lastMonthSpent ?? 0} /></span>
+          <input
+            className="field-input ws-row-input"
+            type="text"
+            inputMode="decimal"
+            readOnly={readOnly}
+            aria-label={`Planned amount for ${item.name}`}
+            value={rowDrafts[item.categoryId] ?? fmt(Math.round(item.amount))}
+            onFocus={event => { const input = event.target; setActiveCategoryId(item.categoryId); setRowDrafts(drafts => ({ ...drafts, [item.categoryId]: String(Math.round(item.amount)) })); requestAnimationFrame(() => input.select()); }}
+            onChange={event => { const value = event.target.value; setRowDrafts(drafts => ({ ...drafts, [item.categoryId]: value })); }}
+            onBlur={() => commitRow(item)}
+            onKeyDown={event => {
+              if (event.key === "Enter") { commitRow(item); event.currentTarget.blur(); }
+              else if (event.key === "Escape") { event.preventDefault(); setRowDrafts(drafts => { const next = { ...drafts }; delete next[item.categoryId]; return next; }); event.currentTarget.blur(); }
+            }}
+          />
+        </div>;
+      })}
+      {active.items.length === 0 && <EmptyState minHeight={220}>No {active.label} categories.</EmptyState>}
+      {/* The slider belongs to the selected row, so it sits under the list, not in the footer. */}
+      {activeItem && !readOnly && <div className="ws-row-slider" onPointerDownCapture={() => setDragging(true)}>
+        <span className="ws-row-slider-label">Adjust {activeItem.name}</span>
+        <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
+      </div>}
+    </section>
   );
-
-  if (workspace) {
-    // Desktop: every category of the group as a row with its amount typed inline (faster than a slider with a mouse).
-    const commitRow = (item: PlanningAllocationItem) => {
-      const draft = rowDrafts[item.categoryId];
-      if (draft === undefined) return;
-      updateItemAmount(item, parseFloat(draft.replace(/[^0-9.]/g, "")) || 0);
-      setRowDrafts(drafts => { const next = { ...drafts }; delete next[item.categoryId]; return next; });
-    };
-    const rowsEl = !editorHidden && (
-      <section className="ws-rows" aria-label={`${active.label} categories`}>
-        {active.items.map(item => {
-          const isActive = item.categoryId === activeItem?.categoryId;
-          return <div key={item.categoryId} className="ws-row" data-active={isActive || undefined} onClick={() => setActiveCategoryId(item.categoryId)}>
-            <CategoryIcon icon={item.icon} categoryName={item.name} size={24} />
-            <span className="ws-row-name">{item.name}</span>
-            <span className="ws-row-meta">{metaLabel} <Money value={item.lastMonthSpent ?? 0} /></span>
-            <input
-              className="ws-row-input"
-              type="text"
-              inputMode="decimal"
-              readOnly={readOnly}
-              aria-label={`Planned amount for ${item.name}`}
-              value={rowDrafts[item.categoryId] ?? fmt(Math.round(item.amount))}
-              onFocus={event => { const input = event.target; setActiveCategoryId(item.categoryId); setRowDrafts(drafts => ({ ...drafts, [item.categoryId]: String(Math.round(item.amount)) })); requestAnimationFrame(() => input.select()); }}
-              onChange={event => { const value = event.target.value; setRowDrafts(drafts => ({ ...drafts, [item.categoryId]: value })); }}
-              onBlur={() => commitRow(item)}
-              onKeyDown={event => {
-                if (event.key === "Enter") { commitRow(item); event.currentTarget.blur(); }
-                else if (event.key === "Escape") { event.preventDefault(); setRowDrafts(drafts => { const next = { ...drafts }; delete next[item.categoryId]; return next; }); event.currentTarget.blur(); }
-              }}
-            />
-          </div>;
-        })}
-        {active.items.length === 0 && <div style={emptyStyle}>No categories found for {active.label}.</div>}
-        {/* The slider belongs to the selected row, so it sits under the list, not in the footer. */}
-        {activeItem && !readOnly && <div className="ws-row-slider" onPointerDownCapture={() => setDragging(true)}>
-          <span className="ws-row-slider-label">Adjust {activeItem.name}</span>
-          <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
-        </div>}
-      </section>
-    );
-    return (
-      <Workspace open={open} onClose={onCancel} label={title}>
-        <div className="ws-alloc" data-wide={wide || undefined}>
-          <section className="ws-room grain-stage" aria-label="Planning balance">
-            {jarScope && <GrainGlow direction="room" scope={jarScope} level={mood?.level ?? 0.7} tones={PALETTES.partner} contained />}
-            {headerEl}
-            <div className="ws-balance">{balanceEl}</div>
-          </section>
-          <div className="ws-main">
-        {readOnlyBanner}
-        {flowPreview}
-            {wide ? rowsEl : editorEls}
-          </div>
-          <div className="ws-footer">
-            {wide && <button type="button" className="ws-cancel" onClick={onCancel}>Cancel</button>}
-            {footerEl}
-          </div>
-        </div>
-      </Workspace>
-    );
-  }
-
   return (
-    <BottomSheet open={open} onClose={onCancel} showHandle label={title} desktopHeight="fill" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
-      {innerContent}
-    </BottomSheet>
+    <Workspace open={open} onClose={close} label={title}>
+      <div className="ws-alloc" data-wide={wide || undefined}>
+        <section className="ws-room grain-stage" aria-label="Planning balance">
+          {jarScope && <GrainGlow direction="room" scope={jarScope} level={mood?.level ?? 0.7} tones={PALETTES.partner} contained />}
+          {headerEl}
+          <div className="ws-balance">{balanceEl}</div>
+        </section>
+        <div className="ws-main">
+      {readOnlyBanner}
+      {flowPreview}
+          {wide ? rowsEl : editorEls}
+        </div>
+        <div className="ws-footer">
+          {wide && <Button variant="secondary" className="ws-cancel" onClick={close}>Cancel</Button>}
+          {footerEl}
+        </div>
+      </div>
+      {/* Fills the screen so the whole app, workspace included, is inert until Apply settles. */}
+      <SavingCover saving={blockingSave.saving} fill="screen" scope={jarScope} />
+    </Workspace>
   );
 }
 
@@ -512,56 +454,29 @@ function formatCounter(value: number): string {
   return rounded < 0 ? `−${magnitude}` : magnitude;
 }
 
-// GroupPicker and styles (copied/encapsulated for reusability)
-function GroupPicker({ groups, activeGroup, onSelect }: { groups: AllocationGroup[]; activeGroup: BudgetGroupKey; onSelect: (key: BudgetGroupKey) => void; }) {
-  return <ChoicePicker aria-label="Budget group" value={activeGroup} onChange={event => onSelect(event.target.value as BudgetGroupKey)}>
-    {groups.map(group => <option key={group.key} value={group.key}>{group.label} ({group.items.length})</option>)}
-  </ChoicePicker>;
-}
-
-const sheetPanelStyle: CSSProperties = { background: "var(--surface)", borderRadius: "24px 24px 0 0", boxShadow: "var(--elevation-float)" };
-const sheetContentStyle: CSSProperties = { overflow: "hidden", display: "flex", flexDirection: "column" };
-const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", rowGap: 10, columnGap: 12, padding: "var(--dialog-body-padding, 16px 20px 14px)", flexShrink: 0 };
-const sheetTitleStyle: CSSProperties = { fontSize: 20, fontWeight: 800, lineHeight: 1.15, color: "var(--text2)" };
-const sheetScrollStyle: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", padding: "var(--dialog-body-padding, 8px 12px 12px)", display: "grid", alignContent: "start", gap: 12 };
-const monthLabelFallbackStyle: CSSProperties = { minHeight: 44, display: "inline-flex", alignItems: "center", color: "var(--text2)", fontSize: 13, fontWeight: 600 };
-const closeButtonStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, justifySelf: "end" };
-const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 3 };
-const quietAvailableRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
-const valueColumnStyle: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 };
-const balanceLabelStyle: CSSProperties = { color: "var(--muted)", fontSize: 12, fontWeight: 600 };
-const quietAvailableValueStyle: CSSProperties = { color: "var(--text2)", fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', letterSpacing: -0.5 };
-const balancedTextStyle: CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0.1, color: "var(--text2)" };
-const deltaChipStyle = (isOver: boolean): CSSProperties => ({
-  display: "inline-flex", alignItems: "center", gap: 2,
-  fontSize: 12, fontWeight: 700, fontFamily: "var(--font-body)",
-  color: isOver ? "var(--danger)" : "var(--text2)",
-});
+const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", rowGap: 12, columnGap: 12, padding: "var(--dialog-body-padding, 16px)" };
+/** Title role (design.md, Shared dialog anatomy): 20/28 semibold in --text. */
+const sheetTitleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: "28px", fontWeight: 600, color: "var(--text)" };
+const closeButtonPlacementStyle: CSSProperties = { justifySelf: "end" };
+const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 4 };
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };
-const categoryPillStyle: CSSProperties = { flex: "0 0 auto", maxWidth: 196, minHeight: 44, borderRadius: 999, border: 0, background: "var(--lg-glass)", color: "var(--text2)", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", boxShadow: "none", transition: "background-color var(--motion-standard) ease, color var(--motion-standard) ease" };
-const categoryPillActiveStyle: CSSProperties = { ...categoryPillStyle, borderColor: "transparent", background: "var(--lg-glass-active)", boxShadow: "inset 0 0 0 .5px var(--lg-edge)", color: "var(--text)" };
-const categoryIconStyle = (isActive: boolean): CSSProperties => ({ color: isActive ? "var(--select-ink)" : "var(--text2)", flexShrink: 0 });
-const categoryAmountStyle = (isActive: boolean, negative: boolean): CSSProperties => ({ flexShrink: 0, fontSize: 12, fontWeight: 650, fontVariantNumeric: "tabular-nums", color: negative ? "var(--danger)" : isActive ? "var(--select-ink)" : "var(--muted)", opacity: isActive ? 0.72 : 1 });
-const categoryNameStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 750 };
+const categoryChipLayoutStyle: CSSProperties = { maxWidth: 196 };
+const negativeBadgeStyle: CSSProperties = { color: "var(--danger)" };
 const editorStyle: CSSProperties = { display: "grid" };
-const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gridTemplateRows: "minmax(68px, auto) auto", gap: 8, minHeight: 132, padding: "14px 10px 12px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
-const amountCurrencyBigStyle: CSSProperties = { position: "absolute", left: 18, top: 18, zIndex: 1 };
+const amountCanvasStyle: CSSProperties = { position: "relative", display: "grid", alignContent: "center", gridTemplateRows: "minmax(68px, auto) auto", gap: 8, minHeight: 132, padding: "16px 12px 12px", borderRadius: 0, background: "var(--surface)", borderBottom: "1px solid color-mix(in srgb, var(--border) 14%, transparent)", overflow: "hidden" };
 const amountEditorStyle: CSSProperties = { position: "relative", display: "flex", justifyContent: "center", alignItems: "center", minWidth: 0, minHeight: 68 };
-const amountCounterStyle: CSSProperties = { position: "absolute", inset: 0, justifyContent: "center", pointerEvents: "none", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: -2, zIndex: 3 };
+const amountCounterRowStyle: CSSProperties = { position: "absolute", inset: 0, display: "flex", justifyContent: "center", alignItems: "center", pointerEvents: "none", zIndex: 3 };
+const amountCounterLineStyle: CSSProperties = { display: "inline-flex", alignItems: "baseline", gap: 4 };
+const amountCounterStyle: CSSProperties = { fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: "-0.022em" };
 const hiddenAmountInputStyle: CSSProperties = { color: "transparent", caretColor: "transparent" };
 const srOnlyStyle: CSSProperties = { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 };
-const amountInputBigStyle = (isOver: boolean): CSSProperties => ({ width: "100%", minWidth: 0, maxWidth: "100vw", border: "none", background: "transparent", color: isOver ? "var(--danger)" : "var(--text2)", textAlign: "center", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: -2, outline: "none", fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', zIndex: 2, padding: 0, margin: 0, backgroundClip: "text", transition: "color 0.35s cubic-bezier(0.22, 1, 0.36, 1)" });
-const metaRowStyle: CSSProperties = { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, color: "var(--text2)", fontSize: 12, fontFamily: "var(--font-body)", opacity: 0.5 };
-const confirmationStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)" };
-const confirmationTitleStyle: CSSProperties = { display: "block", fontSize: 13, lineHeight: 1.2 };
-const confirmationCopyStyle: CSSProperties = { display: "block", marginTop: 3, fontSize: 11, lineHeight: 1.35, color: "var(--muted)" };
-const confirmationBackStyle: CSSProperties = { minWidth: 44, minHeight: 44, padding: "0 10px", border: 0, borderRadius: "var(--radius-control)", background: "var(--surface)", color: "var(--text2)", fontSize: 12, fontWeight: 700, cursor: "pointer" };
-const emptyStyle: CSSProperties = { minHeight: 220, display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 13 };
-const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "0 0 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `14px 18px calc(12px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", boxShadow: "none" };
-const saveButtonStyle: CSSProperties = { width: "100%", marginTop: "auto", minHeight: 52, borderRadius: 16, border: "none", background: "var(--accent)", color: "var(--accent-ink)", padding: "0 20px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 13, fontWeight: 800, boxShadow: "none" };
+const amountInputBigStyle = (isOver: boolean): CSSProperties => ({ width: "100%", minWidth: 0, maxWidth: "100vw", border: "none", background: "transparent", color: isOver ? "var(--danger)" : "var(--text2)", textAlign: "center", fontFamily: "var(--font-body)", fontSize: "clamp(3rem, 16vw, 4.2rem)", lineHeight: 0.92, fontWeight: 500, letterSpacing: "-0.022em", outline: "none", fontVariantNumeric: "tabular-nums", fontFeatureSettings: '"tnum"', zIndex: 2, padding: 0, margin: 0, backgroundClip: "text", transition: "color var(--motion-standard) var(--ease-standard)" });
+/** Supporting figures under the amount: --muted keeps AA, no faded --text2. */
+const metaRowStyle: CSSProperties = { display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 12, color: "var(--muted)", fontSize: 12, lineHeight: "16px", fontFamily: "var(--font-body)" };
+const slimBarPanelStyle: CSSProperties = { display: "flex", flex: "0 0 auto", minHeight: 0, flexDirection: "column", gap: 12, padding: `16px 16px calc(16px + env(safe-area-inset-bottom, 0px))`, background: "var(--surface)", boxShadow: "none" };
 
-// ── Hero pool styles ──────────────────────────────────────────────────────────
+// Hero: the shared screen hero geometry (ui/screen-hero.css), so Rebalance matches Home, Budget and Reflect.
 const heroPoolWrapStyle: CSSProperties = {
   display: "grid",
   gap: 0,
@@ -569,18 +484,19 @@ const heroPoolWrapStyle: CSSProperties = {
   padding: "12px 0 16px",
 };
 const heroPoolLabelStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
+  lineHeight: "20px",
   fontWeight: 600,
-  
   color: "var(--muted)",
 };
-/** Labels sitting on the room: --text2 keeps AA on the tint (muted falls under it). */
 /** A finished state in words, never a light next to a bare 0 (design.md, Light). */
-const allAssignedStyle: CSSProperties = { display: "block", fontSize: "0.5em", lineHeight: 1.8, letterSpacing: "-0.01em" };
+const allAssignedStyle: CSSProperties = { display: "block", fontSize: "0.5em", lineHeight: 1.8 };
+/** Labels sitting on the room: --text2 keeps AA on the tint (muted falls under it). */
 const onRoomLabelStyle: CSSProperties = { color: "var(--text2)" };
 const heroPoolMetaStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 4, marginTop: 8 };
 const heroPoolNumberStyle: CSSProperties = {
-  fontSize: "clamp(52px, 14vw, 80px)",
+  fontFamily: "var(--font-body)",
+  fontSize: "clamp(44px, 14vw, 72px)",
   fontWeight: 400,
   lineHeight: 0.9,
   letterSpacing: "-0.022em",

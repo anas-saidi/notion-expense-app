@@ -50,5 +50,5 @@ export function ReflectFlowChart({ points, height }: Props) {
 }
 
 const legendStyle: CSSProperties = { display: "flex", justifyContent: "center", gap: 16, fontSize: 12, color: "var(--muted)" };
-const legendItemStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" };
+const legendItemStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" };
 const dotStyle: CSSProperties = { width: 8, height: 8, borderRadius: "50%", flexShrink: 0 };

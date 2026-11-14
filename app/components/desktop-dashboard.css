@@ -1,5 +1,5 @@
 .budget-category-workspace { display:contents; }
-.desktop-planning-action { display:none; }
+.ui-button.desktop-planning-action { display:none; }
 /* Desktop composition follows the supplied dashboard and narrow navigation
    references. Below 900px, the established phone layout owns every surface. */
 .desktop-page-title, .desktop-nav-brand, .desktop-nav-primary,
@@ -39,7 +39,7 @@
   .app-nav .desktop-nav-action { position:relative; display:flex; align-items:center; justify-content:center; width:44px; height:44px; min-height:44px; padding:0; border-radius:50%; background:var(--surface); color:var(--text2); box-shadow:var(--elevation-card); }
   .app-nav .desktop-nav-add { background:var(--text); color:var(--bg); }
   .app-nav .desktop-nav-action:last-child { margin-top:12px; }
-  .app-nav .nav-label, .app-nav .desktop-nav-action > span { display:block; position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%); z-index:1; padding:8px 12px; border-radius:8px; white-space:nowrap; background:var(--text); color:var(--bg); font-size:12px; line-height:16px; font-weight:500; opacity:0; visibility:hidden; pointer-events:none; }
+  .app-nav .nav-label, .app-nav .desktop-nav-action > span { display:block; position:absolute; left:calc(100% + 12px); top:50%; transform:translateY(-50%); z-index:1; padding:8px 12px; border-radius:var(--radius-control); white-space:nowrap; background:var(--text); color:var(--bg); font-size:12px; line-height:16px; font-weight:500; opacity:0; visibility:hidden; pointer-events:none; }
   .app-nav-btn:is(:hover,:focus-visible) .nav-label, .desktop-nav-action:is(:hover,:focus-visible) > span { opacity:1; visibility:visible; }
   .app-nav-wrap .app-nav-add { display:none !important; }
   .app-nav .app-nav-btn:focus-visible, .app-nav .desktop-nav-action:focus-visible { outline:3px solid var(--focus-ring); outline-offset:4px; }
@@ -73,10 +73,10 @@
   /* Ink with a thin surface outline, so it reads on the filled bar and on the empty track alike. */
   .desktop-budget-pace { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--text); box-shadow:0 0 0 1.5px var(--surface); }
   .desktop-budget-pace-label { color:var(--text2); font-size:12px; line-height:16px; }
-  .desktop-budget-where { margin-top:auto; display:grid; gap:12px; padding-top:20px; }
+  .desktop-budget-where { margin-top:auto; display:grid; gap:12px; padding-top:24px; }
   .desktop-budget-where-title { margin:0; color:var(--text2); font-size:13px; line-height:20px; font-weight:600; }
-  .desktop-budget-where-list { display:grid; gap:14px; margin:0; padding:0; list-style:none; }
-  .desktop-budget-where-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 12px; align-items:center; }
+  .desktop-budget-where-list { display:grid; gap:12px; margin:0; padding:0; list-style:none; }
+  .desktop-budget-where-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; align-items:center; }
   .desktop-budget-where-name { display:flex; align-items:center; gap:8px; min-width:0; color:var(--text); font-size:14px; line-height:20px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .desktop-budget-where-list strong { color:var(--text); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
   .desktop-budget-where-track { grid-column:1 / -1; display:block; height:4px; overflow:hidden; border-radius:2px; background:var(--track); }
@@ -105,9 +105,6 @@
   .desktop-spending-label > :first-child { flex-shrink:0; }
   .desktop-spending-list strong { font-size:13px; line-height:20px; font-weight:600; color:var(--text); }
   .desktop-spending-track { grid-column:1 / -1; }
-  .desktop-empty { color:var(--text2); font-size:13px; line-height:20px; padding:16px 0; }
-  /* In the month card the empty line stands in for the main number, so it uses body size rather than a caption. */
-  .desktop-month-budget .desktop-empty { font-size:15px; line-height:22px; padding:8px 0 0; }
 }
 
 @media (min-width:1100px) {
@@ -158,18 +155,12 @@
 @media (min-width:900px) {
   .app-banner--desktop-inline { background:transparent !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; padding:8px 0 !important; min-width:0; }
   .app-banner--desktop-inline .banner-content { overflow-wrap:anywhere; }
-  .app-banner--desktop-inline > .banner-action button { min-height:44px; background:transparent !important; color:var(--text) !important; border:0; padding-inline:8px !important; box-shadow:none !important; }
-  .app-banner--desktop-inline > .banner-action button:hover { text-decoration:underline; text-underline-offset:4px; }
-  .app-banner--desktop-inline > .banner-action button:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
 }
 
 @media (min-width:900px) {
   /* Pinned to the card's foot (like the balance card's Retry), so it never floats mid-card when the content is short. */
-  .desktop-planning-action { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; margin-top:auto; padding:0; border:0; background:transparent; color:var(--text); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
-  .desktop-planning-action:hover { color:var(--strong); }
-  .desktop-planning-action:active { opacity:.7; }
-  .desktop-planning-action:disabled { opacity:.5; cursor:default; }
-  .desktop-planning-action:focus-visible { outline:3px solid var(--focus-ring); outline-offset:4px; border-radius:var(--radius-control); }
+  /* Shared quiet Button; this rule only places it. */
+  .ui-button.desktop-planning-action { display:inline-flex; align-self:flex-start; margin-top:auto; }
 }
 
 @media (min-width:900px) {

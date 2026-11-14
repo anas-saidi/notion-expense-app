@@ -1,0 +1,43 @@
+/* SavingCover (SavingCover.tsx): blocks a sheet or view while a write runs.
+   The layer blocks at once; the veil and Bloub fade in after a short delay so a quick save never flashes. */
+.saving-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  cursor: progress;
+  touch-action: none;
+  outline: none;
+  border-radius: inherit;
+}
+.saving-cover[data-fill="screen"] { position: fixed; z-index: 2000; }
+.saving-cover-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: saving-cover-in var(--motion-standard) var(--ease-standard) 180ms both;
+}
+.saving-cover[data-fill="screen"] .saving-cover-veil { background: color-mix(in srgb, var(--bg) 84%, transparent); }
+.saving-cover-content {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  animation: saving-cover-in var(--motion-standard) var(--ease-standard) 180ms both;
+}
+.saving-cover-label {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+@keyframes saving-cover-in { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .saving-cover-veil, .saving-cover-content { animation-duration: 1ms; }
+}

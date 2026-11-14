@@ -3,6 +3,8 @@ export type BillRepeat = "None" | "Monthly" | "Yearly";
 export type BillValues = { amount: number; categoryId: string };
 export type BillMetadata = {
   v: 1; end?: string; account?: string; skipped?: string[];
+  /** Periods paid only in part so far: they stay due for what's left until payments reach the amount. */
+  partial?: string[];
   overrides?: Record<string, Partial<BillValues> & { due?: string }>;
   revisions?: (BillValues & { until: string })[];
 };
@@ -11,7 +13,12 @@ export type BillPayment = { id: string; name?: string; billId: string; period: s
 export type BillOccurrence = BillValues & {
   id: string; billId: string; period: string; name: string; dueDate: string; repeat: BillRepeat;
   accountId?: string; state: "Due" | "Overdue" | "Paid" | "Skipped"; payments: BillPayment[];
+  /** Linked payments so far. A due bill still needs `amount - paid`. */
+  paid: number;
 };
+/** What a bill still needs: its amount less what's been paid toward it (0 once paid or skipped). */
+export const billRemaining = (bill: Pick<BillOccurrence, "amount" | "paid" | "state">) =>
+  bill.state === "Due" || bill.state === "Overdue" ? Math.max(0, bill.amount - bill.paid) : 0;
 export type BillsData = { schedules: BillSchedule[]; payments: BillPayment[]; today: string };
 export const normalizedId = (id: string) => id.replace(/-/g, "").toLowerCase();
 export const isPeriod = (value: unknown): value is string => typeof value === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(value) && value.slice(0, 4) >= "1900";
@@ -41,6 +48,7 @@ export function parseBillMetadata(text: string): BillMetadata {
   if (!value || value.v !== 1 || (value.end !== undefined && !isPeriod(value.end)) ||
       (value.account !== undefined && typeof value.account !== "string") ||
       (value.skipped !== undefined && (!Array.isArray(value.skipped) || !value.skipped.every(isPeriod))) ||
+      (value.partial !== undefined && (!Array.isArray(value.partial) || !value.partial.every(isPeriod))) ||
       (value.revisions !== undefined && (!Array.isArray(value.revisions) || !value.revisions.every((r: any) => isValues(r) && isPeriod(r.until))))) throw new Error("Invalid bill metadata");
   if (value.overrides !== undefined) {
     if (!value.overrides || Array.isArray(value.overrides) || typeof value.overrides !== "object") throw new Error("Invalid bill overrides");
@@ -76,9 +84,12 @@ export function deriveOccurrences(schedules: BillSchedule[], payments: BillPayme
       const id = `${normalizedId(schedule.id)}:${period}`;
       const linked = byOccurrence.get(id) ?? [];
       const values = valuesForPeriod(schedule, period);
+      const paid = linked.reduce((sum, p) => sum + p.amount, 0);
+      // A payment settles the bill, unless it was recorded as a part payment and the total is still short.
+      const settled = linked.length > 0 && !(schedule.metadata.partial?.includes(period) && paid < values.amount - 0.5);
       result.push({ id, billId: schedule.id, period, name: schedule.name, repeat: schedule.repeat, ...values,
-        accountId: schedule.metadata.account, payments: linked,
-        state: linked.length ? "Paid" : schedule.metadata.skipped?.includes(period) ? "Skipped" : values.dueDate < today ? "Overdue" : "Due" });
+        accountId: schedule.metadata.account, payments: linked, paid,
+        state: settled ? "Paid" : schedule.metadata.skipped?.includes(period) ? "Skipped" : values.dueDate < today ? "Overdue" : "Due" });
       visited.add(id);
       if (schedule.repeat === "None") break;
     }
@@ -88,14 +99,15 @@ export function deriveOccurrences(schedules: BillSchedule[], payments: BillPayme
     if (visited.has(id)) continue;
     const p = linked[0]; const schedule = schedules.find(s => normalizedId(s.id) === normalizedId(p.billId));
     result.push({ id, billId: p.billId, period: p.period, name: schedule?.name ?? p.name ?? "Bill payment", repeat: schedule?.repeat ?? "None",
-      ...(schedule ? valuesForPeriod(schedule, p.period) : { amount: p.amount, categoryId: p.categoryId, dueDate: `${p.period}-01` }), payments: linked, state: "Paid" });
+      ...(schedule ? valuesForPeriod(schedule, p.period) : { amount: p.amount, categoryId: p.categoryId, dueDate: `${p.period}-01` }), payments: linked,
+      paid: linked.reduce((sum, x) => sum + x.amount, 0), state: "Paid" });
   }
   return result.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name));
 }
 export function earmarkedByCategory(occurrences: BillOccurrence[], cutoff: string) {
   const totals: Record<string, number> = {};
   for (const bill of occurrences) if ((bill.state === "Due" || bill.state === "Overdue") && bill.dueDate <= cutoff) {
-    const id = normalizedId(bill.categoryId); totals[id] = (totals[id] ?? 0) + bill.amount;
+    const id = normalizedId(bill.categoryId); totals[id] = (totals[id] ?? 0) + billRemaining(bill);
   }
   return totals;
 }

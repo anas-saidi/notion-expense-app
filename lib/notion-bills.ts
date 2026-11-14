@@ -100,12 +100,17 @@ async function performPayment(token: string, draft: any) {
   if (occurrence.state === "Paid" || occurrence.state === "Skipped") throw billError("This occurrence is already paid or skipped. Refresh bills.", 409);
   await validateBillDraft(token, { ...draft, name: schedule.name, dueDate: draft.date, repeat: "None", categoryId: occurrence.categoryId });
   await assertExpenseFitsBudget(token, { categoryId: occurrence.categoryId, amount: draft.amount, overspend: draft.overspend === true });
+  const partial = draft.partial === true;
+  if (partial && !(draft.amount < occurrence.amount - occurrence.paid - 0.5)) throw billError("A part payment must be less than what's left on this bill");
+  // Mark the period first: if the payment then fails, an unpaid period marked partial changes nothing.
+  if (partial) await setPartialPeriod(token, schedule.id, draft.period, true);
   const properties = { Name: { title: [{ text: { content: schedule.name } }] }, Type: { select: { name: "Expense" } },
     Amount: { number: draft.amount }, Category: { relation: [{ id: occurrence.categoryId }] }, Account: { relation: [{ id: draft.accountId }] },
     Date: { date: { start: draft.date } }, Bill: { relation: [{ id: schedule.id }] }, "Bill period": textProperty(draft.period) };
   if (!draft.accountId) throw billError("Choose a payment account");
   try {
     const { data } = await notionFetchJson<any>(token, "/pages", { method: "POST", body: { parent: { database_id: TRANSACTIONS_DB }, properties } });
+    if (!partial && schedule.metadata.partial?.includes(draft.period)) await setPartialPeriod(token, schedule.id, draft.period, false);
     return mapBillPayment(data);
   } catch (error: any) {
     // Resolve ambiguous creates through their stable bill + period identity; never blindly retry.
@@ -113,6 +118,8 @@ async function performPayment(token: string, draft: any) {
       const matches = await queryDatabaseAll(token, TRANSACTIONS_DB, { filter: { and: [
         { property: "Type", select: { equals: "Expense" } }, { property: "Bill", relation: { contains: schedule.id } },
         { property: "Bill period", rich_text: { equals: draft.period } },
+        // Part payments share bill + period, so match this payment's amount and date too.
+        { property: "Amount", number: { equals: draft.amount } }, { property: "Date", date: { equals: draft.date } },
       ] } });
       if (matches.length) return mapBillPayment(matches[0]);
       throw billError("Payment could not be confirmed. Refresh bills before recording it again.", 503);
@@ -120,6 +127,44 @@ async function performPayment(token: string, draft: any) {
     throw error;
   }
 }
+/** Add or remove a period from the schedule's part-paid list, with the same edit check as other bill changes. */
+async function setPartialPeriod(token: string, scheduleId: string, period: string, on: boolean) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { page, schedule: fresh } = await readSchedule(token, scheduleId);
+    const has = fresh.metadata.partial?.includes(period) ?? false;
+    if (has === on) return;
+    const metadata = structuredClone(fresh.metadata);
+    const partial = on ? [...(metadata.partial ?? []), period] : (metadata.partial ?? []).filter(p => p !== period);
+    if (partial.length) metadata.partial = partial; else delete metadata.partial;
+    const { data: latest } = await notionFetchJson<any>(token, `/pages/${fresh.id}`);
+    if (latest.last_edited_time !== page.last_edited_time) { if (attempt === 0) continue; throw billError("Someone just changed this bill. Refresh and try again.", 409); }
+    await notionFetchJson<any>(token, `/pages/${fresh.id}`, { method: "PATCH", body: { properties: { "Bill metadata": textProperty(JSON.stringify(metadata)) } } });
+    return;
+  }
+}
+
+/** Count an expense recorded outside Bills toward a bill: it joins the bill's payments through the Bill relation. */
+async function performLink(token: string, draft: any) {
+  const { schedule, occurrence } = await occurrenceFor(token, draft.billId, draft.period);
+  if (occurrence.state === "Paid" || occurrence.state === "Skipped") throw billError("This occurrence is already paid or skipped. Refresh bills.", 409);
+  const page = await relatedPage(token, draft.transactionId, TRANSACTIONS_DB);
+  const p = page.properties;
+  if (p.Type?.select?.name !== "Expense" || p.Bill?.relation?.length) throw billError("Choose an expense that isn't already counted toward a bill");
+  if (normalizedId(p.Category?.relation?.[0]?.id ?? "") !== normalizedId(occurrence.categoryId)) throw billError("Choose an expense from this bill's category");
+  const amount = p.Amount?.number;
+  if (!Number.isFinite(amount) || amount <= 0 || !p.Date?.date?.start || !p.Account?.relation?.length) throw billError("This expense needs an amount, date and account first");
+  const partial = draft.partial === true;
+  if (partial && !(amount < occurrence.amount - occurrence.paid - 0.5)) throw billError("A part payment must be less than what's left on this bill");
+  if (partial) await setPartialPeriod(token, schedule.id, draft.period, true);
+  const { data } = await notionFetchJson<any>(token, `/pages/${page.id}`, { method: "PATCH", body: { properties: { Bill: { relation: [{ id: schedule.id }] }, "Bill period": textProperty(draft.period) } } });
+  if (!partial && schedule.metadata.partial?.includes(draft.period)) await setPartialPeriod(token, schedule.id, draft.period, false);
+  return mapBillPayment(data);
+}
+export function linkBillPayment(token: string, draft: any) {
+  if (typeof draft.billId !== "string") throw billError("Missing bill id");
+  return serialBillOperation(token, draft.billId, () => performLink(token, draft));
+}
+
 async function performUpdate(token: string, action: any) {
   const { schedule, occurrence } = await occurrenceFor(token, action.billId, action.period);
   if (["skip", "restore", "edit"].includes(action.action) && occurrence.state === "Paid") throw billError("Edit or undo the payment before changing this occurrence", 409);

@@ -1,25 +1,21 @@
 import type { CSSProperties } from "react";
 import type { BudgetScope, Category, MonthlySummary } from "./app-types";
-import { PALETTES } from "./grain/palettes";
 import { monthProgress } from "./category-status";
 import { CardHeader, CardHeaderAction } from "./ui/CardHeader";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SkeletonRows } from "./ui/Skeleton";
+import { Banner } from "./ui/Banner";
+import { EmptyState } from "./ui/EmptyState";
 import { fmt } from "./app-utils";
 import { ReceiptIcon } from "./ui/icons";
 
 type Props = { summary: MonthlySummary; month: string; loading: boolean; error: boolean; showPlanAction?: boolean; onOpenPlan: () => void; onOpenReceipt?: () => void; scope?: BudgetScope; categories?: Category[] };
 
-/** One solid colour per scope (bars never use a gradient): the partner's core colour, or ink for Couple. */
-function scopeFill(scope: BudgetScope): string {
-  if (scope === "joint") return "var(--text)";
-  return PALETTES.partner[scope === "salma" ? "salma" : "anas"].core;
-}
 
 /** Desktop groups the existing monthly facts beside cash, without treating
  * assignments minus spending as a spendable account balance. */
-export function DesktopMonthBudget({ summary, month, loading, error, showPlanAction = true, onOpenPlan, onOpenReceipt, scope = "joint", categories = [] }: Props) {
+export function DesktopMonthBudget({ summary, month, loading, error, showPlanAction = true, onOpenPlan, onOpenReceipt, categories = [] }: Props) {
   const label = new Date(`${month}-01T12:00:00`).toLocaleDateString("en", { month: "long" });
   const assigned = summary.totalAssigned;
   const spent = summary.totalSpent;
@@ -34,11 +30,12 @@ export function DesktopMonthBudget({ summary, month, loading, error, showPlanAct
   const pacePct = isCurrent && comparisonTotal > 0 ? Math.min(100, monthProgress(month) * Math.max(assigned, 0) / comparisonTotal * 100) : null;
   const top = summary.spentByCategory.filter(entry => entry.total > 0).sort((a, b) => b.total - a.total).slice(0, 3);
   const topMax = top[0]?.total ?? 1;
-  const fill = { "--budget-fill": scopeFill(scope) } as CSSProperties;
+  // One solid colour per wallet (bars never use a gradient): --select-color follows html[data-scope], ink for Joint.
+  const fill = { "--budget-fill": "var(--select-color)" } as CSSProperties;
   return <section className="desktop-month-budget" aria-label={`${label} spending`} style={fill}>
-    <CardHeader className="desktop-panel-heading" title={`${label} spending`} action={loading || error ? undefined : assigned > 0 && onOpenReceipt ? <button type="button" className="card-header-action" onClick={onOpenReceipt} aria-label={`View ${label}'s plan receipt`} title={`${label} plan`}><ReceiptIcon size={18} aria-hidden="true" /></button> : showPlanAction ? <CardHeaderAction disabled={!!summary.contributionError} title={summary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label="Open monthly planning">Plan</CardHeaderAction> : undefined} />
-    {/* An unplanned month with no spending has nothing to measure: one quiet line instead of a big 0, "0 assigned" and an empty bar. */}
-    {loading ? <SkeletonRows label="Loading monthly budget" count={3} /> : error ? <p className="desktop-empty">Monthly budget unavailable. Refresh to try again.</p> : assigned <= 0 && spent <= 0 ? <p className="desktop-empty">Nothing planned or spent yet.</p> : <>
+    <CardHeader className="desktop-panel-heading" title={`${label} spending`} action={loading || error ? undefined : assigned > 0 && onOpenReceipt ? <button type="button" className="card-header-action" onClick={onOpenReceipt} aria-label={`View ${label}'s plan receipt`} title={`${label} plan`}><ReceiptIcon size={20} aria-hidden="true" /></button> : showPlanAction ? <CardHeaderAction disabled={!!summary.contributionError} title={summary.contributionError ? "Planning needs confirmed contributions" : undefined} onClick={onOpenPlan} aria-label="Open monthly planning">Plan</CardHeaderAction> : undefined} />
+    {/* An unplanned month with no spending has nothing to measure: one EmptyState line instead of a big 0, "0 assigned" and an empty bar. */}
+    {loading ? <SkeletonRows label="Loading monthly budget" count={3} /> : error ? <Banner tone="danger" role="alert" compact>Monthly budget unavailable. Refresh to try again.</Banner> : assigned <= 0 && spent <= 0 ? <EmptyState align="start">No plan or spending this month.</EmptyState> : <>
       <div className="desktop-budget-spent" data-over={over > 0 || undefined}>
         <strong><Money value={spent} subtleDecimals /></strong>
         <span>spent of <Money value={assigned} /> assigned{over > 0 ? null : <>, <b><Money value={left} /></b> left</>}</span>
@@ -76,7 +73,7 @@ export function DesktopTopSpending({ summary, categories, loading, error }: { su
   const maximum = entries[0]?.total ?? 1;
   return <section className="desktop-top-spending" aria-label="Top spending categories">
     <CardHeader className="desktop-panel-heading" title="Top spending" />
-    {loading ? <SkeletonRows label="Loading spending categories" count={3} /> : error ? <p className="desktop-empty">Spending unavailable</p> : !entries.length ? <p className="desktop-empty">No spending recorded this month.</p> : <ol className="desktop-spending-list">{entries.map(entry => {
+    {loading ? <SkeletonRows label="Loading spending categories" count={3} /> : error ? <Banner tone="danger" role="alert" compact>Spending unavailable.</Banner> : !entries.length ? <EmptyState align="start">No spending this month.</EmptyState> : <ol className="desktop-spending-list">{entries.map(entry => {
       const category = categories.find(c => c.id === entry.categoryId);
       return <li key={entry.categoryId}><div className="desktop-spending-label"><CategoryIcon icon={category?.icon ?? null} categoryName={category?.name} size={20} /><span>{category?.name ?? "Archived category"}</span></div><strong><Money value={entry.total} /></strong><span className="desktop-spending-track" aria-hidden="true"><span style={{ width: `${entry.total / maximum * 100}%` }} /></span></li>;
     })}</ol>}

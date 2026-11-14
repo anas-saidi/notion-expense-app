@@ -23,9 +23,6 @@ html[data-theme="dark"] .plan-receipt-confirmation { --receipt-paper: #292925; -
 .plan-receipt-wallets { padding-bottom: 16px; border-bottom: 1px dashed var(--receipt-rule); }
 .plan-receipt-paper footer { margin-top: 16px; text-align: center; color: var(--receipt-muted); }
 .plan-receipt-actions { display: grid; gap: 8px; }
-.plan-receipt-review { min-height: 44px; border: 0; background: transparent; color: var(--text2); border-radius: var(--radius-control); cursor: pointer; }
-.plan-receipt-review:hover { background: var(--surface2); }
-.plan-receipt-review:active { opacity: .7; }
 @keyframes plan-receipt-print { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .plan-receipt-paper { animation: plan-receipt-fade 120ms ease both; } }
 @keyframes plan-receipt-fade { from { opacity: 0; } to { opacity: 1; } }

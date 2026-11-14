@@ -7,6 +7,7 @@ import type { Account, BudgetScope, Category, MonthlySummary } from "./app-types
 import { savedPlanReceipt, type PlanReceipt } from "./month-plan-receipt";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
 import "./month-plan-receipt.css";
 
 export function MonthPlanReceipt({ receipt, onDone, onReview, title: heading = "Plan saved" }: { receipt: PlanReceipt; onDone: () => void; onReview?: () => void; title?: string }) {
@@ -45,8 +46,8 @@ export function MonthPlanReceipt({ receipt, onDone, onReview, title: heading = "
     </div>
     {receipt.warning && <Banner role="alert" tone="warning" compact>{receipt.warning}</Banner>}
     <div className="plan-receipt-actions">
-      <button type="button" className="plan-primary" onClick={onDone}>Done</button>
-      {onReview && <button type="button" className="plan-receipt-review" onClick={onReview}>{receipt.warning ? "Back to plan to set contributions" : "Back to plan"}</button>}
+      <Button variant="primary" block onClick={onDone}>Done</Button>
+      {onReview && <Button variant="quiet" block onClick={onReview}>{receipt.warning ? "Back to plan to set contributions" : "Back to plan"}</Button>}
     </div>
   </section>;
 }

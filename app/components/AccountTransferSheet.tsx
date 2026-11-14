@@ -9,7 +9,9 @@ import type { Account } from "./app-types";
 import { fmtDate, parseAmount, today } from "./app-utils";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
-import { CheckIcon, ChevronDownIcon, TransferIcon, XIcon } from "./ui/icons";
+import { ChevronDownIcon, TransferIcon, XIcon } from "./ui/icons";
+import { Button } from "./ui/Button";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
 
@@ -30,7 +32,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("Account transfer");
   const [date, setDate] = useState(today());
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const save = useBlockingSave();
   const [error, setError] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -44,7 +46,6 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
     setAmount(initialAmount != null && initialAmount > 0 ? String(Math.round(initialAmount * 100) / 100) : "");
     setNote(initialNote ?? "Account transfer");
     setDate(today());
-    setStatus("idle");
     setError("");
     setDetailsOpen(false);
   }, [account?.id, accounts, initialAmount, initialNote, initialToAccountId, open]);
@@ -68,16 +69,15 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
     && toAccountId
     && fromAccountId !== toAccountId
     && Number.isFinite(parsedAmount)
-    && parsedAmount > 0
-    && status === "idle",
+    && parsedAmount > 0,
   );
 
   const submit = async () => {
     if (!canSubmit) return;
-    setStatus("saving");
     setError("");
 
     try {
+      await save.run(async () => {
       const res = await fetch("/api/account-transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,22 +91,22 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not move money");
-
-      setStatus("success");
+      });
       onSuccess(`Moved to ${toAccount?.label ?? "account"}`);
       onClose();
     } catch (err: unknown) {
-      setStatus("error");
       setError(err instanceof Error ? err.message : "Could not move money");
     }
   };
+
+  const close = guardClose(save.saving, onClose);
 
   if (!open) return null;
 
   return (
     <BottomSheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       label="Move money between accounts"
       size="standard"
       detent="content"
@@ -119,8 +119,8 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
           <div>
             <h2 style={titleStyle}>Move money</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
-            <XIcon size={18} />
+          <button type="button" className="sheet-close-button" onClick={close} aria-label="Close">
+            <XIcon size={20} />
           </button>
         </SheetHeader>
 
@@ -135,7 +135,6 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
                   setToAccountId(accounts.find((entry) => entry.id !== nextFrom)?.id ?? "");
                 }
               }}
-              style={tilePickerStyle}
             >
               <option value="" disabled>Choose source</option>
               {accounts.map((entry) => (
@@ -144,7 +143,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
             </ChoicePicker>
           </BalanceTile>
           <BalanceTile label="To" account={toAccount} amountTyped={amountTyped} nextBalance={toAccount?.balance != null && amountTyped ? toAccount.balance + parsedAmount : null}>
-            <ChoicePicker aria-label="To account" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} style={tilePickerStyle}>
+            <ChoicePicker aria-label="To account" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)}>
               <option value="" disabled>Choose destination</option>
               {destinationAccounts.map((entry) => (
                 <option key={entry.id} value={entry.id} data-icon={accountIconSource(entry.type)}>{entry.label}</option>
@@ -174,7 +173,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
           {showDetails ? <>
             <label style={fieldStyle}>
               <span style={labelStyle}>Note</span>
-              <input value={note} onChange={(event) => setNote(event.target.value)} style={inputStyle} />
+              <input className="field-input" value={note} onChange={(event) => setNote(event.target.value)} />
             </label>
 
             <label style={fieldStyle}>
@@ -183,7 +182,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
             </label>
           </> : (
             <button type="button" aria-expanded={false} aria-label={`Edit note and date: ${dateLabel}, ${note.trim()}`} onClick={() => setDetailsOpen(true)} style={summaryRowStyle}>
-              <span style={summaryTextStyle}>{dateLabel} · {note.trim()}</span>
+              <span style={summaryTextStyle}>{dateLabel}, {note.trim()}</span>
               <ChevronDownIcon size={16} aria-hidden="true" />
             </button>
           )}
@@ -191,12 +190,11 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
 
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
-        <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
-          {status === "success" && <CheckIcon size={16} />}
-          {status === "idle" && <TransferIcon size={16} strokeWidth={2.3} />}
-          {status === "saving" ? "Moving..." : status === "success" ? "Moved" : "Move money"}
-        </button>
+        <Button variant="primary" block onClick={submit} disabled={!canSubmit} icon={<TransferIcon />}>
+          Move money
+        </Button>
       </SheetBody>
+      <SavingCover saving={save.saving} />
     </BottomSheet>
   );
 }
@@ -216,15 +214,14 @@ function BalanceTile({ label, account, amountTyped, nextBalance, children }: { l
 }
 
 const sheetStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",
   borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
 const innerStyle: CSSProperties = {
-  padding: "18px 18px 22px",
+  padding: "16px 24px 24px",
   display: "grid",
-  gap: 18,
+  gap: 24,
 };
 
 const headerStyle: CSSProperties = {
@@ -243,45 +240,19 @@ const titleStyle: CSSProperties = {
   color: "var(--text)",
 };
 
-const closeStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
 const balanceGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 10,
+  gap: 12,
 };
 
 const balanceTileStyle: CSSProperties = {
   minWidth: 0,
-  borderRadius: 16,
+  borderRadius: "var(--radius-card)",
   background: "color-mix(in srgb, var(--accent) 7%, var(--surface))",
-  padding: 13,
+  padding: 12,
   display: "grid",
-  gap: 7,
-};
-
-const tilePickerStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 44,
-  borderRadius: 12,
-  border: "1px solid transparent",
-  background: "transparent",
-  color: "var(--text2)",
-  padding: "0 4px",
-  fontSize: 13,
-  fontWeight: 700,
-  justifyContent: "space-between",
-  boxSizing: "border-box",
+  gap: 8,
 };
 
 const summaryRowStyle: CSSProperties = {
@@ -321,68 +292,38 @@ const formStyle: CSSProperties = {
 
 const fieldStyle: CSSProperties = {
   display: "grid",
-  gap: 7,
+  gap: 8,
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
+  fontSize: 13,
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--text2)",
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 48,
-  borderRadius: 14,
-  border: "1px solid transparent",
-  boxShadow: "inset 0 0 0 1.5px var(--border2)",
-  background: "color-mix(in srgb, var(--surface2) 34%, var(--surface))",
-  color: "var(--text2)",
-  padding: "0 13px",
-  fontSize: 15,
-  outline: "none",
-  boxSizing: "border-box",
 };
 
 const amountWrapStyle: CSSProperties = {
   minHeight: 56,
-  borderRadius: 16,
+  borderRadius: "var(--radius-control)",
   border: "1px solid var(--border)",
   background: "var(--surface)",
   display: "flex",
   alignItems: "center",
-  gap: 10,
-  padding: "0 14px",
+  gap: 8,
+  padding: "0 16px",
 };
 
 const amountInputStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
   border: "none",
-  outline: "none",
   background: "transparent",
-  color: "var(--text2)",
+  color: "var(--text)",
   fontSize: 28,
   fontWeight: 500,
   fontVariantNumeric: "tabular-nums",
 };
 
-
-const submitStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 52,
-  borderRadius: 14,
-  border: "none",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontWeight: 800,
-  fontSize: 15,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-};
 
 const balanceLabelStyle: CSSProperties = {
   fontFamily: "var(--font-body)",

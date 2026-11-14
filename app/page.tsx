@@ -8,9 +8,10 @@ import { fetchApiJson, fetchMonthlyData, monthlyDataUrl, readSavedApiJson, fetch
 import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
+import { toastDuration, type ToastMessage, type ToastOptions } from "./components/ui/Toast";
 import { switchScreen } from "./components/ui/screen-switch";
 import { BillsSection } from "./components/BillsSection";
-import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
+import { billRemaining, deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
 import { billShortfalls, habitSuggestions, type DueBill } from "@/lib/suggestions";
 import { useBalanceChecks } from "./components/useBalanceChecks";
 import { PendingBalanceChecks, balanceChecksToReview } from "./components/BalanceChecks";
@@ -50,6 +51,9 @@ import {
   fmtDate,
   getCategoryScope,
   getAssignBalanceByScope,
+  accountsAgreeWithCategories,
+  shortfallBreakdown,
+  type ShortfallPart,
   withAssignable,
   getLeftToAssignByScope,
   getBalanceByScope,
@@ -220,7 +224,8 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState("");
   const [draftOffer, setDraftOffer] = useState<{ amount: string; name: string; accountId: string; categoryId: string; date: string; scope: BudgetScope; timestamp: number; repeat?: "None" | "Monthly" | "Yearly" } | null>(null);
 
-  const [microToast, setMicroToast] = useState<string | null>(null);
+  const [microToast, setMicroToast] = useState<ToastMessage | null>(null);
+  const toastIdRef = useRef(0);
   const [lastUsedCatId, setLastUsedCatId] = useState("");
   const [displayedBalance, setDisplayedBalance] = useState<number | null>(null);
   const [historyStartMonth, setHistoryStartMonth] = useState(formatMonthInput(today()));
@@ -309,10 +314,13 @@ export default function App() {
     };
   }, []);
 
-  const showToast = (msg: string, timeout = 1400) => {
+  /** The app's one toast (ui/Toast.tsx). A number second argument is the old duration form. */
+  const showToast = (msg: string, options: number | ToastOptions = {}) => {
+    const opts: ToastOptions = typeof options === "number" ? { duration: options } : options;
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setMicroToast(msg);
-    toastTimerRef.current = setTimeout(() => setMicroToast(null), timeout);
+    toastIdRef.current += 1;
+    setMicroToast({ id: toastIdRef.current, message: msg, tone: opts.tone, action: opts.action });
+    toastTimerRef.current = setTimeout(() => setMicroToast(null), toastDuration(opts));
   };
 
   const fetchTransactions = async () => {
@@ -714,6 +722,14 @@ export default function App() {
     }
   };
 
+  // The delete undo uses the app's one toast slot; a newer message (a failure, a save) takes the slot until it ends.
+  const archiveToast: ToastMessage | null = archivedTransaction ? {
+    id: -1,
+    message: archiveStatus === "restoring" ? "Restoring transaction…" : archiveStatus === "error" ? "Restore failed. Transaction remains archived" : "Transaction deleted",
+    tone: archiveStatus === "error" ? "error" : "neutral",
+    action: { label: archiveStatus === "error" ? "Retry" : "Undo", onClick: () => { void restoreArchivedTransaction(); }, disabled: archiveStatus === "restoring" },
+  } : null;
+
   const selectedCat = categories.find((c) => c.id === categoryId);
   const selectedAccount = accounts.find((a) => a.id === accountId) ?? null;
 
@@ -899,6 +915,11 @@ export default function App() {
     return overAssignedSavings ? { label: "Review", onClick: () => setDetailsAccount(overAssignedSavings) } : undefined;
   })();
 
+  // What fixes "X short", offered under its breakdown. Rebalance can't: it only moves money between jars.
+  const shortfallFixes: { label: string; onClick: () => void }[] = budgetScope === "joint"
+    ? [{ label: "Plan", onClick: () => openMonthlyPlan() }, { label: "Contributions", onClick: () => openContributions() }]
+    : [...(shortfallAction?.label === "Review" ? [shortfallAction] : []), { label: "Plan", onClick: () => openMonthlyPlan() }];
+
   const openMonthlyPlan = () => {
     if (monthlySummary.contributionError) { showToast("Planning is paused until confirmed contributions are available.", 4000); return; }
     if (!monthStartPlannerMonth) return;
@@ -1005,7 +1026,9 @@ export default function App() {
     try {
       return deriveOccurrences(billsData.schedules, billsData.payments, billsData.today, billsData.today.slice(0, 7))
         .filter(o => o.state === "Due" || o.state === "Overdue")
-        .map(o => ({ name: o.name, categoryId: o.categoryId, amount: o.amount, dueDate: o.dueDate }));
+        // Part payments leave only the rest due: that's what the category still has to cover.
+        .map(o => ({ name: o.name, categoryId: o.categoryId, amount: billRemaining(o), dueDate: o.dueDate, paid: o.paid }))
+        .filter(o => o.amount >= 0.5);
     } catch { return []; }
   }, [billsData]);
 
@@ -1073,6 +1096,25 @@ export default function App() {
       salma: contributionDue(contribStatus, "salma"),
     } : undefined,
   ); return { ...balance, joint: contributionMoney(balance.joint - advanceReserve) }; }, [accounts, contribStatus, advanceReserve]);
+  /**
+   * "X short" compares accounts, categories and contributions, which refresh separately after a save. While a
+   * refresh is running, or the account and category reads disagree (one landed before the other), keep showing the
+   * last figure where they agreed. A disagreement that outlasts the refresh gets up to two more reads.
+   */
+  const readsAgree = useMemo(() => accountsAgreeWithCategories(accounts, categories), [accounts, categories]);
+  const [agreeRetries, setAgreeRetries] = useState(0);
+  useEffect(() => {
+    if (readsAgree) { setAgreeRetries(0); return; }
+    if (loading || budgetRefreshing || agreeRetries >= 2) return;
+    const timer = window.setTimeout(() => { setAgreeRetries(count => count + 1); void refreshBudgetData().catch(() => {}); }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [readsAgree, loading, budgetRefreshing, agreeRetries]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shortfallSettling = loading || budgetRefreshing || refreshState === "updating" || (!readsAgree && agreeRetries < 2);
+  const shortfallNow = useMemo(() => ({
+    balance: assignBalanceByScope,
+    parts: shortfallBreakdown(budgetScope, accounts, contribStatus ? { anas: contributionDue(contribStatus, "anas"), salma: contributionDue(contribStatus, "salma") } : undefined, budgetScope === "joint" ? advanceReserve : 0),
+  }), [assignBalanceByScope, budgetScope, accounts, contribStatus, advanceReserve]);
+  const settledShortfall = useSettled(shortfallNow, shortfallSettling);
   // Accounts as the UI shows them: personal "ready to assign" keeps back the Joint due.
   const displayAccounts = useMemo(() => withAssignable(
     accounts,
@@ -1266,7 +1308,7 @@ export default function App() {
       onBudgetRebalance={() => setShowRebalance(true)}
       theme={theme}
       onSelectTheme={selectTheme}
-      toast={microToast}
+      toast={microToast ?? archiveToast}
       syncTimestamp={syncTimestamp}
       syncing={syncing}
       onSync={() => { void syncFromNotion(); }}
@@ -1376,7 +1418,9 @@ export default function App() {
           accounts={accounts}
           readyToAssignByScope={readyToAssignByScope}
           jointUnassigned={jointUnassigned}
-          assignBalanceByScope={assignBalanceByScope}
+          assignBalanceByScope={settledShortfall?.balance}
+          shortfallParts={settledShortfall?.parts}
+          shortfallFixes={shortfallFixes}
           contributionRemainingByScope={contributionRemainingByScope}
           monthlySummary={monthlySummary}
           budgetTransactions={budgetTransactions}
@@ -1746,7 +1790,7 @@ export default function App() {
 
       <DeferredMount active={showRebalance}>      <RebalanceSheet
         open={showRebalance}
-        shortfall={assignBalanceByScope[budgetScope] < -0.5 ? { amount: -assignBalanceByScope[budgetScope], onOpen: shortfallAction ? () => { setShowRebalance(false); shortfallAction.onClick(); } : undefined } : undefined}
+        shortfall={settledShortfall && settledShortfall.balance[budgetScope] < -0.5 ? { amount: -settledShortfall.balance[budgetScope], onOpen: shortfallAction ? () => { setShowRebalance(false); shortfallAction.onClick(); } : undefined } : undefined}
         onClose={() => {
           setShowRebalance(false);
           rebalanceReturnToAdd.current = false;
@@ -1770,15 +1814,6 @@ export default function App() {
         }}
       /></DeferredMount>
 
-      {archivedTransaction && (
-        <div role="status" aria-live="polite" style={undoNoticeStyle}>
-          <span>{archiveStatus === "restoring" ? "Restoring transaction…" : archiveStatus === "error" ? "Restore failed; transaction remains archived." : "Transaction deleted."}</span>
-          <button type="button" disabled={archiveStatus === "restoring"} onClick={restoreArchivedTransaction} style={undoButtonStyle}>
-            {archiveStatus === "error" ? "Retry" : "Undo"}
-          </button>
-        </div>
-      )}
-
       {draftOffer && !showAddModal && (
         <div role="dialog" aria-modal="true" aria-label="Restore expense draft" style={draftOverlayStyle}>
           <div style={draftDialogStyle}>
@@ -1797,17 +1832,6 @@ export default function App() {
 }
 
 
-const undoNoticeStyle: CSSProperties = {
-  position: "fixed", left: 16, right: 16, bottom: "calc(92px + env(safe-area-inset-bottom))", zIndex: 200,
-  maxWidth: 480, margin: "0 auto", minHeight: 52, padding: "8px 10px 8px 16px", borderRadius: "var(--radius-card)",
-  background: "var(--text)", color: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-  boxShadow: "var(--elevation-float)", fontSize: 14,
-};
-
-const undoButtonStyle: CSSProperties = {
-  minWidth: 72, minHeight: 44, border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800,
-};
-
 const refreshStatusStyle: CSSProperties = { minHeight: 20, padding: "2px 18px 0", textAlign: "right", color: "var(--muted)", fontSize: 12 };
 const draftOverlayStyle: CSSProperties = { position: "fixed", inset: 0, zIndex: 220, background: "rgba(0,0,0,.35)", display: "grid", placeItems: "center", padding: 20 };
 const draftDialogStyle: CSSProperties = { width: "min(100%, 420px)", padding: 20, borderRadius: "var(--radius-sheet)", background: "var(--surface)", display: "grid", gap: 16 };
@@ -1819,4 +1843,11 @@ function DeferredMount({ active, children }: { active: boolean; children: React.
   const [opened, setOpened] = useState(active);
   useEffect(() => { if (active) setOpened(true); }, [active]);
   return active || opened ? <>{children}</> : null;
+}
+
+/** The last value seen while not `settling`; null until there is one. Keeps a figure steady while its inputs refresh. */
+function useSettled<T>(value: T, settling: boolean): T | null {
+  const settled = useRef<T | null>(null);
+  if (!settling) settled.current = value;
+  return settled.current;
 }

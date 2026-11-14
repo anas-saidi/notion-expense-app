@@ -4,10 +4,14 @@ import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
 
 import { UndoSavingsDeposit } from "./UndoSavingsDeposit";
 import { SkeletonRows } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, FreezeIcon, XIcon, TransferIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
+import { FundIcon, FreezeIcon, XIcon, TransferIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon, ArrowUpIcon } from "./ui/icons";
+import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import type { Account, Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -98,7 +102,11 @@ export function CategoryDetailsSheet({
   const moreActionsRef = useRef<HTMLDivElement>(null);
   // Savings goal due date, edited here and kept locally so the change shows before the list refreshes.
   const [goalDate, setGoalDate] = useState<string | null>(category?.goalDate ?? null);
-  const [savingGoalDate, setSavingGoalDate] = useState(false);
+  // One blocking save for every write made from this sheet (goal month, freeze, unfreeze).
+  const save = useBlockingSave();
+  // The undo-deposit editor owns its delete; it reports busy so its sheet and this one stay blocked.
+  const [depositBusy, setDepositBusy] = useState(false);
+  const busy = save.saving || depositBusy;
   const [goalError, setGoalError] = useState<string | null>(null);
   useEffect(() => { setGoalDate(category?.goalDate ?? null); setGoalError(null); }, [open, category?.id, category?.goalDate]);
   const changeGoalMonth = async (monthValue: string) => {
@@ -108,18 +116,17 @@ export function CategoryDetailsSheet({
     const next = `${monthValue}-${String(new Date(year, monthNumber, 0).getDate()).padStart(2, "0")}`;
     const previous = goalDate;
     setGoalDate(next);
-    setSavingGoalDate(true);
     setGoalError(null);
     try {
-      const res = await fetch("/api/categories", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: category.id, goalDate: next }) });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.error || "Could not change the due date");
+      await save.run(async () => {
+        const res = await fetch("/api/categories", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: category.id, goalDate: next }) });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload.error || "Could not change the due date");
+      });
       await onTransactionsChanged?.();
     } catch (err) {
       setGoalDate(previous);
       setGoalError(err instanceof Error ? err.message : "Could not change the due date");
-    } finally {
-      setSavingGoalDate(false);
     }
   };
 
@@ -170,11 +177,18 @@ export function CategoryDetailsSheet({
   }, [planned, spent]);
 
   if (!open || !category) return null;
+  const close = guardClose(busy, onClose);
+  // The parent owns freeze and unfreeze; the sheet stays blocked until its write settles.
+  const runParentWrite = (write?: () => void | Promise<void>) => {
+    if (!write) return;
+    void save.run(async () => { await write(); }).catch(() => undefined);
+  };
+  const closeDeposit = guardClose(depositBusy, () => setUndoingDeposit(null));
 
   return (
     <BottomSheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       label={`${category.name} details`}
       size="standard" desktopHeight="fill"
       // Standard main sheet: from under the header to the bottom edge, like Accounts
@@ -193,8 +207,8 @@ export function CategoryDetailsSheet({
             <h2 style={titleStyle}>{details?.name ?? category.name}</h2>
           </div>
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-            <button className="sheet-close-button" onClick={onClose} aria-label="Close category details" style={closeButtonStyle}>
-              <XIcon strokeWidth={2.2} />
+            <button type="button" className="sheet-close-button" onClick={close} aria-label="Close category details">
+              <XIcon size={20} />
             </button>
           </div>
         </SheetHeader>
@@ -236,10 +250,10 @@ export function CategoryDetailsSheet({
               <span style={supportingValueStyle}><Money value={goal} /></span>
             </span>}
             <span style={{ ...supportingStatStyle, alignItems: "center" }}>
-              <span style={{ ...supportingLabelStyle, ...(past ? { color: "var(--danger)", fontWeight: 600 } : {}) }}>{reached ? "Reached" : past ? "Past due" : "Due"}</span>
-              <MonthPicker value={goalDate?.slice(0, 7) ?? ""} onChange={(event) => void changeGoalMonth(event.target.value)} disabled={savingGoalDate} aria-label={goalDate ? "Change goal due month" : "Set goal due month"} />
+              <span style={{ ...supportingLabelStyle, ...(past ? { color: "var(--danger)" } : {}) }}>{reached ? "Reached" : past ? "Past due" : "Due"}</span>
+              <MonthPicker value={goalDate?.slice(0, 7) ?? ""} onChange={(event) => void changeGoalMonth(event.target.value)} aria-label={goalDate ? "Change goal due month" : "Set goal due month"} />
             </span>
-            {goalError && <span role="alert" style={{ flexBasis: "100%", textAlign: "center", fontSize: 13, color: "var(--danger)" }}>{goalError}</span>}
+            {goalError && <div style={{ flexBasis: "100%" }}><Banner tone="danger" role="alert" compact>{goalError}</Banner></div>}
           </section>;
         })()}
 
@@ -247,61 +261,21 @@ export function CategoryDetailsSheet({
         <div style={{ ...actionsRowStyle, ...(onTakeOut ? { gridTemplateColumns: "repeat(4, minmax(0, 1fr))" } : {}) }}>
           {onTakeOut ? <>
             {/* Savings keeps deposits, purchases, and deliberate releases together. */}
-            <ActionBtn
-              icon={<FundIcon size={18} strokeWidth={2} />}
-              label="Add"
-              ariaLabel="Add to savings"
-              bg="var(--text)"
-              ink="var(--bg)"
-              border="1px solid transparent"
-              onClick={onOpenFund}
-            />
-            <ActionBtn
-              icon={<ReceiptIcon size={18} strokeWidth={2} />}
-              label="Spend"
-              ariaLabel="Spend from savings"
-              bg="var(--surface)"
-              ink="var(--text2)"
-              border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
-              onClick={onOpenAdd}
-            />
-            <ActionBtn
-              icon={<TransferIcon size={18} strokeWidth={2} />}
-              label="Take out"
-              ariaLabel="Take money out of savings"
-              bg="var(--surface)"
-              ink="var(--text2)"
-              border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
-              onClick={onTakeOut}
-            />
+            <Button variant="primary" size="compact" icon={<FundIcon size={16} />} aria-label="Add to savings" onClick={onOpenFund} style={actionBtnStyle}>Add</Button>
+            <Button variant="secondary" size="compact" icon={<ReceiptIcon size={16} />} aria-label="Spend from savings" onClick={onOpenAdd} style={actionBtnStyle}>Spend</Button>
+            <Button variant="secondary" size="compact" icon={<TransferIcon size={16} />} aria-label="Take money out of savings" onClick={onTakeOut} style={actionBtnStyle}>Take out</Button>
           </> : <>
-          <ActionBtn
-            icon={<ReceiptIcon size={17} strokeWidth={2} />}
-            label="Expense"
-            ariaLabel="Add expense"
-            bg="var(--text)"
-            ink="var(--bg)"
-            border="1px solid transparent"
-            onClick={onOpenAdd}
-          />
-          <ActionBtn
-            icon={<WalletIcon size={18} strokeWidth={2} />}
-            label="Fund"
-            ariaLabel="Fund category"
-            bg="var(--surface)"
-            ink="var(--text2)"
-            border="1px solid color-mix(in srgb, var(--border) 54%, transparent)"
-            onClick={onOpenFund}
-          />
+          <Button variant="primary" size="compact" icon={<ArrowUpIcon size={16} />} aria-label="Add expense" onClick={onOpenAdd} style={actionBtnStyle}>Expense</Button>
+          <Button variant="secondary" size="compact" icon={<WalletIcon size={16} />} aria-label="Fund category" onClick={onOpenFund} style={actionBtnStyle}>Fund</Button>
           </>}
           <div ref={moreActionsRef} style={{ position: "relative", minWidth: 0 }}>
-            <ActionBtn icon={<MoreIcon size={18} />} label="More" ariaLabel="More category actions" bg="transparent" ink="var(--muted)" border="1px solid transparent" onClick={() => setShowMoreActions(true)} />
+            <Button variant="quiet" size="compact" icon={<MoreIcon size={16} />} aria-label="More category actions" aria-haspopup="dialog" aria-expanded={showMoreActions} onClick={() => setShowMoreActions(true)} style={actionBtnStyle}>More</Button>
             <PickerPopover open={showMoreActions} anchorRef={moreActionsRef} title="Category actions" onClose={() => setShowMoreActions(false)} align="right" zIndex={130} size="menu">
               <div className="picker-options">
-                {onEdit && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onEdit(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><EditIcon size={17} />Edit</span></button>}
-                <button type="button" className="picker-option" disabled={loading || isPastMonth(activeMonth)} onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ScaleIcon size={17} />Adjust available</span></button>
-                {onFreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setConfirmingFreeze(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><FreezeIcon size={17} />Freeze</span></button>}
-                {onUnfreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onUnfreeze(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}><ReviveIcon size={17} />Unfreeze</span></button>}
+                {onEdit && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); onEdit(); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}><EditIcon size={20} aria-hidden="true" />Edit</span></button>}
+                <button type="button" className="picker-option" disabled={loading || isPastMonth(activeMonth)} onClick={() => { setShowMoreActions(false); setAdjustingAvailable(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}><ScaleIcon size={20} aria-hidden="true" />Adjust available</span></button>
+                {onFreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); setConfirmingFreeze(true); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}><FreezeIcon size={20} aria-hidden="true" />Freeze</span></button>}
+                {onUnfreeze && <button type="button" className="picker-option" onClick={() => { setShowMoreActions(false); runParentWrite(onUnfreeze); }}><span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}><ReviveIcon size={20} aria-hidden="true" />Unfreeze</span></button>}
               </div>
             </PickerPopover>
           </div>
@@ -315,9 +289,9 @@ export function CategoryDetailsSheet({
           </div>
 
           {loading && <SkeletonRows label="Loading category activity" />}
-          {error && !loading && <div style={panelMessageStyle}>{error}</div>}
+          {error && !loading && <Banner tone="danger" role="alert" compact action={<Button variant="quiet" size="compact" onClick={() => setRefreshKey((value) => value + 1)}>Retry</Button>}>{error}</Banner>}
           {!loading && !error && (data?.timeline?.length ?? 0) === 0 && (
-            <div style={panelMessageStyle}>No activity for {formatMonth(activeMonth)}.</div>
+            <EmptyState>No activity in {formatMonth(activeMonth)}.</EmptyState>
           )}
 
           {!loading && !error && (data?.timeline?.length ?? 0) > 0 && (
@@ -352,12 +326,14 @@ export function CategoryDetailsSheet({
           )}
         </section>
       </SheetBody>
-      <BottomSheet open={undoingDeposit !== null} onClose={() => setUndoingDeposit(null)} label="Savings deposit" detent="content" layered zIndex={150}>
-        {undoingDeposit && <div className="sheet-body" style={{ padding: 24, display: "grid", gap: 16 }}>
-          <SheetHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}><h2 style={{ fontSize: 20 }}>{undoingDeposit.title}</h2><button type="button" aria-label="Close deposit details" onClick={() => setUndoingDeposit(null)} className="sheet-close-button"><XIcon /></button></SheetHeader>
-          <strong style={{ fontSize: 28, fontVariantNumeric: "tabular-nums" }}><Money value={undoingDeposit.amount} currency /></strong>
-          <UndoSavingsDeposit key={undoingDeposit.savingsFundingOperation} operationId={undoingDeposit.savingsFundingOperation!} onUndone={async () => { setUndoingDeposit(null); setRefreshKey(value => value + 1); try { await onTransactionsChanged?.(); } catch { setError("Deposit undone. Refresh to update balances."); } }} />
-        </div>}
+      <SavingCover saving={save.saving} />
+      <BottomSheet open={undoingDeposit !== null} onClose={closeDeposit} label="Savings deposit" detent="content" layered size="compact" zIndex={150} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
+        {undoingDeposit && <SheetBody style={confirmWrapStyle}>
+          <SheetHeader style={topBarStyle}><h2 style={confirmTitleStyle}>{undoingDeposit.title}</h2><button type="button" aria-label="Close deposit details" onClick={closeDeposit} className="sheet-close-button"><XIcon size={20} /></button></SheetHeader>
+          <span style={depositAmountStyle}><Money value={undoingDeposit.amount} currency /></span>
+          <UndoSavingsDeposit key={undoingDeposit.savingsFundingOperation} operationId={undoingDeposit.savingsFundingOperation!} onBusyChange={setDepositBusy} onUndone={async () => { setUndoingDeposit(null); setRefreshKey(value => value + 1); try { await onTransactionsChanged?.(); } catch { setError("Deposit undone. Refresh to update balances."); } }} />
+        </SheetBody>}
+        <SavingCover saving={depositBusy} label="Deleting" />
       </BottomSheet>
       <FundTransactionSheet
         transaction={editingFund}
@@ -382,42 +358,12 @@ export function CategoryDetailsSheet({
           <span style={confirmIconStyle}><FreezeIcon size={20} /></span>
           <div style={{ display: "grid", gap: 6 }}><h2 style={confirmTitleStyle}>Freeze {category.name}?</h2><p style={confirmCopyStyle}>Moves to Frozen. Balance and activity are kept.</p></div>
           <SheetFooter style={confirmActionsStyle}>
-            <button type="button" onClick={() => setConfirmingFreeze(false)} style={confirmCancelStyle}>Cancel</button>
-            <button type="button" onClick={() => { setConfirmingFreeze(false); onFreeze?.(); }} style={confirmFreezeStyle}>Freeze category</button>
+            <Button variant="secondary" onClick={() => setConfirmingFreeze(false)}>Cancel</Button>
+            <Button variant="primary" onClick={() => { setConfirmingFreeze(false); runParentWrite(onFreeze); }}>Freeze category</Button>
           </SheetFooter>
         </SheetBody>
       </BottomSheet>
     </BottomSheet>
-  );
-}
-
-function ActionBtn({
-  icon,
-  label,
-  ariaLabel,
-  onClick,
-  bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
-  ink = "var(--text2)",
-  border = "1px solid transparent",
-}: {
-  icon: React.ReactNode;
-  label: string;
-  ariaLabel: string;
-  onClick: () => void;
-  bg?: string;
-  ink?: string;
-  border?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      style={{ ...actionBtnStyle, background: bg, color: ink, border }}
-    >
-      <span style={actionIconStyle}>{icon}</span>
-      <span>{label}</span>
-    </button>
   );
 }
 
@@ -452,7 +398,7 @@ const sheetStyle: CSSProperties = {
 };
 
 const sheetInnerStyle: CSSProperties = {
-  padding: "18px 18px calc(32px + env(safe-area-inset-bottom, 0px))",
+  padding: "16px 24px calc(32px + env(safe-area-inset-bottom, 0px))",
   display: "grid",
   gap: 16,
 };
@@ -464,23 +410,10 @@ const topBarStyle: CSSProperties = {
   gap: 12,
 };
 
-const closeButtonStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
-  background: "transparent",
-  color: "var(--muted)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
-
 const titleStyle: CSSProperties = {
-  fontSize: 18,
-  lineHeight: 1.2,
-  fontWeight: 700,
+  fontSize: 20,
+  lineHeight: "24px",
+  fontWeight: 600,
   color: "var(--text)",
   margin: 0,
   overflow: "hidden",
@@ -493,14 +426,14 @@ const titleStyle: CSSProperties = {
 const statsWrapStyle: CSSProperties = {
   display: "grid",
   justifyItems: "center",
-  gap: 14,
-  padding: "4px 0 2px",
+  gap: 12,
+  padding: "4px 0",
 };
 
 const availableStyle: CSSProperties = {
   display: "grid",
   justifyItems: "center",
-  gap: 5,
+  gap: 4,
 };
 
 const availableValueStyle: CSSProperties = {
@@ -530,17 +463,18 @@ const supportingStatsStyle: CSSProperties = {
 const supportingStatStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "baseline",
-  gap: 6,
+  gap: 8,
 };
 
 const supportingLabelStyle: CSSProperties = {
   fontSize: 12,
-  fontWeight: 500,
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--muted)",
 };
 
 const supportingValueStyle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 15,
   fontWeight: 600,
   lineHeight: 1,
   color: "var(--text2)",
@@ -551,13 +485,13 @@ const progressGroupStyle: CSSProperties = {
   width: "min(100%, 320px)",
   display: "flex",
   flexDirection: "column",
-  gap: 6,
+  gap: 8,
 };
 
 const statLabelStyle: CSSProperties = {
   fontSize: 12,
+  lineHeight: "16px",
   fontWeight: 600,
-  
   color: "var(--muted)",
 };
 
@@ -575,7 +509,7 @@ const progressFillStyle: CSSProperties = {
   borderRadius: 999,
   background: "var(--select-color)",
   transformOrigin: "left center",
-  transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+  transition: "transform var(--motion-standard) var(--ease-standard)",
 };
 
 /* Actions */
@@ -587,49 +521,20 @@ const actionsRowStyle: CSSProperties = {
   gap: 8,
 };
 
-const actionBtnStyle: CSSProperties = {
-  minHeight: 44,
-  width: "100%",
-  minWidth: 0,
-  padding: "0 8px",
-  borderRadius: "var(--radius-control)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-  fontFamily: "var(--font-body)",
-  fontSize: 13,
-  fontWeight: 750,
-  transition: "background 0.15s ease, color 0.15s ease",
-};
-const confirmWrapStyle: CSSProperties = { padding: "12px 20px calc(20px + env(safe-area-inset-bottom, 0px))", display: "grid", gap: 16 };
-const confirmIconStyle: CSSProperties = { width: 44, height: 44, borderRadius: 14, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--surface2)", color: "var(--text2)" };
-const confirmTitleStyle: CSSProperties = { margin: 0, color: "var(--text)", fontSize: 20, lineHeight: 1.2 };
-const confirmCopyStyle: CSSProperties = { margin: 0, color: "var(--muted)", fontSize: 14, lineHeight: 1.45 };
-const confirmActionsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: 8 };
-const confirmCancelStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)", font: "inherit", fontWeight: 700 };
-const confirmFreezeStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: "var(--radius-control)", background: "var(--text)", color: "var(--bg)", font: "inherit", fontWeight: 750 };
-
-const actionIconStyle: CSSProperties = {
-  width: 22,
-  height: 22,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
+// Toolbar buttons fill their grid cell so the three (or four) actions keep equal width.
+const actionBtnStyle: CSSProperties = { width: "100%", minWidth: 0 };
+const confirmWrapStyle: CSSProperties = { padding: "16px 24px calc(24px + env(safe-area-inset-bottom, 0px))", display: "grid", gap: 16 };
+const confirmIconStyle: CSSProperties = { width: 44, height: 44, borderRadius: "var(--radius-control)", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--surface2)", color: "var(--text2)" };
+const confirmTitleStyle: CSSProperties = { margin: 0, color: "var(--text)", fontSize: 20, lineHeight: "24px", fontWeight: 600 };
+const confirmCopyStyle: CSSProperties = { margin: 0, color: "var(--muted)", fontSize: 15, lineHeight: "22px" };
+const confirmActionsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8 };
+const depositAmountStyle: CSSProperties = { fontSize: 34, lineHeight: 1, fontWeight: 500, color: "var(--text)", fontVariantNumeric: "tabular-nums" };
 
 /* Activity */
 
 const sectionLabelStyle: CSSProperties = {
   fontSize: 12,
-  fontWeight: 700,
-  
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--muted)",
-};
-
-const panelMessageStyle: CSSProperties = {
-  padding: "10px 0",
-  color: "var(--muted)",
-  fontSize: 13,
 };

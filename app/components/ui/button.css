@@ -1,0 +1,68 @@
+/* Shared action buttons (Button.tsx). Four tiers, two sizes; every tier keeps a 44px target.
+   Geometry follows Foundations: 12px control radius, Label (13) and Body (15) type, ink for the main action. */
+.ui-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 44px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-control);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-button[data-size="compact"] {
+  min-height: 44px;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 16px;
+}
+.ui-button[data-block] { display: flex; width: 100%; }
+.ui-button-icon { display: inline-flex; flex-shrink: 0; }
+.ui-button-icon > svg { width: 20px; height: 20px; }
+.ui-button[data-size="compact"] .ui-button-icon > svg { width: 16px; height: 16px; }
+.ui-button-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Primary: the surface's main action. Ink fill, one per surface. */
+.ui-button[data-variant="primary"] { background: var(--accent); color: var(--accent-ink); }
+
+/* Secondary: the alternative next to a primary (Cancel, Keep, Fund). Quiet filled surface. */
+.ui-button[data-variant="secondary"] { background: var(--surface2); color: var(--text); }
+
+/* Quiet: low emphasis, reads as text (Retry, Show all, Copy last month). Fill appears on hover or press. */
+.ui-button[data-variant="quiet"] { background: transparent; color: var(--text2); padding: 0 8px; }
+.ui-button[data-variant="quiet"][data-size="compact"] { padding: 0 8px; }
+
+/* Destructive: removes or undoes money records. Danger text on a faint danger wash, never a loud red fill. */
+.ui-button[data-variant="destructive"] {
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+  color: var(--danger);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-button[data-variant="quiet"]:not(:disabled):hover { background: var(--surface2); color: var(--text); transform: none; }
+}
+.ui-button:not(:disabled):active { transform: scale(0.98); }
+.ui-button[data-variant="quiet"]:not(:disabled):active { background: var(--surface2); }
+
+.ui-button:disabled { cursor: not-allowed; opacity: 0.45; }
+/* Loading keeps full contrast: the label says what is happening, SavingCover does the blocking. */
+.ui-button[aria-busy="true"]:disabled { opacity: 1; cursor: progress; }
+
+.ui-button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-button, .ui-button:not(:disabled):active { transition: none; transform: none; }
+}

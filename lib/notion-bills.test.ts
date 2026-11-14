@@ -42,12 +42,12 @@ describe("Notion bills contract", () => {
     await expect(payBill("token", { billId, period: "2026-10", amount: 550, date: "2026-10-06", accountId })).rejects.toThrow("Short budget");
     expect(vi.mocked(notionFetchJson).mock.calls.some(c => c[1] === "/pages")).toBe(false);
   });
-  it("resolves ambiguous payment creates by querying Bill + period", async () => {
+  it("resolves ambiguous payment creates by querying Bill + period, amount and date", async () => {
     const base = vi.mocked(notionFetchJson).getMockImplementation()!;
     vi.mocked(notionFetchJson).mockImplementation(async (token, path, opts) => { if (path === "/pages") throw new Error("timeout"); return base(token, path, opts); });
     vi.mocked(queryDatabaseAll).mockImplementation(async (_t, _d, body: any) => {
       if (body.filter.or) return [schedule()];
-      if (body.filter.and?.length === 3) return [{ id: "settled", properties: { Type: { select: { name: "Expense" } }, Bill: { relation: [{ id: billId }] }, "Bill period": { rich_text: [{ plain_text: "2026-10" }] }, Date: { date: { start: "2026-10-06" } }, Amount: { number: 550 }, Category: { relation: [{ id: catId }] }, Account: { relation: [{ id: accountId }] } } }];
+      if (body.filter.and?.length === 5) return [{ id: "settled", properties: { Type: { select: { name: "Expense" } }, Bill: { relation: [{ id: billId }] }, "Bill period": { rich_text: [{ plain_text: "2026-10" }] }, Date: { date: { start: "2026-10-06" } }, Amount: { number: 550 }, Category: { relation: [{ id: catId }] }, Account: { relation: [{ id: accountId }] } } }];
       return [];
     });
     expect((await payBill("token", { billId, period: "2026-10", amount: 550, date: "2026-10-06", accountId })).id).toBe("settled");

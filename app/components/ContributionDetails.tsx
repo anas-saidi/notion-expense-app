@@ -13,15 +13,19 @@ import { fmt, parseAmount, today } from "./app-utils";
 import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { DatePicker, MonthPicker } from "./DatePicker";
 import { XIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
-import { MascotHero } from "./mascot/MascotHero";
+import { MascotHero, MASCOT_HERO_SIZE } from "./mascot/MascotHero";
 import { useOnceSignal } from "./mascot/MascotSignal";
 import { motion } from "motion/react";
 import { Summary, Fact } from "./ui/Summary";
 
-const MASCOT_SIZE = 200;
 import { SkeletonRows } from "./ui/Skeleton";
+
+/** Sheets use the screen hero size (design.md: no smaller sheet override). */
+const MASCOT_SIZE = MASCOT_HERO_SIZE;
 import "./contributions.css";
 
 /**
@@ -50,12 +54,14 @@ export function ContributionEntry({ status, scope, onOpen, advancesOnly = false 
   </button>;
 }
 
-export function ContributionAgreementEditor({ month, agreement, proposed, shares, disabled = false, showHeading = true, showAmounts = true, onSaved, editing: controlledEditing, onEditingChange }: {
+export function ContributionAgreementEditor({ month, agreement, proposed, shares, disabled = false, showHeading = true, showAmounts = true, onSaved, editing: controlledEditing, onEditingChange, onBusyChange }: {
   month: string; agreement?: ContributionAgreement; proposed: PartnerAmounts; shares: PartnerAmounts; disabled?: boolean; showHeading?: boolean;
   /** Off where the agreed amounts are already shown next to each partner. */
   showAmounts?: boolean; onSaved: () => void;
   /** Controlled: something else (a tappable fact) opens the editor, so no trigger button is drawn. */
   editing?: boolean; onEditingChange?: (editing: boolean) => void;
+  /** The host sheet blocks itself (SavingCover, guarded close) while the agreement saves. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [ownEditing, setOwnEditing] = useState(false);
   const controlled = controlledEditing !== undefined;
@@ -63,35 +69,37 @@ export function ContributionAgreementEditor({ month, agreement, proposed, shares
   const setEditing = (value: boolean) => { if (controlled) onEditingChange?.(value); else setOwnEditing(value); };
   const [anas, setAnas] = useState("");
   const [salma, setSalma] = useState("");
-  const [saving, setSaving] = useState(false);
+  const saveRun = useBlockingSave();
   const [error, setError] = useState("");
+  useEffect(() => { onBusyChange?.(saveRun.saving); }, [saveRun.saving]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setEditing(false); setError(""); }, [month, agreement?.version]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (controlled && controlledEditing) { setAnas(String(agreement?.targets.anas ?? money(proposed.anas))); setSalma(String(agreement?.targets.salma ?? money(proposed.salma))); setError(""); } }, [controlled, controlledEditing]); // eslint-disable-line react-hooks/exhaustive-deps
   const edit = () => { setAnas(String(agreement?.targets.anas ?? money(proposed.anas))); setSalma(String(agreement?.targets.salma ?? money(proposed.salma))); setEditing(true); setError(""); };
   const save = async () => {
     const a = parseAmount(anas), s = parseAmount(salma);
     if (a == null || s == null || a < 0 || s < 0) { setError("Enter both contribution amounts."); return; }
-    setSaving(true); setError("");
+    setError("");
     try {
+      await saveRun.run(async () => {
       const response = await fetch("/api/contribution-agreements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month, targets: { anas: money(a), salma: money(s) }, shares, expectedVersion: agreement?.version ?? null }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not confirm contributions.");
+      });
       setEditing(false); onSaved();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not confirm contributions. Refresh and try again."); }
-    finally { setSaving(false); }
   };
   return <section className="contribution-agreement" aria-label="Monthly contribution agreement">
     {showHeading && <h3>Agreed contributions</h3>}
     {editing || controlled ? <>
       <div className="contribution-fields">
-        <label>Anas<input className="field-input" inputMode="decimal" value={anas} onChange={e => setAnas(e.target.value)} disabled={saving} /></label>
-        <label>Salma<input className="field-input" inputMode="decimal" value={salma} onChange={e => setSalma(e.target.value)} disabled={saving} /></label>
+        <label>Anas<input className="field-input" inputMode="decimal" value={anas} onChange={e => setAnas(e.target.value)} /></label>
+        <label>Salma<input className="field-input" inputMode="decimal" value={salma} onChange={e => setSalma(e.target.value)} /></label>
       </div>
       <p className="contribution-note">Extra contributions are repayable advances.</p>
-      <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving || disabled} onClick={() => void save()}>{saving ? "Confirming…" : "Confirm"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setEditing(false)}>Cancel</button></div>
+      <div className="contribution-actions"><Button variant="primary" disabled={disabled} onClick={() => void save()}>Confirm</Button><Button variant="quiet" onClick={() => setEditing(false)}>Cancel</Button></div>
     </> : <>
       {agreement && showAmounts && <dl className="contribution-rows"><div><dt>Anas</dt><dd><Money value={agreement.targets.anas} /></dd></div><div><dt>Salma</dt><dd><Money value={agreement.targets.salma} /></dd></div></dl>}
-      {!controlled && <button type="button" className="contribution-text" disabled={disabled} onClick={edit}>{agreement ? showAmounts ? "Change" : "Change agreed amounts" : "Set contributions"}</button>}
+      {!controlled && <Button variant="quiet" size="compact" disabled={disabled} onClick={edit}>{agreement ? showAmounts ? "Change" : "Change agreed amounts" : "Set contributions"}</Button>}
     </>}
     {error && <Banner tone="danger" role="alert" compact>{error}</Banner>}
   </section>;
@@ -109,61 +117,65 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
   const [repaying, setRepaying] = useState<Partner | null>(null);
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
-  const [saving, setSaving] = useState(false);
+  const save = useBlockingSave();
+  const [agreementSaving, setAgreementSaving] = useState(false);
+  const saving = save.saving || agreementSaving;
   const [saveError, setSaveError] = useState("");
   const [uncertain, setUncertain] = useState(false);
-  const [success, setSuccess] = useState("");
   const requestId = useRef("");
-  const [applying, setApplying] = useState<Partner | null>(null);
   // Tapping the agreed amount opens the editor in place. The partner in front is the one shown.
   const [shown, setShown] = useState<Partner>(initialPartner ?? personalScope);
   const [editingAgreement, setEditingAgreement] = useState(false);
   /** Bumped when the agreed amounts are confirmed: both jars wink once. */
   const [agreedWink, setAgreedWink] = useState(0);
   const applyIds = useRef<Partial<Record<Partner, string>>>({});
-  useEffect(() => { if (open) { setShown(initialPartner ?? personalScope); setEditingAgreement(false); setRepaying(null); setSaveError(""); setSuccess(""); setUncertain(false); } }, [open, month]);
+  useEffect(() => { if (open) { setShown(initialPartner ?? personalScope); setEditingAgreement(false); setRepaying(null); setSaveError(""); setUncertain(false); } }, [open, month]);
   const ledger = currentAdvances;
   const outstanding = ledger?.outstanding ?? { anas: 0, salma: 0 };
   // An advance comes off this month's contribution: the offset is dated today, so only the current month can take it.
   const canApply = month === today().slice(0, 7);
   const applicable = (partner: Partner) => canApply && status ? money(Math.min(outstanding[partner], contributionDue(status, partner))) : 0;
   const applyAdvance = async (partner: Partner) => {
-    if (applying || saving) return;
-    setApplying(partner); setSaveError(""); setSuccess("");
+    if (saving) return;
+    setSaveError("");
     try {
+      await save.run(async () => {
       applyIds.current[partner] ??= crypto.randomUUID();
       const response = await fetch("/api/contribution-offsets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner, amount: applicable(partner), date: today(), requestId: applyIds.current[partner] }) });
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Could not apply the advance.");
       delete applyIds.current[partner];
-      setSuccess(`${person(partner)}'s advance applied`); onChanged();
+      });
+      // The figures above update with the result, so no extra message.
+      onChanged();
     } catch (e) { setSaveError(e instanceof Error ? e.message : "Could not apply the advance. Retry to finish it safely."); }
-    finally { setApplying(null); }
   };
-  const startRepayment = (partner: Partner) => { setRepaying(partner); setAmount(String(outstanding[partner])); setDate(today()); setSaveError(""); setSuccess(""); setUncertain(false); requestId.current = crypto.randomUUID(); };
+  const startRepayment = (partner: Partner) => { setRepaying(partner); setAmount(String(outstanding[partner])); setDate(today()); setSaveError(""); setUncertain(false); requestId.current = crypto.randomUUID(); };
   const repay = async () => {
     const value = parseAmount(amount);
     if (!repaying || value == null || value <= 0 || value > outstanding[repaying]) { setSaveError("Enter an amount no greater than the outstanding advance."); return; }
-    setSaving(true); setSaveError("");
+    setSaveError("");
     try {
+      await save.run(async () => {
       const response = await fetch("/api/contribution-repayments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ partner: repaying, amount: money(value), date, requestId: requestId.current }) });
       const result = await response.json();
       if (response.status >= 500) { setUncertain(true); throw new Error("Could not confirm whether the repayment saved. Retry unchanged details to check safely."); }
       if (!response.ok) throw new Error(result.error ?? "Could not record repayment.");
-      setRepaying(null); setSuccess("Repayment recorded"); onChanged();
+      });
+      setRepaying(null); onChanged();
     } catch (e) { if (e instanceof TypeError) setUncertain(true); setSaveError(e instanceof Error ? e.message : "Could not verify the repayment. Retry with the same details to check it safely."); }
-    finally { setSaving(false); }
   };
   // The hero already shows the agreed amount, so the editor is only the action beside it.
   const agreementEditor = status ? <ContributionAgreementEditor showHeading={false} showAmounts={false} editing={editingAgreement} onEditingChange={setEditingAgreement} month={month} agreement={status.agreement}
     proposed={{ anas: Math.max(0, money(status.anasPlan - status.anasPersonalDebt)), salma: Math.max(0, money(status.salmaPlan - status.salmaPersonalDebt)) }}
-    shares={status.agreement?.shares ?? { anas: .65, salma: .35 }} disabled={saving || !!repaying} onSaved={() => { setAgreedWink(Date.now()); onChanged(); }} /> : null;
-  return <BottomSheet open={open} onClose={() => { if (!saving) onClose(); }} label="Monthly contributions" size="standard" detent="content">
+    shares={status.agreement?.shares ?? { anas: .65, salma: .35 }} disabled={!!repaying} onBusyChange={setAgreementSaving} onSaved={() => { setAgreedWink(Date.now()); onChanged(); }} /> : null;
+  const close = guardClose(saving, onClose);
+  return <BottomSheet open={open} onClose={close} label="Monthly contributions" size="standard" detent="content">
     <div className="contribution-sheet sheet-body">
       <SheetHeader className="contribution-header"><h2>Contributions</h2>
-        <button type="button" className="contribution-close" aria-label="Close contributions" disabled={saving} onClick={onClose}><XIcon size={20} /></button></SheetHeader>
+        <button type="button" className="sheet-close-button" aria-label="Close contributions" onClick={close}><XIcon size={20} /></button></SheetHeader>
       {/* The same month chip as the Budget screen: past months stay reviewable for advances and repayments. */}
       <div className="contribution-toolbar"><MonthPicker value={month} max={today().slice(0, 7)} onChange={event => event.target.value && onMonthChange(event.target.value)} aria-label="Contribution month" variant="chip" /></div>
-      {loading ? <SkeletonRows label="Loading contributions" count={4} /> : error || !status ? <Banner tone="danger" role="alert" title="Contributions unavailable" action={<button className="contribution-text" type="button" onClick={onRetry}>Retry</button>} /> : <>
+      {loading ? <SkeletonRows label="Loading contributions" count={4} /> : error || !status ? <Banner tone="danger" role="alert" title="Contributions unavailable" action={<Button variant="quiet" size="compact" onClick={onRetry}>Retry</Button>} /> : <>
         {(() => {
           // Both jars; the one in front is whose answers show (the partner tapped to get here, else you).
           const me = shown;
@@ -179,18 +191,19 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
           };
           return <ContributionSummary key={`${month}-${me}`} partner={me} agreed={!!status.agreement} target={target}
             contributed={Math.max(0, actual)} sent={Math.max(0, money(actual - direct))} left={left} categories={status.directByCategory?.[me] ?? []}
-            advance={outstanding[me]} applicable={applicable(me)} busy={saving || !!repaying || !!applying} applying={applying === me}
+            advance={outstanding[me]} applicable={applicable(me)} busy={!!repaying}
             onApply={() => void applyAdvance(me)} onRepay={() => startRepayment(me)} agreementAction={agreementEditor}
             onEditAgreement={() => setEditingAgreement(value => !value)} editingAgreement={editingAgreement}
             isMe={me === personalScope} month={month} winkId={agreedWink} levels={{ anas: levelFor("anas"), salma: levelFor("salma") }} onShow={partner => { setShown(partner); setEditingAgreement(false); }} />;
         })()}
         {ledger && ledger.unappliedRepayments.anas + ledger.unappliedRepayments.salma > 0 && <Banner tone="warning" role="alert">A corrected agreement or transaction left a repayment above the advance. Review repayment activity.</Banner>}
-        {repaying && <section className="contribution-repay"><h3>Record repayment</h3><label>Repayment amount<input autoFocus className="field-input" inputMode="decimal" value={amount} disabled={saving || uncertain} onChange={e => { setAmount(e.target.value); requestId.current = crypto.randomUUID(); }} /></label>{uncertain || saving ? <span className="contribution-note">Repayment date: {date}</span> : <DatePicker value={date} max={today()} onChange={event => { setDate(event.target.value); requestId.current = crypto.randomUUID(); }} aria-label="Date money was returned" />}
-          <div className="contribution-actions"><button type="button" className="contribution-primary" disabled={saving} onClick={() => void repay()}>{saving ? "Recording…" : uncertain ? "Check repayment" : "Save repayment"}</button><button type="button" className="contribution-text" disabled={saving} onClick={() => setRepaying(null)}>Cancel</button></div>
+        {repaying && <section className="contribution-repay"><h3>Record repayment</h3><label>Repayment amount<input autoFocus className="field-input" inputMode="decimal" value={amount} disabled={uncertain} onChange={e => { setAmount(e.target.value); requestId.current = crypto.randomUUID(); }} /></label>{uncertain ? <span className="contribution-note">Repayment date: {date}</span> : <DatePicker value={date} max={today()} onChange={event => { setDate(event.target.value); requestId.current = crypto.randomUUID(); }} aria-label="Date money was returned" />}
+          <div className="contribution-actions"><Button variant="primary" onClick={() => void repay()}>{uncertain ? "Check repayment" : "Save repayment"}</Button><Button variant="quiet" onClick={() => setRepaying(null)}>Cancel</Button></div>
         </section>}
-        {saveError && <Banner tone="danger" role="alert">{saveError}</Banner>}{success && <p role="status">{success}</p>}
+        {saveError && <Banner tone="danger" role="alert">{saveError}</Banner>}
       </>}
     </div>
+    <SavingCover saving={saving} />
   </BottomSheet>;
 }
 
@@ -198,10 +211,10 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
  * What's left to cover up front, one sentence, then where the paid amount went: sent to Joined,
  * or Joint spending paid directly. Tap the agreed amount to change it.
  */
-function ContributionSummary({ partner, target, agreed, contributed, sent, left, categories, advance, applicable, busy, applying, onApply, onRepay, agreementAction, onEditAgreement, editingAgreement, levels, onShow, isMe, month, winkId }: {
+function ContributionSummary({ partner, target, agreed, contributed, sent, left, categories, advance, applicable, busy, onApply, onRepay, agreementAction, onEditAgreement, editingAgreement, levels, onShow, isMe, month, winkId }: {
   month: string; winkId?: number;
   partner: Partner; target: number; agreed: boolean; contributed: number; sent: number; left: number; categories: DirectSpend[];
-  advance: number; applicable: number; busy: boolean; applying: boolean; onApply: () => void; onRepay: () => void;
+  advance: number; applicable: number; busy: boolean; onApply: () => void; onRepay: () => void;
   /** The agreement editor, opened by tapping the agreed amount. */
   agreementAction?: ReactNode;
   onEditAgreement: () => void; editingAgreement: boolean;
@@ -242,13 +255,13 @@ function ContributionSummary({ partner, target, agreed, contributed, sent, left,
       {/* Advances change what's left, so their actions sit with it. */}
       {(advance > 0 || applicable > 0) && <div className="contribution-advance">
         {advance > 0 && <span>Advance {whole$(advance)}</span>}
-        {applicable > 0 && <button className="contribution-primary" type="button" disabled={busy} aria-label={`Apply ${fmt(applicable)} MAD of ${person(partner)}'s advance to this month`} onClick={onApply}>{applying ? "Applying…" : <>Apply <Money value={applicable} /></>}</button>}
-        {advance > 0 && <button className="contribution-text" type="button" disabled={busy} onClick={onRepay}>Record repayment</button>}
+        {applicable > 0 && <Button variant="primary" size="compact" disabled={busy} aria-label={`Apply ${fmt(applicable)} MAD of ${person(partner)}'s advance to this month`} onClick={onApply}>Apply <Money value={applicable} /></Button>}
+        {advance > 0 && <Button variant="quiet" size="compact" disabled={busy} onClick={onRepay}>Record repayment</Button>}
       </div>}
     </section>
     {contributed >= 0.5 && <section className="contribution-in" aria-label="Where your contribution went">
       <ul>
-        {sent >= 0.5 && <li><span className="contribution-in-icon" aria-hidden="true"><TransferIcon size={14} /></span><span className="contribution-in-name">Sent to Joined</span><span>{whole$(sent)}</span></li>}
+        {sent >= 0.5 && <li><span className="contribution-in-icon" aria-hidden="true"><TransferIcon size={16} /></span><span className="contribution-in-name">Sent to Joined</span><span>{whole$(sent)}</span></li>}
         {categories.length > 0 && <li className="contribution-in-group">Paid directly</li>}
         {categories.map(category => <li key={category.categoryId}><CategoryIcon icon={category.icon} categoryName={category.name} size={24} /><span className="contribution-in-name">{category.name}</span><span>{whole$(category.amount)}</span></li>)}
       </ul>

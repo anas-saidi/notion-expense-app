@@ -1,6 +1,5 @@
 "use client";
 
-import { LiquidButton } from "./ui/LiquidGlass";
 import { SheetHeader } from "./ui/SheetLayout";
 
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
@@ -10,6 +9,7 @@ import { Money } from "./Money";
 import { BottomSheet } from "./ui/BottomSheet";
 import { XIcon } from "./ui/icons";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { EmptyState } from "./ui/EmptyState";
 import { accountIconSource } from "../../lib/category-icons";
 
 type ManageScreenProps = {
@@ -50,7 +50,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails, wi
       open
       onClose={onClose}
       label="Accounts"
-      size={wide ? "planning" : "standard"}
+      size={wide ? "account" : "standard"}
       panelStyle={sheetStyle}
       contentStyle={sheetContentStyle}
     >
@@ -58,9 +58,9 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails, wi
       <div className="manage-list-pane">
       <SheetHeader style={headerStyle}>
         <h1 style={titleStyle}>Accounts</h1>
-        <LiquidButton className="sheet-close-button" type="button" onClick={onClose} aria-label="Close accounts" style={closeStyle}>
-          <XIcon size={18} />
-        </LiquidButton>
+        <button className="sheet-close-button" type="button" onClick={onClose} aria-label="Close accounts">
+          <XIcon size={20} />
+        </button>
       </SheetHeader>
 
       <section aria-label="Account totals" style={heroStyle}>
@@ -106,7 +106,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails, wi
             ))}
           </div>
         ) : (
-          <div style={emptyStyle}>No accounts in this wallet.</div>
+          <EmptyState minHeight={120}>No accounts in this wallet.</EmptyState>
         )}
       </section>
       </div>
@@ -119,37 +119,35 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails, wi
 const screenStyle: CSSProperties = {
   width: "100%",
   margin: "0 auto",
-  padding: "4px 16px calc(env(safe-area-inset-bottom, 0px) + 28px)",
+  padding: "16px 24px calc(env(safe-area-inset-bottom, 0px) + 24px)",
   display: "grid",
   alignContent: "start",
-  gap: 32,
+  gap: 24,
 };
 
-const sheetStyle: CSSProperties = { borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0", background: "var(--bg)" };
+const sheetStyle: CSSProperties = { borderRadius: "var(--radius-sheet) var(--radius-sheet) 0 0" };
 const sheetContentStyle: CSSProperties = { overflowX: "hidden" };
 
 const headerStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 };
-const titleStyle: CSSProperties = { margin: 0, fontFamily: "var(--font-display)", fontSize: 24, lineHeight: 1.1, fontWeight: 750, letterSpacing: "-0.025em", color: "var(--text)" };
-const closeStyle: CSSProperties = { width: 44, height: 44, border: "none", borderRadius: "50%", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
-const heroStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 10, padding: "16px 0 8px", textAlign: "center" };
-const heroLabelStyle: CSSProperties = { fontSize: 12, lineHeight: 1, fontWeight: 700, color: "var(--muted)" };
-const heroAmountStyle: CSSProperties = { display: "inline-flex", justifyContent: "center", fontFamily: "var(--font-body)", fontSize: "clamp(44px, 13vw, 64px)", lineHeight: 0.96, fontWeight: 500, letterSpacing: "-0.035em", color: "var(--text)", whiteSpace: "nowrap" };
+const titleStyle: CSSProperties = { margin: 0, fontFamily: "var(--font-body)", fontSize: 20, lineHeight: "24px", fontWeight: 600, color: "var(--text)" };
+const heroStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 8, padding: "16px 0 8px", textAlign: "center" };
+const heroLabelStyle: CSSProperties = { fontSize: 13, lineHeight: "16px", fontWeight: 600, color: "var(--muted)" };
+const heroAmountStyle: CSSProperties = { display: "inline-flex", justifyContent: "center", fontFamily: "var(--font-body)", fontSize: 34, lineHeight: "40px", fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap" };
 
+// Passive metadata, so plain text (not a pill); danger only when negative.
 const readyMetricStyle = (negative: boolean): CSSProperties => ({
-  display: "inline-flex", alignItems: "baseline", gap: 8, minHeight: 32, marginTop: 4, padding: "7px 10px", borderRadius: 9,
-  background: negative ? "color-mix(in srgb, var(--danger) 10%, var(--surface))" : "color-mix(in srgb, var(--success) 10%, var(--surface))",
-  color: negative ? "var(--danger)" : "var(--success)", fontSize: 12, fontWeight: 650,
+  display: "inline-flex", alignItems: "baseline", gap: 4,
+  color: negative ? "var(--danger)" : "var(--text2)", fontSize: 13, lineHeight: "16px", fontWeight: 600,
 });
 
 const accountsSectionStyle: CSSProperties = { display: "grid", gap: 12 };
 const listStyle: CSSProperties = { display: "grid" };
 
 // Mirrors ui/TransactionRow so account rows read like every other list in the app.
-const accountRowStyle: CSSProperties = { width: "100%", minHeight: 64, padding: "10px 2px", border: 0, background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer" };
-const accountCopyStyle: CSSProperties = { flex: 1, minWidth: 0, display: "grid", gap: 3 };
+const accountRowStyle: CSSProperties = { width: "100%", minHeight: 64, padding: "12px 0", border: 0, background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer" };
+const accountCopyStyle: CSSProperties = { flex: 1, minWidth: 0, display: "grid", gap: 4 };
 const rowTitleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, lineHeight: 1.2, fontWeight: 500, color: "var(--text2)" };
 const rowMetaStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.2, color: "var(--muted)" };
-const amountStackStyle: CSSProperties = { display: "grid", justifyItems: "end", gap: 6, flexShrink: 0, whiteSpace: "nowrap" };
-const balanceStyle: CSSProperties = { fontSize: 15, lineHeight: 1, fontWeight: 650, fontVariantNumeric: "tabular-nums", color: "var(--text2)" };
+const amountStackStyle: CSSProperties = { display: "grid", justifyItems: "end", gap: 4, flexShrink: 0, whiteSpace: "nowrap" };
+const balanceStyle: CSSProperties = { fontSize: 15, lineHeight: 1, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: "var(--text2)" };
 const readyStyle = (negative: boolean): CSSProperties => ({ fontSize: 12, lineHeight: 1, color: negative ? "var(--danger)" : "var(--muted)" });
-const emptyStyle: CSSProperties = { minHeight: 120, display: "grid", placeItems: "center", borderRadius: "var(--radius-card)", background: "var(--surface2)", color: "var(--muted)", fontSize: 13 };

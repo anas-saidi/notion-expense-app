@@ -9,7 +9,9 @@ import { useEffect, useState, type CSSProperties } from "react";
 import type { Account } from "./app-types";
 import { BottomSheet } from "./ui/BottomSheet";
 import { Money, Currency } from "./Money";
-import { BanknoteIcon, CheckIcon, ChevronDownIcon, XIcon } from "./ui/icons";
+import { BanknoteIcon, ChevronDownIcon, XIcon } from "./ui/icons";
+import { Button } from "./ui/Button";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
@@ -27,7 +29,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
   const [name, setName] = useState("Income");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
-  const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const save = useBlockingSave();
   const [error, setError] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -37,7 +39,6 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
     setName("Income");
     setAmount("");
     setDate(today());
-    setStatus("idle");
     setError("");
     setDetailsOpen(false);
   }, [open, account?.id]);
@@ -45,13 +46,13 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
   const parsedAmount = parseAmount(amount) ?? 0;
   const showDetails = detailsOpen || name.trim() === "";
   const dateLabel = date === today() ? "Today" : fmtDate(date);
-  const canSubmit = Boolean(account?.id && name.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0 && (status === "idle" || status === "error"));
+  const canSubmit = Boolean(account?.id && name.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0);
 
   const submit = async () => {
     if (!account || !canSubmit) return;
-    setStatus("saving");
     setError("");
     try {
+      await save.run(async () => {
       const res = await fetch("/api/monthly-income", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,21 +66,22 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not add income");
-      setStatus("success");
+      });
       onSuccess(`Income added to ${account.label}`);
       onClose();
     } catch (err: unknown) {
-      setStatus("error");
       setError(err instanceof Error ? err.message : "Could not add income");
     }
   };
+
+  const close = guardClose(save.saving, onClose);
 
   if (!open || !account) return null;
 
   return (
     <BottomSheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       label={`Add income to ${account.label}`}
       size="standard"
       detent="content"
@@ -90,14 +92,14 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
       <SheetBody style={innerStyle}>
         <SheetHeader style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <div style={accountIconStyle}><CategoryIcon icon={accountIconSource(account.type)} size={28} /></div>
+            <div style={accountIconStyle}><CategoryIcon icon={accountIconSource(account.type)} size={24} /></div>
             <div style={{ minWidth: 0 }}>
               <div style={eyebrowStyle}>Add income</div>
               <h2 style={titleStyle}>{account.label}</h2>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
-            <XIcon size={18} />
+          <button type="button" className="sheet-close-button" onClick={close} aria-label="Close">
+            <XIcon size={20} />
           </button>
         </SheetHeader>
 
@@ -125,7 +127,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
           {showDetails ? <>
             <label style={fieldStyle}>
               <span style={labelStyle}>Description</span>
-              <input value={name} onChange={(event) => setName(event.target.value)} style={inputStyle} />
+              <input className="field-input" value={name} onChange={(event) => setName(event.target.value)} />
             </label>
 
             <label style={fieldStyle}>
@@ -134,24 +136,23 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
             </label>
           </> : (
             <button type="button" aria-expanded={false} aria-label={`Edit description and date: ${name.trim()}, ${dateLabel}`} onClick={() => setDetailsOpen(true)} style={summaryRowStyle}>
-              <span style={summaryTextStyle}>{name.trim()} · {dateLabel}</span>
+              <span style={summaryTextStyle}>{name.trim()}, {dateLabel}</span>
               <ChevronDownIcon size={16} aria-hidden="true" />
             </button>
           )}
         </section>
 
-        {isJointIncomeAccount(account.label) && <IncomeUseControl value={incomeUse} onChange={setIncomeUse} disabled={status === "saving"} />}
+        {isJointIncomeAccount(account.label) && <IncomeUseControl value={incomeUse} onChange={setIncomeUse} />}
 
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
         </div>
 
-        <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48 }}>
-          {status === "success" && <CheckIcon size={16} />}
-          {status === "idle" && <BanknoteIcon size={16} strokeWidth={2.3} />}
-          {status === "saving" ? "Adding..." : status === "success" ? "Added" : "Add income"}
-        </button>
+        <Button variant="primary" block onClick={submit} disabled={!canSubmit} icon={<BanknoteIcon />} style={{ flexShrink: 0 }}>
+          Add income
+        </Button>
       </SheetBody>
+      <SavingCover saving={save.saving} />
     </BottomSheet>
   );
 }
@@ -181,18 +182,17 @@ const summaryTextStyle: CSSProperties = {
 };
 
 const sheetStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--surface) 98%, var(--surface))",
   borderRadius: "var(--radius-sheet)",
   overflow: "hidden",
 };
 
 const innerStyle: CSSProperties = {
-  padding: "18px 18px 22px",
+  padding: "16px 24px 24px",
   display: "flex",
   flexDirection: "column",
   minHeight: 0,
   overflow: "hidden",
-  gap: 16,
+  gap: 24,
 };
 
 const headerStyle: CSSProperties = {
@@ -204,9 +204,9 @@ const headerStyle: CSSProperties = {
 };
 
 const accountIconStyle: CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: 14,
+  width: 40,
+  height: 40,
+  borderRadius: "var(--radius-control)",
   background: "color-mix(in srgb, var(--accent) 10%, var(--surface2))",
   display: "inline-flex",
   alignItems: "center",
@@ -229,24 +229,12 @@ const titleStyle: CSSProperties = {
   color: "var(--text)",
 };
 
-const closeStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
 const balanceCardStyle: CSSProperties = {
-  minHeight: 54,
-  borderRadius: 16,
+  minHeight: 56,
+  borderRadius: "var(--radius-card)",
   background: "color-mix(in srgb, var(--accent) 8%, var(--surface))",
   color: "var(--text2)",
-  padding: "0 13px",
+  padding: "0 12px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
@@ -261,66 +249,35 @@ const formStyle: CSSProperties = {
 
 const fieldStyle: CSSProperties = {
   display: "grid",
-  gap: 7,
+  gap: 8,
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
+  fontSize: 13,
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--text2)",
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 48,
-  borderRadius: 14,
-  border: "1px solid transparent",
-  boxShadow: "inset 0 0 0 1.5px var(--border2)",
-  background: "color-mix(in srgb, var(--surface2) 34%, var(--surface))",
-  color: "var(--text2)",
-  padding: "0 13px",
-  fontSize: 15,
-  outline: "none",
-  boxSizing: "border-box",
 };
 
 const amountWrapStyle: CSSProperties = {
   minHeight: 56,
-  borderRadius: 16,
+  borderRadius: "var(--radius-control)",
   border: "1px solid var(--border)",
   background: "var(--surface)",
   display: "flex",
   alignItems: "center",
-  gap: 10,
-  padding: "0 14px",
+  gap: 8,
+  padding: "0 16px",
 };
 
 const amountInputStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
   border: "none",
-  outline: "none",
   background: "transparent",
-  color: "var(--text2)",
+  color: "var(--text)",
   fontSize: 28,
   fontWeight: 500,
   fontVariantNumeric: "tabular-nums",
 };
 
-
-const submitStyle: CSSProperties = {
-  flexShrink: 0,
-  width: "100%",
-  minHeight: 52,
-  borderRadius: 14,
-  border: "none",
-  background: "var(--accent)",
-  color: "var(--accent-ink)",
-  fontWeight: 800,
-  fontSize: 15,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-};

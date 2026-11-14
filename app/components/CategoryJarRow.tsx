@@ -24,13 +24,14 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, b
   planned: number;
   spent: number;
   /** A bill due within a week this category can't cover: a red dot on the art and its own line. */
-  billShort?: { name: string; dueDate: string; short: number };
+  billShort?: { name: string; dueDate: string; short: number; paid?: number };
   onOpen: () => void;
 }) {
   const { state, low, amount, level } = status;
   // What the category held this month: spent plus what's left (carry-over included), so "spent / held" adds up.
   const held = Math.max(0, spent) + Math.max(0, amount);
-  const line = billShort ? { text: `${billShort.name} due ${fmtDate(billShort.dueDate)}, ${fmt(Math.ceil(billShort.short - 0.005))} short`, color: "var(--danger)", strong: true }
+  // A part-paid bill says so, so the short is clearly what's left to cover, not the whole bill.
+  const line = billShort ? { text: `${billShort.name} due ${fmtDate(billShort.dueDate)}, ${billShort.paid ? `${fmt(Math.round(billShort.paid))} paid, ` : ""}${fmt(Math.ceil(billShort.short - 0.005))} short`, color: "var(--danger)", strong: true }
     : state === "over" ? { text: "Overspent", color: "var(--status-over)", strong: true }
     : low ? { text: runwayDays == null ? "Running low" : runwayLabel(runwayDays), color: "var(--status-low)", strong: false }
     : state === "normal" && Math.round(spent) > 0 ? { text: `${fmt(Math.round(spent))} spent of ${fmt(Math.round(held))}`, color: "var(--text2)", strong: false, spentOnly: true }
@@ -43,7 +44,7 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, b
         <span style={nameStyle}>{cat.name}</span>
         {/* "X spent" repeats the desktop Spent column, so it hides there. */}
         {line && <span className={"spentOnly" in line ? "budget-row-spent-line" : undefined} style={{ ...lineStyle, color: line.color, fontWeight: line.strong ? 600 : 500 }}>{"spentOnly" in line
-          ? <>{fmt(Math.round(spent))}<span style={{ color: "var(--muted)" }}> / {fmt(Math.round(held))} MAD</span></>
+          ? <>{fmt(Math.round(spent))}<span style={{ color: "var(--muted)" }}> / {fmt(Math.round(held))}</span></>
           : line.text}</span>}
       </span>
       <TableCols planned={planned} spent={spent} />
@@ -67,7 +68,7 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   const pct = goal > 0 ? Math.min(1, saved / goal) : 0;
   const when = goalLabel(cat.goalDate);
   // A goal that missed its date gets its own line, in the colour for money that's short.
-  const pastDue = goal > 0 && !reached && when?.past ? `Past due · ${when.label}` : null;
+  const pastDue = goal > 0 && !reached && when?.past ? `Past due since ${when.label}` : null;
   // Reaching a goal bursts once on this device (per goal amount), the next time the row is seen.
   const burst = useOnceSignal(`goal:${cat.id}:${Math.round(goal)}`, reached, "burst");
   const line = goal > 0
@@ -134,7 +135,7 @@ const rowStyle: CSSProperties = {
   alignItems: "center",
   gap: 12,
   minHeight: 76,
-  padding: "8px 24px 8px 10px",
+  padding: "8px 24px 8px 12px",
   border: "none",
   background: "transparent",
   width: "100%",
@@ -145,5 +146,5 @@ const rowStyle: CSSProperties = {
 };
 const textStyle: CSSProperties = { display: "grid", gap: 2, flex: 1, minWidth: 0 };
 const nameStyle: CSSProperties = { fontSize: 15, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" };
-const lineStyle: CSSProperties = { fontSize: 12, fontVariantNumeric: "tabular-nums" };
-const amountStyle: CSSProperties = { fontSize: 17, fontWeight: 600, lineHeight: 1, fontVariantNumeric: "tabular-nums", flexShrink: 0 };
+const lineStyle: CSSProperties = { fontSize: 12, lineHeight: "16px", fontVariantNumeric: "tabular-nums" };
+const amountStyle: CSSProperties = { fontSize: 15, fontWeight: 600, lineHeight: "22px", fontVariantNumeric: "tabular-nums", flexShrink: 0 };

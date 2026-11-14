@@ -58,12 +58,12 @@ export function MonthPicker({value,onChange,max,min,placement="bottom",align="le
     onChange?.({ target: { value: next }, currentTarget: { value: next } } as ChangeEvent<HTMLInputElement>);
     setOpen(false);
   };
-  return <span ref={anchor} className="date-picker-anchor"><PickerTrigger label={label} open={open} variant={variant} ariaLabel={String(rest["aria-label"] ?? "Choose month")} onClick={() => setOpen(!open)} /><PickerPopover open={open} anchorRef={anchor} title="Choose month" onClose={() => setOpen(false)} placement={placement} align={align} zIndex={180} size="menu"><MonthCalendar value={selected} min={min ? String(min) : undefined} max={max ? String(max) : undefined} onChange={selectMonth} /></PickerPopover></span>;
+  return <span ref={anchor} className="date-picker-anchor"><PickerTrigger label={label} open={open} variant={variant} ariaLabel={String(rest["aria-label"] ?? "Choose month")} onClick={() => setOpen(!open)} /><PickerPopover open={open} anchorRef={anchor} title="Choose month" onClose={() => setOpen(false)} placement={placement} align={align} zIndex={180} size="calendar"><MonthCalendar value={selected} min={min ? String(min) : undefined} max={max ? String(max) : undefined} onChange={selectMonth} /></PickerPopover></span>;
 }
 
 export function DatePickerTrigger({ label, open, ariaLabel, onClick, variant = "field" }: { label: string; open: boolean; ariaLabel: string; onClick: () => void; variant?: PickerVariant }) {
   const chip = variant === "chip";
-  return <LiquidButton type="button" className={`choice-trigger date-picker-trigger${chip ? " composer-picker-chip" : ""}`} aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} onClick={onClick}><CalendarIcon size={16} aria-hidden="true" /><span>{label}</span>{!chip && <ChevronDownIcon size={14} aria-hidden="true" className={open ? "date-picker-chevron date-picker-chevron--open" : "date-picker-chevron"} />}</LiquidButton>;
+  return <LiquidButton type="button" className={`choice-trigger date-picker-trigger${chip ? " composer-picker-chip" : ""}`} aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} onClick={onClick}><CalendarIcon size={16} aria-hidden="true" /><span>{label}</span>{!chip && <ChevronDownIcon size={16} aria-hidden="true" className={open ? "date-picker-chevron date-picker-chevron--open" : "date-picker-chevron"} />}</LiquidButton>;
 }
 
 const PickerTrigger = DatePickerTrigger;

@@ -235,6 +235,51 @@ export const getAssignBalanceByScope = (
 };
 
 /**
+ * Each account's unassigned is its balance minus what its jars hold. When the two disagree, the account and
+ * category reads came from different moments (one refreshed, the other not yet), so totals built on them are wrong.
+ */
+export const accountsAgreeWithCategories = (accounts: Account[], categories: Category[]) => {
+  const norm = (id: string) => id.replace(/-/g, "").toLowerCase();
+  return accounts.every(account => {
+    if (account.readyToAssign == null || account.balance == null) return true;
+    const held = categories.reduce((sum, c) => c.defaultAccount && norm(c.defaultAccount) === norm(account.id) ? sum + (c.available ?? 0) : sum, 0);
+    return Math.abs(account.balance - held - account.readyToAssign) <= 1;
+  });
+};
+
+/** One line of "why short": the figure, and whether it adds to the shortfall (+1) or covers it (-1). */
+export type ShortfallPart = { label: string; amount: number; sign: 1 | -1 };
+/**
+ * The parts of `getAssignBalanceByScope` for one scope, so "X short" can show its working. They add up to the
+ * shortfall: Joint = jars − Joined − contributions to come + advances owed back; personal = jars − account + savings
+ * not moved yet + owed to Couple.
+ */
+export const shortfallBreakdown = (
+  scope: BudgetScope,
+  accounts: Account[],
+  contributionRemaining: Partial<Record<Exclude<BudgetScope, "joint">, number>> | undefined,
+  advanceReserve: number,
+): ShortfallPart[] => {
+  const { anasDue, salmaDue } = personalReadyAndDue(accounts, contributionRemaining);
+  const own = accounts.filter(a => !isSavingsAccount(a) && (scope === "joint" ? /joined|joint/i.test(a.label) : scopeFromAccountLabel(a.label) === scope));
+  const balance = own.reduce((sum, a) => sum + (a.balance ?? 0), 0);
+  const jars = balance - own.reduce((sum, a) => sum + (a.readyToAssign ?? 0), 0);
+  const holder = own.length === 1 ? accountDisplayName(own[0].label) : scope === "joint" ? "Joined" : "Your accounts";
+  const parts: (ShortfallPart | false)[] = scope === "joint" ? [
+    { label: "Joint jars hold", amount: jars, sign: 1 },
+    balance >= 0 ? { label: `${holder} has`, amount: balance, sign: -1 } : { label: `${holder} is overdrawn by`, amount: -balance, sign: 1 },
+    anasDue + salmaDue > 0.5 && { label: "Contributions still to come", amount: anasDue + salmaDue, sign: -1 },
+    advanceReserve > 0.5 && { label: "Kept for advances owed back", amount: advanceReserve, sign: 1 },
+  ] : [
+    { label: "Your jars hold", amount: jars, sign: 1 },
+    balance >= 0 ? { label: `${holder} has`, amount: balance, sign: -1 } : { label: `${holder} is overdrawn by`, amount: -balance, sign: 1 },
+    getSavingsReservationByScope(accounts)[scope] > 0.5 && { label: "Savings not moved yet", amount: getSavingsReservationByScope(accounts)[scope], sign: 1 },
+    (scope === "anas" ? anasDue : salmaDue) > 0.5 && { label: "Still owed to Couple", amount: scope === "anas" ? anasDue : salmaDue, sign: 1 },
+  ];
+  return parts.filter((p): p is ShortfallPart => !!p);
+};
+
+/**
  * Adds `assignable` to each account: personal accounts reserve unfunded savings
  * and what they still owe Joint before funding any more categories.
  * With one personal account per partner (the usual case) it carries the live due;

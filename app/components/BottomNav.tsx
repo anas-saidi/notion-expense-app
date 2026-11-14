@@ -44,7 +44,7 @@ export function BottomNav({ tab, onTabChange, desktopPrimaryAction, desktopActio
     <nav aria-label="App navigation" className="app-nav">
       <div ref={phoneNav} className="phone-nav-glass">
         <LiquidTabBar className="phone-nav-tabs" aria-label="Main screens"
-          items={items.map(item => ({ value: item.key, label: item.label, icon: item.key === "home" ? <HomeIcon size={22} /> : item.key === "budget" ? <SlidersIcon size={22} /> : <ChartPieIcon size={22} /> }))}
+          items={items.map(item => ({ value: item.key, label: item.label, icon: item.key === "home" ? <HomeIcon size={24} /> : item.key === "budget" ? <SlidersIcon size={24} /> : <ChartPieIcon size={24} /> }))}
           value={tab} onValueChange={value => {
             if (value !== "home" && value !== "budget" && value !== "history") return;
             if (tab !== value) haptic("selection");

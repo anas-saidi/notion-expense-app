@@ -16,7 +16,7 @@ describe("billShortfalls", () => {
   const bill = (categoryId: string, amount: number, dueDate: string, name = "Rent") => ({ name, categoryId, amount, dueDate });
   it("flags a bill due within a week that the category can't cover", () => {
     const out = billShortfalls([bill("a-1", 500, "2026-11-18")], [{ id: "a1", available: 200 }], "2026-11-13");
-    expect(out.get("a1")).toEqual({ name: "Rent", dueDate: "2026-11-18", short: 300 });
+    expect(out.get("a1")).toEqual({ name: "Rent", dueDate: "2026-11-18", short: 300, paid: 0 });
   });
   it("ignores covered bills and bills more than a week away", () => {
     expect(billShortfalls([bill("a1", 500, "2026-11-18")], [{ id: "a1", available: 500 }], "2026-11-13").size).toBe(0);
@@ -24,7 +24,7 @@ describe("billShortfalls", () => {
   });
   it("adds up several bills in one category and names the first due", () => {
     const out = billShortfalls([bill("a1", 100, "2026-11-19", "Water"), bill("a1", 100, "2026-11-15", "Power")], [{ id: "a1", available: 150 }], "2026-11-13");
-    expect(out.get("a1")).toEqual({ name: "Power", dueDate: "2026-11-15", short: 50 });
+    expect(out.get("a1")).toEqual({ name: "Power", dueDate: "2026-11-15", short: 50, paid: 0 });
   });
 });
 

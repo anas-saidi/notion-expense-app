@@ -1,7 +1,7 @@
 "use client";
 import { categoryIconSource } from "../../lib/category-icons";
 
-import { SheetBody, SheetHeader } from "./ui/SheetLayout";
+import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Category } from "./app-types";
@@ -12,6 +12,8 @@ import { Banner } from "./ui/Banner";
 import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { XIcon } from "./ui/icons";
+import { Button } from "./ui/Button";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 
 type Props = {
   /** The savings category money comes out of; null keeps the sheet closed. */
@@ -31,7 +33,7 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
   const [amount, setAmount] = useState("");
   const [toId, setToId] = useState("");
   const [confirming, setConfirming] = useState(false);
-  const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
+  const save = useBlockingSave();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -39,7 +41,6 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
     setAmount("");
     setToId("");
     setConfirming(false);
-    setStatus("idle");
     setError("");
   }, [savings]);
 
@@ -48,7 +49,7 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
   const value = Number.isFinite(parsed) ? Math.round(parsed) : 0;
   const tooMuch = value > available;
   const destination = useMemo(() => destinations.find((c) => c.id === toId) ?? null, [destinations, toId]);
-  const canSubmit = !!savings && !!destination && value > 0 && !tooMuch && status !== "saving";
+  const canSubmit = !!savings && !!destination && value > 0 && !tooMuch;
 
   // Any edit means the confirmation no longer describes what would happen.
   useEffect(() => { setConfirming(false); }, [amount, toId]);
@@ -56,9 +57,9 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
   const submit = async () => {
     if (!canSubmit || !savings || !destination) return;
     if (!confirming) { setConfirming(true); return; }
-    setStatus("saving");
     setError("");
     try {
+      await save.run(async () => {
       const res = await fetch("/api/transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,25 +73,27 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not take money out of savings");
+      });
       onSuccess(`${fmt(value)} moved to ${destination.name}`);
       onClose();
     } catch (err: unknown) {
-      setStatus("error");
       setConfirming(false);
       setError(err instanceof Error ? err.message : "Could not take money out of savings");
     }
   };
 
+  const close = guardClose(save.saving, onClose);
+
   return (
-    <BottomSheet open={!!savings} onClose={onClose} label="Take out of savings" size="standard" panelStyle={sheetStyle} zIndex={120}>
+    <BottomSheet open={!!savings} onClose={close} label="Take out of savings" size="standard" panelStyle={sheetStyle} zIndex={120}>
       <SheetBody style={innerStyle}>
         <SheetHeader style={headerStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             <CategoryIcon icon={savings?.icon} categoryName={savings?.name} style={{ fontSize: 28, flexShrink: 0 }} />
             <h2 style={titleStyle}>Take from {savings?.name ?? "savings"}</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={closeStyle}>
-            <XIcon strokeWidth={2.2} />
+          <button type="button" className="sheet-close-button" onClick={close} aria-label="Close">
+            <XIcon size={20} />
           </button>
         </SheetHeader>
 
@@ -101,8 +104,9 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
 
         <label style={fieldStyle}>
           <span style={labelStyle}>Amount</span>
-          <div style={{ ...amountWrapStyle, borderColor: tooMuch ? "var(--danger)" : "var(--border)" }}>
+          <div style={amountWrapStyle}>
             <input
+              className="display-amount-input"
               value={amount}
               onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))}
               inputMode="decimal"
@@ -113,8 +117,8 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
             />
             <Currency />
           </div>
-          {tooMuch && <span role="alert" style={errorTextStyle}>More than in savings</span>}
         </label>
+        {tooMuch && <Banner tone="danger" role="alert" compact>More than in savings</Banner>}
 
         <label style={fieldStyle}>
           <span style={labelStyle}>Move it to</span>
@@ -127,35 +131,31 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
         </label>
 
         {confirming && destination && (
-          <div role="status" style={confirmStyle}>
-            <strong style={{ display: "block", fontSize: 13 }}>Move {fmt(value)} out of {savings?.name}?</strong>
-            <span style={{ display: "block", marginTop: 3, fontSize: 12, color: "var(--muted)" }}>
-              It becomes spendable in {destination.name}; {fmt(available - value)} stays in savings.
-            </span>
-          </div>
+          <Banner tone="neutral" role="status" compact title={`Move ${fmt(value)} out of ${savings?.name ?? "savings"}?`}>
+            It becomes spendable in {destination.name}; {fmt(available - value)} stays in savings.
+          </Banner>
         )}
 
         {error && <Banner role="alert" tone="danger" compact>{error}</Banner>}
 
-        <button type="button" onClick={submit} disabled={!canSubmit} style={{ ...submitStyle, opacity: canSubmit ? 1 : 0.48, cursor: canSubmit ? "pointer" : "not-allowed" }}>
-          {status === "saving" ? "Moving…" : confirming ? "Confirm" : "Take out"}
-        </button>
+        <SheetFooter>
+          <Button variant="primary" block onClick={submit} disabled={!canSubmit}>
+            {confirming ? "Confirm" : "Take out"}
+          </Button>
+        </SheetFooter>
       </SheetBody>
+      <SavingCover saving={save.saving} />
     </BottomSheet>
   );
 }
 
 const sheetStyle: CSSProperties = { background: "var(--surface)", borderRadius: "var(--radius-sheet)", overflow: "hidden" };
-const innerStyle: CSSProperties = { padding: "18px 18px calc(22px + env(safe-area-inset-bottom, 0px))", display: "grid", gap: 16, width: "100%", boxSizing: "border-box" };
-const headerStyle: CSSProperties = { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 };
-const titleStyle: CSSProperties = { margin: "4px 0 0", fontSize: 20, lineHeight: 1.2, fontWeight: 600, color: "var(--text)" };
-const closeStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
-const hintStyle: CSSProperties = { minHeight: 42, borderRadius: 14, background: "var(--surface2)", color: "var(--text2)", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12 };
-const fieldStyle: CSSProperties = { display: "grid", gap: 7 };
-const labelStyle: CSSProperties = { fontSize: 12, fontWeight: 700, color: "var(--text2)" };
-const amountWrapStyle: CSSProperties = { minHeight: 56, borderRadius: "var(--radius-control)", border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 10, padding: "0 14px" };
-const amountInputStyle: CSSProperties = { flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--text2)", fontSize: 28, fontWeight: 500, fontVariantNumeric: "tabular-nums" };
-const errorTextStyle: CSSProperties = { fontSize: 12, color: "var(--danger)" };
-const confirmStyle: CSSProperties = { padding: "12px 14px", borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)" };
-// Neutral, not the accent: taking out of savings shouldn't look like a reward.
-const submitStyle: CSSProperties = { width: "100%", minHeight: 52, borderRadius: 14, border: "none", background: "var(--text)", color: "var(--bg)", fontWeight: 800, fontSize: 15, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 };
+const innerStyle: CSSProperties = { padding: "16px 24px calc(24px + env(safe-area-inset-bottom, 0px))", display: "grid", gap: 16, width: "100%", boxSizing: "border-box" };
+const headerStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 };
+const titleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: "24px", fontWeight: 600, color: "var(--text)" };
+// A read-only figure is a plain label/value row, never boxed like an input.
+const hintStyle: CSSProperties = { minHeight: 44, color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13, lineHeight: "16px" };
+const fieldStyle: CSSProperties = { display: "grid", gap: 8 };
+const labelStyle: CSSProperties = { fontSize: 13, lineHeight: "16px", fontWeight: 600, color: "var(--muted)" };
+const amountWrapStyle: CSSProperties = { minHeight: 112, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+const amountInputStyle: CSSProperties = { width: "min(260px, 68vw)", height: 88, padding: 0, border: "none", outline: "none", background: "transparent", color: "var(--text)", textAlign: "right", fontFamily: "var(--font-body)", fontVariantNumeric: "tabular-nums" };

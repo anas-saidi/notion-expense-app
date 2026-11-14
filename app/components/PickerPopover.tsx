@@ -2,6 +2,7 @@
 
 import "./ui/sheet-layout.css";
 import { LiquidSurface } from "./ui/LiquidGlass";
+import { XIcon } from "./ui/icons";
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
@@ -180,7 +181,7 @@ export function PickerPopover({
         zIndex,
       }}
     >
-      {showHeader && <div className="picker-heading"><strong>{title}</strong>{onClose && <button type="button" aria-label={`Close ${title}`} onClick={onClose}>×</button>}</div>}
+      {showHeader && <div className="picker-heading"><strong>{title}</strong>{onClose && <button type="button" className="sheet-close-button" aria-label={`Close ${title}`} onClick={onClose}><XIcon size={20} /></button>}</div>}
       <div className="picker-body">{children}</div>
     </LiquidSurface>,
     document.body

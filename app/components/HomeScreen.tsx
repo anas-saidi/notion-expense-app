@@ -1,5 +1,7 @@
 import { CardHeader, CardHeaderAction } from "./ui/CardHeader";
+import { Button } from "./ui/Button";
 import { SkeletonRows } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./app-types";
 import { WalletCardSwitcher, type ContribStatus } from "./WalletCardSwitcher";
@@ -255,7 +257,7 @@ export function HomeScreen({
       </div>
       <div className="home-budget-context">
       <DesktopMonthBudget scope={budgetScope} categories={categories} summary={monthlySummary} month={homeMonth} loading={monthlyLoading} error={monthlyError} showPlanAction={!showPlanningPrompt && !showMonthEndAlert} onOpenPlan={onOpenPlan} onOpenReceipt={onOpenReceipt} />
-      {(showPlanningPrompt || showMonthEndAlert) && <button className="desktop-planning-action" type="button" disabled={!!monthlySummary.contributionError} onClick={onOpenPlan}>{plannedCount > 0 ? "Resume" : "Plan"} {planningLabel}<ChevronRightIcon size={16} aria-hidden="true" /></button>}
+      {(showPlanningPrompt || showMonthEndAlert) && <Button variant="quiet" size="compact" className="desktop-planning-action" disabled={!!monthlySummary.contributionError} onClick={onOpenPlan}>{plannedCount > 0 ? "Resume" : "Plan"} {planningLabel} <ChevronRightIcon size={16} aria-hidden="true" style={{ verticalAlign: "middle" }} /></Button>}
       </div>
       </div>
       <div className="home-desktop-panels">
@@ -272,7 +274,7 @@ export function HomeScreen({
             {upcomingBills.map(bill => {
               const isImminent = bill.date === today() || bill.date === shiftDate(today(), 1);
               return (
-                <div key={bill.id} style={billChipStyle(isImminent)}>
+                <div key={bill.id} style={billCardStyle(isImminent)}>
                   <span style={billNameStyle}>{bill.name}</span>
                   {bill.amount != null && (
                     <span style={billAmountStyle}>{fmt(bill.amount)}</span>
@@ -293,8 +295,8 @@ export function HomeScreen({
         {/* Zone 6: Recent transactions */}
         <section aria-label="Recent activity">
             <CardHeader className="home-section-hdr home-recent-header" title="Recent activity" titleClassName="section-label" titleStyle={sectionLabelStyle} style={sectionHeaderStyle}
-              action={onOpenHistory ? <CardHeaderAction className="home-recent-action" onClick={onOpenHistory} style={seeAllBtnStyle} aria-label="View all transactions">All activity</CardHeaderAction> : undefined} />
-            {secondaryLoading && recentTxns.length === 0 ? <SkeletonRows label="Loading recent activity" count={4} /> : recentTxns.length === 0 ? <p className="desktop-empty">No recent activity.</p> : recentDays.map((day) => (
+              action={onOpenHistory ? <CardHeaderAction onClick={onOpenHistory} aria-label="View all transactions">All activity</CardHeaderAction> : undefined} />
+            {secondaryLoading && recentTxns.length === 0 ? <SkeletonRows label="Loading recent activity" count={4} /> : recentTxns.length === 0 ? <EmptyState align="start">No recent activity.</EmptyState> : recentDays.map((day) => (
             <div key={day.label} role="group" aria-label={day.label} style={recentDayStyle}>
             <span style={recentDayLabelStyle}>{day.label}</span>
             <div className="home-txn-list row-list" style={recentListStyle}>
@@ -315,7 +317,7 @@ export function HomeScreen({
                     amount={txn.amount}
                     tone={amountTone}
                     prefix={amountPrefix}
-                    icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={22} />}
+                    icon={isIncome ? <BanknoteIcon size={16} /> : isTransfer ? <TransferIcon size={16} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={22} />}
                     onClick={onClickTransaction ? () => onClickTransaction(txn) : undefined}
                   />
                 );
@@ -352,36 +354,21 @@ const sectionHeaderStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  marginBottom: 10,
+  marginBottom: 8,
 };
 
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  
+  fontSize: 13,
+  lineHeight: "16px",
+  fontWeight: 600,
   color: "var(--muted)",
-};
-
-const seeAllBtnStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 2,
-  padding: "4px 8px",
-  borderRadius: 8,
-  border: "none",
-  background: "transparent",
-  color: "var(--muted)",
-  fontSize: 12,
-  fontWeight: 400,
-  cursor: "pointer",
-  letterSpacing: 0.3,
 };
 
 const cardsRailStyle: CSSProperties = {
   display: "flex",
   gap: 8,
   overflowX: "auto",
-  padding: "2px 4px 8px",
+  padding: "4px 4px 8px",
 };
 
 /* Ready to assign row */
@@ -395,12 +382,13 @@ const upcomingWrapStyle: CSSProperties = {
   marginBottom: 16,
 };
 
-const billChipStyle = (isImminent: boolean): CSSProperties => ({
-  flex: "0 0 100px",
-  borderRadius: 12,
+// A small card (Foundations card recipe), not a chip; imminent bills keep a faint warning fill.
+const billCardStyle = (isImminent: boolean): CSSProperties => ({
+  flex: "0 0 104px",
+  borderRadius: "var(--radius-card)",
   background: isImminent ? "color-mix(in srgb, var(--warning) 7%, var(--surface))" : "var(--surface)",
-  border: `1px solid ${isImminent ? "color-mix(in srgb, var(--warning) 28%, var(--border))" : "var(--border)"}`,
-  padding: 10,
+  boxShadow: "var(--elevation-card)",
+  padding: 12,
   display: "flex",
   flexDirection: "column",
   gap: 4,
@@ -435,7 +423,7 @@ const billDateStyle: CSSProperties = {
 
 const recentDayStyle: CSSProperties = { display: "grid", gap: 4, marginBottom: 12 };
 
-const recentDayLabelStyle: CSSProperties = { fontSize: 12, fontWeight: 600, color: "var(--muted)" };
+const recentDayLabelStyle: CSSProperties = { fontSize: 12, lineHeight: "16px", fontWeight: 600, color: "var(--muted)" };
 
 const recentListStyle: CSSProperties = {
   display: "grid",

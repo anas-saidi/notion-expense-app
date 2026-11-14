@@ -1,7 +1,10 @@
 "use client";
 import { accountIconSource } from "../../lib/category-icons";
 import { ChoicePicker } from "./ChoicePicker";
-import { LiquidButton, glassControlStyle } from "./ui/LiquidGlass";
+import { LiquidSegments } from "./ui/LiquidGlass";
+import { Button } from "./ui/Button";
+import { ScreenChip } from "./ui/ScreenChip";
+import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 
 import { SheetBody, SheetFooter, SheetHeader } from "./ui/SheetLayout";
 
@@ -19,10 +22,10 @@ import { Money } from "./Money";
 import { TransactionRow } from "./ui/TransactionRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { PickerPopover } from "./PickerPopover";
-import { Banner, bannerActionStyle } from "./ui/Banner";
+import { Banner } from "./ui/Banner";
 import { DateCalendar } from "./DatePicker";
-import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, AlertTriangleIcon, CalendarIcon, BanknoteIcon, ChevronDownIcon, CheckIcon, DeleteIcon, XIcon } from "./ui/icons";
-import { AccountOptionList, CategoryOptionList, pickerIconStyle, pickerChipIconStyle, pickerChipLabelStyle, pickerChipStyle } from "./TransactionPickers";
+import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, AlertTriangleIcon, CalendarIcon, BanknoteIcon, ChevronDownIcon, DeleteIcon, XIcon } from "./ui/icons";
+import { AccountOptionList, CategoryOptionList, optionRowStyle, pickerIconStyle } from "./TransactionPickers";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
 type AddTransactionSheetProps = {
@@ -138,10 +141,14 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     setShowKeypad(false); props.onCloseDatePicker(); props.onCloseCatPicker(); props.onCloseAccountPicker();
   });
   const [typedBusy, setTypedBusy] = useState(false);
-  const [fundingSourceId, setFundingSourceId] = useState<string | null>(null);
+  // A typed batch save reports its progress here, so the sheet's one saving cover can say it.
+  const [typedSavingLabel, setTypedSavingLabel] = useState<string | null>(null);
   const [showFundPicker, setShowFundPicker] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // Every write from this sheet blocks it (design.md, Saving): the form save (status from the page),
+  // the quick fund move, the typed batch and the delete confirm.
+  const quickFund = useBlockingSave();
+  const deletion = useBlockingSave();
   const [showRepeat, setShowRepeat] = useState(false);
   const repeat = props.repeat ?? "None";
   const setRepeat = (value: BillRepeat) => props.onRepeatChange?.(value);
@@ -163,9 +170,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
     }
     if (!props.open) {
       setShowFundPicker(false);
-      setFundingSourceId(null);
       setConfirmingDelete(false);
-      setDeleting(false);
       setShowKeypad(false);
       setShowRepeat(false);
       setAmountFocused(false);
@@ -196,6 +201,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   useEffect(() => { if (props.transactionType !== "Expense") { setRepeat("None"); setShowRepeat(false); } }, [props.transactionType]);
 
   if (!props.open) return null;
+
+  const formSaving = props.status === "saving";
+  const sheetSaving = formSaving || quickFund.saving || deletion.saving || typedSavingLabel !== null;
+  const closeSheet = guardClose(sheetSaving || typedBusy, props.onClose);
 
   const deficit = props.categoryShortfall;
 
@@ -257,7 +266,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
   return (
     <BottomSheet
       open={props.open}
-      onClose={() => { if (!typedBusy) props.onClose(); }}
+      onClose={closeSheet}
       label={isEditMode ? "Edit transaction" : "Add transaction"}
       size="standard" desktopHeight="fill"
       mobileFullWidth
@@ -274,8 +283,8 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           {entryMode === "type" && !isEditMode ? <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div ref={props.dateRef}>
               {/* Written-page header: the day as a title, the full date small underneath; tap to change the default day. */}
-              <button type="button" className="typed-day" aria-label={`Default date: ${props.selectedDateLabel}. Change`} aria-haspopup="dialog" aria-expanded={props.showDatePicker} onClick={props.onToggleDatePicker}>
-                <span className="typed-day-title">{props.selectedDateLabel}<ChevronDownIcon size={14} aria-hidden="true" data-open={props.showDatePicker || undefined} /></span>
+              <button type="button" className="typed-day" aria-label={`Default date: ${props.selectedDateLabel}. Change`} aria-haspopup="dialog" aria-expanded={props.showDatePicker} disabled={typedBusy} onClick={props.onToggleDatePicker}>
+                <span className="typed-day-title">{props.selectedDateLabel}<ChevronDownIcon size={16} aria-hidden="true" data-open={props.showDatePicker || undefined} /></span>
                 <span className="typed-day-date">{new Date(`${props.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</span>
               </button>
               <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="left" placement="bottom" size="calendar" zIndex={140} anchorRef={props.dateRef}>
@@ -283,19 +292,22 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
               </PickerPopover>
             </div>
           </div> : isEditMode ? <h2 style={dialogTitleStyle}>{isIncome ? "Edit income" : "Edit expense"}</h2>
-            : props.onSaveTyped ? <button type="button" className="typed-back" aria-label={movedLine ? "Back to writing, keeping this line" : "Back to writing"} disabled={props.status === "saving"} onClick={backToWriting}><ArrowLeftIcon size={18} aria-hidden="true" />Write</button>
+            : props.onSaveTyped ? <Button variant="secondary" size="compact" icon={<ArrowLeftIcon />} aria-label={movedLine ? "Back to writing, keeping this line" : "Back to writing"} onClick={backToWriting}>Write</Button>
             : <span aria-hidden="true" />}
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <button disabled={typedBusy} onClick={props.onClose} aria-label="Close" style={closeButtonStyle}>
-              <XIcon strokeWidth={2.2} />
-            </button>
-          </div>
+          <button type="button" className="sheet-close-button" disabled={typedBusy} onClick={closeSheet} aria-label="Close">
+            <XIcon size={20} />
+          </button>
         </SheetHeader>
 
         {!isEditMode && entryMode === "form" && (
-          <div role="tablist" aria-label="Transaction type" className="composer-pane" style={typeSwitcherStyle}>
-            <LiquidButton type="button" role="tab" aria-selected={!isIncome} className="transaction-type transaction-type--expense" disabled={typedBusy} onClick={() => selectTransactionType("Expense")}><ArrowUpIcon size={16} aria-hidden="true" /><span>Expense</span></LiquidButton>
-            <LiquidButton type="button" role="tab" aria-selected={isIncome} className="transaction-type transaction-type--income" disabled={typedBusy} onClick={() => selectTransactionType("Income")}><ArrowDownIcon size={16} aria-hidden="true" /><span>Income</span></LiquidButton>
+          <div className="composer-pane" style={typeSwitcherStyle}>
+            {/* The shared segmented control, as in Reflect; semantic red and green stay on the selected segment's arrow. */}
+            <LiquidSegments aria-label="Transaction type" value={props.transactionType}
+              onValueChange={value => { if (value === "Expense" || value === "Income") selectTransactionType(value); }}
+              items={[
+                { value: "Expense", label: <span style={segmentLabelStyle}><ArrowUpIcon size={16} aria-hidden="true" style={{ color: !isIncome ? "var(--danger)" : undefined }} />Expense</span> },
+                { value: "Income", label: <span style={segmentLabelStyle}><ArrowDownIcon size={16} aria-hidden="true" style={{ color: isIncome ? "var(--success)" : undefined }} />Income</span> },
+              ]} />
           </div>
         )}
 
@@ -311,6 +323,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           onSave={props.onSaveTyped}
           onComplete={props.onTypedComplete ?? (() => {})}
           onBusyChange={setTypedBusy}
+          onSavingChange={setTypedSavingLabel}
           restoreLine={restoreLine ?? props.seedLine ?? null}
           suggestions={props.typedSuggestions}
           onOpenInForm={(line, row) => {
@@ -351,7 +364,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           )}
         </section>
 
-        {props.actualAfterSpending != null && props.actualAfterSpending < 0 && <Banner tone="warning" role="alert" compact icon={<AlertTriangleIcon size={18} />}>
+        {props.actualAfterSpending != null && props.actualAfterSpending < 0 && <Banner tone="warning" role="alert" compact icon={<AlertTriangleIcon size={16} />}>
           Exceeds actual funds by <Money value={Math.abs(props.actualAfterSpending)} />
           {props.balanceCheckedAt && <span style={{ display: "block", marginTop: 4 }}>Checked {fmtDate(props.balanceCheckedAt.slice(0, 10))}</span>}
         </Banner>}
@@ -371,20 +384,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             onChange={(e) => props.onNameChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && props.canSubmit && submit()}
             placeholder={isIncome ? "Income source" : "Description"}
-            style={{
-              width: "100%",
-              minHeight: 56,
-              boxSizing: "border-box",
-              marginTop: 16,
-              background: "transparent",
-              border: "none",
-              padding: "0 16px",
-              color: "var(--text2)",
-              fontSize: 18,
-              lineHeight: 1.25,
-              fontWeight: 400,
-              textAlign: "center",
-            }}
+            style={descriptionInputStyle}
           />
 
           {/* Pickers row */}
@@ -393,42 +393,26 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
             {/* Account picker */}
             <div style={pickerSlotStyle} ref={props.accountRef}>
-              <LiquidButton
-                onClick={props.onToggleAccountPicker}
-                aria-haspopup="dialog"
-                aria-expanded={props.showAccountPicker}
-                aria-controls="account-picker"
-                style={{
-                  ...pickerChipStyle,
-                  color: props.showAccountPicker ? "var(--text2)" : "var(--muted)",
-                }}
-              >
-                <span style={pickerChipIconStyle}><CategoryIcon icon={accountIconSource(props.selectedAccount?.type)} size={24} /></span>
-                <span style={pickerChipLabelStyle}>{props.selectedAccount?.label ?? "Account"}</span>
-              </LiquidButton>
+              <ScreenChip mode="action" onClick={props.onToggleAccountPicker} ariaHasPopup="dialog" ariaExpanded={props.showAccountPicker} ariaControls="account-picker"
+                ariaLabel={`Account: ${props.selectedAccount?.label ?? "none"}`}
+                icon={<CategoryIcon icon={accountIconSource(props.selectedAccount?.type)} size={24} />}>
+                {props.selectedAccount?.label ?? "Account"}
+              </ScreenChip>
 
               <PickerPopover open={props.showAccountPicker} title="Account" onClose={props.onCloseAccountPicker} align="left" placement="top" size="choice" zIndex={140} anchorRef={props.accountRef}>
                 <AccountOptionList id="account-picker" accounts={props.filteredAccounts} selectedId={props.selectedAccount?.id} onSelect={props.onSelectAccount} />
               </PickerPopover>
             </div>
 
-            {isIncome && props.selectedAccount && isJointIncomeAccount(props.selectedAccount.label) && <IncomeUseControl value={props.incomeUse} onChange={props.onIncomeUseChange} disabled={props.status === "saving"} dismiss={props.showAccountPicker || props.showDatePicker || props.showCatPicker} onOpen={() => { props.onCloseAccountPicker(); props.onCloseDatePicker(); props.onCloseCatPicker(); }} />}
+            {isIncome && props.selectedAccount && isJointIncomeAccount(props.selectedAccount.label) && <IncomeUseControl value={props.incomeUse} onChange={props.onIncomeUseChange} dismiss={props.showAccountPicker || props.showDatePicker || props.showCatPicker} onOpen={() => { props.onCloseAccountPicker(); props.onCloseDatePicker(); props.onCloseCatPicker(); }} />}
 
             {/* Category picker */}
             {!isIncome && <div style={pickerSlotStyle} ref={props.catRef}>
-              <LiquidButton
-                onClick={props.onToggleCatPicker}
-                aria-haspopup="dialog"
-                aria-expanded={props.showCatPicker}
-                aria-controls="category-picker"
-                style={{
-                  ...pickerChipStyle,
-                  color: props.selectedCat || props.showCatPicker ? "var(--text2)" : "var(--muted)",
-                }}
-              >
-                <span style={pickerChipIconStyle}><CategoryIcon icon={props.selectedCat?.icon} categoryName={props.selectedCat?.name} size={24} /></span>
-                <span style={pickerChipLabelStyle}>{props.selectedCat?.name ?? "Category"}</span>
-              </LiquidButton>
+              <ScreenChip mode="action" onClick={props.onToggleCatPicker} ariaHasPopup="dialog" ariaExpanded={props.showCatPicker} ariaControls="category-picker"
+                ariaLabel={`Category: ${props.selectedCat?.name ?? "none"}`}
+                icon={<CategoryIcon icon={props.selectedCat?.icon} categoryName={props.selectedCat?.name} size={24} />}>
+                {props.selectedCat?.name ?? "Category"}
+              </ScreenChip>
 
               <PickerPopover open={props.showCatPicker} title="Category" onClose={props.onCloseCatPicker} align="left" placement="top" size="choice" zIndex={140} anchorRef={props.catRef}>
                 <CategoryOptionList id="category-picker" categories={props.filteredCats} selectedId={props.selectedCat?.id} lastUsedId={props.lastUsedCatId} onSelect={props.onSelectCategory} search={props.catSearch} onSearchChange={props.onCatSearchChange} />
@@ -439,11 +423,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             {/* Date picker: the same chip as account and category */}
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <div style={datePickerSlotStyle} ref={props.dateRef}>
-              <LiquidButton onClick={props.onToggleDatePicker} aria-haspopup="dialog" aria-expanded={props.showDatePicker} aria-controls="date-picker" aria-label={`Date: ${props.selectedDateLabel}`}
-                style={{ ...pickerChipStyle, color: props.showDatePicker ? "var(--text2)" : "var(--muted)" }}>
-                <span style={pickerChipIconStyle}><CalendarIcon size={18} aria-hidden="true" /></span>
-                <span style={pickerChipLabelStyle}>{props.selectedDateLabel}</span>
-              </LiquidButton>
+              <ScreenChip mode="action" onClick={props.onToggleDatePicker} ariaHasPopup="dialog" ariaExpanded={props.showDatePicker} ariaControls="date-picker" ariaLabel={`Date: ${props.selectedDateLabel}`}
+                icon={<CalendarIcon size={16} />}>
+                {props.selectedDateLabel}
+              </ScreenChip>
 
               <PickerPopover open={props.showDatePicker} title="Date" onClose={props.onCloseDatePicker} align="right" placement="top" size="calendar" zIndex={140} anchorRef={props.dateRef}>
                 <div id="date-picker"><DateCalendar value={props.date} onChange={props.onSelectDate} /></div>
@@ -457,12 +440,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           {!isIncome && props.billsUnavailable && <Banner tone="warning" compact>Bill reservations unavailable.</Banner>}
           {/* Budget warnings */}
           {!isIncome && (props.suggestedCategory || props.categoryUnfunded || props.categoryOverBudget) && (
-            <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "grid", gap: 8 }}>
               {props.suggestedCategory && props.suggestedCategory.id !== props.selectedCat?.id && (
-                <button onClick={() => props.onSelectCategory(props.suggestedCategory!)} style={{ minHeight: 44, padding: "0 2px", border: "none", background: "transparent", color: "var(--text2)", fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, justifySelf: "start" }}>
-                  <span style={{ fontSize: 14, opacity: 0.85 }}><CategoryIcon icon={props.suggestedCategory.icon} categoryName={props.suggestedCategory.name} size={20} /></span>
-                  <span>Suggested: <strong style={{ fontWeight: 600 }}>{props.suggestedCategory.name}</strong></span>
-                </button>
+                <Button variant="quiet" size="compact" style={{ justifySelf: "start", fontWeight: 400 }} onClick={() => props.onSelectCategory(props.suggestedCategory!)}
+                  icon={<CategoryIcon icon={props.suggestedCategory.icon} categoryName={props.suggestedCategory.name} size={20} />}>
+                  Suggested: <strong style={{ fontWeight: 600 }}>{props.suggestedCategory.name}</strong>
+                </Button>
               )}
               {props.advanceBelowZero != null && props.selectedCat && (
                 <Banner tone="warning" compact>Couple owes you this. <strong>{props.selectedCat.name}</strong> goes <strong><Money value={Math.round(props.advanceBelowZero)} /></strong> below zero.</Banner>
@@ -472,29 +455,18 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   role="alert"
                   tone="warning"
                   compact
-                  icon={<AlertTriangleIcon size={15} />}
+                  icon={<AlertTriangleIcon size={16} />}
                   action={(
                     <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                     {/* Fund from dropdown — only shown once amount is entered */}
                     {props.onQuickFund && sourceCandidates.length > 0 && deficit > 0 && (
-                      <div style={{ position: "relative", flexShrink: 0 }} ref={fundPickerRef}>
-                        <LiquidButton
-                          type="button"
-                          disabled={!!fundingSourceId}
-                          onClick={() => setShowFundPicker(v => !v)}
-                          aria-label="Move funds from another category"
-                          aria-expanded={showFundPicker}
-                          aria-haspopup="listbox"
-                          style={glassControlStyle(fundTriggerStyle(!!fundingSourceId))}
-                        >
-                          {fundingSourceId
-                            ? <><span style={{ width: 11, height: 11, border: "1.5px solid color-mix(in srgb, currentColor 30%, transparent)", borderTopColor: "currentColor", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} /> Moving…</>
-                            : <>Move from <ChevronDownIcon size={10} style={{ flexShrink: 0, color: "var(--muted)", transition: "transform 0.15s", transform: showFundPicker ? "rotate(180deg)" : "none" }} /></>
-                          }
-                        </LiquidButton>
+                      <div style={{ position: "relative", flexShrink: 0, minWidth: 0 }} ref={fundPickerRef}>
+                        <ScreenChip mode="action" onClick={() => setShowFundPicker(v => !v)} ariaLabel="Move funds from another category" ariaExpanded={showFundPicker} ariaHasPopup="listbox">
+                          Move from
+                        </ScreenChip>
 
                         <PickerPopover open={showFundPicker} title="Source category" onClose={() => setShowFundPicker(false)} align="left" placement="top" size="choice" zIndex={150} anchorRef={fundPickerRef}>
-                          <div role="listbox" aria-label="Source categories" style={{ maxHeight: 220, overflowY: "auto", padding: 6, boxSizing: "border-box" }}>
+                          <div role="listbox" aria-label="Source categories" style={{ maxHeight: 220, overflowY: "auto", padding: 8, boxSizing: "border-box" }}>
                             <div style={{ display: "grid", gap: 2 }}>
                               {sourceCandidates.map(cat => {
                                 const moveAmount = Math.min(cat.available!, deficit);
@@ -507,20 +479,15 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                     aria-label={`${cat.name}, ${fmt(moveAmount)} MAD${isPartial ? ", partial" : ""}`}
                                     onClick={async () => {
                                       setShowFundPicker(false);
-                                      setFundingSourceId(cat.id);
-                                      try {
-                                        await props.onQuickFund!(cat.id, moveAmount);
-                                      } finally {
-                                        setFundingSourceId(null);
-                                      }
+                                      await quickFund.run(() => props.onQuickFund!(cat.id, moveAmount)).catch(() => haptic("error"));
                                     }}
                                     className="picker-option"
-                                    style={fundPickerRowStyle}
+                                    style={optionRowStyle(false)}
                                   >
-                                    <div style={{ ...pickerIconStyle, fontSize: 13, width: 28, height: 28, borderRadius: 8 }}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} /></div>
+                                    <div style={pickerIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} /></div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
-                                      {isPartial && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>partial</div>}
+                                      {isPartial && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>partial</div>}
                                     </div>
                                     <span style={{ fontSize: 12, color: "var(--text2)", fontVariantNumeric: "tabular-nums", flexShrink: 0, paddingLeft: 8 }}>
                                       {fmt(moveAmount)}
@@ -535,9 +502,9 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     )}
 
                     {props.onOpenRebalance && (
-                      <button type="button" onClick={() => props.onOpenRebalance!()} style={bannerActionStyle}>
+                      <Button variant="secondary" size="compact" onClick={() => props.onOpenRebalance!()}>
                         Rebalance
-                      </button>
+                      </Button>
                     )}
                     </div>
                   )}
@@ -549,9 +516,10 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           )}
 
           <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8 }}>
-          {!isEditMode && !isIncome && <button type="button" style={keypadToggleStyle} aria-expanded={showRepeat} aria-controls="transaction-repeat" disabled={props.status === "saving"} onClick={() => { haptic("selection"); setShowRepeat(!showRepeat); }}><span>{repeat === "None" ? "Repeat" : `Repeat ${repeat.toLowerCase()}`}</span><ChevronDownIcon size={15} style={{ transform: showRepeat ? "rotate(180deg)" : "none" }} /></button>}
-          <button
-            type="button"
+          {!isEditMode && !isIncome && <Button variant="quiet" size="compact" aria-expanded={showRepeat} aria-controls="transaction-repeat" onClick={() => { haptic("selection"); setShowRepeat(!showRepeat); }}>{repeat === "None" ? "Repeat" : `Repeat ${repeat.toLowerCase()}`}<ChevronDownIcon size={16} aria-hidden="true" style={{ ...chevronStyle, transform: showRepeat ? "rotate(180deg)" : "none" }} /></Button>}
+          <Button
+            variant="quiet"
+            size="compact"
             aria-expanded={showKeypad}
             aria-controls="amount-keypad"
             onClick={() => {
@@ -563,14 +531,13 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                 return next;
               });
             }}
-            style={keypadToggleStyle}
           >
-            <span>{showKeypad ? "Hide keypad" : "Show keypad"}</span>
-            <ChevronDownIcon size={15} style={{ transform: showKeypad ? "rotate(180deg)" : "none", transition: "transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)" }} />
-          </button>
+            {showKeypad ? "Hide keypad" : "Show keypad"}
+            <ChevronDownIcon size={16} aria-hidden="true" style={{ ...chevronStyle, transform: showKeypad ? "rotate(180deg)" : "none" }} />
+          </Button>
           </div>
           {showRepeat && !isEditMode && !isIncome && <div id="transaction-repeat" style={{ display: "grid", gap: 8, padding: "0 16px" }}>
-            <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, fontSize: 13, color: "var(--text2)" }}>Repeat<ChoicePicker aria-label="Repeat expense" value={repeat} disabled={props.status === "saving"} onChange={event => { setRepeat(event.target.value as BillRepeat); haptic("selection"); }} style={{ minHeight: 44, padding: "0 12px", borderRadius: "var(--radius-control)", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", font: "inherit" }}><option value="None">Off</option><option value="Monthly">Monthly</option><option value="Yearly">Yearly</option></ChoicePicker></label>
+            <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, fontSize: 13, color: "var(--text2)" }}>Repeat<ChoicePicker aria-label="Repeat expense" value={repeat} onChange={event => { setRepeat(event.target.value as BillRepeat); haptic("selection"); }}><option value="None">Off</option><option value="Monthly">Monthly</option><option value="Yearly">Yearly</option></ChoicePicker></label>
             {nextDue && <p style={{ margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--muted)" }}>Next bill due {fmtDate(nextDue)}. Future bills use this amount and category.</p>}
           </div>}
 
@@ -587,7 +554,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                   }}
                   style={keypadButtonStyle}
                 >
-                  {key.value === "delete" ? <DeleteIcon size={19} aria-hidden="true" /> : key.label}
+                  {key.value === "delete" ? <DeleteIcon size={20} aria-hidden="true" /> : key.label}
                 </button>
               ))}
             </div>
@@ -595,7 +562,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
 
           {!showKeypad && !isEditMode && props.recentTransactions.length > 0 && (
             <section aria-label="Recent transactions" style={recentSectionStyle}>
-              <div style={recentHeaderStyle}>Recent · tap to reuse</div>
+              <h3 className="section-label" style={recentHeaderStyle}>Recent</h3>
               <div className="row-list" style={recentListStyle}>
                 {props.recentTransactions.map((transaction) => {
                   const recentCategory = props.allCategories?.find((category) => category.id === transaction.category);
@@ -610,7 +577,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                       tone={isRecentIncome ? "income" : "expense"}
                       prefix={isRecentIncome ? "+" : "−"}
                       date={transaction.date ? fmtDate(transaction.date) : undefined}
-                      icon={isRecentIncome ? <BanknoteIcon size={13} /> : <CategoryIcon icon={recentCategory?.icon ?? null} categoryName={recentCategory?.name} size={22} />}
+                      icon={isRecentIncome ? <BanknoteIcon size={16} /> : <CategoryIcon icon={recentCategory?.icon ?? null} categoryName={recentCategory?.name} size={22} />}
                       onClick={props.onUseRecent ? () => {
                         haptic("selection");
                         props.onUseRecent?.(transaction);
@@ -623,74 +590,29 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
             </section>
           )}
 
+          {props.errorMsg && !formSaving && <Banner tone="danger" role="alert" compact>{props.errorMsg}</Banner>}
+
           {/* Edit actions / Save button */}
           <SheetFooter style={footerActionsStyle}>
           {isEditMode && props.onDelete && (
-            <button
-              type="button"
-              onClick={() => { haptic("warning"); setConfirmingDelete(true); }}
-              disabled={props.status === "saving"}
-              style={deleteActionStyle}
-            >
-              <DeleteIcon size={16} />
+            <Button variant="destructive" icon={<DeleteIcon />} style={{ flex: "0.85 1 0" }} onClick={() => { haptic("warning"); setConfirmingDelete(true); }}>
               Delete
-            </button>
+            </Button>
           )}
-          <button
-            onClick={submit}
-            disabled={!props.canSubmit}
-            aria-label={
-              props.status === "saving" ? (isEditMode ? "Updating expense" : isIncome ? "Adding income" : "Adding expense")
-              : props.status === "success" ? (isEditMode ? "Expense updated" : isIncome ? "Income added" : "Expense added")
-              : props.status === "error" ? `Save failed: ${props.errorMsg}`
-              : !isIncome && props.advanceBelowZero != null ? "Save as advance" : !isIncome && (props.overspendBelowZero != null || (props.billShortfall ?? 0) > 0) ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
-            }
-            className="pressable cta-save"
-            style={{
-              width: "100%",
-              flex: isEditMode ? "1.5 1 0" : undefined,
-              minHeight: 52,
-              borderRadius: 14,
-              border: "none",
-              background:
-                props.status === "success" ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
-                : props.status === "error" ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
-                : !props.canSubmit && props.status === "idle" ? "var(--surface2)" : "var(--accent)",
-              color:
-                props.status === "success" ? "var(--success)"
-                : props.status === "error" ? "var(--danger)"
-                : !props.canSubmit && props.status === "idle" ? "var(--muted)" : "var(--accent-ink)",
-              fontWeight: 700,
-              fontSize: 15,
-              cursor: props.canSubmit ? "pointer" : "not-allowed",
-              opacity: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
-            }}
-          >
-            {props.status === "saving" ? (
-              <><span style={{ width: 15, height: 15, border: "2px solid color-mix(in srgb, currentColor 26%, transparent)", borderTopColor: "currentColor", borderRadius: "50%", animation: "spin 0.6s linear infinite", flexShrink: 0 }} />{isEditMode ? "Updating..." : "Saving..."}</>
-            ) : props.status === "success" ? (
-              <><CheckIcon size={16} />{isEditMode ? "Updated" : "Saved"}</>
-            ) : props.status === "error" ? (
-              <><XIcon size={16} />Error</>
-            ) : (
-              !isIncome && props.advanceBelowZero != null ? "Save as advance" : !isIncome && (props.overspendBelowZero != null || (props.billShortfall ?? 0) > 0) ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"
-            )}
-          </button>
+          <Button variant="primary" block onClick={submit} disabled={!props.canSubmit} style={isEditMode ? { flex: "1.5 1 0" } : undefined}>
+            {!isIncome && props.advanceBelowZero != null ? "Save as advance" : !isIncome && (props.overspendBelowZero != null || (props.billShortfall ?? 0) > 0) ? "Save anyway" : isEditMode ? (isIncome ? "Update income" : "Update expense") : isIncome ? "Add income" : "Add expense"}
+          </Button>
           </SheetFooter>
 
         </section>
         </div>}
       </div>
+      <SavingCover saving={sheetSaving && !deletion.saving} label={typedSavingLabel ?? "Saving"} />
 
       {confirmingDelete && props.onDelete && (
         <BottomSheet
           open
-          onClose={() => !deleting && setConfirmingDelete(false)}
+          onClose={guardClose(deletion.saving, () => setConfirmingDelete(false))}
           label={isIncome ? "Confirm delete income" : "Confirm delete expense"}
           detent="content"
           layered
@@ -700,19 +622,16 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
         >
           <SheetBody style={confirmContentStyle}>
             <div style={confirmIconStyle}><DeleteIcon size={20} /></div>
-            <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "grid", gap: 8 }}>
               <h2 style={confirmTitleStyle}>{isIncome ? "Delete this income?" : "Delete this expense?"}</h2>
               <p style={confirmCopyStyle}>Removes this {isIncome ? "income" : "expense"} from activity and budget totals. Undo is available afterward.</p>
             </div>
             <SheetFooter style={confirmActionsStyle}>
-              <button type="button" onClick={() => setConfirmingDelete(false)} disabled={deleting} style={cancelDeleteStyle}>Cancel</button>
-              <button
-                type="button"
-                disabled={deleting}
+              <Button variant="secondary" onClick={() => setConfirmingDelete(false)}>Cancel</Button>
+              <Button
+                variant="destructive"
                 onClick={async () => {
-                  setDeleting(true);
-                  const deleted = await props.onDelete!();
-                  setDeleting(false);
+                  const deleted = await deletion.run(() => props.onDelete!());
                   if (deleted) {
                     haptic("success");
                     props.onClose();
@@ -720,12 +639,12 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     haptic("error");
                   }
                 }}
-                style={confirmDeleteStyle}
               >
-                {deleting ? "Deleting…" : isIncome ? "Delete income" : "Delete expense"}
-              </button>
+                {isIncome ? "Delete income" : "Delete expense"}
+              </Button>
             </SheetFooter>
           </SheetBody>
+          <SavingCover saving={deletion.saving} label="Deleting" />
         </BottomSheet>
       )}
     </BottomSheet>
@@ -762,35 +681,18 @@ const formSectionStyle: CSSProperties = {
   minHeight: 0,
   display: "flex",
   flexDirection: "column",
-  gap: 10,
+  gap: 12,
 };
 
 const footerActionsStyle: CSSProperties = {
   marginTop: "auto",
   position: "relative",
   flexShrink: 0,
-  paddingTop: 2,
+  paddingTop: 4,
   background: "transparent",
   display: "flex",
   alignItems: "stretch",
-  gap: 10,
-};
-
-const deleteActionStyle: CSSProperties = {
-  minHeight: 52,
-  flex: "0.85 1 0",
-  padding: "0 14px",
-  border: 0,
-  borderRadius: 14,
-  background: "color-mix(in srgb, var(--danger) 8%, var(--surface))",
-  color: "var(--danger)",
-  fontSize: 14,
-  fontWeight: 700,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 7,
+  gap: 12,
 };
 
 const confirmPanelStyle: CSSProperties = {
@@ -799,15 +701,15 @@ const confirmPanelStyle: CSSProperties = {
 };
 
 const confirmContentStyle: CSSProperties = {
-  padding: "12px 20px 22px",
+  padding: "12px 24px 24px",
   display: "grid",
-  gap: 18,
+  gap: 16,
 };
 
 const confirmIconStyle: CSSProperties = {
   width: 44,
   height: 44,
-  borderRadius: 14,
+  borderRadius: "var(--radius-control)",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -815,11 +717,9 @@ const confirmIconStyle: CSSProperties = {
   color: "var(--danger)",
 };
 
-const confirmTitleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: 1.2, color: "var(--text)" };
+const confirmTitleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: "24px", fontWeight: 600, color: "var(--text)" };
 const confirmCopyStyle: CSSProperties = { margin: 0, fontSize: 13, lineHeight: 1.5, color: "var(--text2)" };
-const confirmActionsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: 10 };
-const cancelDeleteStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: 14, background: "var(--surface2)", color: "var(--text2)", fontWeight: 700, cursor: "pointer" };
-const confirmDeleteStyle: CSSProperties = { minHeight: 48, border: 0, borderRadius: 14, background: "var(--danger)", color: "white", fontWeight: 750, cursor: "pointer" };
+const confirmActionsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1.35fr", gap: 12 };
 
 const topBarStyle: CSSProperties = {
   display: "flex",
@@ -832,35 +732,40 @@ const typeSwitcherStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  gap: 2,
   minHeight: 44,
   width: "fit-content",
-  margin: "0 auto 14px",
-  padding: 3,
+  margin: "0 auto 16px",
   boxSizing: "border-box",
-  borderRadius: 999,
-  background: "transparent",
 };
 
+const segmentLabelStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8 };
+
+const chevronStyle: CSSProperties = { flexShrink: 0, transition: "transform var(--motion-fast) var(--ease-standard)" };
+
+/** Sheet title (Typography: Title 20/24). */
 const dialogTitleStyle: CSSProperties = {
   margin: 0,
   fontFamily: "var(--font-body)",
-  fontSize: 12,
-  fontWeight: 400,
-  color: "var(--muted)",
+  fontSize: 20,
+  lineHeight: "24px",
+  fontWeight: 600,
+  color: "var(--text)",
 };
 
-const closeButtonStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  border: "none",
+/** The description is a typed value: --text at the composer line size, centred under the amount. */
+const descriptionInputStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 56,
+  boxSizing: "border-box",
+  marginTop: 16,
   background: "transparent",
-  color: "var(--text2)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
+  border: "none",
+  padding: "0 16px",
+  color: "var(--text)",
+  fontSize: 17,
+  lineHeight: "24px",
+  fontWeight: 400,
+  textAlign: "center",
 };
 
 const heroWrapStyle: CSSProperties = {
@@ -870,26 +775,9 @@ const heroWrapStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  gap: 6,
+  gap: 8,
   justifyContent: "center",
   padding: 0,
-};
-
-const keypadToggleStyle: CSSProperties = {
-  minHeight: 44,
-  alignSelf: "center",
-  padding: "0 12px",
-  border: 0,
-  borderRadius: "var(--radius-control)",
-  background: "transparent",
-  color: "var(--text2)",
-  fontSize: 13,
-  fontWeight: 650,
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
 };
 
 const recentSectionStyle: CSSProperties = {
@@ -897,19 +785,21 @@ const recentSectionStyle: CSSProperties = {
   minHeight: 0,
   display: "grid",
   alignContent: "start",
-  gap: 6,
-  padding: "2px 0 0",
+  gap: 8,
+  padding: "4px 0 0",
   overflowY: "auto",
   overscrollBehavior: "contain",
   scrollbarWidth: "none",
 };
 
+/** Section heading: 12px, sentence case, muted, normal weight. */
 const recentHeaderStyle: CSSProperties = {
+  margin: 0,
   padding: "0 4px",
   color: "var(--muted)",
-  fontSize: 11,
-  fontWeight: 700,
-  
+  fontSize: 12,
+  lineHeight: "16px",
+  fontWeight: 500,
 };
 
 const recentListStyle: CSSProperties = {
@@ -924,7 +814,7 @@ const heroCopyStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--text2)",
   textAlign: "center",
-  animation: "fadeUp 0.18s ease both",
+  animation: "fadeUp var(--motion-standard) var(--ease-standard) both",
 };
 
 const keypadStyle: CSSProperties = {
@@ -943,7 +833,7 @@ const keypadButtonStyle: CSSProperties = {
   background: "var(--surface2)",
   color: "var(--text)",
   fontSize: 20,
-  fontWeight: 650,
+  fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
   display: "inline-flex",
   alignItems: "center",
@@ -964,45 +854,11 @@ const pickerContextGroupStyle: CSSProperties = { display: "flex", flexWrap: "wra
 const pickerSlotStyle: CSSProperties = { position: "relative", minWidth: 0 };
 const datePickerSlotStyle: CSSProperties = { position: "relative", minWidth: 0, marginLeft: "auto" };
 
-const fundTriggerStyle = (loading: boolean): CSSProperties => ({
-  minHeight: 44,
-  padding: "0 4px",
-  border: "none",
-  background: "transparent",
-  fontFamily: "var(--font-body)",
-  color: loading ? "var(--muted)" : "var(--text2)",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: loading ? "wait" : "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 3,
-  flexShrink: 0,
-  transition: "color 0.15s ease",
-});
-
-const fundPickerRowStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 44,
-  padding: "8px 10px",
-  background: "transparent",
-  border: "none",
-  borderRadius: 10,
-  color: "var(--text2)",
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  cursor: "pointer",
-  textAlign: "left",
-  boxSizing: "border-box",
-};
-
 const exprPreviewStyle: CSSProperties = {
   margin: 0,
   fontFamily: "var(--font-body)",
   fontSize: 13,
   fontWeight: 500,
-  letterSpacing: 0.2,
-  animation: "fadeUp 0.15s ease both",
+  animation: "fadeUp var(--motion-fast) var(--ease-standard) both",
 };
 

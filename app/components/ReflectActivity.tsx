@@ -13,6 +13,9 @@ import { PromptInput } from "./ui/PromptInput";
 import type { MonthRange } from "@/lib/ledger";
 import "./ui/prompt-input.css";
 import { TransactionRow } from "./ui/TransactionRow";
+import { Button } from "./ui/Button";
+import { EmptyState } from "./ui/EmptyState";
+import { SavingCover, useBlockingSave } from "./ui/SavingCover";
 
 type Props = { transactions: Transaction[]; categories: Category[]; accounts: Account[]; budgetScope: BudgetScope; periodLabel: string; transactionsLoading: boolean; searchOpen: boolean; onSearchClose: () => void;
   /** The months Reflect shows: a question without a month means these. */
@@ -30,6 +33,9 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
   const changeQuery = (value: string) => { setActivityQuery(value); if (ledger.active && value.trim() !== asked) { ledger.clear(); setAsked(""); } };
 
   const [activityType, setActivityType] = useState<"All" | "Expenses" | "Income" | "Transfers" | "Needs review">("All");
+  // A swipe delete is a write: it blocks the screen with the shared saving cover until it settles.
+  const deletion = useBlockingSave();
+  const resetFilters = () => { setActivityType("All"); setActivityQuery(""); ledger.clear(); setAsked(""); };
   const scopedTransactions = useMemo(() => transactions.filter(t => transactionMatchesScope(t, categories, budgetScope, accounts)), [transactions, categories, budgetScope, accounts]);
   const unassignedTransactions = useMemo(() => transactions.filter(t => resolveTransactionScopes(t, categories, accounts).length === 0), [transactions, categories, accounts]);
   const activityTransactions = activityType === "Needs review" ? unassignedTransactions : scopedTransactions;
@@ -68,17 +74,17 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
 
   return (
       <div className="reflect-activity">
-        <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+        <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
           {/* Search or ask, in the app's prompt composer: typing filters entries straight away; send asks Gemini. */}
           {searchOpen && <>
             <PromptInput id="reflect-search" label="Search or ask about your money" value={activityQuery} placeholder="Search or ask, like coffee or eat out vs last month"
               onValueChange={changeQuery} onSubmit={() => askNow(activityQuery)} onStop={() => { ledger.clear(); setAsked(""); }}
               loading={ledger.busy} suggestions={askSuggestions(viewing, topCategoryName)} hint="Type to search, send to ask" autoFocus />
-            <button type="button" className="reflect-ask-more" onClick={() => { setActivityQuery(""); ledger.clear(); setAsked(""); onSearchClose(); }}>Close</button>
+            <Button variant="quiet" size="compact" style={{ justifySelf: "start" }} onClick={() => { setActivityQuery(""); ledger.clear(); setAsked(""); onSearchClose(); }}>Close</Button>
           </>}
           {searchOpen && <LedgerAnswerView state={ledger} categories={categories} viewing={viewing} />}
           {/* While an answer is showing it is the result; the filtered list comes back when the search changes. */}
-          {!ledger.active && <div role="group" aria-label="Activity filters" className="filter-chip-rail" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
+          {!ledger.active && <div role="group" aria-label="Activity filters" className="filter-chip-rail" style={{ display: "flex", gap: 8, overflowX: "auto" }}>
             {(["All", "Expenses", "Income", "Transfers"] as const).map(filter => <ScreenChip key={filter} selected={activityType === filter} onClick={() => setActivityType(filter)}>{filter}</ScreenChip>)}
             {/* Transactions no scope claims (missing account/category) appear in no mode's
                 history, so this chip surfaces them — but only while there's something to fix. */}
@@ -94,17 +100,17 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
         </div>
         {!ledger.active && <>
         {transactionsLoading && (
-          <div style={{ display: "grid", gap: 20 }}>
-            <div className="section-label" style={sectionDividerLabelStyle}>History</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <h2 className="section-label" style={sectionLabelStyle}>Activity</h2>
             <SkeletonRows label="Loading transaction history" count={4} />
           </div>
         )}
         {!transactionsLoading && txGroups.length > 0 && (
-          <div style={{ display: "grid", gap: 20 }}>
+          <div style={{ display: "grid", gap: 24 }}>
             {txGroups.map(({ label, items, expenseTotal, incomeTotal }) => (
               <section key={label}>
                 <div style={groupHeaderStyle}>
-                  <span style={groupLabelStyle}>{label}</span>
+                  <h3 className="section-label" style={sectionLabelStyle}>{label}</h3>
                   {/* A day with one transaction already shows its amount on the row. */}
                   {items.length > 1 && <span style={{ ...groupSubtotalStyle, display: "flex", gap: 12, flexWrap: "wrap" }}>{expenseTotal > 0 && <span>{fmt(expenseTotal)} spent</span>}{incomeTotal > 0 && <span>{fmt(incomeTotal)} income</span>}</span>}
                 </div>
@@ -117,16 +123,16 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
                     const isTransfer = txn.type === "Transfer";
                     const prefix = isIncome ? "+" : isTransfer ? "↔" : "−";
                     return (
-                      <SwipeToDelete key={txn.id} flat deleteLabel={`Delete ${txn.name}`} onDelete={() => onDeleteTransaction(txn.id)}
+                      <SwipeToDelete key={txn.id} flat deleteLabel={`Delete ${txn.name}`} onDelete={() => deletion.run(async () => await onDeleteTransaction(txn.id))}
                         // Swipe right: most spending repeats, so write this one again.
-                        onSwipeRight={!isTransfer && onLogAgain ? () => onLogAgain(txn) : undefined} swipeRightLabel={`Log ${txn.name} again`} swipeRightIcon={<WriteIcon size={17} aria-hidden="true" />}>
+                        onSwipeRight={!isTransfer && onLogAgain ? () => onLogAgain(txn) : undefined} swipeRightLabel={`Log ${txn.name} again`} swipeRightIcon={<WriteIcon size={20} aria-hidden="true" />}>
                         <TransactionRow
                           title={isTransfer && (fromCat || toCat) ? `${fromCat?.name ?? "—"} → ${toCat?.name ?? "—"}` : txn.name}
                           subtitle={!isTransfer ? cat?.name : undefined}
                           amount={txn.amount}
                           tone={isIncome ? "income" : isTransfer ? "transfer" : "expense"}
                           prefix={prefix}
-                          icon={isIncome ? <BanknoteIcon size={13} /> : isTransfer ? <TransferIcon size={12} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={22} />}
+                          icon={isIncome ? <BanknoteIcon size={16} /> : isTransfer ? <TransferIcon size={16} /> : <CategoryIcon icon={cat?.icon ?? null} categoryName={cat?.name} size={22} />}
                           onClick={() => onClickTransaction(txn)}
                         />
                       </SwipeToDelete>
@@ -139,27 +145,30 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
         )}
 
         {!transactionsLoading && txGroups.length === 0 && (
-          <section aria-label="Activity" style={emptyScreenStyle}>
-            <div className="section-label" style={sectionDividerLabelStyle}>Activity</div>
-            <p style={{ fontSize: 13, color: "var(--muted)" }}>No matching transactions in {monthLabel}.</p>
+          <section aria-label="Activity" style={{ display: "grid", gap: 8 }}>
+            <h2 className="section-label" style={sectionLabelStyle}>Activity</h2>
+            {activityQuery.trim() || activityType !== "All"
+              ? <EmptyState announce action={<Button variant="quiet" size="compact" onClick={resetFilters}>Reset filters</Button>}>
+                  {activityQuery.trim() ? <>No activity matches “{activityQuery.trim()}” in {monthLabel}.</> : `No ${typeNoun[activityType]} in ${monthLabel}.`}
+                </EmptyState>
+              : <EmptyState>No activity in {monthLabel}.</EmptyState>}
           </section>
         )}
         </>}
+        <SavingCover saving={deletion.saving} label="Deleting" fill="screen" />
       </div>
 
   );
 }
-const sectionDividerLabelStyle: CSSProperties = {
-  fontSize: 12, fontWeight: 700, letterSpacing: 0.7, color: "var(--muted)",
-};
+/** Section heading (design.md): 12px, sentence case, muted, no tracking. */
+const sectionLabelStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: "16px", fontWeight: 500, color: "var(--muted)" };
+
+/** The empty line names what the type filter hides. */
+const typeNoun = { All: "activity", Expenses: "expenses", Income: "income", Transfers: "transfers", "Needs review": "activity to review" } as const;
 
 const groupHeaderStyle: CSSProperties = {
   display: "flex", alignItems: "center", justifyContent: "space-between",
   marginBottom: 8, paddingLeft: 2,
-};
-
-const groupLabelStyle: CSSProperties = {
-  fontSize: 12, fontWeight: 700, letterSpacing: 0.7, color: "var(--muted)",
 };
 
 const groupSubtotalStyle: CSSProperties = {
@@ -171,7 +180,3 @@ const transactionGroupStyle: CSSProperties = {
   gap: 0,
 };
 
-
-const emptyScreenStyle: CSSProperties = {
-  display: "grid", gap: 8, padding: "8px 2px 24px", animation: "fadeUp 0.3s ease both",
-};

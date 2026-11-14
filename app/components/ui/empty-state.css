@@ -1,0 +1,33 @@
+/* Empty state (EmptyState.tsx): loaded, nothing to show. Quiet text on the surface it sits on; never a card of its own. */
+.ui-empty {
+  box-sizing: border-box;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4) 0;
+  text-align: center;
+  font-family: var(--font-body);
+}
+.ui-empty[data-variant="screen"] { gap: var(--space-2); padding: var(--space-8) 0; }
+.ui-empty[data-align="start"] { justify-items: start; text-align: left; }
+
+.ui-empty-mascot { display: grid; place-items: center; margin-bottom: var(--space-2); }
+
+.ui-empty-title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--type-body);
+  line-height: 22px;
+  font-weight: 600;
+}
+.ui-empty-text {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--muted);
+  font-size: var(--type-label);
+  line-height: 20px;
+}
+.ui-empty[data-variant="screen"] .ui-empty-text { max-width: 40ch; font-size: var(--type-body); line-height: 22px; }
+.ui-empty-action { margin-top: var(--space-1); }
+.ui-empty[data-variant="screen"] .ui-empty-action { margin-top: var(--space-2); }

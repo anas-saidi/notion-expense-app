@@ -3,7 +3,8 @@ import { LiquidButton, glassControlStyle } from "./ui/LiquidGlass";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Children, isValidElement, useRef, useState, type SelectHTMLAttributes, type ChangeEvent, type ReactNode } from "react";
 import { PickerPopover } from "./PickerPopover";
-import { CheckIcon, ChevronDownIcon } from "./ui/icons";
+import { CheckIcon, ChevronDownIcon, SearchIcon } from "./ui/icons";
+import { EmptyState } from "./ui/EmptyState";
 export function ChoicePicker({ children, value, onChange, style, disabled, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -11,13 +12,15 @@ export function ChoicePicker({ children, value, onChange, style, disabled, ...re
   const options = Children.toArray(children).filter(isValidElement).map(child => (child.props as { value: string; children: ReactNode; disabled?: boolean; "data-icon"?: string }));
   const selected = options.find(option => String(option.value) === String(value));
   const title = rest["aria-label"] ?? "Choose an option";
+  const visible = options.filter(option => Children.toArray(option.children).join("").toLowerCase().includes(search.toLowerCase()));
   const content = (option: typeof selected) => <>{option?.["data-icon"] && <CategoryIcon icon={option["data-icon"]} size={24} />}{option?.children ?? "Choose"}</>;
   return <span ref={anchor} style={{ display: "block", minWidth: 0 }}>
     <LiquidButton type="button" disabled={disabled} aria-label={rest["aria-label"]} aria-haspopup="dialog" aria-expanded={open} className="choice-trigger" style={glassControlStyle(style)} onClick={() => { setSearch(""); setOpen(!open); }}>{content(selected)}<ChevronDownIcon size={16} /></LiquidButton>
     <PickerPopover open={open} anchorRef={anchor} title={title} onClose={() => setOpen(false)} zIndex={180} size="choice">
-      {options.length > 10 && <input className="picker-search" aria-label={`Search ${title}`} placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} />}
+      {options.length > 10 && <div style={{ position: "relative" }}><SearchIcon size={16} aria-hidden="true" style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} /><input className="picker-search" aria-label={`Search ${title}`} placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} style={{ paddingLeft: 36, fontSize: 16, boxSizing: "border-box" }} /></div>}
+      {search.trim() && visible.length === 0 && <EmptyState announce>No options match “{search.trim()}”.</EmptyState>}
       <div className="picker-options">
-        {options.filter(option => Children.toArray(option.children).join("").toLowerCase().includes(search.toLowerCase())).map((option, index) => <button className="picker-option" type="button" key={String(option.value) + index} disabled={option.disabled} aria-pressed={String(option.value) === String(value)} onClick={() => { onChange?.({ target: { value: String(option.value) }, currentTarget: { value: String(option.value) } } as ChangeEvent<HTMLSelectElement>); setOpen(false); anchor.current?.querySelector("button")?.focus(); }}><span style={{ display:"inline-flex", alignItems:"center", gap:8 }}>{content(option)}</span>{String(option.value) === String(value) && <CheckIcon size={18} />}</button>)}
+        {visible.map((option, index) => <button className="picker-option" type="button" key={String(option.value) + index} disabled={option.disabled} aria-pressed={String(option.value) === String(value)} onClick={() => { onChange?.({ target: { value: String(option.value) }, currentTarget: { value: String(option.value) } } as ChangeEvent<HTMLSelectElement>); setOpen(false); anchor.current?.querySelector("button")?.focus(); }}><span style={{ display:"inline-flex", alignItems:"center", gap:8 }}>{content(option)}</span>{String(option.value) === String(value) && <CheckIcon size={20} aria-hidden="true" />}</button>)}
       </div>
     </PickerPopover>
   </span>;

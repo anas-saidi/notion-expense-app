@@ -14,6 +14,7 @@ import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { DateCalendar } from "./DatePicker";
 import { AccountOptionList, CategoryOptionList, filterCategories } from "./TransactionPickers";
 import { Banner } from "./ui/Banner";
+import { Button } from "./ui/Button";
 import { CameraIcon, CheckIcon, XIcon } from "./ui/icons";
 import { deleteReceipt, loadReceipt, saveReceipt, shrinkPhoto } from "@/lib/receipt-store";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -30,6 +31,8 @@ type Props = {
   onSave: (transaction: TypedTransactionDraft) => Promise<void>;
   onComplete: (count: number) => void;
   onBusyChange: (busy: boolean) => void;
+  /** The batch save's progress for the host sheet's saving cover ("Saving 2 of 5"), or null when no save runs. */
+  onSavingChange?: (label: string | null) => void;
   /** Move one line into the form for all its fields; the line leaves the written list. */
   onOpenInForm?: (source: string, row: { type: "Expense" | "Income"; name: string; amount: number; date: string; categoryId?: string; accountId?: string }) => void;
   /** A line coming back from the form unsaved: appended to what's written. */
@@ -102,6 +105,11 @@ export function TypeItComposer(props: Props) {
   const { haptic } = useAppHaptics();
   useEffect(() => () => { parseAbort.current?.abort(); }, []);
   useEffect(() => { props.onBusyChange(busy || parsing); }, [busy, parsing, props.onBusyChange]);
+  // The host sheet shows one saving cover for the whole batch; this keeps its label on the line being saved.
+  const savingTotal = useRef(0);
+  useEffect(() => {
+    props.onSavingChange?.(busy ? `Saving ${Math.min(progress + 1, savingTotal.current)} of ${savingTotal.current}` : null);
+  }, [busy, progress, props.onSavingChange]);
 
   useEffect(() => {
     try {
@@ -211,6 +219,7 @@ export function TypeItComposer(props: Props) {
     setProgress(0);
     let confirmed = 0;
     const toSave = readyRows;
+    savingTotal.current = toSave.length;
     // What stays written after `count` of the ready lines are saved: every other line, in its original order.
     const keptAfter = (count: number) => {
       const saved = new Set(toSave.slice(0, count).map(row => row.line));
@@ -240,9 +249,8 @@ export function TypeItComposer(props: Props) {
     // Confirmed saves leave the draft immediately. Failed and unattempted rows retain their choices.
     const remaining = keptAfter(result.saved);
     updateDraft(remaining.map(row => row.source).join("\n"), keptChoices(remaining));
-    setFeedback({ error: Boolean(result.error), message: result.error
-      ? `${result.saved ? `${result.saved} saved. ` : ""}${result.error} Remaining lines are kept. Check History before retrying if the connection was interrupted.`
-      : `${result.saved} ${result.saved === 1 ? "transaction" : "transactions"} saved.${remaining.length ? ` ${remaining.length} ${remaining.length === 1 ? "line is" : "lines are"} kept.` : ""}` });
+    // A clean save is confirmed by the page's toast (onComplete); only a failure stays on the sheet as a Banner.
+    if (result.error) setFeedback({ error: true, message: `${result.saved ? `${result.saved} saved. ` : ""}${result.error} Remaining lines are kept. Check History before retrying if the connection was interrupted.` });
     haptic(result.error ? "error" : "success");
     setBusy(false);
     props.onBusyChange(false);
@@ -389,7 +397,7 @@ export function TypeItComposer(props: Props) {
             <div className="typed-line typed-receipt" data-reading={reading || undefined}>
             {thumbs[r.id] ? <img src={thumbs[r.id]} alt="" /> : <span className="typed-receipt-thumb" aria-hidden="true" />}
             <span className="typed-receipt-text"><span className="typed-reading-target">Receipt</span><small className={reading ? "typed-reading" : undefined}>{reading ? "reading" : online ? "waiting for Read" : "kept, offline"}</small></span>
-            {!reading && <button type="button" className="typed-receipt-remove" aria-label="Remove receipt photo" onClick={() => removeReceipt(r.id)}><XIcon size={16} aria-hidden="true" /></button>}
+            {!reading && <button type="button" className="typed-receipt-remove" aria-label="Remove receipt photo" disabled={busy || parsing} onClick={() => removeReceipt(r.id)}><XIcon size={16} aria-hidden="true" /></button>}
             </div></SwipeToDelete>
           </li>;
         })}
@@ -479,7 +487,7 @@ export function TypeItComposer(props: Props) {
           {account.label}: exceeds actual funds by <Money value={spending - account.estimatedActualBalance!} />
         </Banner> : null;
       })}
-      {feedback && <Banner tone={feedback.error ? "danger" : "success"} role={feedback.error ? "alert" : "status"} compact style={{ marginTop: 12 }}>{feedback.message}</Banner>}
+      {feedback?.error && <Banner tone="danger" role="alert" compact style={{ marginTop: 12 }}>{feedback.message}</Banner>}
     </div>
     {/* One action: Read while any line still needs reading, then Save. */}
     <div className="typed-footer">
@@ -488,15 +496,15 @@ export function TypeItComposer(props: Props) {
       <span className="typed-total">{!online ? <span>Offline, kept as draft</span> : rows.length > 0 && waitingCount > 0 && readyRows.length > 0 && !parsing ? <span>{waitingCount} waiting</span> : rows.length > 0 ? <>{total < 0 ? "−" : total > 0 ? "+" : ""}{fmt(Math.abs(Math.round(total)))} <span>total</span></> : null}</span>
       {/* Read only while some line hasn't been read; after that it's Save, waiting on any tag still to pick. */}
       {unreadCount > 0 || parsing || !rows.length
-        ? <button type="button" className="typed-primary" data-quiet={!unreadCount || !online || undefined} aria-busy={parsing} disabled={!unreadCount || !online || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? `Reading ${readingLines.size}…` : unreadCount ? `Read ${unreadCount}` : "Read"}</button>
-        : <button type="button" className="typed-primary" data-quiet={!ready || !online || undefined} disabled={busy || !online} onClick={ready ? save : showWhatsMissing}>{busy ? `Saving ${progress}/${readyRows.length}…` : <><CheckIcon size={16} />{budgetErrors.length ? "Save anyway" : `Save ${readyRows.length}`}</>}</button>}
+        ? <Button variant={!unreadCount || !online ? "secondary" : "primary"} aria-busy={parsing} disabled={!unreadCount || !online || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? `Reading ${readingLines.size}…` : unreadCount ? `Read ${unreadCount}` : "Read"}</Button>
+        : <Button variant={!ready || !online ? "secondary" : "primary"} icon={<CheckIcon />} disabled={!online} onClick={ready ? save : showWhatsMissing}>{budgetErrors.length ? "Save anyway" : `Save ${readyRows.length}`}</Button>}
     </div>
     <PickerPopover open={picker !== null} title={picker?.kind === "account" ? "Account" : picker?.kind === "date" ? "Date" : "Category"} onClose={() => setPicker(null)} align="left" placement="bottom" size={picker?.kind === "date" ? "calendar" : "choice"} zIndex={140} anchorRef={pickerAnchor}>
       {picker?.kind === "date" && <DateCalendar value={pickerRow?.transaction?.date ?? props.defaultDate} onChange={date => choose(picker.line, { date })} />}
       {picker?.kind === "account" && <AccountOptionList accounts={props.accounts} selectedId={pickerRow?.account?.id} onSelect={accountId => choose(picker.line, { accountId })} />}
       {picker?.kind === "category" && <CategoryOptionList categories={filterCategories(props.categories, catSearch)} selectedId={pickerRow?.category?.id} onSelect={category => choose(picker.line, { categoryId: category.id })} search={catSearch} onSearchChange={setCatSearch} />}
     </PickerPopover>
-    <span role="status" className="sr-only">{parsing ? "Reading your transactions" : busy ? `${progress} transactions saved` : ""}</span>
+    <span role="status" className="sr-only">{parsing ? "Reading your transactions" : ""}</span>
   </div>;
 }
 
