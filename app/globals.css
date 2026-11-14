@@ -1754,31 +1754,47 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   grid-column: 2;
   position: relative;
   display: inline-grid;
-  grid-template-columns: 44px 12px 44px auto;
+  grid-template-columns: 44px 16px 44px auto;
   align-items: center;
   height: 48px;
   padding: 2px;
   box-sizing: border-box;
   isolation: isolate;
 }
-/* The pill is Glisse glass: its lens and rim are drawn for its real box, so it
-   moves and resizes (rather than being clipped) to wrap one face or both. */
-.couple-picker-pill.lg-glass {
-  position: absolute;
-  top: 2px; bottom: 2px; left: 2px;
-  width: 44px;
-  border-radius: 22px;
-  z-index: -1;
-  transition: left 240ms cubic-bezier(0.22, 1, 0.36, 1), width 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.couple-picker[data-selected="both"] .couple-picker-pill.lg-glass { width: 100px; }
-.couple-picker[data-selected="end"] .couple-picker-pill.lg-glass { left: 58px; }
 .couple-picker-person, .couple-picker-join {
   height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer;
   border-radius: 22px; -webkit-tap-highlight-color: transparent;
 }
 .couple-picker-person { width: 44px; display: grid; place-items: center; }
-.couple-picker-join { width: 12px; }
+.couple-picker-join { width: 16px; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/*
+  Join and part (ScopeChipBar). Holding the gap pulls both lights towards it over the 500ms hold,
+  on the light's own curve; letting go early lets them settle back. A tap into Couple plays a short
+  pull, leaving Couple a short drift apart. Motion lives on the face button; the art keeps its scale.
+*/
+.couple-picker-person { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+.couple-picker[data-pulling] .couple-picker-person { transition: transform 500ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-pulling] .couple-picker-person[data-side="start"] { transform: translateX(9px); }
+.couple-picker[data-pulling] .couple-picker-person[data-side="end"] { transform: translateX(-9px); }
+/* Two copies of each keyframe (-a, -b) so the same moment can play again. */
+.couple-picker[data-moment="join-a"] .couple-picker-person[data-side="start"] { animation: couple-pull-start 360ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-moment="join-a"] .couple-picker-person[data-side="end"] { animation: couple-pull-end 360ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-moment="part-a"] .couple-picker-person[data-side="start"] { animation: couple-part-start 320ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-moment="part-a"] .couple-picker-person[data-side="end"] { animation: couple-part-end 320ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-moment="join-b"] .couple-picker-person[data-side="start"] { animation: couple-pull-start-b 360ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-moment="join-b"] .couple-picker-person[data-side="end"] { animation: couple-pull-end-b 360ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-moment="part-b"] .couple-picker-person[data-side="start"] { animation: couple-part-start-b 320ms cubic-bezier(0.33, 0, 0.2, 1); }
+.couple-picker[data-moment="part-b"] .couple-picker-person[data-side="end"] { animation: couple-part-end-b 320ms cubic-bezier(0.33, 0, 0.2, 1); }
+@keyframes couple-pull-start { 45% { transform: translateX(6px); } }
+@keyframes couple-pull-end { 45% { transform: translateX(-6px); } }
+@keyframes couple-part-start { 40% { transform: translateX(-4px); } }
+@keyframes couple-part-end { 40% { transform: translateX(4px); } }
+@keyframes couple-pull-start-b { 45% { transform: translateX(6px); } }
+@keyframes couple-pull-end-b { 45% { transform: translateX(-6px); } }
+@keyframes couple-part-start-b { 40% { transform: translateX(-4px); } }
+@keyframes couple-part-end-b { 40% { transform: translateX(4px); } }
+.couple-picker-person { position: relative; }
 .couple-picker-art {
   display: inline-flex; pointer-events: none;
   transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
@@ -1797,5 +1813,24 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   .couple-picker-label { display: inline; padding-inline: 12px 4px; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .couple-picker-pill.lg-glass, .couple-picker-art { transition: none; }
+  .couple-picker-art, .couple-picker-person { transition: none; animation: none !important; }
+  .couple-picker[data-pulling] .couple-picker-person { transform: none; }
 }
+
+/*
+  Reflect category bars: share of spending, in one neutral tone for every scope. Spent money is not the
+  light (the light only stands for money in a pool), and the scope is already shown by the picker and hero.
+  The fill is as thin as the track, blurred and faded at both ends so it has no hard edge.
+  Overspent rows stay plain danger, which the neutral bars make easier to spot.
+*/
+.soft-bar { position: relative; flex: 1; height: 12px; display: block; }
+.soft-bar::before { content: ""; position: absolute; inset: 4px 0; border-radius: 4px; background: var(--surface2); }
+.soft-bar-fill { position: absolute; inset: 0 auto 0 0; min-width: 10px; display: block; }
+.soft-bar-fill::before {
+  content: ""; position: absolute; inset: 4px 0; border-radius: 4px;
+  background: color-mix(in srgb, var(--text2) 40%, var(--surface2));
+  filter: blur(1.5px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 8px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 8px), transparent);
+}
+.soft-bar-fill[data-over]::before { background: var(--danger); filter: none; -webkit-mask-image: none; mask-image: none; }

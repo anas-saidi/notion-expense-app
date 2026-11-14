@@ -1,0 +1,271 @@
+/*
+ * Grain glow. The "room" direction ships behind the Home, Budget and Reflect heroes (design.md
+ * "Light"); halo, tray and sky remain dev-only studies in /grain-lab.
+ *
+ * The glow is the jar's own liquid colour, lit from behind the mascot, with a
+ * fine film grain on top. Grain is one static SVG feTurbulence tile blended with
+ * `overlay`: overlay leaves white (and near-black) almost untouched, so the grain
+ * only shows inside the coloured light and the flat page stays flat.
+ *
+ * Inputs (set inline by GrainGlow):
+ *   --glow-a, --glow-b   the two light colours (same colour except Couple)
+ *   --glow-strength      0.35..1, follows the jar's liquid level
+ */
+.grain-glow {
+  --glow-alpha: 0.9;
+  --grain-opacity: 0.7;
+  --glow-a: var(--partner-husband);
+  --glow-b: var(--glow-a);
+  --glow-strength: 1;
+  /* --glow-core-a/b: the deep tone near the jar when a chosen colour has one (else the plain colour). */
+  --core-a: color-mix(in srgb, var(--glow-core-a, var(--glow-a)) calc(var(--glow-alpha) * var(--glow-strength) * 100%), transparent);
+  --mid-a: color-mix(in srgb, var(--glow-a) calc(var(--glow-alpha) * var(--glow-strength) * 38%), transparent);
+  --core-b: color-mix(in srgb, var(--glow-core-b, var(--glow-b)) calc(var(--glow-alpha) * var(--glow-strength) * 100%), transparent);
+  --mid-b: color-mix(in srgb, var(--glow-b) calc(var(--glow-alpha) * var(--glow-strength) * 38%), transparent);
+  position: absolute;
+  /* Bleed past the 16px page gutter so the light never shows a hard side edge. */
+  inset: 0 -16px;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  /* Same 700ms curve as the light mascot's brightness, so jar and room fade together. */
+  transition: --glow-strength 700ms cubic-bezier(0.33, 0, 0.2, 1);
+  /* The light belongs to the jar: it is gone before the label, so every word sits on the flat page (AA unchanged). */
+  --fade-end: 262px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(var(--fade-end) - 72px), transparent var(--fade-end));
+  mask-image: linear-gradient(to bottom, #000 calc(var(--fade-end) - 72px), transparent var(--fade-end));
+}
+/* One jar: one light (the second layer only exists for the Couple pair). */
+.grain-glow:not([data-pair]) { --core-b: transparent; --mid-b: transparent; }
+.grain-glow[data-direction="room"]:not([data-pair]) { --wash-b: transparent; --wash-b-mid: transparent; }
+.grain-glow::before,
+.grain-glow::after { content: ""; position: absolute; inset: 0; }
+.grain-glow::before { background: var(--glow-shape); transition: opacity 420ms ease; }
+/* Static grain: one 160px tile, no canvas, no animation. */
+.grain-glow::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2' intercept='-0.5'/%3E%3CfeFuncG type='linear' slope='2' intercept='-0.5'/%3E%3CfeFuncB type='linear' slope='2' intercept='-0.5'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+  opacity: var(--grain-opacity);
+  /* The grain is masked by the light itself, so it fades out with the colour and never dirties the white page. */
+  -webkit-mask-image: var(--glow-shape);
+  mask-image: var(--glow-shape);
+}
+
+/* 1. Halo: a round light behind the jar, like the reference's lit room. */
+.grain-glow[data-direction="halo"] {
+  --grain-opacity: 0.6;
+  --glow-shape:
+    radial-gradient(circle at var(--glow-x-a, 50%) var(--glow-y, 150px), var(--core-a) 0, var(--core-a) 44px, var(--mid-a) 118px, transparent 180px),
+    radial-gradient(circle at var(--glow-x-b, 50%) var(--glow-y, 150px), var(--core-b) 0, var(--core-b) 44px, var(--mid-b) 118px, transparent 180px);
+}
+
+/*
+ * Wavy edge (the reference's "border"): the light keeps a plateau with a fairly
+ * quick fall-off, so it has an edge to bend, and one static SVG filter bends it
+ * with low-frequency noise (feTurbulence + feDisplacementMap, defined in GrainGlow).
+ * Only the light is bent (the grain stays sharp); the text-safe fade mask is unchanged.
+ */
+.grain-glow[data-edge="wavy"]::before { filter: url(#grain-glow-wavy); }
+.grain-glow[data-edge="wavy"][data-direction="halo"] {
+  --glow-shape:
+    radial-gradient(circle at var(--glow-x-a, 50%) var(--glow-y, 150px), var(--core-a) 0, var(--core-a) 36px, var(--mid-a) 92px, var(--mid-a) 118px, transparent 146px),
+    radial-gradient(circle at var(--glow-x-b, 50%) var(--glow-y, 150px), var(--core-b) 0, var(--core-b) 36px, var(--mid-b) 92px, var(--mid-b) 118px, transparent 146px);
+}
+.grain-glow[data-edge="wavy"][data-direction="tray"] {
+  --glow-shape:
+    radial-gradient(ellipse 52% 70% at var(--glow-x-a, 50%) 100%, var(--core-a) 0, var(--mid-a) 62%, var(--mid-a) 78%, transparent 92%),
+    radial-gradient(ellipse 52% 70% at var(--glow-x-b, 50%) 100%, var(--core-b) 0, var(--mid-b) 62%, var(--mid-b) 78%, transparent 92%),
+    linear-gradient(color-mix(in srgb, var(--glow-a) 6%, transparent), color-mix(in srgb, var(--glow-b) 14%, transparent));
+}
+@media (prefers-reduced-transparency: reduce) { .grain-glow[data-edge="wavy"]::before { filter: none; } }
+html[data-grain-a11y="transparency"] .grain-glow[data-edge="wavy"]::before { filter: none; }
+
+/* 2. Tray: the light pools under the jar inside a soft rounded tray, like the reference card. */
+.grain-glow[data-direction="tray"] {
+  inset: 8px 0 auto;
+  height: 262px;
+  border-radius: 32px;
+  --grain-opacity: 0.45;
+  -webkit-mask-image: none;
+  mask-image: none;
+  --glow-shape:
+    radial-gradient(ellipse 60% 75% at var(--glow-x-a, 50%) 100%, var(--core-a) 0, var(--mid-a) 55%, transparent 100%),
+    radial-gradient(ellipse 60% 75% at var(--glow-x-b, 50%) 100%, var(--core-b) 0, var(--mid-b) 55%, transparent 100%),
+    linear-gradient(color-mix(in srgb, var(--glow-a) 6%, transparent), color-mix(in srgb, var(--glow-b) 14%, transparent));
+}
+
+/* 3. Sky: a full-width wash from the top of the screen, fading out above the number. */
+.grain-glow[data-direction="sky"] {
+  height: 300px;
+  bottom: auto;
+  top: -16px;
+  --fade-end: 278px;
+  --glow-alpha: 0.55;
+  --grain-opacity: 0.4;
+  /* Pale partner sky at the top, the light pooled low behind the jar, then flat page by the label. */
+  --glow-shape:
+    radial-gradient(ellipse 55% 45% at var(--glow-x-a, 50%) 72%, var(--core-a) 0, var(--mid-a) 55%, transparent 100%),
+    radial-gradient(ellipse 55% 45% at var(--glow-x-b, 50%) 72%, var(--core-b) 0, var(--mid-b) 55%, transparent 100%),
+    linear-gradient(to bottom, color-mix(in srgb, var(--glow-a) 22%, transparent), color-mix(in srgb, var(--glow-b) 8%, transparent) 60%, transparent 92%);
+}
+
+/*
+ * 4. Room: the mascot's light fills the whole header, like the reference card's lit panel.
+ * A pale wash of the partner colour (Couple: blue on the left, pink on the right) runs
+ * behind the label, number and summary, brightest around the jar, and fades into the page
+ * at the bottom of the hero. Its strength follows the level, so the header itself says how full.
+ * Text over it: the label moves from muted to --text2 to keep AA on the tint.
+ */
+.grain-glow[data-direction="room"] {
+  inset: -16px -16px 0;
+  --glow-alpha: 0.7;
+  /* No flat fill: the whole room is lit from the jar(s), a wide falloff centred on each one,
+     so the room reads as the mascot's own light spreading out, not a tinted panel behind it. */
+  --wash: 20%;
+  --wash-a: color-mix(in srgb, var(--glow-a) calc(var(--glow-strength) * var(--wash)), transparent);
+  --wash-b: color-mix(in srgb, var(--glow-b) calc(var(--glow-strength) * var(--wash)), transparent);
+  --wash-a-mid: color-mix(in srgb, var(--glow-a) calc(var(--glow-strength) * var(--wash) * 0.45), transparent);
+  --wash-b-mid: color-mix(in srgb, var(--glow-b) calc(var(--glow-strength) * var(--wash) * 0.45), transparent);
+  --glow-shape:
+    radial-gradient(circle at var(--glow-x-a, 50%) var(--room-centre, 160px), var(--core-a) 0, var(--mid-a) 80px, transparent 140px),
+    radial-gradient(circle at var(--glow-x-b, 50%) var(--room-centre, 160px), var(--core-b) 0, var(--mid-b) 80px, transparent 140px),
+    radial-gradient(ellipse 95% 80% at var(--glow-x-a, 50%) var(--room-centre, 160px), var(--wash-a) 0, var(--wash-a-mid) 50%, transparent 100%),
+    radial-gradient(ellipse 95% 80% at var(--glow-x-b, 50%) var(--room-centre, 160px), var(--wash-b) 0, var(--wash-b-mid) 50%, transparent 100%);
+  /* One fade for the light and its grain together, so they end as one thing (no seam). */
+  /* Soft at the top too, so the light never starts in a hard line under the header. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 72px, #000 calc(100% - 150px), rgba(0,0,0,.55) calc(100% - 75px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 72px, #000 calc(100% - 150px), rgba(0,0,0,.55) calc(100% - 75px), transparent 100%);
+}
+/* The room ends in 64px of open space under the summary: the fade and its grain live there, never behind text. */
+.grain-stage:has(.grain-glow[data-direction="room"]) { padding-bottom: 96px; }
+/*
+ * Room grain: speckles in the light's core colour (never a grey blend). Faint at the top and
+ * building smoothly toward the bottom, then ended by the room's own soft fade, so the grain
+ * thickens as the light settles into the page with no separate band. One static alpha-noise tile.
+ */
+.grain-glow[data-direction="room"]::after {
+  background: linear-gradient(to right, color-mix(in srgb, var(--glow-core-a, var(--glow-a)) 85%, #000), color-mix(in srgb, var(--glow-core-b, var(--glow-b)) 85%, #000));
+  mix-blend-mode: normal;
+  opacity: calc(0.25 + 0.5 * var(--glow-strength));
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3.4 0 0 0 -1.7'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E"), linear-gradient(to bottom, rgba(0,0,0,.05) 0%, rgba(0,0,0,.12) 45%, rgba(0,0,0,.4) 70%, #000 92%);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3.4 0 0 0 -1.7'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E"), linear-gradient(to bottom, rgba(0,0,0,.05) 0%, rgba(0,0,0,.12) 45%, rgba(0,0,0,.4) 70%, #000 92%);
+  -webkit-mask-size: 180px 180px, 100% 100%;
+  mask-size: 180px 180px, 100% 100%;
+  -webkit-mask-repeat: repeat, no-repeat;
+  mask-repeat: repeat, no-repeat;
+  /* speckles ∩ a ramp that builds toward the bottom; the room's own fade then ends both together. */
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  transition: opacity 700ms cubic-bezier(0.33, 0, 0.2, 1);
+}
+html[data-theme="dark"] .grain-glow[data-direction="room"]::after {
+  background: linear-gradient(to right, var(--glow-a), var(--glow-b));
+  opacity: calc(0.18 + 0.35 * var(--glow-strength));
+}
+/* Dark: pale chosen colours (amber, periwinkle) light a dark room a lot; a 13% wash keeps the label at 5.4:1 or better. */
+/*
+ * Phone layout: edge to edge, whatever the page gutter (the hero is centred; desktop keeps it inside
+ * its panel), and up to the top of the screen behind the header. --room-lift is the header's height
+ * (set by GrainGlow); the light's centres move down by the same amount so they stay on the jars.
+ * While Home sits at the top, the header turns transparent so the light shows through it; it turns
+ * solid again as soon as content scrolls under it.
+ */
+@media (max-width: 899px) {
+  .grain-glow[data-direction="room"] {
+    left: calc(50% - 50vw);
+    right: calc(50% - 50vw);
+    top: calc(-16px - var(--room-lift, 0px));
+    --room-centre: calc(160px + var(--room-lift, 0px));
+  }
+  .app-header { transition: background-color 200ms ease; }
+  html[data-room-at-top] .app-header { background-color: transparent; }
+}
+/*
+ * Content sheet (phones): everything below the hero sits on one surface whose rounded top
+ * rises over the bottom of the room, like a sheet pulled up over the light. The page is
+ * already the sheet's colour, so only its top edge is drawn: an opaque strip in --bg with
+ * rounded top corners and a faint lift. The room's grain gathers just above it.
+ */
+.room-sheet-edge { display: none; }
+@media (max-width: 899px) {
+  /*
+   * Spacing per screen, so the sheet's top sits about 40px under the hero's last line and about
+   * 40px above the first section: --sheet-pad is the room left under the hero, --sheet-drop how far
+   * the room and sheet reach down into empty space that follows the hero (Home's 48px gap).
+   */
+  .grain-stage:has(.grain-glow[data-direction="room"]) { --sheet-drop: 0px; --sheet-pad: 44px; padding-bottom: var(--sheet-pad); }
+  #panel-home .grain-stage { --sheet-drop: 46px; --sheet-pad: 0px; }
+  /* Reflect: its toolbar ends the hero and its list starts 41px below it, so the sheet reaches 24px into that gap. */
+  #panel-history .grain-stage { --sheet-drop: 24px; --sheet-pad: 40px; }
+  /*
+   * The sheet is a real surface: its rounded top edge plus 640px of page colour below it, so when
+   * the hero sinks on scroll (below) it slides under the sheet. Content after the hero is lifted
+   * above the sheet (z-index 1); the hero's own pieces sit under it.
+   */
+  .grain-stage > .room-sheet-edge.room-sheet-edge {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    left: calc(50% - 50vw);
+    right: calc(50% - 50vw);
+    top: calc(100% + var(--sheet-drop, 0px) - 28px);
+    height: 640px;
+    background: var(--bg);
+    border-radius: 28px 28px 0 0;
+    box-shadow: 0 -10px 28px -14px color-mix(in srgb, var(--text) 18%, transparent);
+    pointer-events: none;
+  }
+  .screen-layout :has(.grain-stage) ~ *,
+  .grain-stage ~ * { position: relative; z-index: 3; }
+  /*
+   * Phone Home wraps its panels in display: contents boxes, which can't take a z-index, so the
+   * sheet painted over their unpositioned content (headers, rows) until a hover repainted it.
+   * Lift the real boxes inside instead.
+   */
+  .screen-layout:has(.grain-stage) :is(section, .home-content):not(.grain-stage):not(:has(.grain-stage)) { position: relative; z-index: 3; }
+  /*
+   * Scroll: the hero sinks behind the sheet. Everything in the stage except the sheet moves down by
+   * 45% of the scroll (--room-scroll, set by GrainGlow), so it drifts up at half speed while the sheet
+   * and the content on it scroll normally over it. Compositor-only (transform); none with Reduce Motion.
+   */
+  .grain-stage > :not(.room-sheet-edge) { transform: translate3d(0, calc(var(--room-scroll, 0) * 0.45px), 0); will-change: transform; }
+  /* The sheet ends the room: the light and its densest grain run right up to the sheet's edge (and fade out under it). */
+  .grain-glow[data-direction="room"] {
+    bottom: calc(-1 * var(--sheet-drop, 0px));
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent calc(100% - 4px));
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent calc(100% - 4px));
+  }
+}
+@media (prefers-contrast: more) { .grain-stage > .room-sheet-edge { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { .grain-stage > :not(.room-sheet-edge) { transform: none !important; } }
+html[data-grain-a11y="contrast"] .grain-stage > .room-sheet-edge { display: none !important; }
+
+html[data-theme="dark"] .grain-glow[data-direction="room"] { --glow-alpha: 0.5; --wash: 13%; }
+.grain-stage:has(.grain-glow[data-direction="room"]) .screen-hero-label { color: var(--text2); }
+/* Captions inside the mascot area (the spill's "62% budget left", the offline note) sit on the brightest light:
+   full text colour there (their inline --text2 would drop to about 4.2:1 in dark). */
+.grain-stage:has(.grain-glow[data-direction="room"]) .screen-hero-mascot span { color: var(--text) !important; }
+/* Red facts in the summary ("10.344 due") sit on the tint: a slightly deeper red keeps them near 6:1, not a bare 4.5:1. */
+html:not([data-theme="dark"]) .grain-stage:has(.grain-glow[data-direction="room"]) .screen-hero-summary { --danger: #b3262c; }
+
+/* Dark: the same light, dimmer, so it reads as a glow in the jar and not a lit panel. */
+html[data-theme="dark"] .grain-glow { --glow-alpha: 0.55; --grain-opacity: 0.35; }
+html[data-theme="dark"] .grain-glow[data-direction="sky"] { --glow-alpha: 0.34; }
+
+/* Reduce Transparency: keep the colour, drop the grain and halve the light. Increased contrast: no glow at all. */
+@media (prefers-reduced-transparency: reduce) {
+  .grain-glow { --glow-alpha: 0.3; }
+  .grain-glow::after { display: none; }
+}
+html[data-grain-a11y="transparency"] .grain-glow { --glow-alpha: 0.3; }
+html[data-grain-a11y="transparency"] .grain-glow::after { display: none; }
+@media (prefers-contrast: more) { .grain-glow { display: none; } }
+html[data-grain-a11y="contrast"] .grain-glow { display: none; }
+@media (prefers-reduced-motion: reduce) { .grain-glow, .grain-glow::before { transition: none; } }
+
+/* Everything in the stage (the hero, Reflect's toolbar) sits above the light. */
+.grain-stage { position: relative; isolation: isolate; }
+.grain-stage > :not(.grain-glow) { position: relative; z-index: 1; }
+
+@property --glow-strength { syntax: "<number>"; inherits: true; initial-value: 1; }

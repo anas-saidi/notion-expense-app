@@ -129,3 +129,38 @@ button.typed-back:focus-visible { outline: 2px solid var(--select-ink); outline-
 .realloc-moves .typed-note { margin-top: 2px; }
 .realloc-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .typed-suggestions { margin-bottom: 16px; }
+
+/* Ask your ledger (Reflect): the prompt, a thinking line, then the app's own sentence and what it counted. */
+.reflect-ask { display: grid; gap: 14px; margin-bottom: 8px; }
+.reflect-ask .typed-line { display: grid; }
+.reflect-ask-clarify { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text2); }
+.reflect-ask-answer { display: grid; gap: 10px; }
+.reflect-ask-sentence { margin: 0; text-align: left; font-size: 17px !important; }
+.reflect-ask-label { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.reflect-ask-rows { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.reflect-ask-rows li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 36px; font-size: 15px; color: var(--text); }
+.reflect-ask-rows li > span:first-child { display: grid; gap: 1px; min-width: 0; }
+.reflect-ask-rows small { font-size: 12px; color: var(--muted); }
+.reflect-ask-more { justify-self: start; min-height: 36px; padding: 0; border: 0; background: transparent; color: var(--text2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.reflect-ask .typed-amount { --typed-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; }
+
+
+/* Receipt photos waiting for Read: a thumbnail row each, above the written lines. */
+.typed-receipts { display: grid; gap: 10px; margin: 0 0 18px; padding: 0; list-style: none; }
+.typed-receipt { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.typed-receipts img, .typed-receipt-thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--surface2); }
+.typed-receipt-text { display: grid; gap: 2px; font-size: 16px; color: var(--text); }
+.typed-receipt-text small { font-family: var(--typed-mono); font-size: 12px; color: var(--muted); }
+.typed-receipt-remove { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+button.typed-receipt-remove, button.typed-receipt-remove:not(:disabled):hover { transform: none; }
+@media (hover: hover) and (pointer: fine) { button.typed-receipt-remove:hover { background: var(--surface2); color: var(--text2); } }
+.typed-receipt-remove:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 2px; }
+.typed-camera { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; padding: 0; border: 0; border-radius: 50%; background: var(--surface2); color: var(--text2); cursor: pointer; }
+button.typed-camera, button.typed-camera:not(:disabled):hover { transform: none; }
+button.typed-camera:not(:disabled):active { transform: scale(0.94); transition: transform var(--motion-fast) var(--ease-standard); }
+.typed-camera:disabled { opacity: .5; cursor: default; }
+.typed-camera:focus-visible { outline: 2px solid var(--select-ink); outline-offset: 2px; }
+.typed-footer .typed-total { flex: 1 1 auto; min-width: 0; }
+@media (prefers-reduced-motion: reduce) { button.typed-camera:not(:disabled):active { transform: none; } }
+/* Swiping a line or receipt reveals the delete colour behind it, so the row itself needs the sheet's surface. */
+.typed-lines .typed-line, .typed-receipt { background: var(--surface); }

@@ -15,15 +15,21 @@ type Props = {
   onUse: (suggestion: ReallocationSuggestion) => void;
   /** Pills from lib/suggestions.ts rebalance rules: each points at a real shortfall, bill or unassigned money. */
   suggestions?: string[];
+  /** Gemini started or stopped working (the jar shows thinking meanwhile). */
+  onBusyChange?: (busy: boolean) => void;
 };
 
 /**
  * Suggest moves, in the composer's language: you write what you need on one borderless line, the line shimmers
  * while it's read, and each move comes back as a row with the amount in the margin and its reason underneath.
  */
-export function ReallocationAssistant({ scope, month, categories, onUse, suggestions = [] }: Props) {
+export function ReallocationAssistant({ scope, month, categories, onUse, suggestions = [], onBusyChange }: Props) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const busyChange = useRef(onBusyChange);
+  busyChange.current = onBusyChange;
+  useEffect(() => { busyChange.current?.(busy); }, [busy]);
+  useEffect(() => () => busyChange.current?.(false), []);
   const [error, setError] = useState("");
   const [suggestion, setSuggestion] = useState<ReallocationSuggestion | null>(null);
   const abort = useRef<AbortController | null>(null);

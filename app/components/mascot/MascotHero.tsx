@@ -1,5 +1,5 @@
 "use client";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { BudgetScope } from "../app-types";
 import { Mascot } from "./Mascot";
 import type { JarItem } from "./coinSimMatter";
@@ -8,6 +8,14 @@ import type { Mood } from "./poses";
 import { deriveTarget, useBalanceReaction } from "./mood";
 import { useReducedMotion } from "motion/react";
 import { useRememberedJar } from "./memory";
+import { MascotSignal, type OnceKind, type SignalKind } from "./MascotSignal";
+import { LightMascot } from "../grain/LightMascot";
+import { PALETTES } from "../grain/palettes";
+import { HeartTip } from "../grain/HeartTip";
+import type { ReactionToken } from "./mood";
+
+/** A signal on a jar (see MascotSignal): what it shows, its colour, what it means, and the alert's tap. */
+export type JarSignal = { kind: SignalKind; tone?: "danger" | "neutral"; label?: string; caption?: boolean; onTap?: () => void };
 
 /**
  * Hero size: the jar (about two thirds of this box) carries the same visual
@@ -40,6 +48,11 @@ type Common = {
    * `pending` clears. `level` is only the fallback for a first visit.
    */
   pending?: boolean;
+  /**
+   * Light look, split jar: how bright the light is and its tint, when the screen's number has a mood
+   * (Reflect: did the period keep to its plan). A pool's light comes from its level and `warn` instead.
+   */
+  glow?: { level: number; warn: "low" | "over" | null } | null;
   style?: CSSProperties;
   /**
    * Couple only: wrap each partner's jar, e.g. to make it its own button. Gets the
@@ -50,6 +63,20 @@ type Common = {
   pairItems?: Partial<Record<"anas" | "salma", JarItem[]>>;
   /** Couple only: whose jar sits in front of the other (defaults to Salma's). */
   front?: "anas" | "salma";
+  /** A signal on the jar, or on the whole pair in Couple (e.g. thinking). */
+  signal?: JarSignal | null;
+  /** Couple only: a signal on one partner's jar (e.g. a dot on whoever has money due). */
+  pairSignals?: Partial<Record<"anas" | "salma", JarSignal | null>>;
+  /** A one-off to play (burst, comet); a new id plays it again. */
+  once?: { kind: OnceKind; id: number } | null;
+  /** Wink once when this changes (e.g. after a save); 0 or undefined does nothing. */
+  winkId?: number;
+  /**
+   * "jar" (default): the glass jar with liquid. "light": the jar drawn as a soft light in the partner's
+   * colour; a pool's level is a saturated core that grows and brightens, a split jar shows its items
+   * in the light (design.md, Light).
+   */
+  look?: "jar" | "light";
 };
 
 export type MascotHeroProps =
@@ -71,16 +98,38 @@ export type MascotHeroProps =
  * facts are stated in text next to it.
  */
 export function MascotHero(props: MascotHeroProps) {
-  if (props.scope !== "joint") return <HeroJar {...props} />;
-  return <CouplePair {...props} />;
+  // Always wrapped, so a signal coming or going never remounts the jar (and restarts its physics).
+  return <Signalled signal={props.signal} once={props.once}>
+    {props.scope !== "joint" ? <HeroJar {...props} /> : <CouplePair {...props} />}
+  </Signalled>;
+}
+
+function Signalled({ signal, once, dotAt, children }: { signal?: JarSignal | null; once?: { kind: OnceKind; id: number } | null; dotAt?: Pick<CSSProperties, "top" | "left" | "right">; children: ReactNode }) {
+  return <MascotSignal signal={signal?.kind ?? null} dotAt={dotAt} tone={signal?.tone} label={signal?.label} caption={signal?.caption} onAlertTap={signal?.onTap} once={once}>{children}</MascotSignal>;
 }
 
 /** How big each partner's jar is in the Couple hero, relative to a single hero. */
 const PAIR_SCALE = 0.68;
 /** How far the two jars press into each other, as a share of one jar's size. */
-const PAIR_OVERLAP = 0.34;
+const PAIR_OVERLAP = 0.4;
+/** In the pair, each partner's dot sits on their outer shoulder (the inner one is under the other jar), on the body. */
+const PAIR_DOT = { anas: { top: "24%", left: "24%" }, salma: { top: "24%", right: "30%" } } as const;
 /** The cuddle: both tilt in by the same angle, so their tops and waterlines mirror at one height. */
 const PAIR_TILT = { anas: 8, salma: -8 } as const;
+/**
+ * Where the two bodies meet: the vertical line halfway between the jars' centres, seen from inside each
+ * leaning jar (it tilts about 50% 92% of its box). Jar units: the box is 300 wide, centred on 0.
+ */
+const PAIR_PRESS = (() => {
+  const half = ((1 - PAIR_OVERLAP) * 300) / 2;
+  const pivotY = 0.92 * 300 - 150;
+  const wall = (tilt: number, side: 1 | -1) => {
+    const a = (tilt * Math.PI) / 180;
+    // A body point p lands at screen x = cos(a)·x − sin(a)·(y − pivotY); the wall is screen x = side·half.
+    return { nx: side * Math.cos(a), ny: -side * Math.sin(a), c: half - side * Math.sin(a) * pivotY };
+  };
+  return { anas: wall(PAIR_TILT.anas, 1), salma: wall(PAIR_TILT.salma, -1) };
+})();
 
 /**
  * Couple is not a third character: it's both partners side by side, each in
@@ -113,10 +162,16 @@ function CouplePair(props: MascotHeroProps) {
   });
   const partner = (scope: "anas" | "salma", side: 0 | 1, look: number) => {
     const own = props.pairItems ? props.pairItems[scope] ?? EMPTY : deal(side) as JarItem[];
-    const body = <HeroJar {...shared} {...levelFor(scope)} scope={scope} lookYaw={yaw + look} items={own} style={lean(scope)} />;
+    const ownSignal = props.pairSignals?.[scope];
+    const plain = <HeroJar {...shared} signal={null} once={null} press={PAIR_PRESS[scope]} {...levelFor(scope)} scope={scope} lookYaw={yaw + look} items={own} style={lean(scope)} />;
+    const body = props.pairSignals ? <Signalled signal={ownSignal} dotAt={PAIR_DOT[scope]}>{plain}</Signalled> : plain;
     return <div key={scope} style={slot(scope)}>{props.wrapJar ? props.wrapJar(scope, body, jar) : body}</div>;
   };
-  return <div className="mascot-pair" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: size, ...props.style }}>
+  // Light look: a soft point of light under the pair turns their two lobes into a heart (the jars are unchanged).
+  // With contributions it follows the least-funded partner: the heart is full only when both are in.
+  const heartLevel = props.variant !== "pool" ? 1 : props.levels ? Math.min(props.levels.anas, props.levels.salma) : props.level;
+  return <div className="mascot-pair" style={{ display: "flex", justifyContent: "center", alignItems: "center", height: size, position: "relative", ...props.style }}>
+    {props.look === "light" && <HeartTip size={size} jar={jar} overlap={PAIR_OVERLAP} level={heartLevel} />}
     {partner("anas", 0, -8)}
     {partner("salma", 1, 8)}
   </div>;
@@ -128,7 +183,7 @@ function CouplePair(props: MascotHeroProps) {
  * in, removed ones fade, the pool eases from its old level). The very first
  * time, the emoji jar fills once as a welcome. Reduce Motion always starts settled.
  */
-function HeroJar(props: MascotHeroProps & { memoryKey?: string }) {
+function HeroJar(props: MascotHeroProps & { memoryKey?: string; press?: MascotTarget["press"] }) {
   const { memoryKey, scope, spentPct, unassigned = 0, lookYaw, size = MASCOT_HERO_SIZE, mood, remember = true, pending = false, style } = props;
   const pool = props.variant === "pool";
   const animate = !useReducedMotion();
@@ -138,13 +193,23 @@ function HeroJar(props: MascotHeroProps & { memoryKey?: string }) {
   // A pool always carries a (usually empty) pile, so showing what's in it never rebuilds the jar.
   const poolItems = pool ? props.items ?? EMPTY : EMPTY;
   // Balance changes only matter for the pool; a stable null keeps the hook quiet otherwise.
-  const reaction = useBalanceReaction(pool ? props.balance ?? null : null, scope, pool ? props.available ?? 0 : 0);
+  const balanceReaction = useBalanceReaction(pool ? props.balance ?? null : null, scope, pool ? props.available ?? 0 : 0);
+  // Whichever came last plays: a balance change, or a wink the screen asked for (Reduce Motion skips the wink).
+  const [reaction, setReaction] = useState<ReactionToken | null>(null);
+  const seq = useRef(0);
+  useEffect(() => { if (pool && balanceReaction) setReaction({ ...balanceReaction, id: ++seq.current }); }, [balanceReaction?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (props.winkId && animate) setReaction({ kind: "wink", id: ++seq.current }); }, [props.winkId]); // eslint-disable-line react-hooks/exhaustive-deps
   const derived = deriveTarget({ scope, fundingGap: 0, spentPct, unassigned, loading: false });
-  const base = { ...derived, mood: mood ?? derived.mood, lookYaw };
+  const base = { ...derived, mood: mood ?? derived.mood, lookYaw, press: props.press ?? null };
   const target: MascotTarget = pool
     ? { ...base, outline: "partner", fill: shownLevel, items: poolItems }
     : { ...base, outline: "partner", items: shownItems };
-  return <Mascot target={target} warn={pool ? props.warn ?? null : null} reaction={pool ? reaction : null} size={size} style={{ margin: "0 auto", ...style }} />;
+  if (props.look === "light") {
+    const tone = PALETTES.partner[scope === "salma" ? "salma" : "anas"];
+    return <LightMascot scope={scope} target={target} level={pool ? shownLevel : props.glow?.level ?? 1} size={size} spentPct={spentPct} reaction={reaction} warn={pool ? props.warn ?? null : props.glow?.warn ?? null}
+      edge="soft" levelMode="core" rest="still" tone={tone} style={{ margin: "0 auto", ...style }} />;
+  }
+  return <Mascot target={target} warn={pool ? props.warn ?? null : null} reaction={reaction} size={size} style={{ margin: "0 auto", ...style }} />;
 }
 
 const EMPTY: JarItem[] = [];

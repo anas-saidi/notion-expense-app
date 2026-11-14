@@ -88,6 +88,8 @@ type AddTransactionSheetProps = {
   onUseRecent?: (transaction: Transaction) => void;
   /** Open on the form instead of writing (e.g. arriving with a category already chosen). */
   startInForm?: boolean;
+  /** A line to add to the writing view on open (Activity's swipe-right "log again"). */
+  seedLine?: { source: string; id: number } | null;
   onCatSearchChange: (value: string) => void;
   repeat?: BillRepeat;
   onRepeatChange?: (repeat: BillRepeat) => void;
@@ -309,7 +311,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           onSave={props.onSaveTyped}
           onComplete={props.onTypedComplete ?? (() => {})}
           onBusyChange={setTypedBusy}
-          restoreLine={restoreLine}
+          restoreLine={restoreLine ?? props.seedLine ?? null}
           suggestions={props.typedSuggestions}
           onOpenInForm={(line, row) => {
             // The line moves into the form with everything it already knows.

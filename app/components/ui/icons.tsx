@@ -10,6 +10,7 @@ import {
   Target,
   Pencil,
   PenLine,
+  Camera,
   Search,
   Calendar,
   CalendarRange,
@@ -75,6 +76,7 @@ export const ShuffleIcon      = (p: LucideProps) => <Shuffle           size={S} 
 export const DeleteIcon       = (p: LucideProps) => <Delete        size={S} {...p} />;
 /** Type it: write transactions in plain words, so a pen writing a line. */
 export const WriteIcon = (p: LucideProps) => <PenLine size={S} {...p} />;
+export const CameraIcon = (p: LucideProps) => <Camera size={S} {...p} />;
 export const MoreIcon         = (p: LucideProps) => <MoreHorizontal size={S} {...p} />;
 export const ReceiptIcon      = (p: LucideProps) => <ReceiptText    size={S} {...p} />;
 export const WalletIcon       = (p: LucideProps) => <WalletCards    size={S} {...p} />;

@@ -8,9 +8,9 @@ const EASE_IN = [0.64, 0, 0.78, 0] as const;
 
 /**
  * One partner's jar in the Couple pair as its own button. Tapped, the jar
- * squishes like any other; the caller decides what that reveals (Home drops
- * the partner's figure into the jar) and keeps one jar open at a time. Given
- * `details`, the figure instead rises out from behind the jar's head.
+ * squishes like any other; the caller decides what it does (Home opens that
+ * partner's contributions). Given `details`, the figure rises out from behind
+ * the jar's head instead, one jar open at a time.
  */
 export function PartnerTap({ open, onToggle, label, details, size, pending = false, children }: {
   open: boolean;
@@ -36,7 +36,7 @@ export function PartnerTap({ open, onToggle, label, details, size, pending = fal
   };
   return (
     <div style={{ position: "relative" }}>
-      <button ref={jar} type="button" onClick={toggle} aria-expanded={pending ? undefined : open} aria-disabled={pending || undefined} aria-label={pending ? label : `${label}. ${open ? "Hide" : "Show"} details.`} style={jarButtonStyle}>
+      <button ref={jar} type="button" onClick={toggle} aria-expanded={pending || details == null ? undefined : open} aria-disabled={pending || undefined} aria-label={pending || details == null ? label : `${label}. ${open ? "Hide" : "Show"} details.`} style={jarButtonStyle}>
         {children}
       </button>
       <AnimatePresence initial={false}>

@@ -157,6 +157,7 @@ export function RebalanceSheet({
   const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [usedSuggestion, setUsedSuggestion] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [thinking, setThinking] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -304,6 +305,7 @@ export function RebalanceSheet({
     <AllocationFlow
       jarScope={budgetScope}
       jarShowsAssigned
+      jarSignal={thinking ? { kind: "thinking", label: "Finding moves" } : null}
       open={open}
       selectedMonth={homeMonth}
       onCancel={onClose}
@@ -323,7 +325,7 @@ export function RebalanceSheet({
       editorHidden={assistantOpen}
       flowPreview={<>{!isReadOnly && open && <>
         <button type="button" style={assistantToggleStyle} aria-expanded={assistantOpen} onClick={() => setAssistantOpen(value => !value)}>{assistantOpen ? "Edit by hand" : "Suggest moves"}</button>
-        {assistantOpen && <ReallocationAssistant scope={budgetScope} month={homeMonth}
+        {assistantOpen && <ReallocationAssistant scope={budgetScope} month={homeMonth} onBusyChange={setThinking}
           suggestions={rebalanceSuggestions({ categories: visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original })), bills: dueBills, today: today(), formatAmount: fmt })}
           categories={visibleItems.map(item => ({ id: item.id, name: catById.get(item.id)!.name, available: item.original, reserved: billHolds.get(item.id.replace(/-/g, "").toLowerCase()) ?? 0 }))}
           onUse={suggestion => {

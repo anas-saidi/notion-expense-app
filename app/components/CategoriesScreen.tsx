@@ -1,7 +1,7 @@
 "use client";
 import { LiquidButton } from "./ui/LiquidGlass";
 
-import { HeroSkeleton, SkeletonRows } from "./ui/Skeleton";
+import { SkeletonRows } from "./ui/Skeleton";
 
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import { ScreenToolbar } from "./ui/ScreenLayout";
@@ -15,12 +15,16 @@ import { CalendarIcon, ChevronDownIcon, ChevronRightIcon, ShuffleIcon, PlusIcon 
 import { SearchField } from "./ui/SearchField";
 import { Banner, bannerActionStyle } from "./ui/Banner";
 import { BUDGET_SCOPE_LABELS, fmt, getCategoryScope, getJointAccountUnassigned, today } from "./app-utils";
+import { billShortfalls, type DueBill } from "@/lib/suggestions";
 import { getCategoryAvailableByScope, isSavingsCategory, scopeMonthlySummary } from "./wallet-utils";
+import { planningMood, spendingMood } from "./light-mood";
 import { MascotHero, MASCOT_HERO_SIZE } from "./mascot/MascotHero";
+import { GrainGlow } from "./grain/GrainGlow";
+import { PALETTES } from "./grain/palettes";
 import { MascotSpill } from "./mascot/MascotSpill";
 import { budgetJarItems } from "./mascot/budgetJar";
 import type { ContributionStatus } from "./contribution-utils";
-import { budgetStatus, budgetStatusRank, monthProgress, pace } from "./category-status";
+import { budgetStatus, budgetStatusRank, monthProgress } from "./category-status";
 import { runningLowCategories, runwayLabel } from "./category-runway";
 import { BudgetJarRow, SavingsJarRow } from "./CategoryJarRow";
 import { SectionToggle } from "./ui/SectionToggle";
@@ -59,6 +63,10 @@ type Props = {
   /** "YYYY-MM" of the month that can be planned (next month). */
   planMonth?: string;
   onOpenPlan?: () => void;
+  /** This month's unpaid bills; one due within a week that its category can't cover puts a dot on the row. */
+  dueBills?: DueBill[];
+  /** Money just moved: the jar plays a comet once. */
+  moneyMoved?: { kind: "comet"; id: number } | null;
 };
 
 
@@ -69,6 +77,8 @@ const SECTION_ORDER = ["savings", "obligations", "long term", "wants"];
 /* ─── Main screen ─────────────────────────────────────────────── */
 
 export function CategoriesScreen({
+  dueBills = [],
+  moneyMoved = null,
   categories,
   frozenCategories,
   accounts,
@@ -215,35 +225,45 @@ export function CategoriesScreen({
     }
     return planned > 0 ? (spent / planned) * 100 : null;
   }, [categories, accounts, budgetScope, plannedByCategory, spentByCategory]);
-  // The pool jar's level uses the exact figures Home uses, so it reads the same on both screens.
-  const poolLevel = useMemo(() => {
-    const scoped = scopeMonthlySummary(monthlySummary, categories, accounts, budgetScope);
-    return scoped.totalAssigned > 0 ? 1 - scoped.totalSpent / scoped.totalAssigned : 1;
-  }, [monthlySummary, categories, accounts, budgetScope]);
-  const poolPace = pace(poolLevel, progress);
-  const poolWarn = poolPace === "good" ? null : poolPace;
-  const jarDetails = jarItems.length > 0
+  // The light is the mood of Budget's number, To assign (design.md, Light): bright when everything
+  // is placed, dimmer with money waiting, coral when over-assigned.
+  // Couple has almost nothing to assign (joint money is planned from contributions up front), so its
+  // Budget asks how the joint plan is holding: Left to spend, lit by spending pace like personal Home.
+  const jointBudget = budgetScope === "joint";
+  const jointSpent = useMemo(() => jointBudget ? scopeMonthlySummary(monthlySummary, categories, accounts, "joint").totalSpent : 0, [jointBudget, monthlySummary, categories, accounts]);
+  const planning = loading || monthError || monthlySummary.contributionError ? null
+    : jointBudget ? spendingMood(availableInCategories, jointSpent, progress) : planningMood(availableInCategories, leftToAllocate);
+  const lightLevel = planning?.level ?? 0.35;
+  const poolWarn = planning?.warn ?? null;
+  const jarDetails = loading ? "Loading monthly details" : jarItems.length > 0
     ? `Money left in ${jarItems.length} categor${jarItems.length === 1 ? "y" : "ies"}`
     : "No category has money left";
-  const budgetJar = loading ? <HeroSkeleton size={MASCOT_HERO_SIZE} /> : monthError ? (
+  // Loading keeps the light itself at its remembered level (pending), not a glass skeleton blob.
+  const budgetJar = !loading && monthError ? (
     <span role="status" style={{ minHeight: MASCOT_HERO_SIZE, display: "grid", placeItems: "center", color: "var(--text2)", fontSize: 12 }}>Monthly details unavailable</span>
   ) : (
     <MascotSpill size={MASCOT_HERO_SIZE} label={jarDetails} details={jarDetails} onOpenChange={setJarOpen}>
-      <MascotHero variant="pool" scope={budgetScope} level={poolLevel} warn={poolWarn} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={monthlySummary.contributionError ? undefined : leftToAllocate} />
+      <MascotHero look="light" variant="pool" scope={budgetScope} level={lightLevel} warn={poolWarn} items={jarOpen ? jarItems : undefined} spentPct={jarSpentPct} unassigned={monthlySummary.contributionError ? undefined : leftToAllocate} once={moneyMoved} pending={loading} />
     </MascotSpill>
   );
   const hasScopedCategories = categories.some(cat => getCategoryScope(cat, accounts) === budgetScope);
+  const billShort = useMemo(() => billShortfalls(dueBills, categories, today()), [dueBills, categories]);
 
   return (
     <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main screen-layout" style={wrapStyle}>
 
             <div className="budget-overview-context screen-overview">
-            <section className="budget-desktop-overview" aria-label="Category allocation overview">
-              <ScreenHero mascot={budgetJar} label="Allocated" loading={loading} value={loading || monthError ? null : Math.round(availableInCategories)}
+            <section className="budget-desktop-overview grain-stage" aria-label="Category allocation overview">
+              {/* The jar's light fills the hero, as bright as what's left of the plan (design.md, Light). */}
+              <GrainGlow direction="room" scope={budgetScope} level={lightLevel} tones={PALETTES.partner} />
+              <ScreenHero mascot={budgetJar} label={jointBudget ? "Left to spend" : "To assign"} loading={loading}
+                value={loading || monthError || monthlySummary.contributionError ? null : Math.round(jointBudget ? availableInCategories : leftToAllocate)}
+                done={!jointBudget && !loading && !monthError && !monthlySummary.contributionError && Math.round(leftToAllocate) === 0 ? "All assigned" : undefined}
+                tone={!loading && Math.round(jointBudget ? availableInCategories : leftToAllocate) < 0 ? "danger" : undefined}
                 summary={loading ? null : savingsGap ? <Summary><Fact>{savingsGap.account.label}</Fact> is <Fact tone="danger" onClick={savingsGap.onFix} label={savingsGap.source ? `Move money from ${savingsGap.source.label} to ${savingsGap.account.label}` : `Review ${savingsGap.account.label}`}>{fmt(savingsGap.gap)} short</Fact>.</Summary>
                   : shortBy > 0 ? <Summary><Fact tone="danger" onClick={shortfallAction?.onClick ?? onOpenRebalance} label={`${shortfallAction?.label ?? "Rebalance"}: ${fmt(shortBy)} MAD short`}>{fmt(shortBy)} short</Fact>.</Summary>
                   : firstLow ? <Summary>{runningLow.length === 1 ? <><Fact>{firstLow.category.name}</Fact> has <Fact tone="warning" onClick={onOpenRebalance} label={`Rebalance ${firstLow.category.name}`}>{runwayLabel(firstLow.daysCovered).toLowerCase()}</Fact></> : <><Fact>{runningLow.length} categories</Fact> are <Fact tone="warning" onClick={onOpenRebalance} label="Rebalance running low categories">running low</Fact></>}.</Summary>
-                  : !monthlySummary.contributionError && Math.round(leftToAllocate) > 0 ? <Summary><Fact onClick={onOpenRebalance} label="Assign unassigned money">{fmt(Math.round(leftToAllocate))}</Fact> is <Fact>unassigned</Fact>.</Summary>
+                  : !monthlySummary.contributionError && Math.round(leftToAllocate) > 0 ? <Summary>{jointBudget ? <><Fact onClick={onOpenRebalance} label="Assign unassigned money">{fmt(Math.round(leftToAllocate))}</Fact> is <Fact>unassigned</Fact></> : <><Fact onClick={onOpenRebalance} label={`Assign ${fmt(Math.round(leftToAllocate))} MAD to categories`}>Assign it</Fact> to your categories</>}.</Summary>
                   : budgetScope !== "joint" && contributionRemaining > 0 ? <Summary><Fact onClick={onMoveContribution} label={`Contribute ${fmt(Math.round(contributionRemaining))} MAD to Couple`}>{fmt(Math.round(contributionRemaining))} due to Couple</Fact>.</Summary>
                   : null}
                 actions={monthlySummary.contributionError ? <Banner tone="neutral" compact>Confirmed contributions and repayment reserves unavailable</Banner> : null}
@@ -307,13 +327,13 @@ export function CategoriesScreen({
                       </div>
                       {(() => {
                         // A run of identical empty jars says nothing row by row, so two or more fold into one line.
-                        const empty = group.rows.filter(row => !row.savings && (row.status.state === "empty" || row.status.state === "unfunded"));
+                        const empty = group.rows.filter(row => !row.savings && !billShort.has(row.cat.id) && (row.status.state === "empty" || row.status.state === "unfunded"));
                         const fold = empty.length >= 2 && !search.trim() && !showEmpty.has(group.label);
                         const rows = fold ? group.rows.filter(row => !empty.includes(row)) : group.rows;
                         return <>
                           {rows.map(({ cat, planned, spent, savings, status, runway }) => savings
                             ? <SavingsJarRow key={cat.id} cat={cat} scope={budgetScope} available={cat.available ?? 0} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />
-                            : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} runwayDays={runway?.daysCovered} planned={planned} spent={spent} onOpen={() => onOpenCategoryDetails(cat)} />)}
+                            : <BudgetJarRow key={cat.id} cat={cat} scope={budgetScope} status={status} runwayDays={runway?.daysCovered} planned={planned} spent={spent} billShort={billShort.get(cat.id)} onOpen={() => onOpenCategoryDetails(cat)} />)}
                           {fold && (
                             <button type="button" onClick={() => setShowEmpty(prev => new Set(prev).add(group.label))} style={emptyFoldStyle} aria-label={`Show ${empty.length} empty categories: ${empty.map(row => row.cat.name).join(", ")}`}>
                               <span style={emptyFoldIconsStyle} aria-hidden="true">{empty.slice(0, 4).map(row => <CategoryIcon key={row.cat.id} icon={row.cat.icon} categoryName={row.cat.name} size={20} style={{ opacity: 0.55 }} />)}</span>
@@ -466,3 +486,4 @@ const emptyActionStyle: CSSProperties = {
   fontWeight: 650,
   cursor: "pointer",
 };
+

@@ -83,3 +83,5 @@ button.contribution-jar:focus-visible { outline:3px solid var(--focus-ring); out
   button.contribution-jar, button.contribution-jar:not(:disabled):hover, button.contribution-jar:not(:disabled):active,
   button.contribution-jar[data-front], button.contribution-jar[data-front]:not(:disabled):hover { transform:none; transition:opacity var(--motion-standard) ease; }
 }
+.contribution-pair { cursor: grab; touch-action: pan-y; }
+.contribution-pair:active { cursor: grabbing; }

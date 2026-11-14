@@ -7,7 +7,7 @@ import { MonthPlanReceipt } from "./MonthPlanReceipt";
 import { createPlanReceipt, confirmPlanReceipt, persistMonthPlan, type PlanReceipt } from "./month-plan-receipt";
 import { categoryIconSource } from "../../lib/category-icons";
 
-import { HeroSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
+import { Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { fetchApiJson, fetchMonthlyData } from "../../lib/app-data";
@@ -694,7 +694,7 @@ export function MonthPlanSheet({
               pointerEvents: heroHidden ? "auto" : "none",
             }}
           >
-            <MascotTap label="Planning categories" tabIndex={heroHidden ? 0 : -1} style={{ margin: 0 }}><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} /></MascotTap>
+            <MascotTap label="Planning categories" tabIndex={heroHidden ? 0 : -1} style={{ margin: 0 }}><MascotHero look="light" variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} /></MascotTap>
             <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
               <span style={stickyLabelStyle}>{capacityLabel}</span>
               <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
@@ -710,13 +710,14 @@ export function MonthPlanSheet({
           </div>
         <div ref={setScrollRoot} style={scrollStyle}>
           {loading ? <SkeletonRegion label="Loading monthly plan">
-            <HeroSkeleton label="Loading planning capacity" />
+            {/* The light itself, empty, in place of a glass skeleton blob. */}
+            <MascotHero look="light" variant="split" scope={scope} items={[]} spentPct={null} remember={false} style={{ marginBottom: -4, marginInline: "auto" }} />
             <Skeleton style={{ width: 160, height: 44, margin: "16px auto 32px" }} />
             <SkeletonRows label="Loading planned categories" count={4} iconSize={60} />
           </SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <>
           {/* Hero: the jar fills with the categories you plan; the number is what's still unassigned. */}
           <section aria-label={capacityLabel} style={heroStyle}>
-            <MascotTap label="Planning categories"><MascotHero variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
+            <MascotTap label="Planning categories"><MascotHero look="light" variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
             <span style={heroLabelStyle}>{capacityLabel}</span>
             <span ref={setHeroTarget} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
               {left < 0 ? "−" : ""}

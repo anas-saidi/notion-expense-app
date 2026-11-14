@@ -13,7 +13,7 @@ import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
 import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
 import type { Account, BudgetScope, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
-import { MascotHero } from "./mascot/MascotHero";
+import { MascotHero, type JarSignal } from "./mascot/MascotHero";
 import { MascotTap } from "./mascot/MascotTap";
 import { allocationJarItems } from "./mascot/budgetJar";
 import { fmt, getLeftToAssignByScope } from "./app-utils";
@@ -66,6 +66,8 @@ type AllocationFlowProps = {
   /** The jar shows what the screen is about: filled by the share of money assigned (full = nothing left
    *  unassigned), with no category emojis inside. Overrides `jarLevel`. */
   jarShowsAssigned?: boolean;
+  /** A signal on the jar, e.g. thinking while Suggest moves works. */
+  jarSignal?: JarSignal | null;
 };
 
 export function AllocationFlow({
@@ -93,6 +95,7 @@ export function AllocationFlow({
   jarScope,
   jarLevel,
   jarShowsAssigned = false,
+  jarSignal = null,
 }: AllocationFlowProps) {
   // Spent-floor per category, snapshotted on first activation.
   // Must NOT be recomputed from activeItem.amount after edits — that shifts the
@@ -238,12 +241,12 @@ export function AllocationFlow({
             const jarSize = heroPool && !readOnly ? 176 : undefined;
             if (jarShowsAssigned) {
               const assignedShare = availablePool > 0 ? Math.max(0, Math.min(1, (availablePool - Math.max(0, leftToAssign)) / availablePool)) : 1;
-              return <MascotTap label="Allocation details"><MascotHero variant="pool" scope={jarScope} level={assignedShare} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} /></MascotTap>;
+              return <MascotTap label="Allocation details"><MascotHero look="light" variant="pool" scope={jarScope} level={assignedShare} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>;
             }
             return jarLevel !== undefined ? (
-              <MascotTap label="Allocation details"><MascotHero variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} /></MascotTap>
+              <MascotTap label="Allocation details"><MascotHero look="light" variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>
             ) : (
-              <MascotTap label="Allocation details"><MascotHero variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={jarSize} style={jarStyle} /></MascotTap>
+              <MascotTap label="Allocation details"><MascotHero look="light" variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>
             );
           })()}
           {heroPool && readOnly ? (

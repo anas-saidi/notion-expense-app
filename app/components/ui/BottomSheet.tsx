@@ -378,6 +378,7 @@ export function BottomSheet({
           )}
 
           <div
+            className="bottom-sheet-content"
             style={{
               flex: (isDesktop && desktopHeight === "content") || usesContentDetent ? "0 1 auto" : 1,
               minHeight: 0,

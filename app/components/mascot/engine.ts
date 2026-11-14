@@ -1,4 +1,4 @@
-import { blinkScale, eyePoses, liveliness } from "./face";
+import { blinkScale, eyeMoment, eyePoses, liveliness, shapeEye } from "./face";
 import { TAU, clamp, easeOutCubic, easeOutQuint, lerp, mixHex, r2 } from "./math";
 import {
   EXPRESSIONS, HEART_FACES, HEART_RADII, MASCOT_COLORS, SOLO_FACES,
@@ -41,6 +41,17 @@ export interface MascotTarget {
   /** Extra sideways look, degrees (e.g. partners glancing towards the joint pool). */
   lookYaw?: number;
   /**
+   * Something on the jar wants attention (e.g. its due dot): the eyes turn round, like Bloub's
+   * notification face, and look towards it (degrees; positive yaw = right, positive pitch = up).
+   */
+  attention?: { yaw: number; pitch: number } | null;
+  /**
+   * A neighbour this jar presses against (the Couple pair): a wall in body units, n·p = c, with n the unit
+   * normal pointing into the neighbour. Outline points past it flatten onto it and the squeezed amount bulges
+   * upward, so two soft bodies sit side by side instead of one drawn over the other.
+   */
+  press?: { nx: number; ny: number; c: number } | null;
+  /**
    * Spending jar: each spend drops its category emoji in, sized by amount.
    * Replaces coins when set; items are matched by id, so new ones drop in and
    * removed ones crumble. Always uses matter-js physics.
@@ -48,7 +59,7 @@ export interface MascotTarget {
   items?: JarItem[];
 }
 
-export type ReactionKind = "cheer" | "dip" | "wince";
+export type ReactionKind = "cheer" | "dip" | "wince" | "wink";
 
 interface Pose {
   radii: number[];
@@ -130,6 +141,8 @@ const REACTIONS: Record<ReactionKind, { dur: number; mood: Mood }> = {
   cheer: { dur: 0.9, mood: "excited" },
   dip: { dur: 0.7, mood: "worried" },
   wince: { dur: 1.0, mood: "wince" },
+  // Done: one eye closes for a beat with a small happy bounce (Bloub's wink).
+  wink: { dur: 0.8, mood: "happy" },
 };
 
 export function poseFor(target: MascotTarget): Pose {
@@ -172,6 +185,7 @@ function reactionAt(kind: ReactionKind, k: number) {
     const wobble = Math.sin(2 * Math.PI * k) * Math.exp(-3 * k);
     return { sx: 1 + 0.1 * wobble, sy: 1 - 0.12 * wobble, cy: -0.1 * bump * (1 - k), weight, slosh: 1 - k };
   }
+  if (kind === "wink") return { sx: 1 + 0.03 * bump, sy: 1 - 0.04 * bump, cy: -0.03 * bump, weight, slosh: 0.4 * (1 - k) };
   if (kind === "dip") return { sx: 1 + 0.02 * bump, sy: 1 - 0.05 * bump, cy: 0.05 * bump, weight, slosh: 0.6 * (1 - k) };
   return { sx: 1 + 0.07 * bump, sy: 1 - 0.1 * bump, cy: 0.06 * bump, weight, slosh: 0.9 * (1 - k) };
 }
@@ -213,6 +227,10 @@ export class MascotEngine {
     this.jarId = `${target.scope}|${this.jar.key}`;
     this.itemMode = Boolean(target.items);
     this.lookYaw = target.lookYaw ?? 0;
+    this.attention = target.attention ?? null;
+    this.press = target.press ?? null;
+    this.attentionOn = Boolean(target.attention);
+    this.attend = this.attentionOn ? 1 : 0;
     this.sim = this.makeSim();
     if (target.fill !== undefined && !opts.calm) this.pool = new PoolSim(clamp(target.fill));
     this.reseed(target);
@@ -220,6 +238,14 @@ export class MascotEngine {
 
   private itemMode = false;
   private lookYaw = 0;
+  private attention: { yaw: number; pitch: number } | null = null;
+  private press: { nx: number; ny: number; c: number } | null = null;
+  /** How far the eyes have turned to the attention point (eases both ways). */
+  private attend = 0;
+  private attendT: number | null = null;
+  private attentionOn = false;
+  /** When the current attention point appeared (its glances run from here). */
+  private attentionSince = 0;
 
   /** Items are round, sized bodies that only the matter-js sim handles; coins use the chosen physics. */
   private makeSim(): CoinPhysics | null {
@@ -264,6 +290,10 @@ export class MascotEngine {
     this.t0 = this.opts.calm ? -Infinity : t;
     this.hasCoins = Boolean(target.coins || target.items);
     this.lookYaw = target.lookYaw ?? 0;
+    if (target.attention) this.attention = target.attention;
+    this.press = target.press ?? null;
+    if (Boolean(target.attention) !== this.attentionOn) this.attentionSince = t;
+    this.attentionOn = Boolean(target.attention);
     if (target.fill === undefined || this.opts.calm) { this.pool = null; this.poolT = null; }
     else if (!this.pool) this.pool = new PoolSim(clamp(target.fill));
     else this.pool.setLevel(clamp(target.fill), t);
@@ -448,6 +478,7 @@ export class MascotEngine {
     }
 
     const pts = toPoints(this.opts.calm ? pose.radii : this.wobble(pose.radii, t, pose.fill >= 0), SCALE, { sx, sy, cy });
+    if (this.press) pressAgainst(pts, this.press);
     const body = closedPath(pts);
     let liquid: string | undefined;
     let surface: string | undefined;
@@ -481,6 +512,23 @@ export class MascotEngine {
     let eyeSumX = 0, eyeSumY = 0, eyeMinX = Infinity, eyeMaxX = -Infinity, faceRadius = SCALE;
     // Personal: both slots coincide, so draw one face.
     const faces = pose.faces[0].x === pose.faces[1].x && pose.faces[0].y === pose.faces[1].y ? [pose.faces[0]] : pose.faces;
+    // A wink closes the right eye (of the first face) through the middle of the reaction.
+    const wr = this.reaction;
+    const winkK = wr?.kind === "wink" ? (t - wr.t0) / REACTIONS.wink.dur : -1;
+    const winkClosed = winkK >= 0 && winkK < 1 ? Math.sin(Math.PI * clamp((winkK - 0.1) / 0.6)) : 0;
+    // Bloub's eye range: an idle moment (glance, widen, squint, dot) unless something holds the eyes.
+    const moment = eyeMoment(lifeT, this.opts.calm);
+    if (this.attendT !== null && t > this.attendT) {
+      const step = (t - this.attendT) / 0.35;
+      // Look when it appears, then glance back every 7 s for 1.6 s: a reminder, not a stare.
+      const since = t - this.attentionSince;
+      // Each jar keeps its own rhythm, so a pair never glances in unison.
+      const looking = this.attentionOn && (since < 2.2 || (since + (this.opts.lifePhase ?? 0)) % 7 < 1.6);
+      this.attend = clamp(this.attend + (looking ? step : -step));
+    }
+    this.attendT = t;
+    const attend = this.opts.calm ? (this.attentionOn ? 1 : 0) : easeOutCubic(this.attend);
+    const quiet = 1 - Math.max(attend, reactionWeight);
     faces.forEach((face, i) => {
       // The second face blinks a beat later, like two people.
       const lid = i === 0 ? live.lid : liveliness(lifeT - 0.08, this.opts.calm).lid;
@@ -498,17 +546,21 @@ export class MascotEngine {
       const lookPitch = watch ? clamp(((fy - watch.y) / SCALE) * 38, -22, 12) * watching : 0;
       const lookYaw = watch ? clamp(-watch.slope * 40, -14, 14) * watching : 0;
       const gaze = {
-        yaw: clamp(expr.gaze.yaw + face.yaw + live.dYaw + lookYaw + this.lookYaw, -32, 32),
-        pitch: clamp(expr.gaze.pitch + live.dPitch + lookPitch, -28, 22),
+        yaw: clamp(lerp(expr.gaze.yaw + face.yaw + live.dYaw + lookYaw + this.lookYaw + moment.dYaw * quiet, (this.attention?.yaw ?? 0) + live.dYaw * 0.3, attend), -32, 32),
+        pitch: clamp(lerp(expr.gaze.pitch + live.dPitch + lookPitch + moment.dPitch * quiet, (this.attention?.pitch ?? 0) + live.dPitch * 0.3, attend), -28, 22),
         roll: expr.gaze.roll + live.dRoll,
       };
       eyePoses(gaze, faceR, expr.split).forEach((ep, e) => {
         const cfg = expr.eyes[e];
-        const blink = blinkScale(lid * cfg.open);
+        const winking = i === 0 && e === 1 ? winkClosed : 0;
+        const blink = blinkScale(lid * cfg.open * (1 - winking));
+        // Moments fade under a reaction; attention and the open eye of a wink go round, as in Bloub.
+        const eyeRound = Math.max(moment.round * quiet, attend, i === 0 && e === 0 ? winkClosed : 0);
+        const shaped = shapeEye(cfg.w, cfg.h, { ...moment, ws: lerp(1, moment.ws, quiet), hs: lerp(1, moment.hs, quiet), round: eyeRound });
         const ex = fx + ep.x, ey = fy + ep.y;
         eyeSumX += ex; eyeSumY += ey; eyeMinX = Math.min(eyeMinX, ex); eyeMaxX = Math.max(eyeMaxX, ex);
         eyes.push({
-          d: capsulePath(cfg.w * faceR, cfg.h * faceR),
+          d: capsulePath(shaped.w * faceR, shaped.h * faceR),
           transform:
             `translate(${r2(fx + ep.x)} ${r2(fy + ep.y)}) scale(1 ${r2(blink)}) ` +
             `matrix(${r2(ep.a)} ${r2(ep.b)} ${r2(ep.c)} ${r2(ep.d)} 0 0) rotate(${r2(cfg.tilt)})`,
@@ -565,5 +617,23 @@ export class MascotEngine {
       coins: this.hasCoins ? coins ?? [] : undefined,
       jar: this.hasCoins || pose.fill >= 0 ? { half: this.jar.half, corner: this.jar.corner } : undefined,
     };
+  }
+}
+
+/**
+ * Soft contact with a neighbour: points past the wall flatten onto it with a soft knee (so the edge reads
+ * as flesh, not a cut), and what was squeezed out bulges upward along the wall, like two cushions leaning in.
+ */
+function pressAgainst(pts: { x: number; y: number }[], wall: { nx: number; ny: number; c: number }) {
+  const KNEE = 6;
+  for (const p of pts) {
+    const s = wall.nx * p.x + wall.ny * p.y - wall.c;
+    if (s <= -KNEE) continue;
+    // How far to push back: 0 deep inside, all of s past the knee, a smooth curve between.
+    const back = s <= KNEE ? (s + KNEE) ** 2 / (4 * KNEE) : s;
+    p.x -= wall.nx * back;
+    p.y -= wall.ny * back;
+    // Squeezed flesh goes up, a little, and only near the top half where there's room.
+    p.y -= back * 0.35;
   }
 }

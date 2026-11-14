@@ -80,3 +80,24 @@ export function rebalanceSuggestions({ categories, bills, today, formatAmount }:
   }
   return pills.slice(0, MAX);
 }
+
+/**
+ * Bills due within a week that their category can't cover, by category id: the first bill's name and date,
+ * and how much is short against what the category has. Paid bills are already out of `dueBills`.
+ */
+export function billShortfalls(bills: DueBill[], categories: { id: string; available?: number | null }[], todayDate: string) {
+  const horizon = new Date(`${todayDate}T12:00:00`); horizon.setDate(horizon.getDate() + 7);
+  const limit = horizon.toISOString().slice(0, 10);
+  const norm = (id: string) => id.replace(/-/g, "").toLowerCase();
+  const byCategory = new Map<string, DueBill[]>();
+  for (const bill of bills) if (bill.dueDate <= limit) byCategory.set(norm(bill.categoryId), [...byCategory.get(norm(bill.categoryId)) ?? [], bill]);
+  const out = new Map<string, { name: string; dueDate: string; short: number }>();
+  for (const cat of categories) {
+    const due = byCategory.get(norm(cat.id));
+    if (!due) continue;
+    const short = due.reduce((sum, bill) => sum + bill.amount, 0) - Math.max(0, cat.available ?? 0);
+    const first = [...due].sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+    if (short >= 0.5) out.set(cat.id, { name: first.name, dueDate: first.dueDate, short });
+  }
+  return out;
+}

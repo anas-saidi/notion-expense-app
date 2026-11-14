@@ -10,7 +10,7 @@ import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
 import { BillsSection } from "./components/BillsSection";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
-import { habitSuggestions, type DueBill } from "@/lib/suggestions";
+import { billShortfalls, habitSuggestions, type DueBill } from "@/lib/suggestions";
 import { useBalanceChecks } from "./components/useBalanceChecks";
 import { PendingBalanceChecks, balanceChecksToReview } from "./components/BalanceChecks";
 import { accountKey, checkedFundsAfter } from "../lib/balance-checks";
@@ -37,7 +37,7 @@ import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { calculateContributionStatus, contributionDue } from "./components/contribution-utils";
 import { ContributionDetails, ContributionEntry } from "./components/ContributionDetails";
 import { contributionLedger, money as contributionMoney } from "../lib/contribution-agreements";
-import { scopeFromAccountLabel, withDisplayNames } from "./components/app-utils";
+import { fmt, scopeFromAccountLabel, withDisplayNames } from "./components/app-utils";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
   categoryMatchesScope,
@@ -77,6 +77,8 @@ export default function App() {
   // Which partner Contributions opens on: the one whose figure was tapped, else the signed-in person.
   // Adding starts by writing; openers that arrive with something chosen (a category, a restored draft) start in the form.
   const [addInForm, setAddInForm] = useState(false);
+  // Activity's swipe right: open writing with that entry as a new line.
+  const [seedLine, setSeedLine] = useState<{ source: string; id: number } | null>(null);
   const [contributionsPartner, setContributionsPartner] = useState<"anas" | "salma" | undefined>();
   const openContributions = (partner?: "anas" | "salma") => { setContributionsPartner(partner); setShowContributions(true); };
   const [showPlanReceipt, setShowPlanReceipt] = useState(false);
@@ -144,6 +146,11 @@ export default function App() {
     return () => window.removeEventListener("finance-data-source", handler);
   }, []);
   const [refreshState, setRefreshState] = useState<"idle" | "updating" | "stale">("idle");
+  /** Bumped on every save, so Home's jar winks once. */
+  const [savedWink, setSavedWink] = useState(0);
+  /** Money moved (Rebalance applied, a transfer between accounts): the jar behind the closing sheet plays a comet once. */
+  const [moneyMoved, setMoneyMoved] = useState<{ kind: "comet"; id: number } | null>(null);
+  const playMoneyMoved = () => window.setTimeout(() => setMoneyMoved({ kind: "comet", id: Date.now() }), 250);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [budgetRefreshing, setBudgetRefreshing] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -986,6 +993,22 @@ export default function App() {
     } catch { return []; }
   }, [billsData]);
 
+  /**
+   * What needs acting on now, per scope, for the dot on the scope picker: a bill due within a week its category
+   * can't cover, or a balance check waiting for review. Contributions due are ongoing and stay in the screens' text.
+   */
+  const scopeAttention = useMemo(() => {
+    const out: Partial<Record<BudgetScope, string>> = {};
+    const add = (scope: BudgetScope | null, reason: string) => { const key = scope ?? "joint"; if (!out[key]) out[key] = reason; };
+    for (const [id, short] of billShortfalls(dueBills, categories, today())) {
+      const category = categories.find(c => c.id === id);
+      if (category) add(getCategoryScope(category, accounts), `${short.name} bill needs ${fmt(Math.ceil(short.short - 0.005))} MAD`);
+    }
+    const reviewIds = new Set([...balanceChecks.checks.map(c => c.accountId), ...balanceChecks.reviewCounts.map(c => c.accountId)]);
+    for (const account of accounts) if (reviewIds.has(accountKey(account.id))) add(scopeFromAccountLabel(account.label), `${account.label} balance to review`);
+    return out;
+  }, [dueBills, categories, accounts, balanceChecks.checks, balanceChecks.reviewCounts]);
+
   const scopedPendingItems = useMemo(
     () => pendingItems.filter((item) => categoryIdMatchesScope(item.categoryId, categories, budgetScope)),
     [budgetScope, categories, pendingItems],
@@ -1108,6 +1131,7 @@ export default function App() {
       setRecurringBillId(null);
       setStatus("success");
       showToast(isEditing ? "Transaction updated" : "Saved", 1500);
+      setSavedWink(value => value + 1);
 
       if (transactionType === "Expense") {
         const newEntry = { description: name.trim(), categoryId };
@@ -1207,6 +1231,7 @@ export default function App() {
 
   return (
     <AppShell
+      scopeAttention={scopeAttention}
       tab={tab}
       onTabChange={(t) => { if (t === "history") setReflectView("spending"); setTab(t); setShowManageScreen(false); }}
       onOpenAdd={() => {
@@ -1282,6 +1307,10 @@ export default function App() {
 
       {tab === "home" && (
         <HomeScreen
+          personalScope={mode === "wife" ? "salma" : "anas"}
+          savedWink={savedWink}
+          moneyMoved={moneyMoved}
+          refreshStale={refreshState === "stale" ? { reason: refreshError ?? "Could not refresh", onRetry: () => setLoadAttempt(value => value + 1) } : null}
           contributions={!monthLoading && !monthError && (monthlySummary.contributionError ? <p role="note" style={{ color: "var(--muted)", fontSize: 13 }}>Confirmed contributions unavailable</p> : null)}
           savingsGap={savingsGap ?? undefined}
           contributionLeft={contributionLeft}
@@ -1321,6 +1350,8 @@ export default function App() {
 
       {tab === "budget" && (
         <CategoriesScreen
+          dueBills={dueBills}
+          moneyMoved={moneyMoved}
           categories={categories}
           frozenCategories={frozenCategories}
           accounts={accounts}
@@ -1391,6 +1422,13 @@ export default function App() {
           }}
           onClickTransaction={editTransaction}
           onDeleteTransaction={deleteTransaction}
+          onLogAgain={transaction => {
+            setEditingTransactionId(null);
+            setTransactionType(transaction.type === "Income" ? "Income" : "Expense");
+            setAddInForm(false);
+            setSeedLine({ source: `${transaction.name.trim().toLowerCase()} ${transaction.type === "Income" ? "+" : ""}${Math.round(Math.abs(transaction.amount) * 100) / 100}`, id: Date.now() });
+            setShowAddModal(true);
+          }}
         />
       )}
 
@@ -1419,6 +1457,7 @@ export default function App() {
         }}
         onTypedComplete={(count) => {
           showToast(`${count} ${count === 1 ? "transaction" : "transactions"} saved`, 2000);
+          setSavedWink(value => value + 1);
           void refreshAffectedData().catch(error => showToast(error.message));
           setTimeout(() => { void refreshBudgetData().catch(() => {}); }, 1500);
         }}
@@ -1547,6 +1586,7 @@ export default function App() {
         }}
         onSelectCategory={selectCategory}
         startInForm={addInForm}
+        seedLine={seedLine}
         onUseRecent={(transaction) => {
           // Prefill from a recent one; the date stays today so it saves as a new entry.
           setAmount(String(Math.abs(transaction.amount)));
@@ -1676,6 +1716,7 @@ export default function App() {
           refreshAccountsData(message);
           fetchTransactions();
           refreshBudgetData();
+          playMoneyMoved();
         }}
       /></DeferredMount>
 
@@ -1696,6 +1737,7 @@ export default function App() {
         dueBills={dueBills}
         onSuccess={() => {
           refreshBudgetData("Rebalance applied");
+          if (!rebalanceReturnToAdd.current) playMoneyMoved();
           if (rebalanceReturnToAdd.current) {
             rebalanceReturnToAdd.current = false;
             setAddInForm(true);

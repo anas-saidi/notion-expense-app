@@ -16,6 +16,8 @@ import { Banner } from "./ui/Banner";
 import { DatePicker, MonthPicker } from "./DatePicker";
 import { XIcon, ChevronRightIcon, TransferIcon } from "./ui/icons";
 import { MascotHero } from "./mascot/MascotHero";
+import { useOnceSignal } from "./mascot/MascotSignal";
+import { motion } from "motion/react";
 import { Summary, Fact } from "./ui/Summary";
 
 const MASCOT_SIZE = 200;
@@ -116,6 +118,8 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
   // Tapping the agreed amount opens the editor in place. The partner in front is the one shown.
   const [shown, setShown] = useState<Partner>(initialPartner ?? personalScope);
   const [editingAgreement, setEditingAgreement] = useState(false);
+  /** Bumped when the agreed amounts are confirmed: both jars wink once. */
+  const [agreedWink, setAgreedWink] = useState(0);
   const applyIds = useRef<Partial<Record<Partner, string>>>({});
   useEffect(() => { if (open) { setShown(initialPartner ?? personalScope); setEditingAgreement(false); setRepaying(null); setSaveError(""); setSuccess(""); setUncertain(false); } }, [open, month]);
   const ledger = currentAdvances;
@@ -152,7 +156,7 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
   // The hero already shows the agreed amount, so the editor is only the action beside it.
   const agreementEditor = status ? <ContributionAgreementEditor showHeading={false} showAmounts={false} editing={editingAgreement} onEditingChange={setEditingAgreement} month={month} agreement={status.agreement}
     proposed={{ anas: Math.max(0, money(status.anasPlan - status.anasPersonalDebt)), salma: Math.max(0, money(status.salmaPlan - status.salmaPersonalDebt)) }}
-    shares={status.agreement?.shares ?? { anas: .65, salma: .35 }} disabled={saving || !!repaying} onSaved={onChanged} /> : null;
+    shares={status.agreement?.shares ?? { anas: .65, salma: .35 }} disabled={saving || !!repaying} onSaved={() => { setAgreedWink(Date.now()); onChanged(); }} /> : null;
   return <BottomSheet open={open} onClose={() => { if (!saving) onClose(); }} label="Monthly contributions" size="standard" detent="content">
     <div className="contribution-sheet sheet-body">
       <SheetHeader className="contribution-header"><h2>Contributions</h2>
@@ -178,7 +182,7 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
             advance={outstanding[me]} applicable={applicable(me)} busy={saving || !!repaying || !!applying} applying={applying === me}
             onApply={() => void applyAdvance(me)} onRepay={() => startRepayment(me)} agreementAction={agreementEditor}
             onEditAgreement={() => setEditingAgreement(value => !value)} editingAgreement={editingAgreement}
-            isMe={me === personalScope} levels={{ anas: levelFor("anas"), salma: levelFor("salma") }} onShow={partner => { setShown(partner); setEditingAgreement(false); }} />;
+            isMe={me === personalScope} month={month} winkId={agreedWink} levels={{ anas: levelFor("anas"), salma: levelFor("salma") }} onShow={partner => { setShown(partner); setEditingAgreement(false); }} />;
         })()}
         {ledger && ledger.unappliedRepayments.anas + ledger.unappliedRepayments.salma > 0 && <Banner tone="warning" role="alert">A corrected agreement or transaction left a repayment above the advance. Review repayment activity.</Banner>}
         {repaying && <section className="contribution-repay"><h3>Record repayment</h3><label>Repayment amount<input autoFocus className="field-input" inputMode="decimal" value={amount} disabled={saving || uncertain} onChange={e => { setAmount(e.target.value); requestId.current = crypto.randomUUID(); }} /></label>{uncertain || saving ? <span className="contribution-note">Repayment date: {date}</span> : <DatePicker value={date} max={today()} onChange={event => { setDate(event.target.value); requestId.current = crypto.randomUUID(); }} aria-label="Date money was returned" />}
@@ -194,7 +198,8 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
  * What's left to cover up front, one sentence, then where the paid amount went: sent to Joined,
  * or Joint spending paid directly. Tap the agreed amount to change it.
  */
-function ContributionSummary({ partner, target, agreed, contributed, sent, left, categories, advance, applicable, busy, applying, onApply, onRepay, agreementAction, onEditAgreement, editingAgreement, levels, onShow, isMe }: {
+function ContributionSummary({ partner, target, agreed, contributed, sent, left, categories, advance, applicable, busy, applying, onApply, onRepay, agreementAction, onEditAgreement, editingAgreement, levels, onShow, isMe, month, winkId }: {
+  month: string; winkId?: number;
   partner: Partner; target: number; agreed: boolean; contributed: number; sent: number; left: number; categories: DirectSpend[];
   advance: number; applicable: number; busy: boolean; applying: boolean; onApply: () => void; onRepay: () => void;
   /** The agreement editor, opened by tapping the agreed amount. */
@@ -207,12 +212,23 @@ function ContributionSummary({ partner, target, agreed, contributed, sent, left,
 }) {
   const whole$ = (value: number) => fmt(Math.round(value));
   const level = target > 0 ? Math.min(1, Math.max(0, (target - left) / target)) : 1;
+  // Covering an agreed amount bursts once per partner and month on this device.
+  const burst = useOnceSignal(`contribution-covered:${month}:${partner}`, agreed && target > 0 && left < 0.5, "burst");
   return <>
     <section className="contribution-left" aria-label="Left to cover">
-      {/* Both of you, cuddled up; the one whose figures show sits in front, the other steps back. Tap the back jar to switch. */}
-      <MascotHero variant="pool" scope="joint" size={MASCOT_SIZE} spentPct={null} level={level} warn={null} levels={levels} front={partner} style={{ marginBottom: -8 }}
+      {/* Both of you, cuddled up; the one whose figures show sits in front, the other steps back. Tap the back jar,
+          or swipe the pair sideways, to switch: the jars follow the finger 1:1, resist past the edge, and spring back
+          with the release speed; distance or a quick flick decides. Anas sits left, Salma right. */}
+      <motion.div className="contribution-pair" drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={0.35} dragMomentum={false}
+        dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
+        onDragEnd={(_, info) => {
+          const swiped = info.offset.x < -48 || info.velocity.x < -450 ? "salma" : info.offset.x > 48 || info.velocity.x > 450 ? "anas" : null;
+          if (swiped && swiped !== partner) onShow(swiped);
+        }}>
+      <MascotHero look="light" variant="pool" scope="joint" size={MASCOT_SIZE} spentPct={null} level={level} warn={null} levels={levels} front={partner} style={{ marginBottom: -8 }} winkId={winkId} once={burst}
         wrapJar={(jarPartner, jar) => <button type="button" className="contribution-jar" data-front={jarPartner === partner || undefined} aria-pressed={jarPartner === partner}
           aria-label={jarPartner === partner ? `Showing ${person(jarPartner)}` : `Show ${person(jarPartner)}`} onClick={() => jarPartner !== partner && onShow(jarPartner)}>{jar}</button>} />
+      </motion.div>
       <span className="contribution-who">{person(partner)}</span>
       <span>Left to cover</span>
       {left >= 0.5

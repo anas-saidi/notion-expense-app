@@ -1,4 +1,5 @@
 "use client";
+import { useOnline } from "./useOnline";
 import "./finance-ai.css";
 import "./ui/prompt-input.css";
 
@@ -9,10 +10,12 @@ import type { Account, Category } from "./app-types";
 import { expenseBudgetGate, fmt, fmtDate, shiftDate, today } from "./app-utils";
 import { Money } from "./Money";
 import { PickerPopover } from "./PickerPopover";
+import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { DateCalendar } from "./DatePicker";
 import { AccountOptionList, CategoryOptionList, filterCategories } from "./TransactionPickers";
 import { Banner } from "./ui/Banner";
-import { CheckIcon } from "./ui/icons";
+import { CameraIcon, CheckIcon, XIcon } from "./ui/icons";
+import { deleteReceipt, loadReceipt, saveReceipt, shrinkPhoto } from "@/lib/receipt-store";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { validateParsing, type AIDraft } from "@/lib/finance-ai";
 
@@ -46,6 +49,41 @@ export function TypeItComposer(props: Props) {
   const [progress, setProgress] = useState(0);
   // Lines being read right now (by their text); each settles when its own answer comes back.
   const [readingLines, setReadingLines] = useState<Set<string>>(new Set());
+  // Receipt photos wait on this device (IndexedDB) until Read; only their ids live with the text draft.
+  const receiptsKey = `${props.draftKey}:receipts`;
+  const [receipts, setReceipts] = useState<{ id: string; takenAt: string }[]>([]);
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const online = useOnline();
+  const camera = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    let list: { id: string; takenAt: string }[] = [];
+    try { const saved = JSON.parse(localStorage.getItem(receiptsKey) ?? "[]"); if (Array.isArray(saved)) list = saved.filter(r => typeof r?.id === "string"); } catch {}
+    setReceipts(list);
+    setThumbs({});
+    list.forEach(r => { void loadReceipt(r.id).then(photo => { if (photo) setThumbs(t => ({ ...t, [r.id]: `data:${photo.mimeType};base64,${photo.data}` })); }).catch(() => {}); });
+  }, [receiptsKey]);
+  const storeReceipts = (next: { id: string; takenAt: string }[]) => {
+    setReceipts(next);
+    try { if (next.length) localStorage.setItem(receiptsKey, JSON.stringify(next)); else localStorage.removeItem(receiptsKey); } catch {}
+  };
+  const receiptsRef = useRef(receipts);
+  receiptsRef.current = receipts;
+  const addReceipt = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const data = await shrinkPhoto(file);
+      const id = crypto.randomUUID();
+      await saveReceipt({ id, mimeType: "image/jpeg", data, takenAt: new Date().toISOString() });
+      storeReceipts([...receiptsRef.current, { id, takenAt: new Date().toISOString() }]);
+      setThumbs(t => ({ ...t, [id]: `data:image/jpeg;base64,${data}` }));
+      haptic("selection");
+    } catch { setFeedback({ error: true, message: "Couldn't keep that photo. Try taking it again." }); }
+  };
+  const removeReceipt = (id: string) => {
+    storeReceipts(receiptsRef.current.filter(r => r.id !== id));
+    setThumbs(t => { const next = { ...t }; delete next[id]; return next; });
+    void deleteReceipt(id).catch(() => {});
+  };
   const textRef = useRef(text);
   const choicesRef = useRef(choices);
   const [feedback, setFeedback] = useState<{ error: boolean; message: string } | null>(null);
@@ -215,6 +253,7 @@ export function TypeItComposer(props: Props) {
   const lines = text.split(/\r?\n/);
   // Only lines nothing has read yet: the phone couldn't parse them and no AI draft is attached.
   const unread = lines.flatMap((source, index) => source.trim() && !rows.find(row => row.line === index + 1)?.transaction ? [source] : []);
+  const unreadCount = unread.length + receipts.length;
   const readLine = async (source: string, signal: AbortSignal) => {
     const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal,
       body: JSON.stringify({ action: "parse", text: source, defaultDate: props.defaultDate, categories: props.categories.map(c => ({ id: c.id, name: c.name, defaultAccountId: c.defaultAccount })), accounts: props.accounts.map(a => ({ id: a.id, name: a.label })), defaultAccountId: props.defaultAccountId }) });
@@ -222,14 +261,25 @@ export function TypeItComposer(props: Props) {
     if (!response.ok) throw new Error(data.error || "Could not read this line.");
     return validateParsing(data, props.categories.map(c => ({ id: c.id, name: c.name })), props.accounts.map(a => ({ id: a.id, name: a.label })));
   };
+  const readReceipt = async (id: string, signal: AbortSignal) => {
+    const photo = await loadReceipt(id);
+    if (!photo) throw new Error("That receipt photo is gone. Take it again.");
+    const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal,
+      body: JSON.stringify({ action: "receipt", image: { mimeType: photo.mimeType, data: photo.data }, defaultDate: props.defaultDate, categories: props.categories.map(c => ({ id: c.id, name: c.name, defaultAccountId: c.defaultAccount })), accounts: props.accounts.map(a => ({ id: a.id, name: a.label })), defaultAccountId: props.defaultAccountId }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not read this receipt.");
+    return validateParsing(data, props.categories.map(c => ({ id: c.id, name: c.name })), props.accounts.map(a => ({ id: a.id, name: a.label })));
+  };
+  // Drafts are only sent when you press Read: unread lines and receipt photos, never while offline.
   const parseWithGemini = async () => {
     const targets = [...new Set(unread)];
-    if (!targets.length || lock.current || !props.accounts.length || !props.categories.length) return;
+    const photos = receipts.map(r => r.id);
+    if ((!targets.length && !photos.length) || !online || lock.current || !props.accounts.length || !props.categories.length) return;
     lock.current = true;
     setParsing(true);
     setPicker(null);
     setFeedback(null);
-    setReadingLines(new Set(targets));
+    setReadingLines(new Set([...targets, ...photos.map(id => `receipt:${id}`)]));
     const controller = new AbortController();
     parseAbort.current = controller;
     const problems: string[] = [];
@@ -257,11 +307,40 @@ export function TypeItComposer(props: Props) {
         setReadingLines(current => { const next = new Set(current); next.delete(source!); return next; });
       }
     };
-    await Promise.all(Array.from({ length: Math.min(3, targets.length) }, worker));
+    const photoQueue = [...photos];
+    // Receipts add their lines at the end of what's written, then the photo is deleted from the phone.
+    const photoWorker = async () => {
+      for (let id = photoQueue.shift(); id !== undefined; id = photoQueue.shift()) {
+        try {
+          const result = await readReceipt(id, controller.signal);
+          if (result.questions.length) problems.push(result.questions.join(" "));
+          else if (result.transactions.length) {
+            const current = textRef.current.split(/\r?\n/);
+            while (current.length && !current[current.length - 1].trim()) current.pop();
+            const at = current.length;
+            const added = result.transactions.map(t => [t.name, `${t.type === "Income" ? "+" : ""}${t.amount}`, writtenDate(t.date, props.defaultDate)].filter(Boolean).join(" "));
+            const nextText = [...current, ...added].join("\n");
+            const nextChoices = reconcileTypedChoices(textRef.current, nextText, choicesRef.current);
+            result.transactions.forEach((transaction, offset) => { nextChoices[at + offset + 1] = { transaction, categoryId: transaction.categoryId ?? suggest(transaction.name, props.categories) ?? undefined, accountId: transaction.accountId ?? undefined }; });
+            updateDraft(nextText, nextChoices);
+            removeReceipt(id);
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) problems.push(error instanceof Error ? error.message : "Could not reach Gemini. The photo is kept.");
+        }
+        setReadingLines(current => { const next = new Set(current); next.delete(`receipt:${id}`); return next; });
+      }
+    };
+    await Promise.all([...Array.from({ length: Math.min(3, targets.length) }, worker), ...Array.from({ length: Math.min(2, photos.length) }, photoWorker)]);
     if (!controller.signal.aborted && problems.length) setFeedback({ error: true, message: [...new Set(problems)].join(" ") });
     setReadingLines(new Set());
     setParsing(false);
     lock.current = false;
+  };
+  const removeLine = (index: number) => {
+    const nextText = lines.length > 1 ? lines.filter((_, line) => line !== index).join("\n") : "";
+    updateDraft(nextText, reconcileTypedChoices(text, nextText, choices));
+    haptic("selection");
   };
   const editLine = (index: number, value: string) => {
     const updated = [...lines];
@@ -303,6 +382,18 @@ export function TypeItComposer(props: Props) {
           caretAt.current = suggestion.length;
         }}>{suggestion}</button>)}
       </div>}
+      {receipts.length > 0 && <ul className="typed-receipts" aria-label="Receipt photos">
+        {receipts.map(r => {
+          const reading = readingLines.has(`receipt:${r.id}`);
+          return <li key={r.id}><SwipeToDelete flat disabled={reading} deleteLabel="Remove receipt photo" surface="var(--surface)" onDelete={() => { removeReceipt(r.id); return true; }}>
+            <div className="typed-line typed-receipt" data-reading={reading || undefined}>
+            {thumbs[r.id] ? <img src={thumbs[r.id]} alt="" /> : <span className="typed-receipt-thumb" aria-hidden="true" />}
+            <span className="typed-receipt-text"><span className="typed-reading-target">Receipt</span><small className={reading ? "typed-reading" : undefined}>{reading ? "reading" : online ? "waiting for Read" : "kept, offline"}</small></span>
+            {!reading && <button type="button" className="typed-receipt-remove" aria-label="Remove receipt photo" onClick={() => removeReceipt(r.id)}><XIcon size={16} aria-hidden="true" /></button>}
+            </div></SwipeToDelete>
+          </li>;
+        })}
+      </ul>}
       <div role="group" aria-label="Write transactions" className="typed-lines">
         {lines.map((source, index) => {
           const row = rows.find(item => item.line === index + 1);
@@ -312,7 +403,10 @@ export function TypeItComposer(props: Props) {
           const reading = !!source.trim() && readingLines.has(source);
           const waiting = !!source.trim() && (!transaction || !settled(row));
           const otherAccount = !!row?.account && row.account.id !== props.defaultAccountId;
-          return <div key={index} className="typed-line" data-reading={reading || undefined} onFocus={() => setActiveLine(index)}>
+          // Swipe a line left to remove it. Rows are keyed by position, so the row resets for the line that moves up.
+          return <SwipeToDelete key={index} flat resetAfterDelete disabled={busy || reading || (!source.trim() && lines.length === 1)} deleteLabel={`Remove line ${index + 1}`} surface="var(--surface)"
+            onDelete={() => { removeLine(index); return true; }}>
+          <div className="typed-line" data-reading={reading || undefined} onFocus={() => setActiveLine(index)}>
             <div className="typed-line-main">
               {/* Your words stay as written; the words that move an entry are marked where you wrote them. */}
               <div className="typed-input-wrap">
@@ -371,7 +465,7 @@ export function TypeItComposer(props: Props) {
               </button>}
             </div>}
             {row?.error && focusedLine !== index && !parsing && <p className="typed-note">{row.error}</p>}
-          </div>;
+          </div></SwipeToDelete>;
         })}
       </div>
       {rows.some(row => row.transaction) && <p className="typed-hint-line">Tap a tag to fix it, tap the amount for all fields</p>}
@@ -389,11 +483,13 @@ export function TypeItComposer(props: Props) {
     </div>
     {/* One action: Read while any line still needs reading, then Save. */}
     <div className="typed-footer">
-      <span className="typed-total">{rows.length > 0 && waitingCount > 0 && readyRows.length > 0 && !parsing ? <span>{waitingCount} waiting</span> : rows.length > 0 ? <>{total < 0 ? "−" : total > 0 ? "+" : ""}{fmt(Math.abs(Math.round(total)))} <span>total</span></> : <span>Google reads what your phone can't</span>}</span>
+      <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={event => { void addReceipt(event.target.files?.[0]); event.target.value = ""; }} />
+      <button type="button" className="typed-camera" aria-label="Add a receipt photo" disabled={busy || parsing} onClick={() => camera.current?.click()}><CameraIcon size={20} aria-hidden="true" /></button>
+      <span className="typed-total">{!online ? <span>Offline, kept as draft</span> : rows.length > 0 && waitingCount > 0 && readyRows.length > 0 && !parsing ? <span>{waitingCount} waiting</span> : rows.length > 0 ? <>{total < 0 ? "−" : total > 0 ? "+" : ""}{fmt(Math.abs(Math.round(total)))} <span>total</span></> : null}</span>
       {/* Read only while some line hasn't been read; after that it's Save, waiting on any tag still to pick. */}
-      {unread.length > 0 || parsing || !rows.length
-        ? <button type="button" className="typed-primary" data-quiet={!unread.length || undefined} aria-busy={parsing} disabled={!unread.length || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? `Reading ${readingLines.size}…` : unread.length ? `Read ${unread.length}` : "Read"}</button>
-        : <button type="button" className="typed-primary" data-quiet={!ready || undefined} disabled={busy} onClick={ready ? save : showWhatsMissing}>{busy ? `Saving ${progress}/${readyRows.length}…` : <><CheckIcon size={16} />{budgetErrors.length ? "Save anyway" : `Save ${readyRows.length}`}</>}</button>}
+      {unreadCount > 0 || parsing || !rows.length
+        ? <button type="button" className="typed-primary" data-quiet={!unreadCount || !online || undefined} aria-busy={parsing} disabled={!unreadCount || !online || busy || parsing || !props.accounts.length || !props.categories.length} onClick={parseWithGemini}>{parsing ? `Reading ${readingLines.size}…` : unreadCount ? `Read ${unreadCount}` : "Read"}</button>
+        : <button type="button" className="typed-primary" data-quiet={!ready || !online || undefined} disabled={busy || !online} onClick={ready ? save : showWhatsMissing}>{busy ? `Saving ${progress}/${readyRows.length}…` : <><CheckIcon size={16} />{budgetErrors.length ? "Save anyway" : `Save ${readyRows.length}`}</>}</button>}
     </div>
     <PickerPopover open={picker !== null} title={picker?.kind === "account" ? "Account" : picker?.kind === "date" ? "Date" : "Category"} onClose={() => setPicker(null)} align="left" placement="bottom" size={picker?.kind === "date" ? "calendar" : "choice"} zIndex={140} anchorRef={pickerAnchor}>
       {picker?.kind === "date" && <DateCalendar value={pickerRow?.transaction?.date ?? props.defaultDate} onChange={date => choose(picker.line, { date })} />}

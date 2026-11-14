@@ -17,10 +17,19 @@ type Props = {
   /** Removes row rounding when used inside a continuous activity feed. */
   flat?: boolean;
   surface?: string;
+  /** Swipe right runs this (e.g. log again); the row springs back instead of leaving. */
+  onSwipeRight?: () => void;
+  swipeRightLabel?: string;
+  swipeRightIcon?: ReactNode;
+  /** The row stays mounted after the action (rows keyed by position): reset it for whatever takes its place. */
+  resetAfterDelete?: boolean;
 };
 
-export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel = "Delete item", variant = "delete", flat = false, disabled = false, actions, surface }: Props) {
-  const [offset, setOffset] = useState(0);
+export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel = "Delete item", variant = "delete", flat = false, disabled = false, actions, surface, onSwipeRight, swipeRightLabel = "Log again", swipeRightIcon, resetAfterDelete = false }: Props) {
+  const [offset, setOffsetState] = useState(0);
+  // The finger-up handler reads the position from a ref: the rendered value can lag a frame behind a fast swipe.
+  const offsetRef = useRef(0);
+  const setOffset = (value: number) => { offsetRef.current = value; setOffsetState(value); };
   const [dragging, setDragging] = useState(false);
 
   const outerRef  = useRef<HTMLDivElement>(null);
@@ -87,15 +96,18 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
 
     timerRef.current = setTimeout(async () => {
       try {
-        if (await onDelete?.()) return;
+        if (await onDelete?.() && !resetAfterDelete) return;
       } catch { /* A failed action restores the row for retry. */ }
       committed.current = false;
       if (variant === "freeze") moveFreeze(0); else setOffset(0);
     }, 220);
   };
 
+  // A quick flick counts as much as a long drag: the last move's speed in px/ms.
+  const lastMove = useRef<{ x: number; t: number; v: number }>({ x: 0, t: 0, v: 0 });
   const onTouchStart = (e: React.TouchEvent) => {
     touchActive.current = false;
+    lastMove.current = { x: e.touches[0].clientX, t: performance.now(), v: 0 };
     if (committed.current || disabled) return;
     if (variant === "freeze" && (e.target as HTMLElement).closest("input, button")) return;
     touchActive.current = true;
@@ -119,8 +131,14 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
       return;
     }
 
+    const now = performance.now();
+    const x = e.touches[0].clientX;
+    lastMove.current = { x, t: now, v: (x - lastMove.current.x) / Math.max(1, now - lastMove.current.t) };
     if (direction.current === "h" && dx < 0) {
       setOffset(Math.max(-220, dx));
+    } else if (direction.current === "h" && dx > 0 && onSwipeRight) {
+      // Past the action point the row resists, so it can't be pulled off-screen.
+      setOffset(dx < 140 ? dx : 140 + (dx - 140) * 0.2);
     }
   };
 
@@ -129,14 +147,21 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
     touchActive.current = false;
     if (committed.current || disabled) return;
     direction.current = null;
-    if (offset < -threshold) {
+    const flick = lastMove.current.v;
+    const at = offsetRef.current;
+    if (at < -threshold || (at < -30 && flick < -0.5)) {
       commit();
+    } else if (onSwipeRight && (at > threshold || (at > 30 && flick > 0.5))) {
+      setDragging(false);
+      setOffset(0);
+      onSwipeRight();
     } else {
       setDragging(false);
       setOffset(0);
     }
   };
 
+  const rightProgress = onSwipeRight ? Math.min(1, Math.max(0, offset) / threshold) : 0;
   const revealPx = Math.max(0, -offset);
   const progress = Math.min(1, revealPx / threshold);
   const isPast   = progress >= 1;
@@ -178,6 +203,14 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
             {variant === "freeze" ? <><Snowflake size={17} aria-hidden="true" />Freeze</> : variant === "restore" ? <RotateCcw size={17} aria-hidden="true" /> : <Trash2 size={17} aria-hidden="true" />}
           </button>
         </div>
+
+        {/* Log-again layer, revealed by a swipe right */}
+        {onSwipeRight && <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "flex-start", paddingInlineStart: 20, pointerEvents: "none",
+          background: rightProgress === 0 ? "transparent" : `color-mix(in srgb, var(--surface2) ${Math.round(100 * rightProgress)}%, transparent)` }}>
+          <button type="button" aria-label={swipeRightLabel} disabled={disabled} className="swipe-delete-action" onClick={onSwipeRight}
+            onFocus={() => setOffset(72)} onBlur={() => { if (!committed.current) setOffset(0); }}
+            style={{ opacity: Math.max(rightProgress, 0.01), color: "var(--text)", pointerEvents: "auto" }}>{swipeRightIcon}</button>
+        </div>}
 
         {/* Swipeable surface */}
         <div

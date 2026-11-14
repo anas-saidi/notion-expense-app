@@ -18,6 +18,7 @@ export function AppShell({
   budgetScope,
   onBudgetScopeChange,
   personalScope,
+  scopeAttention,
   onBudgetSearch,
   onReflectSearch,
   onBudgetRebalance,
@@ -37,6 +38,8 @@ export function AppShell({
   budgetScope: BudgetScope;
   onBudgetScopeChange: (scope: BudgetScope) => void;
   personalScope: Exclude<BudgetScope, "joint">;
+  /** Per scope, what needs acting on now: a dot on the scope picker. */
+  scopeAttention?: Partial<Record<BudgetScope, string>>;
   onBudgetSearch?: () => void;
   onReflectSearch?: () => void;
   onBudgetRebalance?: () => void;
@@ -115,7 +118,7 @@ export function AppShell({
           <h1 className="desktop-page-title">{BUDGET_SCOPE_LABELS[budgetScope]} {tab === "home" ? "overview" : tab === "budget" ? "budget" : "activity"}</h1>
           {/* Content scrolling up melts into the header instead of cutting off at its edge. */}
           <ProgressiveBlur position="top" height={32} maxBlur={6} tint="var(--bg)" visible={scrolled} style={{ top: "100%", zIndex: -1 }} />
-          <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} />
+          <GlobalBudgetScopePicker value={budgetScope} onChange={onBudgetScopeChange} personalScope={personalScope} attention={scopeAttention} />
           <div className="app-header-actions">
             {tab === "budget" && onBudgetSearch && <LiquidButton className="app-top-action" type="button" onClick={onBudgetSearch} aria-label="Search categories" style={menuButtonStyle}>
               <SearchIcon size={18} />

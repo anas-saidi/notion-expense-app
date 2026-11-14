@@ -16,10 +16,12 @@ type Props = {
   actions?: ReactNode;
   supporting?: ReactNode;
   tone?: "danger";
+  /** Words in place of a zero ("All assigned", "All contributed"): a light next to a 0 is the one pairing that confuses. */
+  done?: string;
 };
 
 /** Home, Budget and Reflect share geometry; their data and controls stay local. */
-export function ScreenHero({ mascot, label, value, summary, actions, supporting, tone, loading = false, showMetric = true }: Props) {
+export function ScreenHero({ mascot, label, value, summary, actions, supporting, tone, done, loading = false, showMetric = true }: Props) {
   const amount = useRef<HTMLDivElement>(null);
   const measure = useRef<HTMLSpanElement>(null);
   const currency = useRef<HTMLSpanElement>(null);
@@ -44,17 +46,17 @@ export function ScreenHero({ mascot, label, value, summary, actions, supporting,
     let active = true;
     void document.fonts.ready.then(() => { if (active) fit(); });
     return () => { active = false; observer.disconnect(); };
-  }, [value, loading, showMetric]);
+  }, [value, loading, showMetric, done]);
 
   return <div className="screen-hero" style={{ "--hero-mascot-size": `${SCREEN_HERO_MASCOT_SIZE}px`, "--hero-activity-size": `${SCREEN_HERO_ACTIVITY_SIZE}px`, "--hero-chart-top": `${SCREEN_HERO_CHART_TOP}px` } as CSSProperties}>
     <div className="screen-hero-mascot">{mascot}</div>
     {showMetric && <div className="screen-hero-metric">
       <h2 className="screen-hero-label">{label}</h2>
-      <div ref={amount} className="screen-hero-value" data-tone={tone} aria-busy={loading || undefined} aria-label={loading ? "Loading amount" : undefined}>
-        <span ref={measure}>
+      <div ref={amount} className="screen-hero-value" data-tone={tone} data-done={!loading && done ? "" : undefined} aria-busy={loading || undefined} aria-label={loading ? "Loading amount" : undefined}>
+        {!loading && done ? <span ref={measure} className="screen-hero-done">{done}</span> : <span ref={measure}>
           <span className="screen-hero-digits">{loading ? <AmountSkeleton /> : value == null ? "—" : <Money value={value} animated={Number.isInteger(value)} />}</span>
           {!loading && value != null && <span ref={currency} className="screen-hero-currency" aria-hidden="true"><Currency style={{ opacity: 1 }} /></span>}
-        </span>
+        </span>}
       </div>
     </div>}
     <div className="screen-hero-summary">{summary}</div>

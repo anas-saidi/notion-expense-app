@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "glisse/styles.css";
 import "./globals.css";
 import "./components/ui/liquid-glass.css";
+import "./components/ui/soft-edges.css";
 
 export const metadata: Metadata = {
   title: "Couple Finance",

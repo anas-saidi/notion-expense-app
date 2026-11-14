@@ -1,7 +1,7 @@
 import { aiError } from "./finance-ai";
 
-/** Server-only, one bounded request. No grounding, retries or paid fallback. */
-export async function generateFinanceJSON(instructions: string, context: unknown, schema: unknown) {
+/** Server-only, one bounded request. No grounding, retries or paid fallback. An optional image (a receipt) rides along with the text. */
+export async function generateFinanceJSON(instructions: string, context: unknown, schema: unknown, image?: { mimeType: string; data: string }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw aiError("Gemini isn't configured yet. Add GEMINI_API_KEY on the server. Local transaction parsing still works.", 503);
   const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
@@ -11,7 +11,7 @@ export async function generateFinanceJSON(instructions: string, context: unknown
     response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST", cache: "no-store", signal: AbortSignal.timeout(25000),
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: instructions }] }, contents: [{ role: "user", parts: [{ text: JSON.stringify(context) }] }],
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: instructions }] }, contents: [{ role: "user", parts: [...(image ? [{ inlineData: { mimeType: image.mimeType, data: image.data } }] : []), { text: JSON.stringify(context) }] }],
         generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema, maxOutputTokens: 8192 } }),
     });
   } catch { throw aiError("Gemini couldn't be reached. Your draft is kept; try again or use local parsing.", 503); }

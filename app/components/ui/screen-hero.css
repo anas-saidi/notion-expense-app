@@ -43,6 +43,8 @@
 .screen-hero-digits { grid-column: 2; }
 .screen-hero-currency { grid-column: 3; justify-self: end; display: inline-flex; align-items: baseline; }
 .screen-hero-value[data-tone="danger"] { color: var(--danger); }
+/* A finished state in words ("All assigned"): smaller than a number, same row height, so the hero doesn't jump. */
+.screen-hero-value[data-done] > .screen-hero-done { display: block; font-size: .5em; letter-spacing: -.01em; line-height: 2.4; }
 .screen-hero-supporting { color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
 .screen-hero-supporting > p { margin: 0; }
 .screen-hero-summary, .screen-hero-actions { width: 100%; min-width: 0; }

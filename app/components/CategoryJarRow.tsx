@@ -3,7 +3,8 @@ import { categoryIconSource } from "../../lib/category-icons";
 
 import { useId, type CSSProperties } from "react";
 import type { BudgetScope, Category } from "./app-types";
-import { fmt } from "./app-utils";
+import { fmt, fmtDate } from "./app-utils";
+import { MascotSignal, useOnceSignal } from "./mascot/MascotSignal";
 import { runwayLabel } from "./category-runway";
 import type { BudgetStatus } from "./category-status";
 import type { CategoryJarState } from "./mascot/CategoryJar";
@@ -15,24 +16,27 @@ import { CategoryIcon } from "./ui/CategoryIcon";
  * Rows sit flat on a shared section surface; tapping opens the category.
  * On desktop the row becomes a table row: Budgeted and Spent columns appear (CSS).
  */
-export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, onOpen }: {
+export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, billShort, onOpen }: {
   cat: Category;
   scope: BudgetScope;
   status: BudgetStatus;
   runwayDays?: number;
   planned: number;
   spent: number;
+  /** A bill due within a week this category can't cover: a red dot on the art and its own line. */
+  billShort?: { name: string; dueDate: string; short: number };
   onOpen: () => void;
 }) {
   const { state, low, amount, level } = status;
-  const line = state === "over" ? { text: "Overspent", color: "var(--status-over)", strong: true }
+  const line = billShort ? { text: `${billShort.name} due ${fmtDate(billShort.dueDate)}, ${fmt(Math.ceil(billShort.short - 0.005))} short`, color: "var(--danger)", strong: true }
+    : state === "over" ? { text: "Overspent", color: "var(--status-over)", strong: true }
     : low ? { text: runwayDays == null ? "Running low" : runwayLabel(runwayDays), color: "var(--status-low)", strong: false }
     : state === "normal" && Math.round(spent) > 0 ? { text: `${fmt(Math.round(spent))} spent`, color: "var(--muted)", strong: false, spentOnly: true }
     : null;
   const amountColor = state === "over" ? "var(--status-over)" : low ? "var(--status-low)" : state === "normal" ? "var(--text2)" : "var(--muted)";
   return (
     <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, ${fmt(Math.round(amount))} MAD${line ? `, ${line.text}` : state === "empty" ? ", all spent" : state === "unfunded" ? ", not funded" : ""}`}>
-      <BudgetCategoryArtwork level={level} state={state} icon={categoryIconSource(cat.icon, cat.name)} />
+      <BudgetCategoryArtwork level={level} state={state} icon={categoryIconSource(cat.icon, cat.name)} dot={!!billShort} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {/* "X spent" repeats the desktop Spent column, so it hides there. */}
@@ -60,6 +64,8 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   const when = goalLabel(cat.goalDate);
   // A goal that missed its date gets its own line, in the colour for money that's short.
   const pastDue = goal > 0 && !reached && when?.past ? `Past due · ${when.label}` : null;
+  // Reaching a goal bursts once on this device (per goal amount), the next time the row is seen.
+  const burst = useOnceSignal(`goal:${cat.id}:${Math.round(goal)}`, reached, "burst");
   const line = goal > 0
     ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(Math.round(goal))}${when && !when.past ? ` by ${when.label}` : ""}`
     : Math.round(planned) > 0 ? `+${fmt(Math.round(planned))} this month`
@@ -69,7 +75,7 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   const level = goal > 0 ? pct : saved > 0 ? 1 : 0;
   return (
     <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}${pastDue ? `, goal past due since ${when!.label}` : ""}`}>
-      <BudgetCategoryArtwork level={level} state={saved > 0 ? "normal" : "unfunded"} icon={categoryIconSource(cat.icon, cat.name)} />
+      <BudgetCategoryArtwork level={level} state={saved > 0 ? "normal" : "unfunded"} icon={categoryIconSource(cat.icon, cat.name)} burst={burst?.kind === "burst" ? { kind: "burst", id: burst.id } : null} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {line && <span style={{ ...lineStyle, color: reached ? "var(--status-good)" : "var(--muted)", fontWeight: reached ? 600 : 500 }}>{line}</span>}
@@ -82,7 +88,7 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
 }
 
 /** Large, uncontained artwork. Fading never implies the row is disabled. */
-function BudgetCategoryArtwork({ icon, level, state }: { icon: string; level: number; state: CategoryJarState }) {
+function BudgetCategoryArtwork({ icon, level, state, dot = false, burst = null }: { icon: string; level: number; state: CategoryJarState; dot?: boolean; burst?: { kind: "burst"; id: number } | null }) {
   const tintId = `budget-art-${useId().replace(/:/g, "")}`;
   const overspent = state === "over";
   const opacity = overspent ? 1 : 0.6 + 0.4 * Math.max(0, Math.min(1, level));
@@ -94,7 +100,10 @@ function BudgetCategoryArtwork({ icon, level, state }: { icon: string; level: nu
         <feBlend in2="SourceGraphic" mode="normal" />
       </filter>
     </defs></svg>}
-    <CategoryIcon icon={icon} size={60} style={{ opacity, filter: overspent ? `url(#${tintId})` : undefined }} />
+    {/* The same signal language as the jars: a dot when it needs you, a burst when a goal is reached. */}
+    <MascotSignal signal={dot ? "dot" : null} tone="danger" once={burst}>
+      <CategoryIcon icon={icon} size={60} style={{ opacity, filter: overspent ? `url(#${tintId})` : undefined }} />
+    </MascotSignal>
   </span>;
 }
 

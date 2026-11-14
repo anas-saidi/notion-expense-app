@@ -5,6 +5,7 @@ import { MascotEngine, SCALE, VIEWBOX_HALF, type CoinFrame, type MascotFrame, ty
 import { BEAD_SCALE, COIN_R, dustSpecks, type CoinOwner } from "./coins";
 import { mixHex, TAU } from "./math";
 import { EYE_INK } from "./poses";
+import { PALETTES } from "../grain/palettes";
 import type { ReactionToken } from "./mood";
 
 type MascotProps = {
@@ -87,7 +88,7 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   const engine = useMemo(() => new MascotEngine(target, { calm: still, physics, coinShape, lifePhase }), [still, physics, coinShape]); // eslint-disable-line react-hooks/exhaustive-deps
   const [frame, setFrame] = useState<MascotFrame>(() => engine.sample(0));
 
-  const targetKey = `${target.scope}|${target.gap.toFixed(3)}|${target.mood}|${target.celebrate ? 1 : 0}|${target.fill?.toFixed(3) ?? "-"}|${target.coins ? `${(target.coins.anas ?? 0).toFixed(3)},${(target.coins.salma ?? 0).toFixed(3)}` : "-"}|${target.outline ?? "orb"}|${target.salmaShape ?? "egg"}|${target.lookYaw ?? 0}|${target.items ? target.items.map(i => `${i.id}@${i.radius.toFixed(2)}${i.glyph}`).join(",") : "-"}`;
+  const targetKey = `${target.scope}|${target.gap.toFixed(3)}|${target.mood}|${target.celebrate ? 1 : 0}|${target.fill?.toFixed(3) ?? "-"}|${target.coins ? `${(target.coins.anas ?? 0).toFixed(3)},${(target.coins.salma ?? 0).toFixed(3)}` : "-"}|${target.outline ?? "orb"}|${target.salmaShape ?? "egg"}|${target.lookYaw ?? 0}|${target.attention ? `${target.attention.yaw},${target.attention.pitch}` : "-"}|${target.press ? `${target.press.nx.toFixed(3)},${target.press.c.toFixed(1)}` : "-"}|${target.items ? target.items.map(i => `${i.id}@${i.radius.toFixed(2)}${i.glyph}`).join(",") : "-"}`;
   useEffect(() => {
     engine.setTarget(target, now());
     // Redraw once even when not animating (still, off-screen or a background tab),
@@ -138,6 +139,9 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   // parts of each eye to dark ink, following the animated waterline and gaze.
   const eyeFill = isJar ? "var(--text)" : EYE_INK;
   const jointPool = frame.colors[0] !== frame.colors[1];
+  // The light's palette (design.md, Light): picker faces and small glass jars use the same
+  // core and halo tones as the hero light, so the whole app reads as one family of lights.
+  const lightTones = requested.scope === "joint" ? [PALETTES.partner.anas, PALETTES.partner.salma] : [PALETTES.partner[requested.scope], PALETTES.partner[requested.scope]];
   // A pool follows the status palette the category jars use: honey while spending
   // faster than the month, coral once overspent. Draining on pace is not a warning.
   const dry = warn === "over" ? 1 : warn === "low" ? 0.8 : 0;
@@ -159,8 +163,8 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
     <svg viewBox={viewBox} width={size} height={size} style={{ display: "block", overflow: "visible" }}>
       <defs>
         <linearGradient id={`${ids}-fill`} gradientUnits="userSpaceOnUse" x1={-80} y1={0} x2={80} y2={0}>
-          <stop offset="0" stopColor={frame.colors[0]} />
-          <stop offset="1" stopColor={frame.colors[1]} />
+          <stop offset="0" stopColor={lightTones[0].halo} />
+          <stop offset="1" stopColor={lightTones[1].halo} />
         </linearGradient>
       </defs>
       <path d={frame.body} fill={`url(#${ids}-fill)`} />
@@ -171,13 +175,20 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   const contents = isJar ? (
     <svg viewBox={viewBox} width={size} height={size} style={{ display: "block", overflow: "visible" }}>
       <defs>
-        {/* A personal pool is its partner's own colour, as on their picker face;
-            a joint pool lightens both and puts their real mix in the middle. */}
-        <linearGradient id={`${ids}-partner`} gradientUnits="userSpaceOnUse" x1={-80} y1={0} x2={80} y2={0}>
-          <stop offset="0" stopColor={tone(frame.colors[0], jointPool ? SOFTEN_JOINT : SOFTEN)} />
-          {jointPool && <stop offset="0.5" stopColor={tone(mixHex(frame.colors[0], frame.colors[1], 0.5), SOFTEN_JOINT + 0.05)} />}
-          <stop offset="1" stopColor={tone(frame.colors[1], jointPool ? SOFTEN_JOINT : SOFTEN)} />
-        </linearGradient>
+        {/* A personal pool runs from its partner's halo at the surface to their core at the
+            bottom, like the hero light; a joint pool lightens both cores and mixes them in the middle. */}
+        {jointPool ? (
+          <linearGradient id={`${ids}-partner`} gradientUnits="userSpaceOnUse" x1={-80} y1={0} x2={80} y2={0}>
+            <stop offset="0" stopColor={tone(lightTones[0].core, SOFTEN_JOINT)} />
+            <stop offset="0.5" stopColor={tone(mixHex(lightTones[0].core, lightTones[1].core, 0.5), SOFTEN_JOINT + 0.05)} />
+            <stop offset="1" stopColor={tone(lightTones[1].core, SOFTEN_JOINT)} />
+          </linearGradient>
+        ) : (
+          <linearGradient id={`${ids}-partner`} gradientUnits="userSpaceOnUse" x1={0} y1={-80} x2={0} y2={100}>
+            <stop offset="0" stopColor={tone(lightTones[0].halo, SOFTEN)} />
+            <stop offset="1" stopColor={tone(lightTones[0].core, SOFTEN)} />
+          </linearGradient>
+        )}
         {/* Depth: slightly deeper towards the bottom. */}
         <linearGradient id={`${ids}-depth`} gradientUnits="userSpaceOnUse" x1={0} y1={-60} x2={0} y2={100}>
           <stop offset="0" stopColor="#0e0f0c" stopOpacity={0} />
@@ -225,10 +236,6 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
   const front = (
     <svg viewBox={viewBox} width={size} height={size} style={layerStyle}>
       <defs>
-        <radialGradient id={`${ids}-shine`} gradientUnits="userSpaceOnUse" cx={-35} cy={-55} r={110}>
-          <stop offset="0" stopColor="#fff" stopOpacity={0.35} />
-          <stop offset="1" stopColor="#fff" stopOpacity={0} />
-        </radialGradient>
         {/* Eyes clip against the outline, so a glance towards the edge tucks them in. */}
         <clipPath id={`${ids}-fclip`}><path d={frame.body} /></clipPath>
         {frame.liquid && <clipPath id={`${ids}-eye-liquid`}><path d={frame.liquid} /></clipPath>}
@@ -251,7 +258,6 @@ export function Mascot({ target: requested, reaction, size = 96, calm, physics, 
         )}
         {material === "fake" && <path d={frame.body} fill={`url(#${ids}-inner)`} />}
       </g>
-      {!isJar && <path d={frame.body} fill={`url(#${ids}-shine)`} />}
       {/* Jar edge: a soft, slightly blurred border in the app's border token, so it suits light and dark. */}
       {isJar && (
         <>

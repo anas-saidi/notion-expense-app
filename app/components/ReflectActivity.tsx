@@ -1,22 +1,35 @@
 "use client";
 
 import { SkeletonRows } from "./ui/Skeleton";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, Transaction } from "./app-types";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { SwipeToDelete } from "./ui/SwipeToDelete";
 import { isExpenseTransaction, resolveTransactionScopes, transactionMatchesScope, fmt } from "./app-utils";
-import { BanknoteIcon, TransferIcon } from "./ui/icons";
+import { BanknoteIcon, TransferIcon, WriteIcon } from "./ui/icons";
 import { ScreenChip } from "./ui/ScreenChip";
-import { SearchField } from "./ui/SearchField";
+import { LedgerAnswerView, askSuggestions, useLedgerAsk } from "./ReflectAsk";
+import { PromptInput } from "./ui/PromptInput";
+import type { MonthRange } from "@/lib/ledger";
+import "./ui/prompt-input.css";
 import { TransactionRow } from "./ui/TransactionRow";
 
-type Props = { transactions: Transaction[]; categories: Category[]; accounts: Account[]; budgetScope: BudgetScope; periodLabel: string; transactionsLoading: boolean; searchOpen: boolean; onSearchClose: () => void; onClickTransaction: (transaction: Transaction) => void; onDeleteTransaction: (id: string) => boolean | Promise<boolean> };
-export function ReflectActivity({ transactions, categories, accounts, budgetScope, periodLabel: monthLabel, transactionsLoading, searchOpen, onSearchClose, onClickTransaction, onDeleteTransaction }: Props) {
+type Props = { transactions: Transaction[]; categories: Category[]; accounts: Account[]; budgetScope: BudgetScope; periodLabel: string; transactionsLoading: boolean; searchOpen: boolean; onSearchClose: () => void;
+  /** The months Reflect shows: a question without a month means these. */
+  viewing: MonthRange;
+  /** This period's biggest spending category, for the ask pills. */
+  topCategoryName?: string;
+  onLogAgain?: (transaction: Transaction) => void;
+  onClickTransaction: (transaction: Transaction) => void; onDeleteTransaction: (id: string) => boolean | Promise<boolean> };
+export function ReflectActivity({ transactions, categories, accounts, budgetScope, periodLabel: monthLabel, transactionsLoading, searchOpen, onSearchClose, viewing, topCategoryName, onClickTransaction, onDeleteTransaction, onLogAgain }: Props) {
   const [activityQuery, setActivityQuery] = useState("");
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Search or ask: typing filters entries instantly; asking sends the text to Gemini as a question.
+  const ledger = useLedgerAsk({ categories, accounts, scope: budgetScope, viewing });
+  const [asked, setAsked] = useState("");
+  const askNow = (text: string) => { setAsked(text.trim()); void ledger.ask(text); };
+  const changeQuery = (value: string) => { setActivityQuery(value); if (ledger.active && value.trim() !== asked) { ledger.clear(); setAsked(""); } };
+
   const [activityType, setActivityType] = useState<"All" | "Expenses" | "Income" | "Transfers" | "Needs review">("All");
-  useEffect(() => { if (searchOpen) searchInputRef.current?.focus(); }, [searchOpen]);
   const scopedTransactions = useMemo(() => transactions.filter(t => transactionMatchesScope(t, categories, budgetScope, accounts)), [transactions, categories, budgetScope, accounts]);
   const unassignedTransactions = useMemo(() => transactions.filter(t => resolveTransactionScopes(t, categories, accounts).length === 0), [transactions, categories, accounts]);
   const activityTransactions = activityType === "Needs review" ? unassignedTransactions : scopedTransactions;
@@ -56,17 +69,16 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
   return (
       <div className="reflect-activity">
         <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-          {searchOpen && (
-            <SearchField
-              ref={searchInputRef}
-              value={activityQuery}
-              onChange={setActivityQuery}
-              onClose={() => { setActivityQuery(""); onSearchClose(); }}
-              placeholder="Search description, category or account"
-              ariaLabel="Search activity"
-            />
-          )}
-          <div role="group" aria-label="Activity filters" className="filter-chip-rail" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
+          {/* Search or ask, in the app's prompt composer: typing filters entries straight away; send asks Gemini. */}
+          {searchOpen && <>
+            <PromptInput id="reflect-search" label="Search or ask about your money" value={activityQuery} placeholder="Search or ask, like coffee or eat out vs last month"
+              onValueChange={changeQuery} onSubmit={() => askNow(activityQuery)} onStop={() => { ledger.clear(); setAsked(""); }}
+              loading={ledger.busy} suggestions={askSuggestions(viewing, topCategoryName)} hint="Type to search, send to ask" autoFocus />
+            <button type="button" className="reflect-ask-more" onClick={() => { setActivityQuery(""); ledger.clear(); setAsked(""); onSearchClose(); }}>Close</button>
+          </>}
+          {searchOpen && <LedgerAnswerView state={ledger} categories={categories} viewing={viewing} />}
+          {/* While an answer is showing it is the result; the filtered list comes back when the search changes. */}
+          {!ledger.active && <div role="group" aria-label="Activity filters" className="filter-chip-rail" style={{ display: "flex", gap: 6, overflowX: "auto" }}>
             {(["All", "Expenses", "Income", "Transfers"] as const).map(filter => <ScreenChip key={filter} selected={activityType === filter} onClick={() => setActivityType(filter)}>{filter}</ScreenChip>)}
             {/* Transactions no scope claims (missing account/category) appear in no mode's
                 history, so this chip surfaces them — but only while there's something to fix. */}
@@ -78,8 +90,9 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
             >
               Needs review
             </ScreenChip>}
-          </div>
+          </div>}
         </div>
+        {!ledger.active && <>
         {transactionsLoading && (
           <div style={{ display: "grid", gap: 20 }}>
             <div className="section-label" style={sectionDividerLabelStyle}>History</div>
@@ -104,7 +117,9 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
                     const isTransfer = txn.type === "Transfer";
                     const prefix = isIncome ? "+" : isTransfer ? "↔" : "−";
                     return (
-                      <SwipeToDelete key={txn.id} flat deleteLabel={`Delete ${txn.name}`} onDelete={() => onDeleteTransaction(txn.id)}>
+                      <SwipeToDelete key={txn.id} flat deleteLabel={`Delete ${txn.name}`} onDelete={() => onDeleteTransaction(txn.id)}
+                        // Swipe right: most spending repeats, so write this one again.
+                        onSwipeRight={!isTransfer && onLogAgain ? () => onLogAgain(txn) : undefined} swipeRightLabel={`Log ${txn.name} again`} swipeRightIcon={<WriteIcon size={17} aria-hidden="true" />}>
                         <TransactionRow
                           title={isTransfer && (fromCat || toCat) ? `${fromCat?.name ?? "—"} → ${toCat?.name ?? "—"}` : txn.name}
                           subtitle={!isTransfer ? cat?.name : undefined}
@@ -129,6 +144,7 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
             <p style={{ fontSize: 13, color: "var(--muted)" }}>No matching transactions in {monthLabel}.</p>
           </section>
         )}
+        </>}
       </div>
 
   );

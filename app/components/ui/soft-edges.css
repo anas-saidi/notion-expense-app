@@ -1,0 +1,116 @@
+/* Feathered edges (trial, see docs/design-references/soft-focus-cards.md).
+   Content dissolves into the surface through an alpha mask instead of clipping at a hard line.
+   Masks are cheap compared with blur: no backdrop sampling, no per-frame filter.
+   Rule: an edge feathers only while content is hidden past it, so nothing fades for no reason. */
+
+/* ── Scroll-driven feather bands ─────────────────────────────────
+   Each band grows over the first / last 24px of scroll, driven by the scroller itself,
+   so nothing runs in JS. A scroller that can't scroll has an inactive timeline and no mask. */
+@property --feather-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --feather-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+
+@keyframes feather-start { from { --feather-start: 0px; } to { --feather-start: 24px; } }
+@keyframes feather-end { from { --feather-end: 24px; } to { --feather-end: 0px; } }
+@keyframes feather-overlay { from { opacity: 1; } to { opacity: 0; } }
+
+@supports (animation-timeline: scroll()) {
+  /* Vertical scrollers: sheets, picker lists.
+     Sheets that already draw a ProgressiveBlur edge keep it instead. */
+  .bottom-sheet-content:not(:has([data-progressive-blur])),
+  .picker-body,
+  .picker-options {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--feather-start), #000 calc(100% - var(--feather-end)), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 var(--feather-start), #000 calc(100% - var(--feather-end)), transparent 100%);
+    animation: feather-start linear both, feather-end linear both;
+    animation-timeline: scroll(self), scroll(self);
+    animation-range: 0 24px, calc(100% - 24px) 100%;
+  }
+
+  /* Picker lists fade under their heading, so the hairline goes. */
+  .picker-heading { border-bottom-color: transparent; }
+
+  /* Horizontal rails: Home cards, allocation categories, Reflect filter chips.
+     The last chip dissolves instead of being cut mid-shape. */
+  .home-scroll-rail,
+  .planning-scroll-rail,
+  .categories-scroll-rail,
+  .filter-chip-rail {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--feather-start), #000 calc(100% - var(--feather-end)), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 var(--feather-start), #000 calc(100% - var(--feather-end)), transparent 100%);
+    animation: feather-start linear both, feather-end linear both;
+    animation-timeline: scroll(self inline), scroll(self inline);
+    animation-range: 0 24px, calc(100% - 24px) 100%;
+  }
+
+  /* Desktop dashboard panels are cards (surface + shadow), so a mask would clip the shadow and
+     fade the card itself into the page. Instead a sticky overlay fades the rows into the card's
+     own surface at the bottom, and only while rows are hidden below. The top is a sticky header. */
+  @media (min-width: 900px) {
+    .home-bills-panel > .bills-section::after,
+    .home-content > section[aria-label="Recent activity"]::after,
+    .desktop-top-spending::after {
+      content: "";
+      display: block;
+      position: sticky;
+      bottom: calc(-1 * var(--desktop-panel-padding, 24px));
+      height: 32px;
+      margin-top: -32px;
+      background: linear-gradient(to bottom, color-mix(in srgb, var(--surface) 0%, transparent), var(--surface));
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0; /* stays hidden when the panel can't scroll (inactive timeline) */
+      animation: feather-overlay linear both;
+      animation-timeline: scroll(nearest);
+      animation-range: calc(100% - 24px) 100%;
+    }
+  }
+}
+
+/* ── Category artwork ────────────────────────────────────────────
+   Large art melts into the canvas at its extremities instead of ending at the art's cut edge.
+   Small icons stay crisp: a feather at 24px only reads as blur. */
+.category-art[data-feather] img {
+  -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent 100%);
+          mask-image: radial-gradient(closest-side, #000 74%, transparent 100%);
+}
+
+/* ── Loading skeletons ───────────────────────────────────────────
+   Placeholders fade in from their ends, like out-of-focus text, rather than reading as grey pills.
+   The mask is static, so the shimmer stays a cheap background animation. */
+.skeleton {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 min(16px, 25%), #000 calc(100% - min(16px, 25%)), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 min(16px, 25%), #000 calc(100% - min(16px, 25%)), transparent 100%);
+}
+.skeleton.skeleton--blob {
+  -webkit-mask-image: radial-gradient(closest-side, #000 60%, transparent 100%);
+          mask-image: radial-gradient(closest-side, #000 60%, transparent 100%);
+}
+
+/* ── Mode picker: the partner left out is out of focus ───────────
+   The glass pill keeps its hard edge (it is the selection). The excluded face
+   softens instead of only greying out; hover or press brings it back into focus. */
+.couple-picker .couple-picker-art {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease, filter 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.couple-picker .couple-picker-person:not([data-included]) .couple-picker-art { filter: blur(0.75px); }
+.couple-picker .couple-picker-person:not([data-included]):active .couple-picker-art { filter: none; }
+@media (hover: hover) and (pointer: fine) {
+  .couple-picker .couple-picker-person:not([data-included]):hover .couple-picker-art { filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .couple-picker .couple-picker-art { transition: none; }
+}
+
+/* ── Reduce Transparency: every feather and soft focus goes back to a plain edge ── */
+@media (prefers-reduced-transparency: reduce) {
+  .bottom-sheet-content, .picker-body, .picker-options,
+  .home-scroll-rail, .planning-scroll-rail, .categories-scroll-rail, .filter-chip-rail,
+  .category-art[data-feather] img, .skeleton, .skeleton.skeleton--blob {
+    -webkit-mask-image: none; mask-image: none;
+  }
+  .picker-heading { border-bottom-color: var(--border); }
+  .home-bills-panel > .bills-section::after,
+  .home-content > section[aria-label="Recent activity"]::after,
+  .desktop-top-spending::after { display: none; }
+  .couple-picker .couple-picker-person:not([data-included]) .couple-picker-art { filter: none; }
+}

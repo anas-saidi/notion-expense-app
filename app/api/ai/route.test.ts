@@ -98,3 +98,24 @@ it("rejects a malformed app budget before calling Gemini", async () => {
   expect(res.status).toBe(400);
   expect(generateFinanceJSON).not.toHaveBeenCalled();
 });
+it("turns a ledger question into a lookup without sending transactions or amounts", async () => {
+  vi.mocked(generateFinanceJSON).mockResolvedValue({ kind: "compare", type: "Expense", categoryIds: ["c0"], search: null, period: { start: "2026-10", end: "2026-10" }, compare: { start: "2026-09", end: "2026-09" }, question: null });
+  const res = await POST(request({ action: "ask", text: "eat out vs last month", categories: [{ id: food, name: "Eat out" }], viewing: { start: "2026-10", end: "2026-10" } }));
+  expect(res.status).toBe(200);
+  expect((await res.json()).lookup).toMatchObject({ kind: "compare", categoryIds: [food] });
+  const context = JSON.stringify(vi.mocked(generateFinanceJSON).mock.calls[0][1]);
+  expect(context).not.toContain(food); expect(context).not.toMatch(/amount|available|balance/);
+  expect(queryDatabaseAll).not.toHaveBeenCalled();
+});
+it("reads a receipt photo into drafts, sending the image but no text field", async () => {
+  vi.mocked(generateFinanceJSON).mockResolvedValue({ transactions: [{ name: "Mercado Central", amount: 32.35, date: "2026-10-10", type: "Expense", categoryId: food, accountId: null }], questions: [] });
+  const res = await POST(request({ action: "receipt", image: { mimeType: "image/jpeg", data: "QUJD" }, defaultDate: "2026-10-11", categories: [{ id: food, name: "Groceries" }], accounts: [] }));
+  expect(res.status).toBe(200); expect((await res.json()).transactions[0].amount).toBe(32.35);
+  const [, context, , image] = vi.mocked(generateFinanceJSON).mock.calls[0];
+  expect(image).toEqual({ mimeType: "image/jpeg", data: "QUJD" });
+  expect(JSON.stringify(context)).not.toContain('"text"');
+});
+it("rejects a receipt that isn't a small image before calling Gemini", async () => {
+  expect((await POST(request({ action: "receipt", image: { mimeType: "application/pdf", data: "QUJD" }, defaultDate: "2026-10-11", categories: [], accounts: [] }))).status).toBe(400);
+  expect(generateFinanceJSON).not.toHaveBeenCalled();
+});

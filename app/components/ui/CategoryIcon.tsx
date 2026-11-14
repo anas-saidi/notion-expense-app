@@ -3,7 +3,10 @@
 import type { CSSProperties } from "react";
 import { categoryIconSource, DEFAULT_CATEGORY_IMAGE } from "../../../lib/category-icons";
 
-/** Category artwork has one transparent, consistently sized frame throughout the app. */
+/** Category artwork has one transparent, consistently sized frame throughout the app.
+ *  From 48px up the art feathers into the canvas; smaller icons stay crisp. */
+const FEATHER_MIN_SIZE = 48;
+
 export function CategoryIcon({ icon, categoryName, size = 22, style = {}, decorative = true, label }: {
   icon?: string | null;
   categoryName?: string | null;
@@ -13,6 +16,8 @@ export function CategoryIcon({ icon, categoryName, size = 22, style = {}, decora
   label?: string;
 }) {
   return <span
+    className="category-art"
+    data-feather={size >= FEATHER_MIN_SIZE ? "" : undefined}
     role={!decorative ? "img" : undefined}
     aria-hidden={decorative ? "true" : undefined}
     aria-label={!decorative ? (label ?? categoryName ?? "Category") : undefined}

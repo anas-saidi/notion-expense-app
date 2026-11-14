@@ -3,17 +3,24 @@ import { SCREEN_HERO_MASCOT_SIZE } from "./hero-tokens";
 import type { CSSProperties, ReactNode } from "react";
 
 /** One visual treatment for pending content; decorative shapes stay out of the accessibility tree. */
-export function Skeleton({ style }: { style?: CSSProperties }) {
-  return <span aria-hidden="true" className="skeleton" style={{ display: "block", height: 14, width: "100%", ...style }} />;
+export function Skeleton({ style, blob = false }: { style?: CSSProperties; blob?: boolean }) {
+  return <span aria-hidden="true" className={blob ? "skeleton skeleton--blob" : "skeleton"} style={{ display: "block", height: 14, width: "100%", ...style }} />;
 }
 
 export function SkeletonRegion({ label, children, style }: { label: string; children: ReactNode; style?: CSSProperties }) {
   return <div role="status" aria-label={label} aria-busy="true" style={style}>{children}</div>;
 }
 
+/**
+ * The hero while a screen loads: a faint, shapeless light in both partner colours where the mascot's
+ * light will be (design.md, Light), never a grey glass-jar blob that the light then replaces.
+ */
 export function HeroSkeleton({ label = "Loading monthly details", size = SCREEN_HERO_MASCOT_SIZE }: { label?: string; size?: number }) {
   return <SkeletonRegion label={label} style={{ minHeight: size, display: "grid", placeItems: "center" }}>
-    <Skeleton style={{ width: size * 0.72, height: size * 0.84, borderRadius: 40 }} />
+    <span aria-hidden="true" style={{
+      display: "block", width: size * 0.8, height: size * 0.8, borderRadius: "50%", opacity: 0.35, filter: `blur(${Math.round(size * 0.1)}px)`,
+      background: "radial-gradient(circle at 38% 55%, var(--partner-husband) 0 30%, transparent 62%), radial-gradient(circle at 62% 55%, var(--partner-wife) 0 30%, transparent 62%)",
+    }} />
   </SkeletonRegion>;
 }
 

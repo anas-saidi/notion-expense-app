@@ -63,6 +63,7 @@ export function ProgressiveBlur({
   return (
     <div
       aria-hidden="true"
+      data-progressive-blur=""
       className={className}
       style={{
         position: "absolute",

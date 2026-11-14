@@ -1,5 +1,5 @@
 // Mechanics adapted from bloub (MIT) — see BLOUB_LICENSE.txt. Constants are our own.
-import { clamp, createRng, loopNoise } from "./math";
+import { clamp, createRng, lerp, loopNoise } from "./math";
 
 /**
  * Eyes are painted on a sphere, not laid flat: each eye takes the sphere's
@@ -110,3 +110,72 @@ export function liveliness(t: number, calm = false): Liveliness {
 
 /** A blink is a vertical squash in screen space around the eye centre. */
 export const blinkScale = (lid: number) => 0.08 + 0.92 * clamp(lid);
+
+/**
+ * Bloub's eye range on top of a mood: every few seconds the eyes do one small thing, then settle back.
+ * The capsule stays the only shape; a moment only scales it, rounds it or turns the head.
+ * - glance: a quick look to one side (or up), held, then back
+ * - widen: both eyes open bigger for a beat (noticing)
+ * - squint: eyes narrow and flatten (content)
+ * - dot: eyes become round dots (attentive), like Bloub's notification face
+ */
+export type EyeMomentKind = "glance" | "widen" | "squint" | "dot";
+export interface EyeMoment {
+  dYaw: number;
+  dPitch: number;
+  /** Width and height multipliers. */
+  ws: number;
+  hs: number;
+  /** 0 = the mood's capsule, 1 = a round dot. */
+  round: number;
+}
+export const NO_EYE_MOMENT: EyeMoment = { dYaw: 0, dPitch: 0, ws: 1, hs: 1, round: 0 };
+
+const MOMENT_RNG = createRng(0xe7e5);
+type ScheduledMoment = { t: number; kind: EyeMomentKind; dur: number; yaw: number; pitch: number };
+/** Pre-drawn like the blinks: deterministic, and each jar reads it at its own phase. */
+const MOMENTS: ScheduledMoment[] = (() => {
+  const kinds: EyeMomentKind[] = ["glance", "glance", "widen", "squint", "dot", "glance"];
+  const out: ScheduledMoment[] = [];
+  let t = 2.6;
+  while (t < 3600) {
+    const kind = kinds[Math.floor(MOMENT_RNG() * kinds.length)];
+    const side = MOMENT_RNG() < 0.5 ? -1 : 1;
+    out.push({ t, kind, dur: kind === "glance" ? 0.9 + MOMENT_RNG() * 0.6 : 0.8 + MOMENT_RNG() * 0.5, yaw: side * (10 + MOMENT_RNG() * 8), pitch: (MOMENT_RNG() - 0.3) * 14 });
+    t += 3.5 + MOMENT_RNG() * 4;
+  }
+  return out;
+})();
+
+/** In fast (110 ms), hold, out softer (220 ms): a look is quick, the return is lazy. */
+function momentEnvelope(k: number, dur: number): number {
+  const s = k * dur;
+  if (s < 0 || s > dur) return 0;
+  if (s < 0.11) return 1 - (1 - s / 0.11) ** 3;
+  const out = dur - s;
+  return out < 0.22 ? (out / 0.22) ** 2 * (3 - 2 * (out / 0.22)) : 1;
+}
+
+export function eyeMoment(t: number, calm = false): EyeMoment {
+  if (calm) return NO_EYE_MOMENT;
+  let lo = 0, hi = MOMENTS.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (MOMENTS[mid].t <= t) lo = mid; else hi = mid - 1;
+  }
+  const m = MOMENTS[lo];
+  const e = momentEnvelope((t - m.t) / m.dur, m.dur);
+  if (e <= 0) return NO_EYE_MOMENT;
+  switch (m.kind) {
+    case "glance": return { dYaw: m.yaw * e, dPitch: m.pitch * e, ws: 1, hs: 1, round: 0 };
+    case "widen": return { dYaw: 0, dPitch: -3 * e, ws: 1 + 0.18 * e, hs: 1 + 0.22 * e, round: 0 };
+    case "squint": return { dYaw: 0, dPitch: 2 * e, ws: 1 + 0.12 * e, hs: 1 - 0.5 * e, round: 0 };
+    case "dot": return { dYaw: m.yaw * 0.4 * e, dPitch: 0, ws: 1, hs: 1, round: e };
+  }
+}
+
+/** A capsule eye after a moment: scaled, and pulled towards a round dot slightly wider than the capsule. */
+export function shapeEye(w: number, h: number, m: EyeMoment): { w: number; h: number } {
+  const dot = Math.max(w, Math.min(h, w * 1.3));
+  return { w: lerp(w * m.ws, dot, m.round), h: lerp(h * m.hs, dot, m.round) };
+}

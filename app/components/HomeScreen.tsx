@@ -41,6 +41,8 @@ type HomeScreenProps = {
   balanceByScope?: Record<BudgetScope, number>;
   readyToAssignByScope: Record<BudgetScope, number>;
   budgetScope: BudgetScope;
+  /** Who is signed in: Couple's hero is their own contribution, so the summary names only the partner's. */
+  personalScope?: Exclude<BudgetScope, "joint">;
   homeMonth: string;
   onHomeMonthChange: (month: string) => void;
   planningRemaining?: Record<BudgetScope, number>;
@@ -51,10 +53,19 @@ type HomeScreenProps = {
   jointUnassigned?: number;
   /** Assign unassigned money (opens Rebalance, the same place Budget's banner goes). */
   onOpenAssign?: () => void;
+  /** Bumped on each save: the jar winks once. */
+  savedWink?: number;
+  /** Money just moved: the jar plays a comet once. */
+  moneyMoved?: { kind: "comet"; id: number } | null;
+  /** Balances couldn't refresh: the jar shows "!", and tapping it retries. */
+  refreshStale?: { reason: string; onRetry: () => void } | null;
 };
 
 
 export function HomeScreen({
+  savedWink,
+  moneyMoved,
+  refreshStale,
   contributions,
   billsSection,
   balanceChecks,
@@ -77,6 +88,7 @@ export function HomeScreen({
   monthlySummary,
   categoryAvailableByScope,
   balanceByScope,
+  personalScope,
   readyToAssignByScope,
   budgetScope,
   homeMonth,
@@ -183,7 +195,8 @@ export function HomeScreen({
       const reviewLabel = `Review balance check for ${account.label}`;
       return <span key={key}><Fact>{account.label}</Fact>{off == null ? <> has a <Fact tone="warning" onClick={review} label={reviewLabel}>count to review</Fact></> : off < 0.01 ? <> <Fact tone="success" onClick={review} label={reviewLabel}>matches</Fact> your count</> : <> is <Fact tone="warning" onClick={review} label={reviewLabel}>{fmt(Math.max(1, Math.round(off)))} off</Fact></>}</span>;
     }),
-    ...(!monthlyLoading && !monthlyError && !monthlySummary.contributionError ? contributionLeft : []).map(({ partner, left }) => {
+    // Couple's hero number is your own contribution left, so only your partner's due is repeated here.
+    ...(!monthlyLoading && !monthlyError && !monthlySummary.contributionError ? contributionLeft : []).filter(({ partner, left }) => !(budgetScope === "joint" && partner === personalScope && left > 0)).map(({ partner, left }) => {
       const name = partner === "anas" ? "Anas" : "Salma";
       // Beyond the agreement is an advance Couple owes back; it reads as extra, not as a row of its own.
       return left > 0
@@ -203,6 +216,12 @@ export function HomeScreen({
       ? <><Fact onClick={onOpenPlan} label={`Resume planning ${planningLabel}`}>{plannedCount} of 3 budgets</Fact> are ready for <Fact>{planningLabel}</Fact></>
       : <><Fact>{planningLabel}</Fact> <Fact onClick={onOpenPlan} label={`Plan ${planningLabel}`}>isn&rsquo;t planned</Fact> yet</>}</span>,
   ].filter(Boolean).slice(0, 3);
+  // A calm day in a personal scope: the cash, quietly (the hero is Left to spend, not the balance).
+  // Couple skips it: the joint account's cash isn't the pool, so it only appears when a bill needs it.
+  const cash = budgetScope !== "joint" ? balanceByScope?.[budgetScope] : undefined;
+  if (summaryClauses.length === 0 && cash != null && !monthlyLoading) {
+    summaryClauses.push(<span key="cash"><Fact>{fmt(Math.round(cash))}</Fact> in your accounts</span>);
+  }
 
   return (
     <div id="panel-home" className="screen-layout" role="tabpanel" aria-labelledby="tab-home">
@@ -218,12 +237,17 @@ export function HomeScreen({
           monthlySummary={monthlySummary}
           categoryAvailableByScope={categoryAvailableByScope}
           balanceByScope={balanceByScope}
+          personalScope={personalScope}
           contribStatus={contribStatus}
           categories={categories}
           overspent={overspentInCategories}
           balanceDetail={contributions}
           summary={summaryClauses.length > 0 ? <Summary>{joinClauses(summaryClauses)}.</Summary> : null}
           feedback={balanceChecks}
+          winkId={savedWink}
+          onOpenPartner={onOpenContributions}
+          once={moneyMoved}
+          stale={refreshStale}
         />
       </div>
 

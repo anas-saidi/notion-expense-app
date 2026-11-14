@@ -1,6 +1,6 @@
 "use client";
 
-import { HeroSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
+import { Skeleton, SkeletonRegion, SkeletonRows } from "./ui/Skeleton";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
@@ -15,9 +15,12 @@ import { ScreenToolbar } from "./ui/ScreenLayout";
 import { SCREEN_HERO_CHART_HEIGHT } from "./ui/hero-tokens";
 import { ScreenHero } from "./ui/ScreenHero";
 import { MASCOT_HERO_SIZE, MascotHero } from "./mascot/MascotHero";
+import { GrainGlow } from "./grain/GrainGlow";
+import { PALETTES } from "./grain/palettes";
 import { motion, useReducedMotion } from "motion/react";
 import { MascotTap } from "./mascot/MascotTap";
 import { spendingJarItems } from "./mascot/budgetJar";
+
 import { BottomSheet } from "./ui/BottomSheet";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
@@ -25,6 +28,11 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
 import { TransactionRow } from "./ui/TransactionRow";
 import { SlidersIcon, XIcon } from "./ui/icons";
+import { planKeptMood } from "./light-mood";
+import { scopeMonthlySummary } from "./wallet-utils";
+
+/** While transactions load, the light shows on its own. */
+const NO_JAR_ITEMS: ReturnType<typeof spendingJarItems> = [];
 
 type Props = {
   transactions: Transaction[];
@@ -42,10 +50,11 @@ type Props = {
   onAddExpense: () => void;
   onClickTransaction: (transaction: Transaction) => void;
   onDeleteTransaction: (id: string) => boolean | Promise<boolean>;
+  /** Swipe right on an entry: write it again in the add sheet. */
+  onLogAgain?: (transaction: Transaction) => void;
 };
 const monthName = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleDateString("en", { month: "short", year: "numeric" });
 const periodName = ({ start, end }: ReflectPeriod) => !start ? "All time" : start === end ? monthName(start) : `${monthName(start)} – ${monthName(end)}`;
-const tone = (index: number) => `color-mix(in srgb, var(--select-ink) ${Math.max(20, 92 - index * 12)}%, var(--surface2))`;
 
 export function ReflectScreen(props: Props) {
   const reducedMotion = useReducedMotion();
@@ -91,6 +100,14 @@ export function ReflectScreen(props: Props) {
   const overBudgetByCategory = new Map(budgetReady && excludedAccounts.length === 0 ? overBudget.map(row => [row.id, row] as const) : []);
 
   const overRows = budgetReady && excludedAccounts.length === 0 ? overBudget : [];
+  // The light is the mood of the period against its plan (design.md, Light): bright within plan,
+  // honey when categories went over, coral when the total did. Unfiltered single months only;
+  // otherwise there's no plan to judge and the light rests at its steady strength.
+  const planMood = useMemo(() => {
+    if (!budgetReady || filterCount > 0 || !props.monthlySummary) return null;
+    const scoped = scopeMonthlySummary(props.monthlySummary, props.categories, props.accounts, props.budgetScope);
+    return planKeptMood(scoped.totalAssigned, scoped.totalSpent, overRows.reduce((sum, row) => sum + row.overBudget, 0));
+  }, [budgetReady, filterCount, props.monthlySummary, props.categories, props.accounts, props.budgetScope, overRows]);
   // The current month is still running, so its recap speaks in the present.
   const ongoing = singleMonth && props.period.start === currentMonth;
   const recap = [
@@ -101,7 +118,7 @@ export function ReflectScreen(props: Props) {
     budgetReady && excludedAccounts.length === 0 && overRows.length === 0 && <span key="within">all categories <Fact tone="success">{ongoing ? "are within budget" : "stayed within budget"}</Fact></span>,
   ].filter(Boolean);
 
-  const categoryRow = (row: ReflectCategory, index: number, inflow = false) => {
+  const categoryRow = (row: ReflectCategory, _index: number, inflow = false) => {
     const variance = !inflow ? overBudgetByCategory.get(row.id) : undefined;
     return <li key={row.id}>
     <button type="button" onClick={() => setSelectedId(row.id)} aria-label={`${row.name}, ${inflow ? "net inflow" : "spent"} ${Math.abs(row.net)} MAD${!inflow && row.share > 0 ? `, ${(row.share * 100).toFixed(1)} percent` : ""}${variance ? `, ${variance.overBudget} MAD over budget, assigned ${variance.assigned} MAD` : ""}, view transactions`} style={categoryButtonStyle}>
@@ -112,7 +129,7 @@ export function ReflectScreen(props: Props) {
           <span style={{ flexShrink: 0, color: inflow ? "var(--action-income)" : "var(--text2)", fontSize: 15, fontWeight: 600 }}>{inflow ? "+" : ""}<OverviewMoney value={Math.abs(row.net)} /></span>
         </span>
         <span style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {!inflow && row.net > 0 && <span aria-hidden="true" style={{ height: 4, flex: 1, borderRadius: 4, background: "var(--surface2)", overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: `${row.share * 100}%`, background: variance ? "var(--danger)" : tone(index), borderRadius: 4 }} /></span>}
+          {!inflow && row.net > 0 && <span aria-hidden="true" className="soft-bar"><span className="soft-bar-fill" data-over={variance ? "" : undefined} style={{ width: `${row.share * 100}%` }} /></span>}
           <span style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{row.net > 0 ? row.share * 100 < 0.5 ? "<1%" : `${Math.round(row.share * 100)}%` : `${row.transactions.length} transactions`}</span>
         </span>
         {variance && <span style={{ fontSize: 13, color: "var(--danger)" }}><OverviewMoney value={variance.overBudget} /> over budget</span>}
@@ -148,15 +165,19 @@ export function ReflectScreen(props: Props) {
       ? <section className="reflect-hero-chart" aria-label="Spending and money in over this period">{props.transactionsLoading
         ? <SkeletonRegion label="Loading activity chart" style={{ height: SCREEN_HERO_CHART_HEIGHT, display: "grid", gridTemplateRows: "16px 1fr", gap: 16 }}><Skeleton style={{ width: "60%", height: 16, marginInline: "auto" }} /><Skeleton style={{ height: "100%", borderRadius: 8 }} /></SkeletonRegion>
         : <ReflectFlowChart points={flow} height={SCREEN_HERO_CHART_HEIGHT} />}</section>
-      : props.transactionsLoading ? <HeroSkeleton /> : <MascotTap label="React to spending" style={jarButtonStyle}>
-        <MascotHero variant="split" scope={props.budgetScope} items={jarItems} spentPct={null} size={MASCOT_HERO_SIZE} />
+      // Loading shows the light itself (no glass skeleton blob in the light look), so nothing swaps when data arrives.
+      : <MascotTap label="React to spending" style={jarButtonStyle}>
+        <MascotHero look="light" variant="split" scope={props.budgetScope} items={props.transactionsLoading ? NO_JAR_ITEMS : jarItems} spentPct={null} size={MASCOT_HERO_SIZE} glow={props.transactionsLoading ? null : planMood}
+          signal={!props.transactionsLoading && !props.error && breakdown.total === 0 ? { kind: "sleep", label: "No spending this period" } : null} />
       </MascotTap>}
     </motion.div>
   </div>;
 
   return <div id="panel-history" className="screen-layout" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0, paddingBottom: 100 }}>
     <div className="reflect-desktop-panels">
-      <section className="reflect-desktop-overview screen-overview" aria-label="Spending breakdown">
+      <section className="reflect-desktop-overview screen-overview grain-stage" aria-label="Spending breakdown">
+        {/* The jar's light fills the hero, as bright as the period kept to its plan (design.md, Light). */}
+        <GrainGlow direction="room" scope={props.budgetScope} level={planMood?.level ?? 0.7} tones={PALETTES.partner} />
         <ScreenHero
           mascot={heroVisual}
           label="Spent" showMetric={props.view === "spending"} loading={props.transactionsLoading} value={props.transactionsLoading || props.error ? null : breakdown.total > 0 ? Math.max(1, Math.round(breakdown.total)) : 0}
@@ -167,7 +188,8 @@ export function ReflectScreen(props: Props) {
       <section className="reflect-desktop-categories screen-content" aria-label="Reflect results">
         {props.error ? <Banner tone="danger" role="alert" title="Could not load this period" action={<button onClick={props.onRetry} style={quietButtonStyle}>Retry</button>}>Records unchanged. Refresh Reflect to retry.</Banner>
           : props.transactionsLoading ? <SkeletonRegion label="Loading Reflect"><SkeletonRows /></SkeletonRegion>
-          : props.view === "activity" ? <ReflectActivity {...props} periodLabel={label} searchOpen={searchOpen} onSearchClose={() => setSearchOpen(false)} />
+          : props.view === "activity" ? <ReflectActivity {...props} periodLabel={label} searchOpen={searchOpen} onSearchClose={() => setSearchOpen(false)}
+            viewing={{ start: props.period.start || currentMonth, end: props.period.end || currentMonth }} topCategoryName={unfiltered.spending[0]?.name} />
           : !hasData ? <section style={{ padding: "40px 0", textAlign: "center" }}><h2 style={{ fontSize: 20, fontWeight: 500 }}>{filterCount ? "No matching spending" : "No spending yet"}</h2><p style={mutedStyle}>{filterCount ? "Include more categories or accounts to see the breakdown." : "Choose another period or add an expense."}</p>{filterCount > 0 ? <button type="button" style={quietButtonStyle} onClick={() => { setExcludedAccounts([]); setExcludedCategories([]); }}>Reset filters</button> : <button type="button" style={quietButtonStyle} onClick={event => { event.currentTarget.focus(); props.onAddExpense(); }}>Add expense</button>}</section>
           : <ul aria-label="Spending by category" style={listStyle}>{breakdown.spending.map((row, index) => categoryRow(row, index))}</ul>}
       </section>
