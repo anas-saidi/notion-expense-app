@@ -71,12 +71,6 @@ button.reflect-category-row {
 /* Over-budget rows in Reflect's sheet: BudgetJarRow's anatomy, flush with the sheet's content edge. */
 button.over-budget-row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 76px; padding: var(--space-2) 0; border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 
-/* Reflect filter options keep the picker-option frame with secondary text in both states. */
-button.picker-option.reflect-filter-option {
-  color: var(--text2);
-  font-size: var(--type-body);
-  justify-content: space-between;
-}
 
 /* Restore-draft dialog over the app. No global scrim token exists yet, so the dim is named here. */
 .draft-restore-overlay {

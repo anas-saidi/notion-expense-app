@@ -66,7 +66,7 @@ import {
   today,
   transactionMatchesScope,
 } from "./components/app-utils";
-import { AppLoadingSkeleton, ScreenLoadingSkeleton, Skeleton, SkeletonRegion, SkeletonRows } from "./components/ui/Skeleton";
+import { AppLoadingSkeleton, ScreenLoadingSkeleton } from "./components/ui/Skeleton";
 
 type SessionUser = { email: string | null; name: string | null; avatarUrl: string | null };
 
@@ -1317,9 +1317,10 @@ export default function App() {
       showAddButton={!showManageScreen}
     >
       {recovery}
-      {refreshState !== "idle" && (tab !== "history" || refreshState === "stale") && (
+      {/* A background refresh after a save shows nothing (amounts hold their last value); only a failed refresh says so. */}
+      {refreshState === "stale" && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
-          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>{refreshError ?? "Could not refresh"}</span> <Button variant="quiet" size="compact" onClick={() => setLoadAttempt(value => value + 1)}>Retry</Button></>}
+          <span>{refreshError ?? "Could not refresh"}</span> <Button variant="quiet" size="compact" onClick={() => setLoadAttempt(value => value + 1)}>Retry</Button>
         </div>
       )}
       {showManageScreen && (

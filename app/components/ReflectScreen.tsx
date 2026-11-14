@@ -29,10 +29,11 @@ import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
 import "./screen-components.css";
 import { OverBudgetRow } from "./CategoryJarRow";
+import { FilterChecklist } from "./FilterChecklist";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
 import { TransactionRow } from "./ui/TransactionRow";
-import { CheckIcon, SlidersIcon, XIcon } from "./ui/icons";
+import { SlidersIcon, XIcon } from "./ui/icons";
 import { planKeptMood } from "./light-mood";
 import { scopeMonthlySummary } from "./wallet-utils";
 
@@ -94,7 +95,6 @@ export function ReflectScreen(props: Props) {
     () => buildMoneyFlow(unfiltered.spending, props.transactions, props.categories, props.accounts, props.budgetScope, props.period, []),
     [unfiltered.spending, props.transactions, props.categories, props.accounts, props.budgetScope, props.period],
   );
-  const toggle = (id: string, values: string[], set: (values: string[]) => void) => set(values.includes(id) ? values.filter(value => value !== id) : [...values, id]);
   const choosePeriod = (period: ReflectPeriod) => { props.onPeriodChange(period); setShowPeriod(false); };
   const label = periodName(props.period);
   const hasData = breakdown.transactionCount > 0;
@@ -231,8 +231,10 @@ export function ReflectScreen(props: Props) {
     <BottomSheet open={showFilters} onClose={() => setShowFilters(false)} label="Filter spending" size="standard" desktopHeight="fill" contentStyle={sheetContentStyle}>
       <ReflectSheetHeader title="Filter spending" onClose={() => setShowFilters(false)} />
       <BlurScrollArea style={sheetScrollStyle}>
-        <FilterGroup title="Categories" items={categoryOptions} excluded={excludedCategories} onToggle={id => toggle(id, excludedCategories, setExcludedCategories)} onAll={() => setExcludedCategories([])} onNone={() => setExcludedCategories(categoryOptions.map(row => row.id))} />
-        <FilterGroup title="Accounts" items={accountOptions} excluded={excludedAccounts} onToggle={id => toggle(id, excludedAccounts, setExcludedAccounts)} onAll={() => setExcludedAccounts([])} onNone={() => setExcludedAccounts(accountOptions.map(row => row.id))} />
+        <FilterChecklist title="Categories" excluded={excludedCategories} onExcludedChange={setExcludedCategories}
+          items={categoryOptions.map(row => ({ id: row.id, name: row.name, art: <CategoryIcon icon={row.icon} categoryName={row.name} size={32} />, detail: row.net > 0 ? fmt(Math.round(row.net)) : row.net < 0 ? `+${fmt(Math.round(-row.net))}` : undefined }))} />
+        <FilterChecklist title="Accounts" excluded={excludedAccounts} onExcludedChange={setExcludedAccounts}
+          items={accountOptions.map(row => ({ id: row.id, name: row.name, art: <CategoryIcon icon={props.accounts.find(account => account.id === row.id)?.icon ?? null} categoryName={row.name} size={32} /> }))} />
       </BlurScrollArea>
       <SheetFooter><Button variant="primary" block onClick={() => setShowFilters(false)}>Done</Button></SheetFooter>
     </BottomSheet>
@@ -251,7 +253,6 @@ function OverviewMoney({ value, currency = false }: { value: number; currency?: 
 
 /** The shared sheet header (Shared dialog anatomy): a 20/24 semibold title and the shared 44px close, 12px apart. */
 function ReflectSheetHeader({ title, onClose }: { title: string; onClose: () => void }) { return <SheetHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}><h2 style={{ fontSize: 20, lineHeight: "24px", fontWeight: 600, margin: 0, color: "var(--text)" }}>{title}</h2><button type="button" className="sheet-close-button" aria-label="Close" onClick={onClose}><XIcon size={20} /></button></SheetHeader>; }
-function FilterGroup({ title, items, excluded, onToggle, onAll, onNone }: { title: string; items: { id: string; name: string }[]; excluded: string[]; onToggle: (id: string) => void; onAll: () => void; onNone: () => void }) { return <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}><legend style={sectionTitleStyle}>{title}</legend><div style={{ display: "flex", gap: 8, margin: "8px 0 4px" }}><Button variant="quiet" size="compact" onClick={onAll}>All</Button><Button variant="quiet" size="compact" onClick={onNone}>None</Button></div><div style={{ display: "grid", gap: 2 }}>{items.map(item => { const included = !excluded.includes(item.id); return <button type="button" key={item.id} className="picker-option reflect-filter-option" aria-pressed={included} onClick={() => onToggle(item.id)}><span style={{ overflowWrap: "anywhere" }}>{item.name}</span>{included && <CheckIcon size={20} aria-hidden="true" style={{ flexShrink: 0, color: "var(--select-ink)" }} />}</button>; })}</div>{!items.length && <EmptyState>No {title.toLowerCase()} in this period.</EmptyState>}</fieldset>; }
 /** A flat selected fill: Joint's --select-wash is a gradient. */
 const jarFrameStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: MASCOT_HERO_SIZE };
 const PERIOD_PRESETS = [["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const;
