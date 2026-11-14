@@ -89,7 +89,7 @@ html[data-theme="dark"] {
 @media (min-width:900px) {
   .phone-nav-glass { display: none; }
   .desktop-glass-nav { display: flex; position: relative; isolation: isolate; padding: 6px 10px; gap: 6px; }
-  .desktop-nav-material.lg-glass { display: block; position: absolute; inset: 0 4px; border-radius: 32px; pointer-events: none; z-index: -1; box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 6px 18px var(--lg-drop); }
+  /* No glass track behind the desktop tabs: in the light direction only the jar glows (design.md, Light). The selected tab keeps its own fill. */
   .app-nav-btn.lg-button { position: relative; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .app-nav-btn.lg-button[aria-selected="true"], html[data-theme="dark"] .app-nav-btn.lg-button[aria-selected="true"] {
     background-color: var(--lg-glass-active); background-image: var(--lg-rim, none);

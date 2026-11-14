@@ -254,7 +254,7 @@ export function HomeScreen({
 
       </div>
       <div className="home-budget-context">
-      <DesktopMonthBudget summary={monthlySummary} month={homeMonth} loading={monthlyLoading} error={monthlyError} showPlanAction={!showPlanningPrompt && !showMonthEndAlert} onOpenPlan={onOpenPlan} onOpenReceipt={onOpenReceipt} />
+      <DesktopMonthBudget scope={budgetScope} categories={categories} summary={monthlySummary} month={homeMonth} loading={monthlyLoading} error={monthlyError} showPlanAction={!showPlanningPrompt && !showMonthEndAlert} onOpenPlan={onOpenPlan} onOpenReceipt={onOpenReceipt} />
       {(showPlanningPrompt || showMonthEndAlert) && <button className="desktop-planning-action" type="button" disabled={!!monthlySummary.contributionError} onClick={onOpenPlan}>{plannedCount > 0 ? "Resume" : "Plan"} {planningLabel}<ChevronRightIcon size={16} aria-hidden="true" /></button>}
       </div>
       </div>

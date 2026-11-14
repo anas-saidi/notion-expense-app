@@ -230,12 +230,7 @@ html[data-theme="dark"] .grain-glow[data-direction="room"]::after {
    * Lift the real boxes inside instead.
    */
   .screen-layout:has(.grain-stage) :is(section, .home-content):not(.grain-stage):not(:has(.grain-stage)):not(.grain-stage *) { position: relative; z-index: 3; }
-  /*
-   * Scroll: the hero sinks behind the sheet. Everything in the stage except the sheet moves down by
-   * 45% of the scroll (--room-scroll, set by GrainGlow), so it drifts up at half speed while the sheet
-   * and the content on it scroll normally over it. Compositor-only (transform); none with Reduce Motion.
-   */
-  .grain-stage > :not(.room-sheet-edge) { transform: translate3d(0, calc(var(--room-scroll, 0) * 0.45px), 0); will-change: transform; }
+  /* No scroll-driven sink: the hero scrolls with the page (a per-frame style write made scrolling lag). */
   /* The sheet ends the room: the light and its densest grain run right up to the sheet's edge (and fade out under it). */
   .grain-glow[data-direction="room"] {
     bottom: calc(-1 * var(--sheet-drop, 0px));
@@ -243,8 +238,23 @@ html[data-theme="dark"] .grain-glow[data-direction="room"]::after {
     mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent calc(100% - 4px));
   }
 }
+/*
+ * Desktop: the hero's card is the room. The light fills the whole card, clipped to its rounded
+ * corners, instead of a framed rectangle inside its padding (Home and Budget wrap the hero in a padded
+ * card; on Reflect the hero is the card). No top fade: there's no header over it here.
+ */
+@media (min-width: 900px) {
+  .screen-overview:has(.grain-glow[data-direction="room"]) { position: relative; overflow: hidden; isolation: isolate; }
+  .screen-overview .grain-stage:not(.screen-overview):has(.grain-glow[data-direction="room"]) { position: static; padding-bottom: 0; }
+  .grain-stage.screen-overview:has(.grain-glow[data-direction="room"]) { padding-bottom: 24px; }
+  .screen-overview .grain-glow[data-direction="room"] {
+    inset: 0;
+    --room-centre: 168px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 55%, rgba(0,0,0,.5) 80%, rgba(0,0,0,.15) 100%);
+    mask-image: linear-gradient(to bottom, #000 0, #000 55%, rgba(0,0,0,.5) 80%, rgba(0,0,0,.15) 100%);
+  }
+}
 @media (prefers-contrast: more) { .grain-stage > .room-sheet-edge { display: none !important; } }
-@media (prefers-reduced-motion: reduce) { .grain-stage > :not(.room-sheet-edge) { transform: none !important; } }
 html[data-grain-a11y="contrast"] .grain-stage > .room-sheet-edge { display: none !important; }
 
 html[data-theme="dark"] .grain-glow[data-direction="room"] { --glow-alpha: 0.5; --wash: 13%; }

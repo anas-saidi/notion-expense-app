@@ -356,7 +356,7 @@ export function CategoriesScreen({
             })}
 
             {!loading && frozenCategories.length > 0 && (
-              <section aria-labelledby="budget-frozen" style={sectionStyle}>
+              <section className="budget-desktop-group" aria-labelledby="budget-frozen" style={sectionStyle}>
                 <SectionToggle id="budget-frozen" label="Frozen" count={frozenCategories.length} open={!collapsed.has("Frozen")} onToggle={() => toggleSection("Frozen")} />
                 {!collapsed.has("Frozen") && (
                   <div style={listSurfaceStyle}>

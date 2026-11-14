@@ -1809,9 +1809,7 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 .couple-picker-person:not([data-included]):active .couple-picker-art { transform: scale(.72); }
 .couple-picker :is(.couple-picker-person, .couple-picker-join):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .couple-picker-label { display: none; }
-@media (min-width: 900px) {
-  .couple-picker-label { display: inline; padding-inline: 12px 4px; color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
-}
+/* The faces already say who the screen is about, and the page title names the scope: no label beside the picker. */
 @media (prefers-reduced-motion: reduce) {
   .couple-picker-art, .couple-picker-person { transition: none; animation: none !important; }
   .couple-picker[data-pulling] .couple-picker-person { transform: none; }
@@ -1820,7 +1818,7 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 /*
   Reflect category bars: share of spending, in one neutral tone for every scope. Spent money is not the
   light (the light only stands for money in a pool), and the scope is already shown by the picker and hero.
-  The fill is as thin as the track, blurred and faded at both ends so it has no hard edge.
+  The fill is as thin as the track and one solid colour: bars never use a gradient, blur or faded ends.
   Overspent rows stay plain danger, which the neutral bars make easier to spot.
 */
 .soft-bar { position: relative; flex: 1; height: 12px; display: block; }
@@ -1829,8 +1827,5 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 .soft-bar-fill::before {
   content: ""; position: absolute; inset: 4px 0; border-radius: 4px;
   background: color-mix(in srgb, var(--text2) 40%, var(--surface2));
-  filter: blur(1.5px);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 8px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 8px), transparent);
 }
-.soft-bar-fill[data-over]::before { background: var(--danger); filter: none; -webkit-mask-image: none; mask-image: none; }
+.soft-bar-fill[data-over]::before { background: var(--danger); }

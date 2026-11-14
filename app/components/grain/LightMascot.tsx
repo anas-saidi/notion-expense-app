@@ -33,8 +33,6 @@ const FADE = `opacity ${EASE}`;
 
 /** How long a change keeps drawing in still mode: the engine's 420ms morph plus settling. */
 const SETTLE_MS = 900;
-/** How long a reaction (wink, cheer, dip) keeps drawing in still mode. */
-const REACTION_MS = 1400;
 
 /** Status tints the jar uses for a pool spending faster than the month (honey) or overspent (coral). */
 const WARN_HEX = { low: "#e9b949", over: "#e8776c" } as const;
@@ -75,25 +73,15 @@ export function LightMascot({ scope, level, size, spentPct, edge = "wavy", level
   const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   useEffect(() => {
     engine.setTarget(target, now());
-    setFrame(engine.sample(now()));
-    if (rest !== "still" || reduced) return;
-    // Still: animate the change, then stop drawing (no idle loop, no filters re-run at rest).
-    let raf = 0;
-    // Items dropping in need longer to tumble and settle than a level change.
-    const until = performance.now() + SETTLE_MS;
-    const tick = () => { setFrame(engine.sample(now())); if (performance.now() < until) raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    // Still: no frame-by-frame drawing at all. The shape and eyes go straight to their settled pose
+    // (each drawn frame re-ran the light's SVG filters and dropped frames on phones); only the level
+    // fades, in CSS. Live mode (the dev lab) keeps the morph.
+    setFrame(engine.sample(rest === "still" ? now() + SETTLE_MS / 1000 + 2 : now()));
   }, [engine, target, rest]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!reaction) return;
+    // Reactions (wink, cheer, dip) only play in live mode; in still mode they'd need a drawing loop.
+    if (!reaction || rest === "still") return;
     engine.react(reaction.kind, now());
-    if (rest !== "still" || reduced) return;
-    let raf = 0;
-    const until = performance.now() + REACTION_MS;
-    const tick = () => { setFrame(engine.sample(now())); if (performance.now() < until) raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
   }, [engine, reaction?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (rest !== "live" || reduced) return;
@@ -164,7 +152,7 @@ export function LightMascot({ scope, level, size, spentPct, edge = "wavy", level
         {/* Grain as speckles of the light's own deeper colour (never grey): noise becomes
             alpha, so where the light fades out the speckles fade with it and the edge dithers. */}
         <filter id={`${ids}-noise`} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="2" seed="2" stitchTiles="stitch" result="n" />
+          <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="1" seed="2" stitchTiles="stitch" result="n" />
           <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3.2 0 0 0 -1.55" result="dots" />
           <feFlood floodColor={mixHex(a, "#000000", 0.28)} />
           <feComposite in2="dots" operator="in" />

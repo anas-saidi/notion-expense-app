@@ -16,7 +16,7 @@ const PAIR_OFFSET = 51;
  * Anas blue, Salma pink, Couple both side by side (never one blended lavender).
  * Strength follows the liquid level, so a fuller jar glows more. Dev study only.
  */
-export function GrainGlow({ direction, scope, level, edge = "soft", tones, lights = true }: { direction: GlowDirection; scope: BudgetScope; level: number; edge?: GlowEdge; tones?: { anas: Tone; salma: Tone }; /** False when the hero shows no jar (a chart): the room keeps only its wash and grain. */ lights?: boolean }) {
+export function GrainGlow({ direction, scope, level, edge = "soft", tones, lights = true, contained = false }: { direction: GlowDirection; scope: BudgetScope; level: number; edge?: GlowEdge; tones?: { anas: Tone; salma: Tone }; /** False when the hero shows no jar (a chart): the room keeps only its wash and grain. */ lights?: boolean; /** Inside its own surface (the Rebalance workspace): no lift behind the app header, no scroll sink, no sheet edge. */ contained?: boolean }) {
   const blue = "var(--partner-husband)";
   const pink = "var(--partner-wife)";
   const couple = scope === "joint";
@@ -33,12 +33,12 @@ export function GrainGlow({ direction, scope, level, edge = "soft", tones, light
     "--glow-strength": (0.35 + 0.65 * Math.max(0, Math.min(1, level))).toFixed(3),
   } as CSSProperties;
   const glow = useRef<HTMLDivElement>(null);
-  useRoomUnderHeader(direction === "room", glow);
+  useRoomUnderHeader(direction === "room" && !contained, glow);
   return <>
     {edge === "wavy" && <WavyFilter />}
-    <div ref={glow} className="grain-glow" data-direction={direction} data-edge={edge} data-pair={couple || undefined} data-lights={lights ? undefined : "off"} style={style} aria-hidden="true" />
+    <div ref={glow} className="grain-glow" data-direction={direction} data-edge={edge} data-pair={couple || undefined} data-lights={lights ? undefined : "off"} data-contained={contained || undefined} style={style} aria-hidden="true" />
     {/* Phones: the top edge of the content sheet, rising over the bottom of the room (design.md, Light). */}
-    {direction === "room" && <div className="room-sheet-edge" aria-hidden="true" />}
+    {direction === "room" && !contained && <div className="room-sheet-edge" aria-hidden="true" />}
   </>;
 }
 
@@ -57,17 +57,22 @@ function useRoomUnderHeader(active: boolean, glow: RefObject<HTMLDivElement>) {
     const header = document.querySelector<HTMLElement>(".app-header");
     const scroller = header?.closest<HTMLElement>(".app-content") ?? null;
     if (!header || !scroller) return;
+    // Scrolling does almost nothing: it only flips the at-top flag when it actually changes. Writing a
+    // style on every frame (the old hero sink, or the header height on the root) made the browser
+    // recompute the whole hero, mascot filters included, and scrolling lagged.
     let frame = 0;
-    const sync = () => {
+    let atTop: boolean | null = null;
+    const syncTop = () => {
       frame = 0;
-      root.style.setProperty("--room-lift", `${header.offsetHeight}px`);
-      if (scroller.scrollTop <= 2) root.dataset.roomAtTop = ""; else delete root.dataset.roomAtTop;
-      // The hero sinks behind the content sheet: its stage gets the scroll (capped once it's out of view).
-      const stage = glow.current?.parentElement;
-      if (stage) stage.style.setProperty("--room-scroll", String(Math.min(scroller.scrollTop, 1400)));
+      const next = scroller.scrollTop <= 2;
+      if (next === atTop) return;
+      atTop = next;
+      if (next) root.dataset.roomAtTop = ""; else delete root.dataset.roomAtTop;
     };
-    const onScroll = () => { if (!frame) frame = requestAnimationFrame(sync); };
-    const resize = new ResizeObserver(onScroll);
+    const syncLift = () => { root.style.setProperty("--room-lift", `${header.offsetHeight}px`); };
+    const sync = () => { syncLift(); syncTop(); };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(syncTop); };
+    const resize = new ResizeObserver(syncLift);
     resize.observe(header);
     scroller.addEventListener("scroll", onScroll, { passive: true });
     roomsMounted += 1;

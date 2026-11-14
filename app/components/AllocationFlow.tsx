@@ -8,6 +8,11 @@ import { XIcon } from "./ui/icons";
 import { Money, Currency } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { BottomSheet } from "./ui/BottomSheet";
+import { Workspace } from "./ui/Workspace";
+import { GrainGlow } from "./grain/GrainGlow";
+import { PALETTES } from "./grain/palettes";
+import { planningMood } from "./light-mood";
+import "./allocation-workspace.css";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
@@ -68,7 +73,26 @@ type AllocationFlowProps = {
   jarShowsAssigned?: boolean;
   /** A signal on the jar, e.g. thinking while Suggest moves works. */
   jarSignal?: JarSignal | null;
+  /**
+   * Open as a full-screen workspace instead of a sheet (Rebalance): the mascot and the number sit in a
+   * room lit by To assign, the categories on a content sheet below; desktop splits into two panes with
+   * amounts typed inline (design.md, Light).
+   */
+  workspace?: boolean;
 };
+
+/** Matches the desktop breakpoint, for the parts that differ in structure (not just style). */
+function useWide() {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 900px)");
+    const sync = () => setWide(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  return wide;
+}
 
 export function AllocationFlow({
   open,
@@ -96,7 +120,10 @@ export function AllocationFlow({
   jarLevel,
   jarShowsAssigned = false,
   jarSignal = null,
+  workspace = false,
 }: AllocationFlowProps) {
+  const wide = useWide();
+  const [rowDrafts, setRowDrafts] = useState<Record<string, string>>({});
   // Spent-floor per category, snapshotted on first activation.
   // Must NOT be recomputed from activeItem.amount after edits — that shifts the
   // range input's `min` mid-drag and causes a runaway feedback loop.
@@ -188,14 +215,23 @@ export function AllocationFlow({
   // Range math
   const rangeMin = activeItem ? getSpentFloor(activeItem) : 0;
   const rangeMax = activeItem ? Math.max(rangeMin, activeItem.amount + Math.max(0, leftToAssign)) : 0;
-  const updateActiveAmount = (nextAmount: number) => {
-    if (readOnly || !activeItem) return;
+  const updateItemAmount = (target: PlanningAllocationItem, nextAmount: number) => {
+    if (readOnly) return;
     setConfirming(false);
-    const minAmount = getSpentFloor(activeItem);
-    const maxAmount = Math.max(minAmount, activeItem.amount + Math.max(0, leftToAssign));
+    const minAmount = getSpentFloor(target);
+    const maxAmount = Math.max(minAmount, target.amount + Math.max(0, leftToAssign));
     const clampedAmount = Math.min(maxAmount, Math.max(minAmount, Math.round(nextAmount)));
-    active.onChange(active.items.map((item) => (item.categoryId === activeItem.categoryId ? { ...item, amount: clampedAmount } : item)));
+    active.onChange(active.items.map((item) => (item.categoryId === target.categoryId ? { ...item, amount: clampedAmount } : item)));
   };
+  const updateActiveAmount = (nextAmount: number) => { if (activeItem) updateItemAmount(activeItem, nextAmount); };
+  // The workspace's light is the mood of To assign, as on Budget: bright when all is placed, dim with money waiting, coral when over.
+  // While the slider is held the light and the face hold still, then settle once on release: following
+  // every step made the lights flicker for no reason (the money is still moving).
+  const liveMood = availablePool > 0 ? planningMood(assignedBudget + assignedSavings, leftToAssign) : null;
+  const settled = useRef({ mood: liveMood, left: leftToAssign });
+  if (!dragging) settled.current = { mood: liveMood, left: leftToAssign };
+  const mood = settled.current.mood;
+  const faceLeft = settled.current.left;
 
   const selectGroup = (groupKey: BudgetGroupKey) => {
     const nextGroup = groups.find((group) => group.key === groupKey);
@@ -218,8 +254,7 @@ export function AllocationFlow({
     }
   };
 
-  const innerContent = (
-    <>
+  const headerEl = (
         <header className="sheet-header" style={sheetHeaderStyle}>
           <h2 style={sheetTitleStyle}>{title}</h2>
           <button onClick={onCancel} aria-label="Close" style={closeButtonStyle}>
@@ -228,20 +263,20 @@ export function AllocationFlow({
           {!rebalanceMode && <span style={monthLabelFallbackStyle}>{monthLabel}</span>}
           {headerControls ?? <GroupPicker groups={groups} activeGroup={activeGroup} onSelect={selectGroup} />}
         </header>
-
-      <BlurScrollArea style={sheetScrollStyle}>
+  );
+  const balanceEl = (
         <section className="planning-balance" aria-label="Planning balance" style={{ ...balanceHeaderStyle, position: "relative", overflow: "visible" }}>
           {/* The jar fills as money is assigned: full when balanced, worried when over. */}
           {jarScope && (jarItems.length > 0 || jarShowsAssigned) && (() => {
             // Same face vocabulary as every other jar: content ("happy", like a funded Joint)
             // when balanced, not the oversized "excited" eyes nothing else uses.
-            const jarMood = isOver ? "worried" : isBalanced ? "happy" : leftToAssign > 0.5 ? "curious" : "idle";
+            const jarMood = availablePool > 0 && faceLeft < 0 ? "worried" : availablePool > 0 && faceLeft === 0 ? "happy" : faceLeft > 0.5 ? "curious" : "idle";
             const jarStyle = { marginBottom: heroPool ? -8 : 4 };
             // While editing, a smaller jar keeps the active amount and slider in view on a phone.
             const jarSize = heroPool && !readOnly ? 176 : undefined;
             if (jarShowsAssigned) {
               const assignedShare = availablePool > 0 ? Math.max(0, Math.min(1, (availablePool - Math.max(0, leftToAssign)) / availablePool)) : 1;
-              return <MascotTap label="Allocation details"><MascotHero look="light" variant="pool" scope={jarScope} level={assignedShare} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>;
+              return <MascotTap label="Allocation details"><MascotHero look="light" variant="pool" scope={jarScope} level={workspace ? mood?.level ?? assignedShare : assignedShare} warn={workspace ? mood?.warn ?? null : undefined} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>;
             }
             return jarLevel !== undefined ? (
               <MascotTap label="Allocation details"><MascotHero look="light" variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>
@@ -252,7 +287,7 @@ export function AllocationFlow({
           {heroPool && readOnly ? (
             // A closed or future month has nothing to assign: the hero is the pool itself.
             <div style={heroPoolWrapStyle}>
-              <span style={heroPoolLabelStyle}>{poolLabel}</span>
+              <span style={{ ...heroPoolLabelStyle, ...(workspace ? onRoomLabelStyle : null) }}>{poolLabel}</span>
               <span style={heroPoolNumberStyle}>
                 <Money value={availablePool} currency animated />
               </span>
@@ -260,9 +295,9 @@ export function AllocationFlow({
           ) : heroPool ? (
             // The hero is what is left to place; the pool it comes from is a quiet line under it.
             <div style={heroPoolWrapStyle}>
-              <span style={heroPoolLabelStyle}>{isOver ? "Over-assigned" : "Unassigned"}</span>
+              <span style={{ ...heroPoolLabelStyle, ...(workspace ? onRoomLabelStyle : null) }}>{isOver ? "Over-assigned" : "Unassigned"}</span>
               <span style={{ ...heroPoolNumberStyle, color: isOver ? "var(--danger)" : heroPoolNumberStyle.color }}>
-                {isOver && "−"}<Money value={Math.abs(Math.round(leftToAssign))} currency animated={!dragging} />
+                {workspace && isBalanced ? <span style={allAssignedStyle}>All assigned</span> : <>{isOver && "−"}<Money value={Math.abs(Math.round(leftToAssign))} currency animated={!dragging} /></>}
               </span>
               {/* "Unassigned 0" already says it's balanced; only a caller's own note adds anything. */}
               {isBalanced && balancedNote && <div style={heroPoolMetaStyle}>{balancedNote}</div>}
@@ -289,9 +324,8 @@ export function AllocationFlow({
             </div>
           )}
         </section>
-        {readOnlyBanner}
-        {flowPreview}
-
+  );
+  const editorEls = (<>
         {!editorHidden && <section className="planning-studio" aria-label="Budget allocation" style={studioStyle}>
           <div className="planning-scroll-rail planning-category-rail" style={categoryRailStyle} aria-label={`${active.label} categories`}>
             {active.items.map((item) => {
@@ -342,6 +376,8 @@ export function AllocationFlow({
                       setDraftValue(null);
                       event.currentTarget.blur();
                     } else if (event.key === "Escape") {
+                      // Escape cancels the draft only; the workspace stays open.
+                      event.preventDefault();
                       setDraftValue(null);
                       event.currentTarget.blur();
                     }
@@ -357,8 +393,8 @@ export function AllocationFlow({
             </div>
           </div>
         )}
-      </BlurScrollArea>
-
+  </>);
+  const footerEl = (<>
       {activeItem && !readOnly && !editorHidden && (
         <div className="sheet-footer sheet-inset" aria-label="Budget control" style={slimBarPanelStyle}>
           <div onPointerDownCapture={() => setDragging(true)}>
@@ -380,8 +416,85 @@ export function AllocationFlow({
           </button>
         </div>
       )}
+  </>);
+
+  const innerContent = (
+    <>
+      {headerEl}
+      <BlurScrollArea style={sheetScrollStyle}>
+        {balanceEl}
+        {readOnlyBanner}
+        {flowPreview}
+
+        {editorEls}
+      </BlurScrollArea>
+
+      {footerEl}
     </>
   );
+
+  if (workspace) {
+    // Desktop: every category of the group as a row with its amount typed inline (faster than a slider with a mouse).
+    const commitRow = (item: PlanningAllocationItem) => {
+      const draft = rowDrafts[item.categoryId];
+      if (draft === undefined) return;
+      updateItemAmount(item, parseFloat(draft.replace(/[^0-9.]/g, "")) || 0);
+      setRowDrafts(drafts => { const next = { ...drafts }; delete next[item.categoryId]; return next; });
+    };
+    const rowsEl = !editorHidden && (
+      <section className="ws-rows" aria-label={`${active.label} categories`}>
+        {active.items.map(item => {
+          const isActive = item.categoryId === activeItem?.categoryId;
+          return <div key={item.categoryId} className="ws-row" data-active={isActive || undefined} onClick={() => setActiveCategoryId(item.categoryId)}>
+            <CategoryIcon icon={item.icon} categoryName={item.name} size={24} />
+            <span className="ws-row-name">{item.name}</span>
+            <span className="ws-row-meta">{metaLabel} <Money value={item.lastMonthSpent ?? 0} /></span>
+            <input
+              className="ws-row-input"
+              type="text"
+              inputMode="decimal"
+              readOnly={readOnly}
+              aria-label={`Planned amount for ${item.name}`}
+              value={rowDrafts[item.categoryId] ?? fmt(Math.round(item.amount))}
+              onFocus={event => { const input = event.target; setActiveCategoryId(item.categoryId); setRowDrafts(drafts => ({ ...drafts, [item.categoryId]: String(Math.round(item.amount)) })); requestAnimationFrame(() => input.select()); }}
+              onChange={event => { const value = event.target.value; setRowDrafts(drafts => ({ ...drafts, [item.categoryId]: value })); }}
+              onBlur={() => commitRow(item)}
+              onKeyDown={event => {
+                if (event.key === "Enter") { commitRow(item); event.currentTarget.blur(); }
+                else if (event.key === "Escape") { event.preventDefault(); setRowDrafts(drafts => { const next = { ...drafts }; delete next[item.categoryId]; return next; }); event.currentTarget.blur(); }
+              }}
+            />
+          </div>;
+        })}
+        {active.items.length === 0 && <div style={emptyStyle}>No categories found for {active.label}.</div>}
+        {/* The slider belongs to the selected row, so it sits under the list, not in the footer. */}
+        {activeItem && !readOnly && <div className="ws-row-slider" onPointerDownCapture={() => setDragging(true)}>
+          <span className="ws-row-slider-label">Adjust {activeItem.name}</span>
+          <SteppedAmountSlider min={rangeMin} max={rangeMax} value={activeItem.amount} onChange={updateActiveAmount} label={`Adjust planned amount for ${activeItem.name}`} />
+        </div>}
+      </section>
+    );
+    return (
+      <Workspace open={open} onClose={onCancel} label={title}>
+        <div className="ws-alloc" data-wide={wide || undefined}>
+          <section className="ws-room grain-stage" aria-label="Planning balance">
+            {jarScope && <GrainGlow direction="room" scope={jarScope} level={mood?.level ?? 0.7} tones={PALETTES.partner} contained />}
+            {headerEl}
+            <div className="ws-balance">{balanceEl}</div>
+          </section>
+          <div className="ws-main">
+        {readOnlyBanner}
+        {flowPreview}
+            {wide ? rowsEl : editorEls}
+          </div>
+          <div className="ws-footer">
+            {wide && <button type="button" className="ws-cancel" onClick={onCancel}>Cancel</button>}
+            {footerEl}
+          </div>
+        </div>
+      </Workspace>
+    );
+  }
 
   return (
     <BottomSheet open={open} onClose={onCancel} showHandle label={title} desktopHeight="fill" detent="content" maxHeight="calc(100dvh - max(env(safe-area-inset-top, 0px), 20px))" panelStyle={sheetPanelStyle} contentStyle={sheetContentStyle} zIndex={80}>
@@ -461,6 +574,10 @@ const heroPoolLabelStyle: CSSProperties = {
   
   color: "var(--muted)",
 };
+/** Labels sitting on the room: --text2 keeps AA on the tint (muted falls under it). */
+/** A finished state in words, never a light next to a bare 0 (design.md, Light). */
+const allAssignedStyle: CSSProperties = { display: "block", fontSize: "0.5em", lineHeight: 1.8, letterSpacing: "-0.01em" };
+const onRoomLabelStyle: CSSProperties = { color: "var(--text2)" };
 const heroPoolMetaStyle: CSSProperties = { display: "grid", justifyItems: "center", gap: 4, marginTop: 8 };
 const heroPoolNumberStyle: CSSProperties = {
   fontSize: "clamp(52px, 14vw, 80px)",

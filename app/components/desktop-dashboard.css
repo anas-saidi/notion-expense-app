@@ -57,17 +57,30 @@
   .home-balance-panel .contribution-entry { margin-top:auto; padding:16px 0 0; }
   .home-balance-panel .contribution-entry-title { font-size:13px; }
   .home-budget-context { display:flex; flex-direction:column; min-width:0; padding:var(--desktop-panel-padding); border-radius:var(--radius-card); background:var(--surface); box-shadow:var(--elevation-card); }
-  .desktop-month-budget { padding:0; background:transparent; box-shadow:none; justify-content:flex-start; gap:16px; flex:0 0 auto; }
+  .desktop-month-budget { padding:0; background:transparent; box-shadow:none; justify-content:flex-start; gap:16px; flex:1 1 auto; }
   .desktop-budget-spent { display:grid; gap:8px; }
-  .desktop-budget-spent > span { color:var(--text2); font-size:13px; }
+  .desktop-budget-spent > span { color:var(--text2); font-size:14px; line-height:20px; }
+  .desktop-budget-spent > span b { color:var(--text); font-weight:600; }
   .desktop-budget-spent > strong { color:var(--text); font-size:clamp(28px,3vw,40px); line-height:1.1; font-weight:500; letter-spacing:-.02em; }
   .desktop-budget-spent[data-over] { --money-decimal-color:var(--danger); }
   .desktop-budget-spent[data-over] > strong { color:var(--danger); }
   .desktop-spending-track { display:block; overflow:hidden; background:var(--track); border-radius:4px; height:4px; }
   .desktop-spending-track > span { display:block; height:100%; border-radius:inherit; background:var(--select-color); }
   .desktop-budget-comparison { display:grid; gap:8px; }
-  .desktop-budget-comparison-track { display:flex; height:12px; overflow:hidden; background:var(--track); border-radius:4px; }
-  .desktop-budget-within { background:var(--text2); }
+  .desktop-budget-comparison-track { position:relative; display:flex; height:12px; overflow:hidden; background:var(--track); border-radius:6px; }
+  /* Bars are one solid colour, never a gradient: the scope's core colour (ink for Couple). */
+  .desktop-budget-within { background:var(--budget-fill, var(--text2)); }
+  /* Ink with a thin surface outline, so it reads on the filled bar and on the empty track alike. */
+  .desktop-budget-pace { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--text); box-shadow:0 0 0 1.5px var(--surface); }
+  .desktop-budget-pace-label { color:var(--text2); font-size:12px; line-height:16px; }
+  .desktop-budget-where { margin-top:auto; display:grid; gap:12px; padding-top:20px; }
+  .desktop-budget-where-title { margin:0; color:var(--text2); font-size:13px; line-height:20px; font-weight:600; }
+  .desktop-budget-where-list { display:grid; gap:14px; margin:0; padding:0; list-style:none; }
+  .desktop-budget-where-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 12px; align-items:center; }
+  .desktop-budget-where-name { display:flex; align-items:center; gap:8px; min-width:0; color:var(--text); font-size:14px; line-height:20px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .desktop-budget-where-list strong { color:var(--text); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .desktop-budget-where-track { grid-column:1 / -1; display:block; height:4px; overflow:hidden; border-radius:2px; background:var(--track); }
+  .desktop-budget-where-track > span { display:block; height:100%; border-radius:inherit; background:var(--budget-fill, var(--text2)); }
   .desktop-budget-excess { background:var(--danger); box-shadow:inset 2px 0 var(--surface); }
   .desktop-budget-comparison-labels { display:grid; grid-template-columns:1fr; gap:12px; margin:0; }
   .desktop-budget-comparison-labels > div { min-width:0; }
@@ -102,7 +115,7 @@
 }
 
 @media (min-width:1200px) {
-  .desktop-top-spending { display:block; }
+  /* Most spent now lives in the month card beside the hero, so the separate card stays hidden. */
 }
 
 @media (min-width:1200px) {
@@ -198,6 +211,8 @@
   .budget-overview-context { align-self:start; }
   /* Icon, message and action on one line: the action sits at the end instead of wrapping underneath. */
   .budget-category-workspace > .budget-desktop-controls { padding:0; min-height:44px; }
+  /* Desktop only: each section (Savings, Obligations, Wants, Frozen) is its own card, like Home's panels. Phones keep one sheet. */
+  .budget-category-workspace .budget-desktop-group { padding:16px var(--desktop-panel-padding) 12px; background:var(--surface); border-radius:var(--radius-card); box-shadow:var(--elevation-card); }
 }
 @media (min-width:1100px) {
   #panel-budget { align-items:start; column-gap:var(--desktop-panel-gap); }

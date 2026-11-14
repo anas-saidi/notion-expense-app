@@ -303,6 +303,8 @@ export function RebalanceSheet({
 
   return (
     <AllocationFlow
+      // Rebalance is a big operation: a full-screen workspace, not a sheet (design.md, Light).
+      workspace
       jarScope={budgetScope}
       jarShowsAssigned
       jarSignal={thinking ? { kind: "thinking", label: "Finding moves" } : null}

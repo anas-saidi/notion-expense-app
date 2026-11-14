@@ -48,7 +48,9 @@
 .screen-hero-supporting { color: var(--muted); font-size: 13px; line-height: 20px; text-align: center; }
 .screen-hero-supporting > p { margin: 0; }
 .screen-hero-summary, .screen-hero-actions { width: 100%; min-width: 0; }
-.screen-hero-summary .summary { --summary-size: var(--hero-summary-size); margin: 0; line-height: 1.4; text-align: left; }
+/* Centred like the light and the number above it, on every width. */
+.screen-hero-summary .summary { --summary-size: var(--hero-summary-size); margin: 0; line-height: 1.4; text-align: center; }
+.screen-hero-summary .skeleton { margin-inline: auto; }
 .screen-hero-actions { display: grid; gap: 12px; }
 .screen-hero-actions:empty { display: none; }
 .screen-hero-actions .balance-check-notices { margin-bottom: 0 !important; }
@@ -76,10 +78,6 @@
 .reflect-hero-chart { width: 100%; min-width: 0; box-sizing: border-box; padding: var(--hero-chart-top) 0 12px; height: 100%; }
 
 .reflect-hero-visual[data-view="activity"] { height: var(--hero-activity-size); }
-@media (max-width: 899px) {
-  .screen-hero-summary .summary { text-align: center; }
-  .screen-hero-summary .skeleton { margin-inline: auto; }
-}
 
 /* Hero taps reveal detail; the visual stays anchored to its shared frame. */
 @media (hover: hover) and (pointer: fine) {
