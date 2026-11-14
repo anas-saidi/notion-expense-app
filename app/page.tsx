@@ -8,6 +8,8 @@ import { fetchApiJson, fetchMonthlyData, monthlyDataUrl, readSavedApiJson, fetch
 import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
+import { Button } from "./components/ui/Button";
+import "./components/screen-components.css";
 import { toastDuration, type ToastMessage, type ToastOptions } from "./components/ui/Toast";
 import { switchScreen } from "./components/ui/screen-switch";
 import { BillsSection } from "./components/BillsSection";
@@ -1252,7 +1254,7 @@ export default function App() {
   if (!mounted || loading) return <AppLoadingSkeleton recovery={recovery} />;
 
   if (loadError) {
-    return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 20, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 22 }}>Could not load your finances</h1><p style={{ margin: "10px 0 18px", color: "var(--text2)" }}>Balances unchanged. Check your connection and retry.</p><button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ minHeight: 48, padding: "0 18px", border: 0, borderRadius: "var(--radius-control)", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 800 }}>Retry</button></section></main>;
+    return <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24, background: "var(--bg)" }}><section role="alert" style={{ maxWidth: 420, padding: 24, borderRadius: "var(--radius-card)", background: "var(--surface)", boxShadow: "var(--elevation-card)" }}><h1 style={{ fontSize: 20 }}>Could not load your finances</h1><p style={{ margin: "8px 0 16px", color: "var(--text2)" }}>Balances unchanged. Check your connection and retry.</p><Button variant="primary" size="regular" onClick={() => setLoadAttempt(value => value + 1)}>Retry</Button></section></main>;
   }
 
   const parsedAmount = amount ? evalExpr(amount) : 0;
@@ -1317,7 +1319,7 @@ export default function App() {
       {recovery}
       {refreshState !== "idle" && (tab !== "history" || refreshState === "stale") && (
         <div role="status" aria-live="polite" style={refreshStatusStyle}>
-          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>{refreshError ?? "Could not refresh"}</span> <button type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry</button></>}
+          {refreshState === "updating" ? <SkeletonRegion label="Updating balances"><Skeleton style={{ width: 84, height: 10 }} /></SkeletonRegion> : <><span>{refreshError ?? "Could not refresh"}</span> <Button variant="quiet" size="compact" onClick={() => setLoadAttempt(value => value + 1)}>Retry</Button></>}
         </div>
       )}
       {showManageScreen && (
@@ -1815,13 +1817,13 @@ export default function App() {
       /></DeferredMount>
 
       {draftOffer && !showAddModal && (
-        <div role="dialog" aria-modal="true" aria-label="Restore expense draft" style={draftOverlayStyle}>
+        <div role="dialog" aria-modal="true" aria-label="Restore expense draft" className="draft-restore-overlay">
           <div style={draftDialogStyle}>
             <h2 style={{ fontSize: 20 }}>Restore unfinished expense?</h2>
             <p style={{ color: "var(--text2)", lineHeight: 1.45 }}>A draft from {new Date(draftOffer.timestamp).toLocaleDateString()} is available. It will not be submitted automatically.</p>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={() => { try { localStorage.removeItem(`expenseDraft:v1:${mode}`); } catch {} setDraftOffer(null); }} style={draftSecondaryButtonStyle}>Discard</button>
-              <button type="button" onClick={() => { setAmount(draftOffer.amount); setName(draftOffer.name); setAccountId(accounts.some(a => a.id === draftOffer.accountId) ? draftOffer.accountId : ""); setCategoryId(categories.some(c => c.id === draftOffer.categoryId) ? draftOffer.categoryId : ""); setDate(draftOffer.date || today()); setRecurringRepeat(draftOffer.repeat === "Monthly" || draftOffer.repeat === "Yearly" ? draftOffer.repeat : "None"); setBudgetScope(draftOffer.scope); setDraftOffer(null); setAddInForm(true); setShowAddModal(true); }} style={draftPrimaryButtonStyle}>Restore</button>
+              <Button variant="secondary" size="regular" onClick={() => { try { localStorage.removeItem(`expenseDraft:v1:${mode}`); } catch {} setDraftOffer(null); }} style={{ flex: 1 }}>Discard</Button>
+              <Button variant="primary" size="regular" onClick={() => { setAmount(draftOffer.amount); setName(draftOffer.name); setAccountId(accounts.some(a => a.id === draftOffer.accountId) ? draftOffer.accountId : ""); setCategoryId(categories.some(c => c.id === draftOffer.categoryId) ? draftOffer.categoryId : ""); setDate(draftOffer.date || today()); setRecurringRepeat(draftOffer.repeat === "Monthly" || draftOffer.repeat === "Yearly" ? draftOffer.repeat : "None"); setBudgetScope(draftOffer.scope); setDraftOffer(null); setAddInForm(true); setShowAddModal(true); }} style={{ flex: 1 }}>Restore</Button>
             </div>
           </div>
         </div>
@@ -1832,11 +1834,8 @@ export default function App() {
 }
 
 
-const refreshStatusStyle: CSSProperties = { minHeight: 20, padding: "2px 18px 0", textAlign: "right", color: "var(--muted)", fontSize: 12 };
-const draftOverlayStyle: CSSProperties = { position: "fixed", inset: 0, zIndex: 220, background: "rgba(0,0,0,.35)", display: "grid", placeItems: "center", padding: 20 };
-const draftDialogStyle: CSSProperties = { width: "min(100%, 420px)", padding: 20, borderRadius: "var(--radius-sheet)", background: "var(--surface)", display: "grid", gap: 16 };
-const draftSecondaryButtonStyle: CSSProperties = { flex: 1, minHeight: 48, borderRadius: "var(--radius-control)", border: "1px solid var(--border2)", background: "var(--surface)", color: "var(--text)", fontWeight: 700 };
-const draftPrimaryButtonStyle: CSSProperties = { ...draftSecondaryButtonStyle, border: 0, background: "var(--accent)", color: "var(--accent-ink)" };
+const refreshStatusStyle: CSSProperties = { minHeight: 20, padding: "2px 16px 0", textAlign: "right", color: "var(--muted)", fontSize: 12 };
+const draftDialogStyle: CSSProperties = { width: "min(100%, 420px)", padding: 24, borderRadius: "var(--radius-sheet)", background: "var(--surface)", display: "grid", gap: 16 };
 
 /** Load sheet code on first use, then preserve drafts and exit animations. */
 function DeferredMount({ active, children }: { active: boolean; children: React.ReactNode }) {

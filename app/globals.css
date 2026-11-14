@@ -2,7 +2,7 @@
 @media (hover: hover) and (pointer: fine) {
   .budget-row-icon:hover {
     transform: scale(1.1) rotate(-6deg);
-    transition: transform 0.15s ease-out;
+    transition: transform var(--motion-fast) var(--ease-standard);
   }
 }
 
@@ -20,7 +20,7 @@
   );
   background-size: 800px 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -262,7 +262,7 @@ body {
   font-feature-settings: "calt";
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
-  transition: background-color 0.4s ease, color 0.4s ease;
+  transition: background-color var(--motion-slow) var(--ease-standard), color var(--motion-slow) var(--ease-standard);
 }
 
 .app-shell-root {
@@ -282,12 +282,12 @@ input, select, button, textarea { font-family: inherit; }
 
 button {
   transition:
-    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    color 0.2s ease,
-    filter 0.2s ease;
+    transform var(--motion-standard) var(--ease-standard),
+    box-shadow var(--motion-standard) var(--ease-standard),
+    border-color var(--motion-standard) var(--ease-standard),
+    background-color var(--motion-standard) var(--ease-standard),
+    color var(--motion-standard) var(--ease-standard),
+    filter var(--motion-standard) var(--ease-standard);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -370,17 +370,17 @@ button:not(:disabled):active {
   }
 
   .planning-studio {
-    gap: 9px !important;
+    gap: var(--space-2) !important;
   }
 
   .planning-group-rail {
-    gap: 7px !important;
+    gap: var(--space-2) !important;
     padding-bottom: 1px !important;
   }
 
   .planning-category-rail {
     gap: 8px !important;
-    padding-bottom: 3px !important;
+    padding-bottom: var(--space-1) !important;
   }
 
   .planning-amount-canvas {
@@ -395,9 +395,9 @@ button:not(:disabled):active {
   }
 
   .planning-dial-panel {
-    gap: 11px !important;
-    padding: 18px 14px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
-    border-radius: 20px 0 0 0 !important;
+    gap: var(--space-3) !important;
+    padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: var(--radius-sheet) 0 0 0 !important;
   }
 
   .planning-dial-range {
@@ -408,13 +408,13 @@ button:not(:disabled):active {
 @media (max-height: 720px) and (max-width: 430px) {
 
   .planning-balance {
-    gap: 6px !important;
+    gap: var(--space-1) !important;
   }
 
   .planning-amount-canvas {
     min-height: 116px !important;
     border-radius: 0 !important;
-    padding-block: 10px !important;
+    padding-block: var(--space-2) !important;
   }
 
   .planning-amount-input {
@@ -423,7 +423,7 @@ button:not(:disabled):active {
 
   .planning-dial-panel {
     gap: 8px !important;
-    border-radius: 20px 0 0 0 !important;
+    border-radius: var(--radius-sheet) 0 0 0 !important;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
@@ -436,7 +436,7 @@ button:not(:disabled):active {
   }
 
   .planning-dial-panel {
-    border-radius: 20px 0 0 0 !important;
+    border-radius: var(--radius-sheet) 0 0 0 !important;
   }
 
   .planning-amount-input {
@@ -595,7 +595,7 @@ html {
   }
 }
 .rebalance-btn-icon {
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-fast) var(--ease-standard);
 }
 
 @keyframes budgetBarIn {
@@ -739,12 +739,12 @@ html {
 
 .history-pill {
   display: grid;
-  gap: 5px;
-  padding: 10px 10px 9px;
-  border-radius: 12px;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
   background: var(--surface2);
   min-width: 0;
-  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--motion-fast) var(--ease-standard);
 }
 
 .history-pill strong {
@@ -761,7 +761,7 @@ html {
   overflow: hidden;
   background: transparent;
   border-radius: 0;
-  padding: 10px 2px;
+  padding: var(--space-3) 2px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -771,9 +771,9 @@ html {
   animation: txRowIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--stagger, 0ms);
   transition:
-    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.15s ease,
-    box-shadow 0.18s ease;
+    transform var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-standard) var(--ease-standard);
 }
 
 .home-txn-list > .tx-row:last-child,
@@ -818,12 +818,12 @@ html {
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
-  color: #fff;
+  color: var(--accent-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: opacity var(--motion-standard) ease, transform var(--motion-fast) ease;
+  transition: opacity var(--motion-standard) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 }
 
 .swipe-delete-action:active {
@@ -841,7 +841,7 @@ html {
 /* ── FAB (add button) ─────────────────────────────────────── */
 
 .fab-add {
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  transition: transform var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -853,7 +853,7 @@ html {
 
 .fab-add:active {
   transform: scale(0.94);
-  transition-duration: 0.08s;
+  transition-duration: var(--motion-fast);
 }
 
 .fab-add:focus-visible {
@@ -868,7 +868,7 @@ html {
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
-  padding: 0 var(--app-content-gutter) calc(104px + env(safe-area-inset-bottom, 0px));
+  padding: 0 var(--app-content-gutter) calc(var(--space-8) * 3 + var(--space-2) + env(safe-area-inset-bottom, 0px));
 }
 
 .app-header {
@@ -922,7 +922,7 @@ html { scrollbar-gutter: stable; }
   border-radius: 999px;
   background: var(--surface2);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--type-label);
   font-weight: 600;
   cursor: pointer;
 }
@@ -975,17 +975,17 @@ html { scrollbar-gutter: stable; }
   border-radius: var(--radius-control);
 }
 
-/* Section heading base (design.md: 12px sentence-case muted label). Screen rules below may adjust it. */
-.section-label { margin:0; font-size:12px; line-height:16px; font-weight:500; color:var(--muted); letter-spacing:0; text-transform:none; }
+/* Section heading base (design.md: Label 13/16, sentence-case, muted). Screen rules below may adjust it. */
+.section-label { margin:0; font-size:var(--type-label); line-height:16px; font-weight:600; color:var(--muted); letter-spacing:0; text-transform:none; }
 
 @media (max-width: 600px) {
   .home-recent-header {
-    margin-bottom: 14px !important;
+    margin-bottom: var(--space-4) !important;
   }
 
   .home-recent-header .section-label {
-    font-size: 13px !important;
-    letter-spacing: 0.8px !important;
+    font-size: var(--type-label) !important;
+    letter-spacing: 0 !important;
   }
 
 }
@@ -1000,10 +1000,10 @@ html { scrollbar-gutter: stable; }
 
 .app-top-action {
   transition:
-    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.18s ease;
+    transform var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-standard) var(--ease-standard);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1090,10 +1090,10 @@ html { scrollbar-gutter: stable; }
   cursor: pointer;
   position: relative;
   transition:
-    color 0.2s ease,
-    background-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+    color var(--motion-standard) var(--ease-standard),
+    background-color var(--motion-standard) var(--ease-standard),
+    box-shadow var(--motion-standard) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .app-nav-btn[aria-selected="true"] {
@@ -1194,13 +1194,13 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
 
   /* Transaction rows: more comfortable padding on desktop */
   .home-txn-row {
-    padding: 18px 20px !important;
-    border-radius: 16px !important;
+    padding: var(--space-4) var(--space-6) !important;
+    border-radius: var(--radius-card) !important;
   }
 
   /* Section headers: a bit more breathing room */
   .home-section-hdr {
-    margin-bottom: 14px !important;
+    margin-bottom: var(--space-4) !important;
   }
 
   /* Sidebar nav button hover state */
@@ -1222,7 +1222,7 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     margin-left: var(--app-sidebar-width);
     width: var(--app-desktop-content-width);
     max-width: 1100px;
-    padding-bottom: 64px;
+    padding-bottom: 48px;
     padding-left: 48px;
     padding-right: 48px;
     padding-top: calc(var(--safe-top) + 48px);
@@ -1269,7 +1269,7 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     max-width: none;
     height: 100%;
     gap: 2px;
-    padding: 0 10px;
+    padding: 0 var(--space-2);
   }
   .app-nav-btn {
     flex: none;
@@ -1277,9 +1277,9 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     justify-content: flex-start;
     gap: 12px;
     min-height: 48px;
-    padding: 11px 14px;
+    padding: var(--space-3) var(--space-4);
     border-left: none;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
   }
   .app-nav-btn[aria-selected="true"] {
     background: transparent;
@@ -1319,11 +1319,6 @@ html[data-theme="dark"] .app-nav-btn[aria-selected="true"] {
     text-transform: none !important;
   }
 
-  /* Section divider labels: 11px → 12px */
-  .section-label {
-    font-size: 12px !important;
-  }
-
   /* Page transaction/bill rows: 13px → 15px, matching Budget and Reflect names.
      Scoped to .app-content so sheets (portaled to body) keep their size. */
   .app-content .tx-row-title {
@@ -1346,7 +1341,7 @@ button[aria-label^="Close" i] {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 140ms ease, background-color 140ms ease;
+  transition: transform var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard);
 }
 
 .sheet-close-button:active,
@@ -1367,7 +1362,7 @@ button[aria-label^="Close" i]:focus-visible {
 .insights-controls {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 /* History section: consistent spacing */
@@ -1383,8 +1378,8 @@ button[aria-label^="Close" i]:focus-visible {
   flex: 0 0 auto;
   width: 30px;
   height: 30px;
-  margin-top: -3px;
-  border-radius: 10px;
+  margin-top: calc(-1 * var(--space-1));
+  border-radius: var(--radius-control);
   background: var(--surface2);
   color: var(--text2);
 }
@@ -1404,7 +1399,7 @@ button[aria-label^="Close" i]:focus-visible {
 
   /* History: larger section gap */
   .insights-history {
-    gap: 20px;
+    gap: var(--space-6);
   }
 }
 
@@ -1506,7 +1501,7 @@ button[aria-label^="Close" i]:focus-visible {
   .budget-col {
     display: block;
     text-align: right;
-    font-size: 14px;
+    font-size: var(--type-label);
     font-weight: 500;
     color: var(--text2);
     font-variant-numeric: tabular-nums;
@@ -1519,7 +1514,7 @@ button[aria-label^="Close" i]:focus-visible {
     display: grid;
     grid-template-columns: minmax(0, 1fr) repeat(3, var(--budget-col-width));
     gap: 12px;
-    padding: 8px 24px 6px 10px;
+    padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
     border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
     font-size: 12px;
     font-weight: 700;
@@ -1572,12 +1567,7 @@ button[aria-label^="Close" i]:focus-visible {
 /* Bottom sheets use an opaque surface; never let the backdrop tint the panel. */
 .bottom-sheet-frame,
 .bottom-sheet-panel {
-  background-color: #fff !important;
-}
-
-html[data-theme="dark"] .bottom-sheet-frame,
-html[data-theme="dark"] .bottom-sheet-panel {
-  background-color: #161816 !important;
+  background-color: var(--surface) !important;
 }
 
 /* Shared single-choice and calendar controls. */
@@ -1587,13 +1577,12 @@ html[data-theme="dark"] .bottom-sheet-panel {
 .field-input::placeholder { color: var(--muted); }
 .date-picker-anchor { position: relative; display: block; min-width: 0; }
 .date-picker-trigger { justify-content: flex-start; white-space: nowrap; }
-.date-picker-trigger.composer-picker-chip { width: auto; min-height: 44px; padding: 0 12px !important; border-color: color-mix(in srgb, var(--border) 44%, transparent) !important; border-radius: 999px !important; font-size: 13px !important; font-weight: 600; }
 .date-picker-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.date-picker-chevron { margin-left: auto; color: var(--muted); transition: transform 180ms ease; }
+.date-picker-chevron { margin-left: auto; color: var(--muted); transition: transform var(--motion-standard) var(--ease-standard); }
 .date-picker-chevron--open { transform: rotate(180deg); }
 .date-picker-native-input { position: absolute; inset: auto 0 0 auto; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .picker-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 15px; }
-.picker-heading button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text2); font-size: 24px; cursor: pointer; }
+.picker-heading button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text2); font-size: var(--type-title); cursor: pointer; }
 .picker-body { max-height: min(440px, calc(100dvh - 104px)); overflow: auto; overscroll-behavior: contain; }
 .picker-options { padding: 8px; max-height: 320px; overflow: auto; }
 .picker-option { width: 100%; min-height: 48px !important; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px !important; border: 0; border-radius: var(--radius-control); background: transparent !important; box-shadow: none !important; color: var(--text); text-align: left; font-size: 15px; cursor: pointer; }
@@ -1604,7 +1593,7 @@ html[data-theme="dark"] .bottom-sheet-panel {
 .date-calendar { padding: 8px; }
 .date-month { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .date-calendar button { min-height: 44px; min-width: 36px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text); cursor: pointer; }
-.date-month { margin: 0 0 4px; font-size: 14px; }
+.date-month { margin: 0 0 4px; font-size: var(--type-label); }
 .date-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 2px; text-align: center; }
 .month-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; text-align: center; }
 .date-grid > span { color: var(--muted); font-size: 12px; padding: 4px 0; }
@@ -1614,7 +1603,7 @@ html[data-theme="dark"] .bottom-sheet-panel {
 .date-grid button[aria-current="date"][aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .month-grid button[aria-current="date"][aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
 .date-calendar button:disabled { opacity: .35; cursor: default; }
-.transaction-type { min-width: 112px; height: 40px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 650; cursor: pointer; transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease; }
+.transaction-type { min-width: 112px; height: 40px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: var(--type-label); font-weight: 650; cursor: pointer; transition: background var(--motion-standard) var(--ease-standard), color var(--motion-standard) var(--ease-standard), box-shadow var(--motion-standard) var(--ease-standard); }
 .transaction-type[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--elevation-card); }
 .transaction-type--expense[aria-selected="true"] svg { color: var(--danger); }
 .transaction-type--income[aria-selected="true"] svg { color: var(--success); }
@@ -1630,7 +1619,7 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   .home-desktop-panels { display:grid; grid-template-columns:minmax(0, 0.85fr) minmax(0, 1.15fr); align-items:start; gap:24px; }
   .home-bills-panel, .home-content { display:grid; align-content:start; gap:24px; min-width:0; }
   .home-bills-panel > *, .home-content > section { min-width:0; }
-  .home-content > section { background:var(--surface); border-radius:16px; box-shadow:var(--elevation-card); padding:20px; }
+  .home-content > section { background:var(--surface); border-radius:var(--radius-card); box-shadow:var(--elevation-card); padding:var(--space-6); }
   .home-txn-list { grid-template-columns:1fr !important; }
   .reflect-desktop-panels { display:grid; grid-template-columns:minmax(240px, 0.8fr) minmax(0, 1.2fr); gap:24px; align-items:start; }
   .reflect-desktop-overview, .reflect-desktop-categories { min-width:0; background:var(--surface); border-radius:16px; box-shadow:var(--elevation-card); padding:24px; }
@@ -1640,24 +1629,24 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 @media (min-width:900px) {
   .account-desktop-layout { grid-template-columns:minmax(230px, 0.8fr) minmax(0, 1.2fr); align-items:start; gap:24px !important; padding:24px !important; }
   .account-desktop-header { grid-column:1 / -1; }
-  .account-desktop-overview, .account-desktop-activity { display:grid; gap:20px; min-width:0; align-content:start; }
-  .account-desktop-overview { background:var(--surface2); border-radius:16px; padding:20px; }
+  .account-desktop-overview, .account-desktop-activity { display:grid; gap:var(--space-6); min-width:0; align-content:start; }
+  .account-desktop-overview { background:var(--surface2); border-radius:var(--radius-card); padding:var(--space-6); }
   .account-desktop-activity { padding:8px 0; }
 }
 
 /* Accounts on wide screens: list and detail in one panel, the selected account open beside the list. */
 .manage-list-pane { display:grid; align-content:start; gap:32px; min-width:0; }
 .manage-screen[data-wide] { grid-template-columns:300px minmax(0, 1fr); align-items:stretch; gap:0 !important; padding:0 !important; min-height:min(720px, calc(100dvh - 40px)); }
-.manage-screen[data-wide] .manage-list-pane { gap:24px; padding:20px 16px 24px 20px; border-right:1px solid var(--border); }
-.manage-screen[data-wide] .manage-account-row { padding-inline:10px !important; border-radius:12px; }
+.manage-screen[data-wide] .manage-list-pane { gap:24px; padding:var(--space-6) var(--space-4); border-right:1px solid var(--border); }
+.manage-screen[data-wide] .manage-account-row { padding-inline:var(--row-bleed) !important; border-radius:var(--radius-control); }
 .manage-screen[data-wide] .manage-account-row[aria-current="true"] { background:var(--surface2) !important; }
 .manage-detail-pane { min-width:0; }
 
 .desktop-nav-actions { display:none; }
 @media (min-width:900px) {
   .app-header-actions { display:none !important; }
-  .desktop-nav-actions { display:flex; flex-direction:column; gap:2px; padding:24px 10px 0; pointer-events:auto; }
-  .desktop-nav-action { display:flex; align-items:center; gap:12px; min-height:48px; width:100%; padding:11px 14px; border:0; border-radius:12px; background:transparent; color:var(--muted); font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+  .desktop-nav-actions { display:flex; flex-direction:column; gap:2px; padding:var(--space-6) var(--space-2) 0; pointer-events:auto; }
+  .desktop-nav-action { display:flex; align-items:center; gap:12px; min-height:48px; width:100%; padding:var(--space-3) var(--space-4); border:0; border-radius:var(--radius-control); background:transparent; color:var(--muted); font:inherit; font-size:13px; text-align:left; cursor:pointer; }
   .desktop-nav-action:hover { background:var(--surface2); color:var(--text2); }
   .desktop-nav-action:focus-visible { outline:2px solid var(--focus-ring); outline-offset:2px; }
   .desktop-nav-action:disabled { opacity:.45; cursor:not-allowed; }
@@ -1726,7 +1715,7 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 }
 .couple-picker-person, .couple-picker-join {
   height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer;
-  border-radius: 22px; -webkit-tap-highlight-color: transparent;
+  border-radius: 999px; -webkit-tap-highlight-color: transparent;
 }
 .couple-picker-person { width: 44px; display: grid; place-items: center; }
 .couple-picker-join { width: 16px; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -1736,7 +1725,7 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   on the light's own curve; letting go early lets them settle back. A tap into Couple plays a short
   pull, leaving Couple a short drift apart. Motion lives on the face button; the art keeps its scale.
 */
-.couple-picker-person { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+.couple-picker-person { transition: transform var(--motion-standard) var(--ease-standard); }
 .couple-picker[data-pulling] .couple-picker-person { transition: transform 500ms cubic-bezier(0.33, 0, 0.2, 1); }
 .couple-picker[data-pulling] .couple-picker-person[data-side="start"] { transform: translateX(9px); }
 .couple-picker[data-pulling] .couple-picker-person[data-side="end"] { transform: translateX(-9px); }
@@ -1760,7 +1749,7 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
 .couple-picker-person { position: relative; }
 .couple-picker-art {
   display: inline-flex; pointer-events: none;
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+  transition: transform var(--motion-standard) var(--ease-standard), opacity var(--motion-standard) var(--ease-standard);
 }
 .couple-picker-person:not([data-included]) .couple-picker-art { opacity: .45; transform: scale(.8); }
 @media (hover: hover) and (pointer: fine) {
@@ -1785,10 +1774,10 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   Overspent rows stay plain danger, which the neutral bars make easier to spot.
 */
 .soft-bar { position: relative; flex: 1; height: 12px; display: block; }
-.soft-bar::before { content: ""; position: absolute; inset: 4px 0; border-radius: 4px; background: var(--surface2); }
+.soft-bar::before { content: ""; position: absolute; inset: 4px 0; border-radius: 999px; background: var(--surface2); }
 .soft-bar-fill { position: absolute; inset: 0 auto 0 0; min-width: 10px; display: block; }
 .soft-bar-fill::before {
-  content: ""; position: absolute; inset: 4px 0; border-radius: 4px;
+  content: ""; position: absolute; inset: 4px 0; border-radius: 999px;
   background: color-mix(in srgb, var(--text2) 40%, var(--surface2));
 }
 .soft-bar-fill[data-over]::before { background: var(--danger); }

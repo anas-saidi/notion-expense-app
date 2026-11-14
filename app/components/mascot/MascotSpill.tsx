@@ -165,7 +165,7 @@ const detailsStyle: CSSProperties = {
   // A little air under the jar so the line doesn't read as stuck to it.
   paddingTop: 8,
   whiteSpace: "nowrap",
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 600,
   color: "var(--text2)",
   fontVariantNumeric: "tabular-nums",

@@ -22,7 +22,7 @@ export function PendingBalanceChecks({ error, paused = false, loading, onRetry }
   error: string | null; paused?: boolean; loading: boolean; onRetry: () => void;
 }) {
   if (!error) return null;
-  return <section className="balance-check-notices" aria-label="Balance checks" style={{ display: "grid", gap: 12, marginBottom: 20 }}>
+  return <section className="balance-check-notices" aria-label="Balance checks" style={{ display: "grid", gap: 12, marginBottom: 24 }}>
     {paused
       ? <Banner desktopInline tone="neutral" role="status" compact>{error}</Banner>
       : <Banner desktopInline tone="warning" role="alert" compact action={<Button variant="quiet" size="compact" onClick={onRetry} disabled={loading}>Retry</Button>}>{error}</Banner>}

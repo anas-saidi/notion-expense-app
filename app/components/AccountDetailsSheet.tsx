@@ -17,6 +17,7 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Banner } from "./ui/Banner";
 import { Button } from "./ui/Button";
+import "./sheet-components.css";
 import { ScreenChip } from "./ui/ScreenChip";
 import { EmptyState } from "./ui/EmptyState";
 import { LiquidSegments } from "./ui/LiquidGlass";
@@ -446,7 +447,7 @@ export function AccountDetailsSheet({
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 16 }} animate={reducedMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
             <div style={reconcileHeaderStyle}>
-              <button type="button" ref={reconcileBackRef} onClick={closeReconcile} aria-label={`Back to ${account.label}`} style={reconcileBackStyle}><ChevronLeftIcon size={20} /></button>
+              <button type="button" ref={reconcileBackRef} onClick={closeReconcile} aria-label={`Back to ${account.label}`} className="sheet-icon-button"><ChevronLeftIcon size={20} /></button>
               <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
                 <h3 style={reconcileTitleStyle}>Check balance</h3>
                 {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
@@ -567,7 +568,7 @@ export function AccountDetailsSheet({
                         type="button"
                         onClick={() => undoAddedTxn(t.id)}
                         aria-label={`Remove ${t.name}`}
-                        style={undoBtnStyle}
+                        className="sheet-icon-button sheet-icon-button--muted"
                       >
                         <XIcon size={16} />
                       </button>
@@ -848,8 +849,6 @@ function ActionBtn({
   label,
   ariaLabel,
   onClick,
-  bg = "var(--surface2)",
-  ink = "var(--text2)",
   buttonRef,
 }: {
   buttonRef?: React.Ref<HTMLButtonElement>;
@@ -857,8 +856,6 @@ function ActionBtn({
   label: string;
   ariaLabel: string;
   onClick: () => void;
-  bg?: string;
-  ink?: string;
 }) {
   return (
     <button
@@ -866,7 +863,7 @@ function ActionBtn({
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      style={{ ...actionBtnStyle, background: bg, color: ink }}
+      className="account-action-tile"
     >
       <span style={actionIconStyle} aria-hidden="true">{icon}</span>
       <span style={actionLabelStyle}>{label}</span>
@@ -1019,19 +1016,6 @@ const actionsRowStyle: CSSProperties = {
   gap: 8,
 };
 
-const actionBtnStyle: CSSProperties = {
-  minHeight: 64,
-  padding: 8,
-  borderRadius: "var(--radius-control)",
-  border: "none",
-  cursor: "pointer",
-  display: "inline-flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 4,
-  transition: "background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard)",
-};
 
 const actionLabelStyle: CSSProperties = {
   fontSize: 13,
@@ -1063,19 +1047,6 @@ const reconcileHeaderStyle: CSSProperties = {
   marginLeft: -12,
 };
 
-const reconcileBackStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  flexShrink: 0,
-  border: "none",
-  background: "transparent",
-  color: "var(--text2)",
-  borderRadius: "50%",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-};
 
 const reconcileTitleStyle: CSSProperties = {
   margin: 0,
@@ -1235,19 +1206,6 @@ const addedAmtStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-const undoBtnStyle: CSSProperties = {
-  width: 44,
-  height: 44,
-  borderRadius: "var(--radius-control)",
-  border: "none",
-  background: "transparent",
-  color: "var(--muted)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
 
 
 

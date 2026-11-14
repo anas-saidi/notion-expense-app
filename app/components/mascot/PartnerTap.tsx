@@ -77,7 +77,7 @@ const figureStyle: CSSProperties = {
   alignItems: "baseline",
   gap: 4,
   whiteSpace: "nowrap",
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 600,
   color: "var(--text2)",
   fontVariantNumeric: "tabular-nums",

@@ -42,3 +42,6 @@ yarn-error.log*
 
 # Local visual-verification output (screenshots, scripts)
 artifacts/
+
+# design eval scripts served only while a tour runs
+public/__design-eval*

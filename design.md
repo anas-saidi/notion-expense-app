@@ -181,7 +181,7 @@ Never tint the entire light canvas. Depth comes from surfaces and restrained ele
 
 Use SF Pro Rounded through the native `ui-rounded` stack (`--font-body`), with tabular numerals for financial values.
 
-The whole product is in one currency, so the currency mark appears only where it's needed: on a screen's or sheet's main number (once) and inside amount inputs. Rows, chips, subtotals, sentences, banners, chart labels and tooltips show the bare number. Accessible labels always say the currency. Wherever it does appear it is the one shared mark (`Currency` / `<Money currency>` in `Money.tsx`): same baseline, after the number (`199.516 MAD`, never `MAD 199.516`), regular weight, muted, at most 12px (`min(0.7em, 12px)`), and never tinted by the amount's state, so it never competes with the number.
+The whole product is in one currency, so the currency mark appears only where it's needed: on a screen's or sheet's main number (once) and inside amount inputs. Rows, chips, subtotals, sentences, banners, chart labels and tooltips show the bare number. One exception: a "spent / held" ratio (`540 / 500 MAD`) ends with a small mark (10px), because two bare numbers side by side read as a score, not money. Accessible labels always say the currency. Wherever it does appear it is the one shared mark (`Currency` / `<Money currency>` in `Money.tsx`): same baseline, after the number (`199.516 MAD`, never `MAD 199.516`), regular weight, muted, at most 12px (`min(0.7em, 12px)`), and never tinted by the amount's state, so it never competes with the number.
 
 | Role | Size / line | Use |
 |---|---:|---|
@@ -191,7 +191,7 @@ The whole product is in one currency, so the currency mark appears only where it
 | Title | 20 / 24 | Screen and sheet titles |
 | Financial display | Responsive | The single owning amount |
 
-Body and control text must not be smaller than 12px. Weight, size, and color create hierarchy; do not introduce decorative typefaces.
+Body and control text must not be smaller than 12px. Text inputs use 16px on phones so iOS Safari doesn't zoom on focus; that is the only size outside the scale. Weight, size, and color create hierarchy; do not introduce decorative typefaces.
 
 ### Spacing
 

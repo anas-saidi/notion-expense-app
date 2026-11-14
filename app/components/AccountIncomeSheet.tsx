@@ -15,6 +15,7 @@ import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
+import "./sheet-components.css";
 import { fmtDate, parseAmount, today } from "./app-utils";
 
 type AccountIncomeSheetProps = {
@@ -135,7 +136,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
               <DatePicker value={date} onChange={(event) => setDate(event.target.value)} />
             </label>
           </> : (
-            <button type="button" aria-expanded={false} aria-label={`Edit description and date: ${name.trim()}, ${dateLabel}`} onClick={() => setDetailsOpen(true)} style={summaryRowStyle}>
+            <button type="button" aria-expanded={false} aria-label={`Edit description and date: ${name.trim()}, ${dateLabel}`} onClick={() => setDetailsOpen(true)} className="sheet-summary-row">
               <span style={summaryTextStyle}>{name.trim()}, {dateLabel}</span>
               <ChevronDownIcon size={16} aria-hidden="true" />
             </button>
@@ -157,22 +158,6 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
   );
 }
 
-const summaryRowStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 44,
-  border: "none",
-  borderRadius: 12,
-  background: "transparent",
-  color: "var(--text2)",
-  padding: "0 4px",
-  fontSize: 14,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 8,
-  cursor: "pointer",
-  textAlign: "left",
-};
 
 const summaryTextStyle: CSSProperties = {
   minWidth: 0,

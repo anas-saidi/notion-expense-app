@@ -21,7 +21,8 @@ import { CalendarIcon, CheckIcon, ChevronLeftIcon, PlusIcon, XIcon, ReceiptIcon,
 import { SkeletonRows } from "./ui/Skeleton";
 import { DatePicker, MonthPicker } from "./DatePicker";
 import { PickerPopover } from "./PickerPopover";
-import { AccountOptionList, CategoryOptionList, optionRowStyle } from "./TransactionPickers";
+import { AccountOptionList, CategoryOptionList } from "./TransactionPickers";
+import "./sheet-components.css";
 import { EmptyState } from "./ui/EmptyState";
 import { SheetFooter } from "./ui/SheetLayout";
 import { useAppHaptics } from "./ui/useAppHaptics";
@@ -259,7 +260,7 @@ export function BillsSection({ data, loading, refreshing = false, error, categor
       <CategoryOptionList categories={categories.filter(c => !c.snoozed && !c.archived && categoryMatchesScope(c, scope, accounts) && c.name.toLowerCase().includes(search.toLowerCase()))} selectedId={categoryId} search={search} onSearchChange={setSearch} onSelect={c => { setCategoryId(c.id); setPicker(null); }} />
     </PickerPopover>
     <PickerPopover open={picker === "account" && open} anchorRef={accountRef} title="Choose account" onClose={() => setPicker(null)} zIndex={180} size="choice">
-      {view !== "pay" && <div style={{ padding: "8px 8px 0" }}><button type="button" className="picker-option" aria-pressed={!accountId} style={{ ...optionRowStyle(!accountId), justifyContent: "space-between" }} onClick={() => { setAccountId(""); setPicker(null); }}>No suggested account{!accountId && <CheckIcon size={20} aria-hidden="true" />}</button></div>}
+      {view !== "pay" && <div style={{ padding: "8px 8px 0" }}><button type="button" className="picker-option composer-option composer-option--split" aria-pressed={!accountId} onClick={() => { setAccountId(""); setPicker(null); }}>No suggested account{!accountId && <CheckIcon size={20} aria-hidden="true" />}</button></div>}
       <AccountOptionList accounts={accounts} selectedId={accountId} onSelect={id => { setAccountId(id); setPicker(null); }} />
     </PickerPopover>
   </section>;

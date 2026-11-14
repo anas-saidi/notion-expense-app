@@ -8,6 +8,7 @@ import { Money } from "./Money";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { SearchIcon } from "./ui/icons";
 import { EmptyState } from "./ui/EmptyState";
+import "./sheet-components.css";
 
 /**
  * The option lists inside the composer's anchored pickers. The Add transaction
@@ -28,7 +29,7 @@ export function AccountOptionList({ id, accounts, selectedId, onSelect }: {
         {accounts.map((acct) => {
           const selected = acct.id === selectedId;
           return (
-            <button className="picker-option" aria-pressed={selected} key={acct.id} onClick={() => { if (!selected) haptic("selection"); onSelect(acct.id); }} style={optionRowStyle(selected)}>
+            <button type="button" className="picker-option composer-option" aria-pressed={selected} key={acct.id} onClick={() => { if (!selected) haptic("selection"); onSelect(acct.id); }}>
               <div style={pickerIconStyle}><CategoryIcon icon={accountIconSource(acct.type)} size={24} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: selected ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acct.label}</div>
@@ -67,7 +68,7 @@ export function CategoryOptionList({ id, categories, selectedId, lastUsedId, onS
             const type = cat.type[0] ?? null;
             const lastUsed = cat.id === lastUsedId;
             return (
-              <button className="picker-option" aria-pressed={selected} key={cat.id} onClick={() => { if (!selected) haptic("selection"); onSelect(cat); }} style={optionRowStyle(selected)}>
+              <button type="button" className="picker-option composer-option" aria-pressed={selected} key={cat.id} onClick={() => { if (!selected) haptic("selection"); onSelect(cat); }}>
                 <div style={pickerIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: selected ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.name}</div>
@@ -88,8 +89,8 @@ export function CategoryOptionList({ id, categories, selectedId, lastUsedId, onS
       </div>
       {/* The shared picker search (.picker-search, as in ChoicePicker) with a leading search icon. */}
       <div style={{ position: "relative" }}>
-        <SearchIcon size={16} aria-hidden="true" style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
-        <input type="text" className="picker-search" aria-label="Search categories" value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search categories" autoFocus style={{ paddingLeft: 36, fontSize: 16, boxSizing: "border-box" }} />
+        <SearchIcon size={16} aria-hidden="true" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
+        <input type="text" className="picker-search composer-picker-search" aria-label="Search categories" value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search categories" autoFocus />
       </div>
     </div>
   );
@@ -119,7 +120,7 @@ export const pickerChipStyle: CSSProperties = {
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  gap: 7,
+  gap: 8,
 };
 
 export const pickerChipIconStyle: CSSProperties = {

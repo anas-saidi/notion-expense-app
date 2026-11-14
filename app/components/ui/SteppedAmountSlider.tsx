@@ -74,6 +74,6 @@ export function SteppedAmountSlider({ min, max, value, onChange, label }: { min:
 }
 
 const wrapStyle: CSSProperties = { position: "relative", display: "grid", padding: "2px 0", touchAction: "none" };
-const ticksStyle: CSSProperties = { height: 38, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px" };
-const tickStyle = (active: boolean, passed: boolean, tone: string): CSSProperties => ({ width: active ? 4 : 3, height: 34, borderRadius: 999, background: active ? tone : passed ? `color-mix(in srgb, ${tone} 48%, var(--text2))` : "var(--surface2)", transform: `scaleY(${active ? 1 : .65})`, transformOrigin: "center", transition: "transform 150ms var(--ease-standard), background-color 150ms ease" });
+const ticksStyle: CSSProperties = { height: 38, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px" };
+const tickStyle = (active: boolean, passed: boolean, tone: string): CSSProperties => ({ width: active ? 4 : 3, height: 34, borderRadius: 999, background: active ? tone : passed ? `color-mix(in srgb, ${tone} 48%, var(--text2))` : "var(--surface2)", transform: `scaleY(${active ? 1 : .65})`, transformOrigin: "center", transition: "transform var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) ease" });
 const rangeStyle: CSSProperties = { position: "absolute", inset: "0 0 auto", width: "100%", height: 44, margin: 0, opacity: 0, cursor: "ew-resize", touchAction: "none" };

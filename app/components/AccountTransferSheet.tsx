@@ -14,6 +14,7 @@ import { Button } from "./ui/Button";
 import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { accountIconSource } from "../../lib/category-icons";
 import { Banner } from "./ui/Banner";
+import "./sheet-components.css";
 
 type AccountTransferSheetProps = {
   open: boolean;
@@ -181,7 +182,7 @@ export function AccountTransferSheet({ open, account, accounts, initialToAccount
               <DatePicker value={date} onChange={(event) => setDate(event.target.value)} />
             </label>
           </> : (
-            <button type="button" aria-expanded={false} aria-label={`Edit note and date: ${dateLabel}, ${note.trim()}`} onClick={() => setDetailsOpen(true)} style={summaryRowStyle}>
+            <button type="button" aria-expanded={false} aria-label={`Edit note and date: ${dateLabel}, ${note.trim()}`} onClick={() => setDetailsOpen(true)} className="sheet-summary-row">
               <span style={summaryTextStyle}>{dateLabel}, {note.trim()}</span>
               <ChevronDownIcon size={16} aria-hidden="true" />
             </button>
@@ -255,22 +256,6 @@ const balanceTileStyle: CSSProperties = {
   gap: 8,
 };
 
-const summaryRowStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 44,
-  border: "none",
-  borderRadius: 12,
-  background: "transparent",
-  color: "var(--text2)",
-  padding: "0 4px",
-  fontSize: 14,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 8,
-  cursor: "pointer",
-  textAlign: "left",
-};
 
 const summaryTextStyle: CSSProperties = {
   minWidth: 0,

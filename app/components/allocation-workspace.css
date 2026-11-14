@@ -5,7 +5,7 @@
  */
 .ws-alloc { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; background: var(--bg); }
 
-.workspace .ws-alloc .ws-room.grain-stage { position: relative; isolation: isolate; overflow: hidden; padding: env(safe-area-inset-top, 0px) 16px 40px; }
+.workspace .ws-alloc .ws-room.grain-stage { position: relative; isolation: isolate; overflow: hidden; padding: env(safe-area-inset-top, 0px) var(--space-4) 48px; }
 .workspace .ws-room.grain-stage > * { transform: none; will-change: auto; }
 .ws-room .sheet-header { padding: 12px 4px 0 !important; }
 .ws-balance { display: grid; justify-items: center; margin-top: 12px; }
@@ -20,7 +20,7 @@
 
 /* The content sheet rises over the bottom of the room, as on the main screens. */
 .ws-main {
-  position: relative; z-index: 3; margin-top: -28px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  position: relative; z-index: 3; margin-top: calc(-1 * var(--space-8)); min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   display: grid; align-content: start; gap: 12px; padding: 16px 16px 12px;
   background: var(--bg); border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   box-shadow: var(--elevation-sheet);

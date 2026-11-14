@@ -9,7 +9,7 @@
 .plan-desktop-body { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,34%); gap:var(--dialog-inset); flex:1; min-height:0; padding:0 var(--dialog-inset) var(--dialog-inset); }
 /* Pulled 12px into the inset so row hovers get side padding while text stays on the dialog inset. */
 .plan-desktop-main { margin-inline:-12px; padding-inline:12px; overflow:auto; min-width:0; scrollbar-width:thin; scrollbar-color:var(--border2) transparent; }
-.plan-desktop h2 { margin:0; font-size:16px; line-height:24px; font-weight:600; }
+.plan-desktop h2 { margin:0; font-size:var(--type-body); line-height:22px; font-weight:600; }
 .plan-desktop-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
 
 /* Table: category, last plan, spent, new plan, freeze. Columns sit on the 4-point grid. */
@@ -23,7 +23,7 @@
 /* Copy last month is the plan column's one action: a compact secondary Button, right-aligned. */
 .plan-amount-cell { display:flex; align-items:center; min-height:44px; margin-right:-8px; cursor:text; }
 .plan-group { padding:24px 0 8px; color:var(--muted); font-size:12px; line-height:16px; font-weight:600; }
-.plan-table-row { min-height:56px; padding-block:8px; border-radius:var(--radius-control); border-bottom:1px solid color-mix(in srgb, var(--border) 45%, transparent); font-size:14px; font-variant-numeric:tabular-nums; }
+.plan-table-row { min-height:56px; padding-block:8px; border-radius:var(--radius-control); border-bottom:1px solid color-mix(in srgb, var(--border) 45%, transparent); font-size:var(--type-label); font-variant-numeric:tabular-nums; }
 .plan-table-row:hover { background:color-mix(in srgb, var(--surface2) 45%, transparent); }
 .plan-category { display:flex; align-items:center; gap:12px; min-width:0; font-weight:600; }
 .plan-category-name { display:grid; gap:2px; min-width:0; }
@@ -33,7 +33,7 @@
 /* Plan cells are inline-editable numbers, like a spreadsheet: at rest they read as the third number column
    (same size, right-aligned, tabular); hover hints they're editable; focus shows a clear field. The cell's
    -8px margin lines the digits up with Spent and Last plan despite the field's inner padding. */
-.plan-amount { width:100%; min-height:32px !important; height:32px; padding:0 8px !important; border:1px solid transparent !important; border-radius:var(--radius-control) !important; background:transparent !important; color:var(--text); font-size:14px !important; font-weight:400; text-align:right; font-variant-numeric:tabular-nums; transition:border-color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard); }
+.plan-amount { width:100%; min-height:32px !important; height:32px; padding:0 8px !important; border:1px solid transparent !important; border-radius:var(--radius-control) !important; background:transparent !important; color:var(--text); font-size:var(--type-label) !important; font-weight:400; text-align:right; font-variant-numeric:tabular-nums; transition:border-color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard); }
 .plan-amount::placeholder { color:var(--muted); opacity:.6; }
 .plan-amount:focus::placeholder { color:transparent; }
 @media (hover: hover) and (pointer: fine) { .plan-table-row:hover .plan-amount:not(:focus) { background:var(--surface2) !important; } }
@@ -75,7 +75,7 @@
 
 /* Review inherits the editor's category rows, grid inset and semantic controls. */
 .plan-review-head, .plan-review-row { grid-template-columns:minmax(0,1fr) 112px 112px; }
-.plan-review-row { font-size:14px; }
+.plan-review-row { font-size:var(--type-label); }
 .plan-review-row .plan-category-name > span { white-space:normal; overflow-wrap:anywhere; }
 .plan-review-before { color:var(--text2); }
 .plan-review-after { color:var(--text); font-weight:600; }
@@ -107,8 +107,8 @@
 .plan-gap:active { opacity:.6; }
 .plan-gap:focus-visible { outline:2px solid var(--select-ink); outline-offset:2px; border-radius:var(--radius-control); }
 .plan-compare { display:grid; gap:8px; }
-.plan-compare-track { height:8px; overflow:hidden; border-radius:4px; background:var(--track); }
-.plan-compare-track > span { display:block; height:100%; border-radius:4px; background:var(--text2); transition:width var(--motion-standard) var(--ease-standard); }
+.plan-compare-track { height:8px; overflow:hidden; border-radius:999px; background:var(--track); }
+.plan-compare-track > span { display:block; height:100%; border-radius:inherit; background:var(--text2); transition:width var(--motion-standard) var(--ease-standard); }
 @media (prefers-reduced-motion:reduce) { .plan-compare-track > span { transition:none; } }
 .plan-compare-labels { display:flex; justify-content:space-between; gap:12px; color:var(--text2); font-size:13px; line-height:20px; font-variant-numeric:tabular-nums; }
 .plan-compare-labels strong { color:var(--text); font-weight:600; }
@@ -125,13 +125,11 @@
 
 .plan-partner-remaining h3 { margin:0 0 8px; color:var(--muted); font-size:12px; line-height:16px; font-weight:600; }
 .plan-partner-remaining dl { display:grid; gap:8px; margin:0; }
-.plan-partner-remaining dl > div { display:flex; align-items:baseline; justify-content:space-between; gap:16px; font-size:14px; line-height:20px; }
+.plan-partner-remaining dl > div { display:flex; align-items:baseline; justify-content:space-between; gap:16px; font-size:var(--type-label); line-height:20px; }
 .plan-partner-remaining dt { color:var(--text2); }
 .plan-partner-remaining dd { margin:0; color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
 .plan-partner-remaining dd[data-short] { color:var(--danger); }
 .plan-partner-remaining .plan-remaining-short { font-size:12px; font-weight:400; }
-.plan-draft-banner { margin-bottom:16px; }
-.planner-wrap > .plan-draft-banner { width:auto !important; margin:0 16px 16px; }
 .planner-wrap .plan-partner-remaining { width:100%; }
 
 .plan-mobile-actions { display:flex; align-items:center; gap:12px; }

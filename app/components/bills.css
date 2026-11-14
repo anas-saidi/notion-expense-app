@@ -31,10 +31,10 @@
 
 .bills-detail-context .bills-category-value { display: inline-flex; align-items: center; gap: 8px; }
 
-.bills-sheet-detail .bills-sheet-header h2 { font-size: 18px; line-height: 24px; font-weight: 600; }
+.bills-sheet-detail .bills-sheet-header h2 { font-size: var(--type-title); line-height: 24px; font-weight: 600; }
 .bills-detail-summary { display: grid; justify-items: start; gap: 8px; padding: 4px 0; }
 
-.bills-section-heading > h2.section-label { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--muted); }
+.bills-section-heading > h2.section-label { font-size: var(--type-label); line-height: 16px; font-weight: 600; color: var(--muted); }
 
 /* Date-led bill list: the date is grouped, while names and amounts stay flat. */
 .bill-date-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 88px; padding: 16px 0; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }

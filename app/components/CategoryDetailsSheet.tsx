@@ -11,6 +11,7 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { FundIcon, FreezeIcon, XIcon, TransferIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon, ArrowUpIcon } from "./ui/icons";
 import { Banner } from "./ui/Banner";
 import { Button } from "./ui/Button";
+import "./sheet-components.css";
 import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import type { Account, Category } from "./app-types";
 import { Money } from "./Money";
@@ -202,8 +203,8 @@ export function CategoryDetailsSheet({
 
         {/* ── Header ── */}
         <SheetHeader style={topBarStyle}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <CategoryIcon icon={category.icon} categoryName={category.name} style={{ fontSize: 26, flexShrink: 0 }} />
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <CategoryIcon icon={category.icon} categoryName={category.name} size={24} style={{ flexShrink: 0 }} />
             <h2 style={titleStyle}>{details?.name ?? category.name}</h2>
           </div>
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
@@ -314,10 +315,10 @@ export function CategoryDetailsSheet({
                     prefix={item.direction === "in" ? "+" : "−"}
                     date={formatDay(item.date)}
                     icon={item.kind === "funded"
-                      ? <FundIcon size={14} />
+                      ? <FundIcon size={16} />
                       : item.kind === "expense"
                         ? <CategoryIcon icon={category.icon} categoryName={category.name} size={20} />
-                        : <TransferIcon size={14} />}
+                        : <TransferIcon size={16} />}
                     onClick={item.kind === "funded" ? item.savingsFundingOperation ? () => setUndoingDeposit(item) : !item.readOnly ? () => setEditingFund({ ...item, categoryAvailable: available }) : undefined : undefined}
                   />
                 );
@@ -356,7 +357,7 @@ export function CategoryDetailsSheet({
       <BottomSheet open={confirmingFreeze} onClose={() => setConfirmingFreeze(false)} label="Confirm freeze category" detent="content" layered size="compact" zIndex={150} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
         <SheetBody style={confirmWrapStyle}>
           <span style={confirmIconStyle}><FreezeIcon size={20} /></span>
-          <div style={{ display: "grid", gap: 6 }}><h2 style={confirmTitleStyle}>Freeze {category.name}?</h2><p style={confirmCopyStyle}>Moves to Frozen. Balance and activity are kept.</p></div>
+          <div style={{ display: "grid", gap: 4 }}><h2 style={confirmTitleStyle}>Freeze {category.name}?</h2><p style={confirmCopyStyle}>Moves to Frozen. Balance and activity are kept.</p></div>
           <SheetFooter style={confirmActionsStyle}>
             <Button variant="secondary" onClick={() => setConfirmingFreeze(false)}>Cancel</Button>
             <Button variant="primary" onClick={() => { setConfirmingFreeze(false); runParentWrite(onFreeze); }}>Freeze category</Button>
@@ -533,7 +534,7 @@ const depositAmountStyle: CSSProperties = { fontSize: 34, lineHeight: 1, fontWei
 /* Activity */
 
 const sectionLabelStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: "var(--type-label)",
   lineHeight: "16px",
   fontWeight: 600,
   color: "var(--muted)",

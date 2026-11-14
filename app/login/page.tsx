@@ -50,7 +50,7 @@ const card: CSSProperties = {
 
 const eyebrow: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 500,
   
   color: "var(--muted)",
@@ -59,7 +59,7 @@ const eyebrow: CSSProperties = {
 
 const title: CSSProperties = {
   fontFamily: "var(--font-display)",
-  fontSize: 24,
+  fontSize: 20,
   fontWeight: 700,
   color: "var(--text)",
   margin: "0 0 12px",
@@ -67,7 +67,7 @@ const title: CSSProperties = {
 
 const subtitle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 14,
+  fontSize: 15,
   color: "var(--text2)",
   margin: "0 0 24px",
   lineHeight: 1.5,
@@ -92,5 +92,5 @@ const button: CSSProperties = {
   fontSize: 13,
   fontWeight: 800,
   textDecoration: "none",
-  borderRadius: 14,
+  borderRadius: "var(--radius-control)",
 };

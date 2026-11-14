@@ -160,8 +160,8 @@ export function ReflectActivity({ transactions, categories, accounts, budgetScop
 
   );
 }
-/** Section heading (design.md): 12px, sentence case, muted, no tracking. */
-const sectionLabelStyle: CSSProperties = { margin: 0, fontSize: 12, lineHeight: "16px", fontWeight: 500, color: "var(--muted)" };
+/** Section heading (design.md Label): 13/16, weight 600, sentence case, muted, no tracking. */
+const sectionLabelStyle: CSSProperties = { margin: 0, fontSize: "var(--type-label)", lineHeight: "16px", fontWeight: 600, color: "var(--muted)" };
 
 /** The empty line names what the type filter hides. */
 const typeNoun = { All: "activity", Expenses: "expenses", Income: "income", Transfers: "transfers", "Needs review": "activity to review" } as const;

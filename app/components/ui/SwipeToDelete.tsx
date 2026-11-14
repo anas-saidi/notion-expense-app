@@ -200,7 +200,7 @@ export function SwipeToDelete({ onDelete, children, threshold = 80, deleteLabel 
             onClick={commit}
             style={{ opacity: Math.max(progress, 0.01), ...(variant === "freeze" ? { color: "var(--text)", width: "auto", minWidth: 80, gap: 8 } : {}) }}
           >
-            {variant === "freeze" ? <><Snowflake size={17} aria-hidden="true" />Freeze</> : variant === "restore" ? <RotateCcw size={17} aria-hidden="true" /> : <Trash2 size={17} aria-hidden="true" />}
+            {variant === "freeze" ? <><Snowflake size={16} aria-hidden="true" />Freeze</> : variant === "restore" ? <RotateCcw size={20} aria-hidden="true" /> : <Trash2 size={20} aria-hidden="true" />}
           </button>
         </div>
 

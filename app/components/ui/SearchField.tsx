@@ -13,7 +13,7 @@ export const SearchField = forwardRef<HTMLInputElement, {
 }>(function SearchField({ value, onChange, onClose, placeholder, ariaLabel, showClose = true }, ref) {
   return (
     <label style={wrapStyle}>
-      <SearchIcon size={15} aria-hidden="true" style={{ color: "var(--muted)", flexShrink: 0 }} />
+      <SearchIcon size={16} aria-hidden="true" style={{ color: "var(--muted)", flexShrink: 0 }} />
       <input
         ref={ref}
         type="search"
@@ -35,7 +35,7 @@ export const SearchField = forwardRef<HTMLInputElement, {
 const wrapStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 9,
+  gap: 8,
   minHeight: 44,
   padding: "0 0 0 12px",
   borderRadius: "var(--radius-control)",
@@ -50,7 +50,7 @@ const inputStyle: CSSProperties = {
   background: "transparent",
   color: "var(--text)",
   fontFamily: "var(--font-body)",
-  fontSize: 16,
+  fontSize: 15,
   outline: "none",
 };
 

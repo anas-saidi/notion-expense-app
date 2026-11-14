@@ -5,7 +5,6 @@ import { Button } from "./ui/Button";
 import { EmptyState } from "./ui/EmptyState";
 import { ScreenChip } from "./ui/ScreenChip";
 import { SheetFooter, SheetHeader } from "./ui/SheetLayout";
-import { optionRowStyle } from "./TransactionPickers";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { Account, BudgetScope, Category, MonthlySummary, Transaction } from "./app-types";
@@ -28,6 +27,8 @@ import { spendingJarItems } from "./mascot/budgetJar";
 import { BottomSheet } from "./ui/BottomSheet";
 import { BlurScrollArea } from "./ui/ProgressiveBlur";
 import { Banner } from "./ui/Banner";
+import "./screen-components.css";
+import { OverBudgetRow } from "./CategoryJarRow";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
 import { TransactionRow } from "./ui/TransactionRow";
@@ -125,7 +126,7 @@ export function ReflectScreen(props: Props) {
   const categoryRow = (row: ReflectCategory, _index: number, inflow = false) => {
     const variance = !inflow ? overBudgetByCategory.get(row.id) : undefined;
     return <li key={row.id}>
-    <button type="button" onClick={() => setSelectedId(row.id)} aria-label={`${row.name}, ${inflow ? "net inflow" : "spent"} ${Math.abs(row.net)} MAD${!inflow && row.share > 0 ? `, ${(row.share * 100).toFixed(1)} percent` : ""}${variance ? `, ${variance.overBudget} MAD over budget, assigned ${variance.assigned} MAD` : ""}, view transactions`} style={categoryButtonStyle}>
+    <button type="button" onClick={() => setSelectedId(row.id)} aria-label={`${row.name}, ${inflow ? "net inflow" : "spent"} ${Math.abs(row.net)} MAD${!inflow && row.share > 0 ? `, ${(row.share * 100).toFixed(1)} percent` : ""}${variance ? `, ${variance.overBudget} MAD over budget, assigned ${variance.assigned} MAD` : ""}, view transactions`} className="reflect-category-row">
       <CategoryIcon icon={row.icon} categoryName={row.name} size={32} />
       <span style={{ flex: 1, minWidth: 0, display: "grid", gap: 8 }}>
         <span style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "baseline" }}>
@@ -167,7 +168,7 @@ export function ReflectScreen(props: Props) {
     <motion.div key={props.view} initial={{ opacity: 0.65 }} animate={{ opacity: 1 }} transition={{ duration: reducedMotion ? 0 : 0.22 }} style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", minWidth: 0 }}>
     {props.view === "activity"
       ? <section className="reflect-hero-chart" aria-label="Spending and money in over this period">{props.transactionsLoading
-        ? <SkeletonRegion label="Loading activity chart" style={{ height: SCREEN_HERO_CHART_HEIGHT, display: "grid", gridTemplateRows: "16px 1fr", gap: 16 }}><Skeleton style={{ width: "60%", height: 16, marginInline: "auto" }} /><Skeleton style={{ height: "100%", borderRadius: 8 }} /></SkeletonRegion>
+        ? <SkeletonRegion label="Loading activity chart" style={{ height: SCREEN_HERO_CHART_HEIGHT, display: "grid", gridTemplateRows: "16px 1fr", gap: 16 }}><Skeleton style={{ width: "60%", height: 16, marginInline: "auto" }} /><Skeleton style={{ height: "100%", borderRadius: "var(--radius-control)" }} /></SkeletonRegion>
         : <ReflectFlowChart points={flow} height={SCREEN_HERO_CHART_HEIGHT} />}</section>
       // Loading shows the light itself (no glass skeleton blob in the light look), so nothing swaps when data arrives.
       : <div style={jarFrameStyle}>
@@ -177,7 +178,7 @@ export function ReflectScreen(props: Props) {
     </motion.div>
   </div>;
 
-  return <div id="panel-history" className="screen-layout" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0, paddingBottom: 100 }}>
+  return <div id="panel-history" className="screen-layout screen-nav-clearance" role="tabpanel" aria-labelledby="tab-history" style={{ display: "grid", gap: 24, minWidth: 0 }}>
     <div className="reflect-desktop-panels">
       <section className="reflect-desktop-overview screen-overview grain-stage" aria-label="Spending breakdown">
         {/* The jar's light fills the hero, as bright as the period kept to its plan (design.md, Light). */}
@@ -208,7 +209,7 @@ export function ReflectScreen(props: Props) {
     <BottomSheet open={showOverBudget} onClose={() => setShowOverBudget(false)} label="Over-budget categories" size="compact" contentStyle={sheetContentStyle}>
       <ReflectSheetHeader title="Over-budget categories" onClose={() => setShowOverBudget(false)} />
       <BlurScrollArea style={sheetScrollStyle}>
-        <ul style={listStyle}>{overRows.map(row => <li key={row.id}><button type="button" style={{ ...categoryButtonStyle, justifyContent: "space-between" }} onClick={() => { setShowOverBudget(false); setSelectedId(row.id); }} aria-label={`${row.name}, ${fmt(row.overBudget)} MAD over budget, view transactions`}><span>{row.name}</span><span style={{ color: "var(--danger)" }}><Money value={row.overBudget} /> over</span></button></li>)}</ul>
+        <ul style={listStyle}>{overRows.map(row => <li key={row.id}><OverBudgetRow name={row.name} icon={row.icon} spent={row.net} planned={row.assigned} over={row.overBudget} onOpen={() => { setShowOverBudget(false); setSelectedId(row.id); }} /></li>)}</ul>
       </BlurScrollArea>
     </BottomSheet>
 
@@ -250,7 +251,7 @@ function OverviewMoney({ value, currency = false }: { value: number; currency?: 
 
 /** The shared sheet header (Shared dialog anatomy): a 20/24 semibold title and the shared 44px close, 12px apart. */
 function ReflectSheetHeader({ title, onClose }: { title: string; onClose: () => void }) { return <SheetHeader style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}><h2 style={{ fontSize: 20, lineHeight: "24px", fontWeight: 600, margin: 0, color: "var(--text)" }}>{title}</h2><button type="button" className="sheet-close-button" aria-label="Close" onClick={onClose}><XIcon size={20} /></button></SheetHeader>; }
-function FilterGroup({ title, items, excluded, onToggle, onAll, onNone }: { title: string; items: { id: string; name: string }[]; excluded: string[]; onToggle: (id: string) => void; onAll: () => void; onNone: () => void }) { return <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}><legend style={sectionTitleStyle}>{title}</legend><div style={{ display: "flex", gap: 8, margin: "8px 0 4px" }}><Button variant="quiet" size="compact" onClick={onAll}>All</Button><Button variant="quiet" size="compact" onClick={onNone}>None</Button></div><div style={{ display: "grid", gap: 2 }}>{items.map(item => { const included = !excluded.includes(item.id); return <button type="button" key={item.id} className="picker-option" aria-pressed={included} onClick={() => onToggle(item.id)} style={{ ...optionRowStyle(included), fontSize: 15, justifyContent: "space-between" }}><span style={{ overflowWrap: "anywhere" }}>{item.name}</span>{included && <CheckIcon size={20} aria-hidden="true" style={{ flexShrink: 0, color: "var(--select-ink)" }} />}</button>; })}</div>{!items.length && <EmptyState>No {title.toLowerCase()} in this period.</EmptyState>}</fieldset>; }
+function FilterGroup({ title, items, excluded, onToggle, onAll, onNone }: { title: string; items: { id: string; name: string }[]; excluded: string[]; onToggle: (id: string) => void; onAll: () => void; onNone: () => void }) { return <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}><legend style={sectionTitleStyle}>{title}</legend><div style={{ display: "flex", gap: 8, margin: "8px 0 4px" }}><Button variant="quiet" size="compact" onClick={onAll}>All</Button><Button variant="quiet" size="compact" onClick={onNone}>None</Button></div><div style={{ display: "grid", gap: 2 }}>{items.map(item => { const included = !excluded.includes(item.id); return <button type="button" key={item.id} className="picker-option reflect-filter-option" aria-pressed={included} onClick={() => onToggle(item.id)}><span style={{ overflowWrap: "anywhere" }}>{item.name}</span>{included && <CheckIcon size={20} aria-hidden="true" style={{ flexShrink: 0, color: "var(--select-ink)" }} />}</button>; })}</div>{!items.length && <EmptyState>No {title.toLowerCase()} in this period.</EmptyState>}</fieldset>; }
 /** A flat selected fill: Joint's --select-wash is a gradient. */
 const jarFrameStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: MASCOT_HERO_SIZE };
 const PERIOD_PRESETS = [["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const;
@@ -260,6 +261,5 @@ const sectionTitleStyle: CSSProperties = { fontSize: 12, lineHeight: "16px", fon
 /** The detail sheets' one owning amount (as in TransactionDetailsSheet): 32/40 semibold, tabular. */
 const detailAmountStyle: CSSProperties = { fontSize: 32, lineHeight: "40px", fontWeight: 600, fontVariantNumeric: "tabular-nums", color: "var(--text)" };
 const listStyle: CSSProperties = { listStyle: "none", margin: 0, padding: 0 };
-const categoryButtonStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, width: "100%", minHeight: 76, border: 0, background: "transparent", padding: "12px 0", textAlign: "left", font: "inherit", cursor: "pointer" };
 const sheetContentStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 16, padding: "var(--dialog-body-padding, 16px 20px max(20px, env(safe-area-inset-bottom)))", overflow: "hidden", boxSizing: "border-box" };
 const sheetScrollStyle: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto" };

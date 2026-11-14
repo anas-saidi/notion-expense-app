@@ -22,8 +22,8 @@
 @keyframes mascot-signal-breathe { 50% { transform: scale(1.18); opacity: .7; } }
 
 /* Alert: a "!" in the danger colour. */
-.mascot-signal-alert { display: grid; justify-items: center; gap: 5px; }
-.mascot-signal-alert i { display: block; width: 8px; border-radius: 4px; background: var(--danger); }
+.mascot-signal-alert { display: grid; justify-items: center; gap: var(--space-1); }
+.mascot-signal-alert i { display: block; width: 8px; border-radius: 999px; background: var(--danger); }
 .mascot-signal-alert i:first-child { height: 30px; }
 .mascot-signal-alert i:last-child { height: 8px; }
 .mascot-signal-alert-button { pointer-events: auto; padding: 0; border: 0; background: transparent; cursor: pointer; }
@@ -45,7 +45,7 @@
 .mascot-signal-burst { position: absolute; inset: 0; pointer-events: none; }
 .mascot-signal-burst i { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; background: var(--text2);
   animation: mascot-signal-speck 700ms var(--ease-standard) forwards; }
-.mascot-signal-burst i:nth-child(odd) { width: 6px; height: 6px; margin: -3px; background: var(--muted); }
+.mascot-signal-burst i:nth-child(odd) { width: 6px; height: 6px; margin: 0; translate: -50% -50%; background: var(--muted); }
 @keyframes mascot-signal-speck { from { transform: rotate(var(--a)) translateY(0); opacity: 1; } to { transform: rotate(var(--a)) translateY(-90px); opacity: 0; } }
 .mascot-signal[data-once="burst"] > .mascot-signal-body { animation: mascot-signal-hop 500ms var(--ease-standard); }
 @keyframes mascot-signal-hop { 40% { transform: scale(1.06); } }
@@ -54,7 +54,7 @@
 .mascot-signal[data-once="comet"] > .mascot-signal-body { animation: mascot-signal-away 1000ms var(--ease-standard); }
 @keyframes mascot-signal-away { 0% { transform: none; opacity: 1; } 25% { transform: scale(0.18); opacity: 0; } 75% { transform: scale(0.18); opacity: 0; } 100% { transform: none; opacity: 1; } }
 .mascot-signal-comet { position: absolute; inset: 0; pointer-events: none; }
-.mascot-signal-comet i { position: absolute; left: 50%; top: 55%; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: var(--text);
+.mascot-signal-comet i { position: absolute; left: 50%; top: 55%; width: 12px; height: 12px; translate: -50% -50%; border-radius: 50%; background: var(--text);
   box-shadow: -10px 4px 0 -2px color-mix(in srgb, var(--text) 45%, transparent), -20px 8px 0 -4px color-mix(in srgb, var(--text) 20%, transparent);
   animation: mascot-signal-streak 1000ms var(--ease-standard) forwards; }
 @keyframes mascot-signal-streak { 0%, 20% { transform: translate(0, 0); opacity: 0; } 30% { opacity: 1; } 55% { transform: translate(70px, -50px); opacity: 1; } 56% { transform: translate(-70px, 40px); opacity: 0; } 70% { opacity: 1; } 80%, 100% { transform: translate(0, 0); opacity: 0; } }

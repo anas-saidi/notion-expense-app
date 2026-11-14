@@ -21,7 +21,7 @@
   }
   body { padding:var(--desktop-frame-inset) 0; background:color-mix(in srgb,var(--text) 7%,var(--bg)); }
   .app-shell-root { width:var(--desktop-frame-width); margin:0 auto; min-height:calc(100dvh - 48px); background:var(--bg); border-radius:32px; isolation:isolate; }
-  #app-root-shell.app-content { width:var(--app-desktop-content-width); max-width:none; margin-left:var(--app-sidebar-width); padding:24px 32px 40px; --app-content-gutter:32px; }
+  #app-root-shell.app-content { width:var(--app-desktop-content-width); max-width:none; margin-left:var(--app-sidebar-width); padding:var(--space-6) var(--space-8) 48px; --app-content-gutter:32px; }
   .app-content .app-header { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:16px; min-height:64px; margin:0 0 32px !important; min-width:0; width:100%; padding:0 !important; position:relative !important; top:auto; background:transparent !important; backdrop-filter:none !important; }
   .desktop-page-title { display:block; margin:0; color:var(--text); font-size:20px; line-height:28px; font-weight:600; letter-spacing:-.02em; }
   .app-header > [role="tablist"] { grid-column:2; grid-row:1; }
@@ -59,15 +59,15 @@
   .home-budget-context { display:flex; flex-direction:column; min-width:0; padding:var(--desktop-panel-padding); border-radius:var(--radius-card); background:var(--surface); box-shadow:var(--elevation-card); }
   .desktop-month-budget { padding:0; background:transparent; box-shadow:none; justify-content:flex-start; gap:16px; flex:1 1 auto; }
   .desktop-budget-spent { display:grid; gap:8px; }
-  .desktop-budget-spent > span { color:var(--text2); font-size:14px; line-height:20px; }
+  .desktop-budget-spent > span { color:var(--text2); font-size:var(--type-label); line-height:20px; }
   .desktop-budget-spent > span b { color:var(--text); font-weight:600; }
   .desktop-budget-spent > strong { color:var(--text); font-size:clamp(28px,3vw,40px); line-height:1.1; font-weight:500; letter-spacing:-.02em; }
   .desktop-budget-spent[data-over] { --money-decimal-color:var(--danger); }
   .desktop-budget-spent[data-over] > strong { color:var(--danger); }
-  .desktop-spending-track { display:block; overflow:hidden; background:var(--track); border-radius:4px; height:4px; }
+  .desktop-spending-track { display:block; overflow:hidden; background:var(--track); border-radius:999px; height:4px; }
   .desktop-spending-track > span { display:block; height:100%; border-radius:inherit; background:var(--select-color); }
   .desktop-budget-comparison { display:grid; gap:8px; }
-  .desktop-budget-comparison-track { position:relative; display:flex; height:12px; overflow:hidden; background:var(--track); border-radius:6px; }
+  .desktop-budget-comparison-track { position:relative; display:flex; height:12px; overflow:hidden; background:var(--track); border-radius:999px; }
   /* Bars are one solid colour, never a gradient: the scope's core colour (ink for Couple). */
   .desktop-budget-within { background:var(--budget-fill, var(--text2)); }
   /* Ink with a thin surface outline, so it reads on the filled bar and on the empty track alike. */
@@ -77,9 +77,9 @@
   .desktop-budget-where-title { margin:0; color:var(--text2); font-size:13px; line-height:20px; font-weight:600; }
   .desktop-budget-where-list { display:grid; gap:12px; margin:0; padding:0; list-style:none; }
   .desktop-budget-where-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; align-items:center; }
-  .desktop-budget-where-name { display:flex; align-items:center; gap:8px; min-width:0; color:var(--text); font-size:14px; line-height:20px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .desktop-budget-where-list strong { color:var(--text); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
-  .desktop-budget-where-track { grid-column:1 / -1; display:block; height:4px; overflow:hidden; border-radius:2px; background:var(--track); }
+  .desktop-budget-where-name { display:flex; align-items:center; gap:8px; min-width:0; color:var(--text); font-size:var(--type-label); line-height:20px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .desktop-budget-where-list strong { color:var(--text); font-size:var(--type-label); font-weight:600; font-variant-numeric:tabular-nums; }
+  .desktop-budget-where-track { grid-column:1 / -1; display:block; height:4px; overflow:hidden; border-radius:999px; background:var(--track); }
   .desktop-budget-where-track > span { display:block; height:100%; border-radius:inherit; background:var(--budget-fill, var(--text2)); }
   .desktop-budget-excess { background:var(--danger); box-shadow:inset 2px 0 var(--surface); }
   .desktop-budget-comparison-labels { display:grid; grid-template-columns:1fr; gap:12px; margin:0; }
@@ -97,7 +97,7 @@
   .home-bills-panel > .bills-section:empty { display:none; }
   .home-desktop-panels .home-txn-list { display:grid; grid-template-columns:minmax(0,1fr) !important; }
   .home-desktop-panels .home-txn-row { padding:12px var(--row-bleed) !important; border-radius:var(--radius-control) !important; }
-  .home-desktop-panels .tx-row-title { font-size:14px !important; }
+  .home-desktop-panels .tx-row-title { font-size:var(--type-body) !important; }
   .home-desktop-panels .home-section-hdr { margin-bottom:16px !important; }
   .desktop-spending-list { display:grid; gap:24px; margin:16px 0 0; padding:0; list-style:none; }
   .desktop-spending-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:start; }

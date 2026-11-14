@@ -37,6 +37,7 @@ import { SheetHeader } from "./ui/SheetLayout";
 import { SavingCover, guardClose, useBlockingSave } from "./ui/SavingCover";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import "./month-plan-desktop.css";
+import "./sheet-components.css";
 import { ContributionAgreementEditor } from "./ContributionDetails";
 import type { ContributionAgreement, ContributionLedger } from "../../lib/contribution-agreements";
 
@@ -473,7 +474,7 @@ export function MonthPlanSheet({
     } catch { setSaveError("Could not remove the draft from this browser."); }
   };
   // One notice for the browser draft: what was restored (or why it needs review) and the way to drop it.
-  const draftBanner = (hasLocalDraft || draftNotice) && <Banner className="plan-draft-banner" tone={draftNotice ? "warning" : "neutral"} compact action={hasLocalDraft ? <Button variant="quiet" size="compact" onClick={discardDraft}>Discard draft</Button> : undefined}>{draftNotice || "Browser draft restored"}</Banner>;
+  const draftBanner = (hasLocalDraft || draftNotice) && <Banner className="plan-draft-notice" tone={draftNotice ? "warning" : "neutral"} compact action={hasLocalDraft ? <Button variant="quiet" size="compact" onClick={discardDraft}>Discard draft</Button> : undefined}>{draftNotice || "Browser draft restored"}</Banner>;
 
   const save = async () => {
     if (!changed.length || loading || saveLock.current || saving || freezing || unfreezing || loadError || capacityError || !contributionsReady) return;
@@ -625,7 +626,7 @@ export function MonthPlanSheet({
                     {/* Spent, then the plan it's measured against, then the new plan: copy moves the middle column one step right. */}
                     <span role="cell">{fmt(Math.round(currentSpent.get(id) ?? 0))}</span><span role="cell">{fmt(Math.round(currentPlanned.get(id) ?? 0))}</span>
                     <label role="cell" className="plan-amount-cell"><input className="field-input plan-amount" data-changed={changedRow || undefined} type="text" inputMode="decimal" placeholder="—" aria-label={`${planLabel} plan for ${cat.name}${changedRow ? ", changed" : ""}`} aria-invalid={expressions[id] != null && expressions[id].trim() !== "" && parseAmount(expressions[id]) === null} value={expressions[id] ?? (amountFor(cat) ? String(amountFor(cat)) : "")} onFocus={e => e.currentTarget.select()} onChange={e => { const text = e.target.value.replace(/[^\d+\-*/, .()]/g, ""); setExpressions(prev => ({ ...prev, [id]: text })); const value = text.trim() ? parseAmount(text) : 0; if (value !== null) setAmount(cat, value); }} onKeyDown={e => { if (e.key === "Enter" || e.key === "Tab") { const inputs = Array.from(e.currentTarget.closest(".plan-table")?.querySelectorAll<HTMLInputElement>("input:not(:disabled)") ?? []); const next = inputs[inputs.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)]; if (next) { e.preventDefault(); next.focus(); } else if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } } }} /></label>
-                    <button type="button" className="plan-freeze" onClick={() => void freeze(cat)} aria-label={`Freeze ${cat.name} and clear its ${planLabel} allocation`} title={`Freeze ${cat.name}`}><FreezeIcon size={17} aria-hidden="true" /></button>
+                    <button type="button" className="plan-freeze" onClick={() => void freeze(cat)} aria-label={`Freeze ${cat.name} and clear its ${planLabel} allocation`} title={`Freeze ${cat.name}`}><FreezeIcon size={16} aria-hidden="true" /></button>
                   </div>;
                 })}</div>)}
               </div>
@@ -1012,7 +1013,7 @@ const stickyLabelStyle: CSSProperties = {
 
 const stickyAmountStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
-  fontSize: 24,
+  fontSize: 20,
   fontWeight: 600,
   lineHeight: 1,
   fontVariantNumeric: "tabular-nums",
@@ -1090,7 +1091,8 @@ const rowOpenStyle: CSSProperties = { boxShadow: "var(--elevation-card)" };
 
 const rowTopStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, minWidth: 0 };
 
-const quickRowStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, paddingLeft: 44 };
+// Indent past the 32px category icon and the row gap so quick amounts line up with the name.
+const quickRowStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, paddingLeft: "calc(32px + var(--space-3))" };
 
 
 
@@ -1114,10 +1116,10 @@ const rowMetaStyle: CSSProperties = {
 const rowInputColStyle: CSSProperties = { display: "grid", justifyItems: "end", gap: 4, flexShrink: 0 };
 
 // Sizing only; the look comes from .field-input like every other form field.
-// 16px keeps iOS from zooming in on focus.
+// Body size; phones get 16px from the global input rule, which keeps iOS from zooming in on focus.
 const inputStyle: CSSProperties = {
   width: 96,
-  fontSize: 16,
+  fontSize: 15,
   textAlign: "right",
   fontVariantNumeric: "tabular-nums",
 };

@@ -4,7 +4,7 @@ html[data-theme="dark"] .plan-receipt-confirmation { --receipt-paper: #292925; -
 .plan-receipt-heading { text-align: center; }
 .plan-receipt-heading h2 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
 .plan-receipt-heading h2:focus { outline: none; }
-.plan-receipt-heading p { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.plan-receipt-heading p { margin: 8px 0 0; font-size: var(--type-label); color: var(--muted); }
 .plan-receipt-printer { width: min(100%, 360px); margin: 0 auto; position: relative; }
 .plan-receipt-slot { height: 8px; background: var(--text); border-radius: 999px; }
 .plan-receipt-feed { overflow: hidden; padding: 0 12px 12px; margin-top: -4px; }

@@ -38,13 +38,13 @@ export function HeroSkeleton({ label = "Loading monthly details", size = SCREEN_
 export function SkeletonRows({ label = "Loading activity", count = 3, iconSize = 24 }: { label?: string; count?: number; iconSize?: number }) {
   return <SkeletonRegion label={label}>
     {/* Each row keeps TransactionRow's 64px minimum, so loaded rows replace it without a shift. */}
-    {Array.from({ length: count }, (_, index) => <div key={index} style={{ boxSizing: "border-box", minHeight: 64, display: "flex", alignItems: "center", gap: 12, padding: "14px 0" }}>
+    {Array.from({ length: count }, (_, index) => <div key={index} style={{ boxSizing: "border-box", minHeight: 64, display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
       <Skeleton style={{ width: iconSize, height: iconSize, borderRadius: iconSize > 32 ? 18 : 6, flexShrink: 0 }} />
-      <div style={{ flex: 1, display: "grid", gap: 7, minWidth: 0 }}>
+      <div style={{ flex: 1, display: "grid", gap: 8, minWidth: 0 }}>
         <Skeleton style={{ width: `${index % 2 ? 48 : 60}%`, height: 13 }} />
         <Skeleton style={{ width: "32%", height: 10 }} />
       </div>
-      <div style={{ display: "grid", gap: 7, justifyItems: "end" }}>
+      <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
         <Skeleton style={{ width: 60, height: 13 }} />
         <Skeleton style={{ width: 36, height: 10 }} />
       </div>

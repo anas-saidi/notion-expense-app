@@ -1,0 +1,123 @@
+/* Rows, tiles and icon controls inside sheets and composers that used to carry inline styles.
+   Tokens and the type scale only (12, 13, 15, 20). Actions use the shared Button instead. */
+
+/* Account details: Move, Add income and Check balance tiles (icon over label). */
+.account-action-tile {
+  min-height: 64px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface2);
+  color: var(--text2);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+/* Transparent 44px icon control (Back inside a sheet step, Remove on a row). */
+.sheet-icon-button {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.sheet-icon-button--muted {
+  border-radius: var(--radius-control);
+  color: var(--muted);
+}
+
+/* Collapsed details row ("Description, date") that expands the fields. */
+.sheet-summary-row {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Composer picker options: .picker-option at Label size, icon first. */
+.picker-option.composer-option {
+  justify-content: flex-start;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.picker-option.composer-option:not([aria-pressed="true"]) { color: var(--text2); }
+.picker-option.composer-option--split { justify-content: space-between; }
+
+/* Category search inside the composer picker: room for the leading search icon. */
+.picker-search.composer-picker-search {
+  padding-left: var(--space-8);
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+/* Amount keypad key. */
+.composer-keypad-key {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Settings navigation row (Accounts). Hover and press states live in globals.css. */
+.settings-navigation-row {
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Close button placed at the end of a grid header. */
+.sheet-close-end { justify-self: end; }
+
+/* Month plan browser-draft notice (a shared Banner); layout only. */
+.plan-draft-notice { margin-bottom: var(--space-4); }
+.planner-wrap > .plan-draft-notice { width: auto !important; margin: 0 var(--space-4) var(--space-4); }
+
+/* The docked desktop inspector (Category details) uses the same sheet title as dialogs. */
+.bottom-sheet-panel[data-presentation="inspector"] .sheet-header h1,
+.bottom-sheet-panel[data-presentation="inspector"] .sheet-header h2 {
+  margin: 0 !important;
+  font-size: var(--dialog-title-size) !important;
+  line-height: var(--dialog-title-line) !important;
+  font-weight: 600 !important;
+  letter-spacing: normal !important;
+  color: var(--text);
+}

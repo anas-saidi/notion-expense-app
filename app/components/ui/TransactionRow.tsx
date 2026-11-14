@@ -75,7 +75,7 @@ const iconStyle = (tone: TransactionTone): CSSProperties => ({
   width: 24,
   height: 24,
   flexShrink: 0,
-  borderRadius: 8,
+  borderRadius: "var(--radius-control)",
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
@@ -91,10 +91,10 @@ const iconStyle = (tone: TransactionTone): CSSProperties => ({
       : "var(--text2)",
 });
 
-const copyStyle: CSSProperties = { flex: 1, minWidth: 0, display: "grid", gap: 3 };
+const copyStyle: CSSProperties = { flex: 1, minWidth: 0, display: "grid", gap: 4 };
 const titleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, lineHeight: 1.2, fontWeight: 500, color: "var(--text2)" };
 const subtitleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.2, color: "var(--muted)" };
-const valueStackStyle: CSSProperties = { display: "grid", justifyItems: "end", gap: 6, flexShrink: 0, whiteSpace: "nowrap" };
+const valueStackStyle: CSSProperties = { display: "grid", justifyItems: "end", gap: 4, flexShrink: 0, whiteSpace: "nowrap" };
 
 /** Signed-amount colour shared by every place that shows a transaction's amount. */
 export const signedAmountColor = (tone: TransactionTone) => tone === "income"

@@ -1,5 +1,6 @@
 "use client";
 import { Button } from "./ui/Button";
+import "./sheet-components.css";
 import { SheetHeader } from "./ui/SheetLayout";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -19,7 +20,7 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
         </div>
       </section>
       {onOpenAccounts && <section aria-label="Finances" style={sectionStyle}>
-        {onOpenAccounts && <button type="button" className="settings-navigation-row" onClick={onOpenAccounts} style={navigationRowStyle}>
+        {onOpenAccounts && <button type="button" className="settings-navigation-row" onClick={onOpenAccounts}>
           Accounts <ChevronRightIcon size={20} aria-hidden="true" />
         </button>}
 
@@ -46,4 +47,3 @@ const sectionStyle = { display: "grid", gap: 8 } as const;
 const sectionTitleStyle = { margin: 0, fontSize: 13, lineHeight: "16px", color: "var(--muted)", fontWeight: 600 } as const;
 const settingRowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, minHeight: 48 } as const;
 const rowLabelStyle = { fontSize: 15, lineHeight: "22px", color: "var(--text)" } as const;
-const navigationRowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", minHeight: 48, padding: 0, border: 0, background: "transparent", color: "var(--text)", fontSize: 15, lineHeight: "22px", cursor: "pointer", textAlign: "left" } as const;

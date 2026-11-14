@@ -10,6 +10,7 @@ import { BottomSheet } from "./ui/BottomSheet";
 import { XIcon } from "./ui/icons";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { EmptyState } from "./ui/EmptyState";
+import "./screen-components.css";
 import { accountIconSource } from "../../lib/category-icons";
 
 type ManageScreenProps = {
@@ -86,8 +87,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails, wi
                 onClick={() => onOpenDetails(account)}
                 aria-label={`View ${account.label} details`}
                 aria-current={wide && account.id === selectedId ? "true" : undefined}
-                className="tx-row transaction-row manage-account-row"
-                style={accountRowStyle}
+                className="tx-row transaction-row manage-account-row manage-account-row-button"
               >
                 <CategoryIcon icon={accountIconSource(account.type)} size={24} />
                 <span style={accountCopyStyle}>
@@ -144,7 +144,6 @@ const accountsSectionStyle: CSSProperties = { display: "grid", gap: 12 };
 const listStyle: CSSProperties = { display: "grid" };
 
 // Mirrors ui/TransactionRow so account rows read like every other list in the app.
-const accountRowStyle: CSSProperties = { width: "100%", minHeight: 64, padding: "12px 0", border: 0, background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer" };
 const accountCopyStyle: CSSProperties = { flex: 1, minWidth: 0, display: "grid", gap: 4 };
 const rowTitleStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, lineHeight: 1.2, fontWeight: 500, color: "var(--text2)" };
 const rowMetaStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.2, color: "var(--muted)" };

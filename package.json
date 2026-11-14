@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "design:eval": "node scripts/design-eval.mjs",
+    "design:check": "node scripts/design-eval.mjs --check"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

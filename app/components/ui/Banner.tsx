@@ -101,10 +101,10 @@ export function Banner({ className, tone = "neutral", icon, title, children, act
  */
 export const bannerTextActionStyle: CSSProperties = {
   minHeight: 44,
-  margin: "-10px -8px -10px 0",
+  margin: "-12px -8px -12px 0",
   padding: "0 8px",
   border: "none",
-  borderRadius: 10,
+  borderRadius: "var(--radius-control)",
   background: "transparent",
   color: "var(--text2)",
   fontSize: 12,

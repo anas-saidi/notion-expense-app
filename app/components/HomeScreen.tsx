@@ -1,5 +1,6 @@
 import { CardHeader, CardHeaderAction } from "./ui/CardHeader";
 import { Button } from "./ui/Button";
+import "./screen-components.css";
 import { SkeletonRows } from "./ui/Skeleton";
 import { EmptyState } from "./ui/EmptyState";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
@@ -290,7 +291,7 @@ export function HomeScreen({
       )}
 
       </div>
-      <div className="home-content" style={contentStyle}>
+      <div className="home-content screen-nav-clearance" style={contentStyle}>
 
         {/* Zone 6: Recent transactions */}
         <section aria-label="Recent activity">
@@ -344,7 +345,6 @@ const walletSwitcherWrapStyle: CSSProperties = {
 const contentStyle: CSSProperties = {
   display: "grid",
   gap: 24,
-  paddingBottom: 80,
   minWidth: 0,
 };
 

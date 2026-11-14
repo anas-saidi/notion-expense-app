@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState, type InputHTMLAttributes, type ChangeEvent } from "react";
 import { LiquidButton } from "./ui/LiquidGlass";
+import { ScreenChip } from "./ui/ScreenChip";
 import { PickerPopover } from "./PickerPopover";
 import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "./ui/icons";
 import { today } from "./app-utils";
@@ -62,8 +63,9 @@ export function MonthPicker({value,onChange,max,min,placement="bottom",align="le
 }
 
 export function DatePickerTrigger({ label, open, ariaLabel, onClick, variant = "field" }: { label: string; open: boolean; ariaLabel: string; onClick: () => void; variant?: PickerVariant }) {
-  const chip = variant === "chip";
-  return <LiquidButton type="button" className={`choice-trigger date-picker-trigger${chip ? " composer-picker-chip" : ""}`} aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} onClick={onClick}><CalendarIcon size={16} aria-hidden="true" /><span>{label}</span>{!chip && <ChevronDownIcon size={16} aria-hidden="true" className={open ? "date-picker-chevron date-picker-chevron--open" : "date-picker-chevron"} />}</LiquidButton>;
+  // The chip look is the shared action chip (design.md: composer pickers use ScreenChip mode="action").
+  if (variant === "chip") return <ScreenChip mode="action" icon={<CalendarIcon size={16} />} ariaLabel={ariaLabel} ariaHasPopup="dialog" ariaExpanded={open} onClick={onClick}>{label}</ScreenChip>;
+  return <LiquidButton type="button" className="choice-trigger date-picker-trigger" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} onClick={onClick}><CalendarIcon size={16} aria-hidden="true" /><span>{label}</span><ChevronDownIcon size={16} aria-hidden="true" className={open ? "date-picker-chevron date-picker-chevron--open" : "date-picker-chevron"} /></LiquidButton>;
 }
 
 const PickerTrigger = DatePickerTrigger;

@@ -46,7 +46,7 @@ export function Money({
  * quiet next to a hero number and scales down beside smaller text.
  */
 export function Currency({ style }: { style?: CSSProperties }) {
-  return <span style={{ ...currencyStyle, ...style }}>{MONEY_CURRENCY}</span>;
+  return <span className="currency-mark" style={{ ...currencyStyle, ...style }}>{MONEY_CURRENCY}</span>;
 }
 
 export const currencyStyle: CSSProperties = {
@@ -70,4 +70,4 @@ const moneyWrapStyle: CSSProperties = {
   fontFeatureSettings: "\"tnum\"",
 };
 
-const decimalStyle: CSSProperties = { fontSize: "max(0.7em, 11px)", fontWeight: 400, color: "var(--money-decimal-color, var(--muted))" };
+const decimalStyle: CSSProperties = { fontSize: "max(0.7em, 12px)", fontWeight: 400, color: "var(--money-decimal-color, var(--muted))" };

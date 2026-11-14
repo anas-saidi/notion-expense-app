@@ -5,6 +5,7 @@ import { Children, isValidElement, useRef, useState, type SelectHTMLAttributes, 
 import { PickerPopover } from "./PickerPopover";
 import { CheckIcon, ChevronDownIcon, SearchIcon } from "./ui/icons";
 import { EmptyState } from "./ui/EmptyState";
+import "./sheet-components.css";
 export function ChoicePicker({ children, value, onChange, style, disabled, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -17,7 +18,7 @@ export function ChoicePicker({ children, value, onChange, style, disabled, ...re
   return <span ref={anchor} style={{ display: "block", minWidth: 0 }}>
     <LiquidButton type="button" disabled={disabled} aria-label={rest["aria-label"]} aria-haspopup="dialog" aria-expanded={open} className="choice-trigger" style={glassControlStyle(style)} onClick={() => { setSearch(""); setOpen(!open); }}>{content(selected)}<ChevronDownIcon size={16} /></LiquidButton>
     <PickerPopover open={open} anchorRef={anchor} title={title} onClose={() => setOpen(false)} zIndex={180} size="choice">
-      {options.length > 10 && <div style={{ position: "relative" }}><SearchIcon size={16} aria-hidden="true" style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} /><input className="picker-search" aria-label={`Search ${title}`} placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} style={{ paddingLeft: 36, fontSize: 16, boxSizing: "border-box" }} /></div>}
+      {options.length > 10 && <div style={{ position: "relative" }}><SearchIcon size={16} aria-hidden="true" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} /><input className="picker-search composer-picker-search" aria-label={`Search ${title}`} placeholder="Search" value={search} onChange={event => setSearch(event.target.value)} style={{ boxSizing: "border-box" }} /></div>}
       {search.trim() && visible.length === 0 && <EmptyState announce>No options match “{search.trim()}”.</EmptyState>}
       <div className="picker-options">
         {visible.map((option, index) => <button className="picker-option" type="button" key={String(option.value) + index} disabled={option.disabled} aria-pressed={String(option.value) === String(value)} onClick={() => { onChange?.({ target: { value: String(option.value) }, currentTarget: { value: String(option.value) } } as ChangeEvent<HTMLSelectElement>); setOpen(false); anchor.current?.querySelector("button")?.focus(); }}><span style={{ display:"inline-flex", alignItems:"center", gap:8 }}>{content(option)}</span>{String(option.value) === String(value) && <CheckIcon size={20} aria-hidden="true" />}</button>)}

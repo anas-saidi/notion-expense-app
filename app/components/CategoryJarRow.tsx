@@ -9,6 +9,8 @@ import { runwayLabel } from "./category-runway";
 import type { BudgetStatus } from "./category-status";
 import type { CategoryJarState } from "./mascot/CategoryJar";
 import { CategoryIcon } from "./ui/CategoryIcon";
+import { Currency } from "./Money";
+import "./screen-components.css";
 
 /**
  * One category on the Budget tab: its artwork (fading with remaining funds),
@@ -38,17 +40,34 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, b
     : null;
   const amountColor = state === "over" ? "var(--status-over)" : low ? "var(--status-low)" : state === "normal" ? "var(--text2)" : "var(--muted)";
   return (
-    <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, ${fmt(Math.round(amount))} MAD${line ? `, ${line.text}` : state === "empty" ? ", all spent" : state === "unfunded" ? ", not funded" : ""}`}>
+    <button type="button" onClick={onOpen} className="budget-row budget-jar-row" aria-label={`${cat.name}, ${fmt(Math.round(amount))} MAD${line ? `, ${line.text}` : state === "empty" ? ", all spent" : state === "unfunded" ? ", not funded" : ""}`}>
       <BudgetCategoryArtwork level={level} state={state} icon={categoryIconSource(cat.icon, cat.name)} dot={!!billShort} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {/* "X spent" repeats the desktop Spent column, so it hides there. */}
         {line && <span className={"spentOnly" in line ? "budget-row-spent-line" : undefined} style={{ ...lineStyle, color: line.color, fontWeight: line.strong ? 600 : 500 }}>{"spentOnly" in line
-          ? <>{fmt(Math.round(spent))}<span style={{ color: "var(--muted)" }}> / {fmt(Math.round(held))}</span></>
+          ? <>{fmt(Math.round(spent))}<span style={{ color: "var(--muted)" }}> / {fmt(Math.round(held))}</span><Currency style={ratioCurrencyStyle} /></>
           : line.text}</span>}
       </span>
       <TableCols planned={planned} spent={spent} />
       <span style={{ ...amountStyle, color: amountColor }}>{Math.round(amount) < 0 ? "−" : ""}{fmt(Math.abs(Math.round(amount)))}</span>
+    </button>
+  );
+}
+
+/**
+ * An over-budget category in a list outside the Budget tab (Reflect's over-budget sheet):
+ * the same artwork, name, quiet "spent / planned" line and one number as BudgetJarRow, in the overspent state.
+ */
+export function OverBudgetRow({ name, icon, spent, planned, over, onOpen }: { name: string; icon: string | null; spent: number; planned: number; over: number; onOpen: () => void }) {
+  return (
+    <button type="button" onClick={onOpen} className="over-budget-row" aria-label={`${name}, ${fmt(Math.round(over))} MAD over budget, ${fmt(Math.round(spent))} MAD spent of ${fmt(Math.round(planned))} MAD planned, view transactions`}>
+      <BudgetCategoryArtwork level={0} state="over" icon={categoryIconSource(icon, name)} />
+      <span style={textStyle}>
+        <span style={nameStyle}>{name}</span>
+        <span style={{ ...lineStyle, color: "var(--text2)", fontWeight: 500 }}>{fmt(Math.round(spent))}<span style={{ color: "var(--muted)" }}> / {fmt(Math.round(planned))}</span><Currency style={ratioCurrencyStyle} /></span>
+      </span>
+      <span style={{ ...amountStyle, color: "var(--status-over)" }}>−{fmt(Math.round(over))}</span>
     </button>
   );
 }
@@ -79,7 +98,7 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   // Without a goal, keep funded artwork clear.
   const level = goal > 0 ? pct : saved > 0 ? 1 : 0;
   return (
-    <button type="button" onClick={onOpen} className="budget-row" style={rowStyle} aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}${pastDue ? `, goal past due since ${when!.label}` : ""}`}>
+    <button type="button" onClick={onOpen} className="budget-row budget-jar-row" aria-label={`${cat.name}, savings, ${fmt(Math.round(saved))} MAD${line ? `, ${line}` : ""}${pastDue ? `, goal past due since ${when!.label}` : ""}`}>
       <BudgetCategoryArtwork level={level} state={saved > 0 ? "normal" : "unfunded"} icon={categoryIconSource(cat.icon, cat.name)} burst={burst?.kind === "burst" ? { kind: "burst", id: burst.id } : null} />
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
@@ -130,21 +149,9 @@ function goalLabel(date: string | null | undefined): { label: string; past: bool
   return { label, past: date.slice(0, 7) < new Date().toISOString().slice(0, 7) };
 }
 
-const rowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  minHeight: 76,
-  padding: "8px 24px 8px 12px",
-  border: "none",
-  background: "transparent",
-  width: "100%",
-  cursor: "pointer",
-  fontFamily: "var(--font-body)",
-  color: "inherit",
-  textAlign: "left",
-};
 const textStyle: CSSProperties = { display: "grid", gap: 2, flex: 1, minWidth: 0 };
 const nameStyle: CSSProperties = { fontSize: 15, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" };
+/** "spent / held MAD": the shared muted mark, small and set just after the second number. */
+const ratioCurrencyStyle: CSSProperties = { fontSize: 10, marginLeft: 4 };
 const lineStyle: CSSProperties = { fontSize: 12, lineHeight: "16px", fontVariantNumeric: "tabular-nums" };
 const amountStyle: CSSProperties = { fontSize: 15, fontWeight: 600, lineHeight: "22px", fontVariantNumeric: "tabular-nums", flexShrink: 0 };

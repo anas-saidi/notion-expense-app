@@ -25,7 +25,8 @@ import { PickerPopover } from "./PickerPopover";
 import { Banner } from "./ui/Banner";
 import { DateCalendar } from "./DatePicker";
 import { ArrowDownIcon, ArrowLeftIcon, ArrowUpIcon, AlertTriangleIcon, CalendarIcon, BanknoteIcon, ChevronDownIcon, DeleteIcon, XIcon } from "./ui/icons";
-import { AccountOptionList, CategoryOptionList, optionRowStyle, pickerIconStyle } from "./TransactionPickers";
+import { AccountOptionList, CategoryOptionList, pickerIconStyle } from "./TransactionPickers";
+import "./sheet-components.css";
 import { useAppHaptics } from "./ui/useAppHaptics";
 
 type AddTransactionSheetProps = {
@@ -481,8 +482,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                                       setShowFundPicker(false);
                                       await quickFund.run(() => props.onQuickFund!(cat.id, moveAmount)).catch(() => haptic("error"));
                                     }}
-                                    className="picker-option"
-                                    style={optionRowStyle(false)}
+                                    className="picker-option composer-option"
                                   >
                                     <div style={pickerIconStyle}><CategoryIcon icon={cat.icon} categoryName={cat.name} size={24} /></div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -552,7 +552,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
                     haptic("rigid");
                     enterAmount(key.value);
                   }}
-                  style={keypadButtonStyle}
+                  className="composer-keypad-key"
                 >
                   {key.value === "delete" ? <DeleteIcon size={20} aria-hidden="true" /> : key.label}
                 </button>
@@ -752,7 +752,7 @@ const dialogTitleStyle: CSSProperties = {
   color: "var(--text)",
 };
 
-/** The description is a typed value: --text at the composer line size, centred under the amount. */
+/** The description is a typed value: --text at Body size (15; phones force 16 on inputs), centred under the amount. */
 const descriptionInputStyle: CSSProperties = {
   width: "100%",
   minHeight: 56,
@@ -762,7 +762,7 @@ const descriptionInputStyle: CSSProperties = {
   border: "none",
   padding: "0 16px",
   color: "var(--text)",
-  fontSize: 17,
+  fontSize: 15,
   lineHeight: "24px",
   fontWeight: 400,
   textAlign: "center",
@@ -810,7 +810,7 @@ const recentListStyle: CSSProperties = {
 const heroCopyStyle: CSSProperties = {
   margin: 0,
   fontFamily: "var(--font-body)",
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 500,
   color: "var(--text2)",
   textAlign: "center",
@@ -826,20 +826,6 @@ const keypadStyle: CSSProperties = {
   gap: 4,
 };
 
-const keypadButtonStyle: CSSProperties = {
-  minHeight: 44,
-  border: "none",
-  borderRadius: "var(--radius-control)",
-  background: "var(--surface2)",
-  color: "var(--text)",
-  fontSize: 20,
-  fontWeight: 600,
-  fontVariantNumeric: "tabular-nums",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-};
 
 const pickerBarStyle: CSSProperties = {
   width: "100%",

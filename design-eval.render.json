@@ -1,0 +1,64 @@
+{
+  "captured": "2026-11-14",
+  "how": "scripts/design-eval-render-tour.js in the dev app, one run per width",
+  "runs": [
+    {
+      "width": 375,
+      "views": ["Home", "Settings", "Add transaction", "Bills", "Activity", "Contributions", "Plan receipt", "Budget", "Category detail", "Rebalance", "Reflect"],
+      "checks": {
+        "native": { "ok": 128, "bad": 0, "examples": [] },
+        "rawButtons": { "ok": 45, "bad": 0, "examples": [] },
+        "textSize": { "ok": 258, "bad": 1, "examples": ["Plan receipt: span \"16.395\" 24px"] },
+        "textColor": { "ok": 259, "bad": 0, "examples": [] },
+        "family": { "ok": 245, "bad": 0, "examples": [] },
+        "targets": { "ok": 127, "bad": 0, "examples": [] },
+        "radius": { "ok": 55, "bad": 0, "examples": [] },
+        "buttonTiers": { "ok": 14, "bad": 0, "examples": [] },
+        "chips": { "ok": 17, "bad": 0, "examples": [] }
+      },
+      "roles": {
+        "card header title": { "13px/600 text2 h=20": { "n": 2, "views": ["Home"], "eg": "h2.card-header-title.section-label \"Due bills\"" } },
+        "card header action": { "13px/400 muted radius=12 h=44": { "n": 2, "views": ["Home"], "eg": "button.card-header-action \"All bills\"" } },
+        "button quiet": { "13px/600 text2 h=44": { "n": 8, "views": ["Settings", "Bills", "Budget", "Category detail", "Rebalance"], "eg": "button.ui-button \"Sync now\"" } },
+        "sheet title": { "20px/600 text h=24": { "n": 4, "views": ["Settings", "Bills", "Contributions", "Category detail"], "eg": "h2 \"Settings\"" } },
+        "sheet close": { "surface2 round h=44": { "n": 5, "views": ["Settings", "Add transaction", "Bills", "Contributions", "Category detail"], "eg": "button.sheet-close-button" } },
+        "button secondary/regular": { "15px/600 surface2 h=48": { "n": 1, "views": ["Add transaction"], "eg": "button.ui-button \"Read\"" } },
+        "chip off": { "12px/600 text2 glass pill h=44": { "n": 14, "views": ["Bills", "Activity", "Contributions", "Budget", "Category detail", "Rebalance"], "eg": "\"Bill month\"" } },
+        "chip on": { "12px/600 text glass pill h=44": { "n": 3, "views": ["Bills", "Activity", "Rebalance"], "eg": "\"Due\"" } },
+        "section label": { "13px/600 muted h=16": { "n": 6, "views": ["Activity"], "eg": "h3.section-label \"Yesterday\"" } },
+        "button primary/regular": { "15px/600 ink h=48": { "n": 2, "views": ["Plan receipt", "Rebalance"], "eg": "button.ui-button \"Done\"" } },
+        "button primary/compact": { "13px/600 ink h=44": { "n": 1, "views": ["Category detail"], "eg": "button.ui-button \"Add to savings\"" } },
+        "button secondary/compact": { "13px/600 surface2 h=44": { "n": 2, "views": ["Category detail"], "eg": "button.ui-button \"Spend from savings\"" } }
+      }
+    },
+    {
+      "width": 1280,
+      "views": ["Home", "Settings", "Add transaction", "Bills", "Activity", "Contributions", "Plan receipt", "Budget", "Category detail", "Rebalance", "Reflect"],
+      "checks": {
+        "native": { "ok": 133, "bad": 0, "examples": [] },
+        "rawButtons": { "ok": 45, "bad": 0, "examples": [] },
+        "textSize": { "ok": 279, "bad": 0, "examples": [] },
+        "textColor": { "ok": 279, "bad": 0, "examples": [] },
+        "family": { "ok": 265, "bad": 0, "examples": [] },
+        "targets": { "ok": 132, "bad": 0, "examples": [] },
+        "radius": { "ok": 86, "bad": 0, "examples": [] },
+        "buttonTiers": { "ok": 15, "bad": 0, "examples": [] },
+        "chips": { "ok": 11, "bad": 0, "examples": [] }
+      },
+      "roles": {
+        "card header title": { "13px/600 text2 h=20": { "n": 3, "views": ["Home"], "eg": "h2.card-header-title \"November spending\"" } },
+        "card header action": { "13px/400 muted radius=12 h=44": { "n": 3, "views": ["Home"], "eg": "button.card-header-action \"All bills\"" } },
+        "button quiet": { "13px/600 text2 h=44": { "n": 8, "views": ["Settings", "Bills", "Budget", "Category detail", "Rebalance"], "eg": "button.ui-button \"Sync now\"" } },
+        "sheet title": { "20px/600 text h=28": { "n": 4, "views": ["Settings", "Bills", "Contributions", "Category detail"], "eg": "h2 \"Settings\"" } },
+        "sheet close": { "surface2 round h=44": { "n": 5, "views": ["Settings", "Add transaction", "Bills", "Contributions", "Category detail"], "eg": "button.sheet-close-button" } },
+        "button secondary/regular": { "15px/600 surface2 h=48": { "n": 2, "views": ["Add transaction", "Rebalance"], "eg": "button.ui-button \"Read\"" } },
+        "chip off": { "12px/600 text2 glass pill h=44": { "n": 9, "views": ["Bills", "Activity", "Contributions", "Budget", "Category detail"], "eg": "\"Bill month\"" } },
+        "chip on": { "12px/600 text glass pill h=44": { "n": 2, "views": ["Bills", "Activity"], "eg": "\"Due\"" } },
+        "section label": { "13px/600 muted h=16": { "n": 6, "views": ["Activity"], "eg": "h3.section-label \"Yesterday\"" } },
+        "button primary/regular": { "15px/600 ink h=48": { "n": 2, "views": ["Plan receipt", "Rebalance"], "eg": "button.ui-button \"Done\"" } },
+        "button primary/compact": { "13px/600 ink h=44": { "n": 1, "views": ["Category detail"], "eg": "button.ui-button \"Add to savings\"" } },
+        "button secondary/compact": { "13px/600 surface2 h=44": { "n": 2, "views": ["Category detail"], "eg": "button.ui-button \"Spend from savings\"" } }
+      }
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 /* Prompt input (ported from prompt-kit): a rounded field with the send button inside, suggestion pills above. */
-.prompt { display: grid; gap: 10px; }
+.prompt { display: grid; gap: var(--space-3); }
 .prompt-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
 .prompt-suggestion {
-  min-height: 36px; padding: 0 14px; border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 999px;
-  background: var(--surface); color: var(--text2); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap;
+  min-height: 36px; padding: 0 var(--space-3); border: 1px solid color-mix(in srgb, var(--border) 80%, transparent); border-radius: 999px;
+  background: var(--surface); color: var(--text2); font: inherit; font-size: var(--type-label); cursor: pointer; white-space: nowrap;
 }
 button.prompt-suggestion, button.prompt-suggestion:not(:disabled):hover { transform: none; }
 @media (hover: hover) and (pointer: fine) { button.prompt-suggestion:not(:disabled):hover { background: var(--surface2); color: var(--text); } }
@@ -17,7 +17,7 @@ button.prompt-suggestion:not(:disabled):active { transform: scale(0.97); transit
 .prompt-field:focus-within { border-color: color-mix(in srgb, var(--text) 24%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 35%, transparent); }
 .prompt-field[data-disabled] { cursor: not-allowed; opacity: .6; }
 .prompt-field textarea {
-  display: block; width: 100%; min-height: 44px; margin: 0; padding: 6px 8px; border: 0; background: transparent; resize: none;
+  display: block; width: 100%; min-height: 44px; margin: 0; padding: var(--space-2); border: 0; background: transparent; resize: none;
   color: var(--text); font: inherit; font-size: 16px; line-height: 1.45; outline: none; overflow-y: auto;
 }
 .prompt-field textarea::placeholder { color: var(--muted); }

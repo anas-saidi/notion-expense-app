@@ -104,7 +104,7 @@ const labelStyle: CSSProperties = { minWidth: 0, overflow: "hidden", textOverflo
 const badgeStyle = (selected: boolean, tone: "neutral" | "metric"): CSSProperties => ({
   minWidth: 24,
   height: 20,
-  padding: "0 6px",
+  padding: "0 4px",
   borderRadius: 999,
   display: "inline-flex",
   alignItems: "center",
@@ -113,7 +113,7 @@ const badgeStyle = (selected: boolean, tone: "neutral" | "metric"): CSSPropertie
     ? "var(--select-wash)"
     : selected ? "var(--lg-glass)" : "var(--surface2)",
   color: tone === "metric" && !selected ? "var(--select-ink)" : "inherit",
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 600,
   fontVariantNumeric: "tabular-nums",
 });

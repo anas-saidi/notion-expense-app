@@ -31,6 +31,7 @@ import { BudgetJarRow, SavingsJarRow } from "./CategoryJarRow";
 import { SectionToggle } from "./ui/SectionToggle";
 import { ScreenChip } from "./ui/ScreenChip";
 import { Button } from "./ui/Button";
+import "./screen-components.css";
 import { EmptyState } from "./ui/EmptyState";
 import { SavingCover, useBlockingSave } from "./ui/SavingCover";
 
@@ -265,7 +266,7 @@ export function CategoriesScreen({
   const billShort = useMemo(() => billShortfalls(dueBills, categories, today()), [dueBills, categories]);
 
   return (
-    <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main screen-layout" style={wrapStyle}>
+    <div id="panel-budget" role="tabpanel" aria-labelledby="tab-budget" className="categories-main screen-layout screen-nav-clearance" style={wrapStyle}>
 
             <div className="budget-overview-context screen-overview">
             <section className="budget-desktop-overview grain-stage" aria-label="Category allocation overview">
@@ -375,7 +376,7 @@ export function CategoriesScreen({
                   <div style={listSurfaceStyle}>
                     {frozenCategories.map((cat) => (
                       <SwipeToDelete key={cat.id} variant="restore" deleteLabel={`Restore ${cat.name}`} onDelete={() => { void restore.run(async () => { await onReviveCategory(cat); }).catch(() => undefined); return true; }}>
-                        <button type="button" onClick={() => onOpenCategoryDetails(cat)} style={frozenRowStyle} aria-label={cat.name}>
+                        <button type="button" onClick={() => onOpenCategoryDetails(cat)} className="frozen-category-row" aria-label={cat.name}>
                           <CategoryIcon icon={cat.icon} categoryName={cat.name} size={60} style={{ opacity: 0.5, flexShrink: 0 }} />
                           <span style={frozenNameStyle}>{cat.name}</span>
                           <ChevronRightIcon size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
@@ -401,7 +402,6 @@ export function CategoriesScreen({
 const wrapStyle: CSSProperties = {
   display: "grid",
   gap: 16,
-  paddingBottom: 96,
   minWidth: 0,
 };
 
@@ -445,23 +445,7 @@ const topActionStyle: CSSProperties = {
 /* ─── Card ─────────────────────────────────────────────────────── */
 
 
-// Flat, like the jar rows: the section's surface is the only container.
-const frozenRowStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 76,
-  padding: "8px 24px 8px 12px",
-  border: "none",
-  borderRadius: 0,
-  background: "var(--surface)",
-  boxShadow: "none",
-  color: "var(--text2)",
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  textAlign: "left",
-  cursor: "pointer",
-  fontFamily: "var(--font-body)",
-};
+// Frozen rows are flat like the jar rows: .frozen-category-row in screen-components.css.
 
 const frozenNameStyle: CSSProperties = {
   flex: 1,

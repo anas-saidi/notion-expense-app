@@ -13,6 +13,7 @@ import { GrainGlow } from "./grain/GrainGlow";
 import { PALETTES } from "./grain/palettes";
 import { planningMood } from "./light-mood";
 import "./allocation-workspace.css";
+import "./sheet-components.css";
 import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
 import { EmptyState } from "./ui/EmptyState";
@@ -229,7 +230,7 @@ export function AllocationFlow({
   const headerEl = (
         <SheetHeader style={sheetHeaderStyle}>
           <h2 style={sheetTitleStyle}>{title}</h2>
-          <button type="button" className="sheet-close-button" onClick={close} aria-label={`Close ${title.toLowerCase()}`} style={closeButtonPlacementStyle}>
+          <button type="button" className="sheet-close-button sheet-close-end" onClick={close} aria-label={`Close ${title.toLowerCase()}`}>
             <XIcon size={20} />
           </button>
         </SheetHeader>
@@ -457,7 +458,6 @@ function formatCounter(value: number): string {
 const sheetHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", rowGap: 12, columnGap: 12, padding: "var(--dialog-body-padding, 16px)" };
 /** Title role (design.md, Shared dialog anatomy): 20/28 semibold in --text. */
 const sheetTitleStyle: CSSProperties = { margin: 0, fontSize: 20, lineHeight: "28px", fontWeight: 600, color: "var(--text)" };
-const closeButtonPlacementStyle: CSSProperties = { justifySelf: "end" };
 const balanceHeaderStyle: CSSProperties = { display: "grid", gap: 4 };
 const studioStyle: CSSProperties = { display: "grid", gap: 8 };
 const categoryRailStyle: CSSProperties = { display: "flex", gap: 8, overflowX: "auto", padding: "0 4px 4px", alignItems: "center" };

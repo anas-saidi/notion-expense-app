@@ -1,0 +1,91 @@
+/* Screen-level rows, list options and overlays that are not action buttons (design.md, Shared components).
+   Values come from the tokens and the type scale; rows keep their own button element for selection. */
+
+/* Bottom clearance so the last row scrolls clear of the floating nav: one value for every screen. */
+.screen-nav-clearance { padding-bottom: calc(var(--space-8) * 3); }
+
+/* Budget jar rows (spending and savings): flat, the section surface is the only container. */
+button.budget-jar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 76px;
+  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: inherit;
+  text-align: left;
+}
+
+/* Frozen category rows share the jar row geometry on the section surface. */
+button.frozen-category-row {
+  width: 100%;
+  min-height: 76px;
+  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
+  border: none;
+  border-radius: 0;
+  background: var(--surface);
+  box-shadow: none;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+/* Account rows on Manage: transaction-row anatomy without the divider. */
+button.manage-account-row-button {
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-3) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* Hover and press stay unfilled, as before; the wide layout's selected fill still applies. */
+.manage-account-list button.manage-account-row-button:active,
+.manage-account-list button.manage-account-row-button:not(:disabled):hover { background: transparent; }
+
+/* Reflect category rows: icon, name and amount over the share bar. */
+button.reflect-category-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 76px;
+  border: 0;
+  background: transparent;
+  padding: var(--space-3) 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+/* Over-budget rows in Reflect's sheet: BudgetJarRow's anatomy, flush with the sheet's content edge. */
+button.over-budget-row { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 76px; padding: var(--space-2) 0; border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+
+/* Reflect filter options keep the picker-option frame with secondary text in both states. */
+button.picker-option.reflect-filter-option {
+  color: var(--text2);
+  font-size: var(--type-body);
+  justify-content: space-between;
+}
+
+/* Restore-draft dialog over the app. No global scrim token exists yet, so the dim is named here. */
+.draft-restore-overlay {
+  --draft-restore-scrim: rgb(0 0 0 / 35%);
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: var(--draft-restore-scrim);
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+}

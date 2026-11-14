@@ -88,7 +88,7 @@ html[data-theme="dark"] {
 .screen-hero-mascot .reflect-hero-switch .lg-tab:focus-visible { border-radius: calc(var(--lg-tab-height) / 2); outline-offset: -3px; }
 @media (min-width:900px) {
   .phone-nav-glass { display: none; }
-  .desktop-glass-nav { display: flex; position: relative; isolation: isolate; padding: 6px 10px; gap: 6px; }
+  .desktop-glass-nav { display: flex; position: relative; isolation: isolate; padding: var(--space-2) var(--space-3); gap: var(--space-2); }
   /* No glass track behind the desktop tabs: in the light direction only the jar glows (design.md, Light). The selected tab keeps its own fill. */
   .app-nav-btn.lg-button { position: relative; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .app-nav-btn.lg-button[aria-selected="true"], html[data-theme="dark"] .app-nav-btn.lg-button[aria-selected="true"] {
@@ -123,7 +123,8 @@ html[data-theme="dark"] {
   box-shadow: inset 0 0 0 .5px var(--lg-edge), 0 2px 6px var(--lg-drop);
 }
 .transaction-type.lg-button { min-height: 44px; background-color: var(--lg-glass); }
-.appearance-system-button.lg-button, .appearance-theme-button.lg-button { background-color: var(--lg-glass); }
+/* Label type (13px); globals.css sets 14px on these, chips keep their own size. */
+.appearance-system-button.lg-button, .appearance-theme-button.lg-button { background-color: var(--lg-glass); font-size: var(--type-label); }
 .picker-option[aria-pressed="true"],
 .date-calendar button[aria-pressed="true"],
 .date-grid button[aria-current="date"][aria-pressed="true"],
