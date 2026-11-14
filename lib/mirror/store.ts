@@ -154,12 +154,13 @@ export class MirrorStore {
   /** One small row: which stored copy is live, and whether reads may trust it. */
   async version(scope: string, maxAgeMs: number) {
     await this.ready(scope);
-    const { rows } = await this.db.query(`SELECT generation, synced_at,
+    const { rows } = await this.db.query(`SELECT generation, synced_at, published_revision,
       revision=published_revision AND generation IS NOT NULL AND synced_at > now() - ($2 * interval '1 millisecond')
         AND NOT EXISTS (SELECT 1 FROM finance_mirror_writes WHERE scope=$1 AND expires_at > now()) AS usable
       FROM finance_mirror WHERE scope=$1`, [scope, maxAgeMs]);
     const row = rows[0];
-    return row?.usable && row.generation ? { generation: String(row.generation), syncedAt: new Date(row.synced_at).toISOString() } : null;
+    // The revision changes when a write patches pages into the same generation.
+    return row?.usable && row.generation ? { generation: String(row.generation), revision: String(row.published_revision), syncedAt: new Date(row.synced_at).toISOString() } : null;
   }
   async acquire(scope: string) {
     await this.ready(scope);
@@ -231,8 +232,79 @@ export class MirrorStore {
       INSERT INTO finance_mirror_writes(id,scope,expires_at) SELECT $2,scope,now()+interval '5 minutes' FROM bumped`, [scope, id]);
     return id;
   }
-  async finishWrite(scope: string, id: string) {
-    await this.db.query(`WITH removed AS (DELETE FROM finance_mirror_writes WHERE scope=$1 AND id=$2 RETURNING scope)
-      UPDATE finance_mirror SET revision=revision+1, not_before=now()+($3 * interval '1 millisecond') WHERE scope IN (SELECT scope FROM removed)`, [scope, id, WRITE_SETTLE_MS]);
+  /**
+   * Close a write fence. With `pages` (every page the write returned plus its
+   * related pages, read from Notion after the write), the published snapshot
+   * absorbs them and stays published, but only if it was current when this
+   * write began and no other write is open. Otherwise it stays fenced until
+   * the settled full import, as before.
+   */
+  async finishWrite(scope: string, id: string, pages?: any[]): Promise<{ applied: boolean; revision?: string }> {
+    return this.transaction(async client => {
+      const removed = await client.query("DELETE FROM finance_mirror_writes WHERE scope=$1 AND id=$2 RETURNING scope", [scope, id]);
+      if (!removed.rows.length) return { applied: false };
+      const head = await this.lockHead(client, scope);
+      // beginWrite bumped revision once; any other write, import or expired
+      // fence since then leaves published_revision further behind.
+      const generation = head?.generation;
+      const current = !!generation && !head.fenced && BigInt(head.published_revision) === BigInt(head.revision) - BigInt(1);
+      if (pages && generation && current) {
+        await this.upsertPages(client, scope, generation, pages);
+        const { rows } = await client.query(`UPDATE finance_mirror SET revision=revision+1, published_revision=revision+1, content_hash=NULL,
+          not_before=now()+($2 * interval '1 millisecond') WHERE scope=$1 RETURNING revision`, [scope, WRITE_SETTLE_MS]);
+        return { applied: true, revision: String(rows[0].revision) };
+      }
+      await client.query("UPDATE finance_mirror SET revision=revision+1, not_before=now()+($2 * interval '1 millisecond') WHERE scope=$1", [scope, WRITE_SETTLE_MS]);
+      return { applied: false };
+    });
+  }
+  /** Re-read related pages into a still-published snapshot. Returns the new revision, or null if anything else changed it. */
+  async refreshPages(scope: string, revision: string, pages: any[]): Promise<string | null> {
+    return this.transaction(async client => {
+      const head = await this.lockHead(client, scope);
+      if (!head?.generation || head.fenced || String(head.revision) !== revision || String(head.published_revision) !== revision) return null;
+      await this.upsertPages(client, scope, head.generation, pages);
+      const { rows } = await client.query("UPDATE finance_mirror SET revision=revision+1, published_revision=revision+1, content_hash=NULL WHERE scope=$1 RETURNING revision", [scope]);
+      return String(rows[0].revision);
+    });
+  }
+  /** Current stored copies of these pages, for relations a write may have removed. */
+  async pagesById(scope: string, ids: string[]): Promise<any[]> {
+    if (!ids.length) return [];
+    const { rows } = await this.db.query(`SELECT records.page FROM finance_mirror mirror JOIN finance_mirror_records records
+      ON records.scope=mirror.scope AND records.generation=mirror.generation
+      WHERE mirror.scope=$1 AND lower(replace(records.page->>'id','-','')) = ANY($2::text[])`, [scope, ids.map(normalizeDatabaseId)]);
+    return rows.map(row => row.page);
+  }
+  private async lockHead(client: Pick<SqlDriver, "query">, scope: string) {
+    const { rows } = await client.query(`SELECT revision, published_revision, generation,
+      EXISTS (SELECT 1 FROM finance_mirror_writes WHERE scope=$1 AND expires_at > now()) AS fenced
+      FROM finance_mirror WHERE scope=$1 FOR UPDATE`, [scope]);
+    return rows[0] as { revision: string; published_revision: string; generation: string | null; fenced: boolean } | undefined;
+  }
+  /** Replace each page in place (same ordinal) or add it first, as Notion lists newest pages first. */
+  private async upsertPages(client: Pick<SqlDriver, "query">, scope: string, generation: string, pages: any[]) {
+    const { rows } = await client.query("SELECT database_id FROM finance_mirror_schemas WHERE scope=$1 AND generation=$2", [scope, generation]);
+    const mirrored = new Set(rows.map(row => row.database_id));
+    for (const page of pages) {
+      const databaseId = normalizeDatabaseId(String(page?.parent?.database_id ?? ""));
+      if (!mirrored.has(databaseId) || typeof page.id !== "string") continue;
+      const removed = await client.query(`DELETE FROM finance_mirror_records WHERE scope=$1 AND generation=$2 AND database_id=$3
+        AND lower(replace(page->>'id','-',''))=$4 RETURNING ordinal`, [scope, generation, databaseId, normalizeDatabaseId(page.id)]);
+      const ordinal = removed.rows[0]?.ordinal;
+      await client.query(`INSERT INTO finance_mirror_records(scope,generation,database_id,ordinal,page)
+        SELECT $1,$2,$3,COALESCE($4::bigint,(SELECT COALESCE(min(ordinal),1)-1 FROM finance_mirror_records WHERE scope=$1 AND generation=$2 AND database_id=$3)),$5::jsonb`,
+        [scope, generation, databaseId, ordinal ?? null, JSON.stringify(page)]);
+    }
+  }
+  private async transaction<T>(work: (client: Pick<SqlDriver, "query">) => Promise<T>): Promise<T> {
+    const client = this.db.connect ? await this.db.connect() : this.db;
+    try {
+      await client.query("BEGIN");
+      try { const result = await work(client); await client.query("COMMIT"); return result; }
+      catch (error) { await client.query("ROLLBACK"); throw error; }
+    } finally {
+      if ("release" in client && typeof client.release === "function") client.release();
+    }
   }
 }

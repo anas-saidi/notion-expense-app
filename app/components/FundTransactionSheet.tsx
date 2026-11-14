@@ -117,7 +117,7 @@ export function FundTransactionSheet({ transaction, accounts, onClose, onChanged
         </label>
         <div style={fieldStyle}>
           <span style={labelStyle}>Date</span>
-          <DatePicker value={date} onChange={(event) => setDate(event.target.value)} aria-label="Funding date" style={controlStyle} />
+          <DatePicker value={date} onChange={(event) => setDate(event.target.value)} aria-label="Funding date" />
         </div>
         <div style={fieldStyle}>
           <span style={labelStyle}>Account</span>

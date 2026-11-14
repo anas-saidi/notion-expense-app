@@ -8,6 +8,7 @@ import { fetchApiJson, fetchMonthlyData, monthlyDataUrl, readSavedApiJson, fetch
 import { getPlanningMonth, getNextMonth, type PlanningFund } from "@/lib/planning-month";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import { AppShell } from "./components/AppShell";
+import { switchScreen } from "./components/ui/screen-switch";
 import { BillsSection } from "./components/BillsSection";
 import { deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
 import { billShortfalls, habitSuggestions, type DueBill } from "@/lib/suggestions";
@@ -126,6 +127,8 @@ export default function App() {
 
   const [monthError, setMonthError] = useState(false);
   const monthRequest = useRef(0);
+  // The month whose numbers are on screen: a refresh of that same month (after a save) keeps them visible.
+  const shownMonth = useRef<string | null>(null);
   const catalogRequest = useRef(0);
   const accountsRequest = useRef(0);
   const transactionsRequest = useRef(0);
@@ -155,6 +158,8 @@ export default function App() {
   const [budgetRefreshing, setBudgetRefreshing] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [tab, setTab] = useState<AppTab>("home");
+  // Fetch Reflect's code once the app is idle, so its first visit swaps lights instead of blanking while it loads.
+  useEffect(() => { const timer = window.setTimeout(() => { void import("./components/ReflectScreen"); }, 2500); return () => window.clearTimeout(timer); }, []);
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
   const [nextMonthFunds, setNextMonthFunds] = useState<{ categoryId: string; planned: number; reverse?: boolean }[]>([]);
   const monthStartPlannerMonth = useMemo(() => {
@@ -177,6 +182,16 @@ export default function App() {
   const [detailsCategory, setDetailsCategory] = useState<Category | null>(null);
   const [showRebalance, setShowRebalance] = useState(false);
   const [showManageScreen, setShowManageScreen] = useState(false);
+  // Wide screens show Accounts as list and detail: the selected account renders into the panel's pane.
+  const [accountsWide, setAccountsWide] = useState(false);
+  const [accountsPane, setAccountsPane] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1100px)");
+    const sync = () => setAccountsWide(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
   const [showMonthStartPlanner, setShowMonthStartPlanner] = useState(false);
   const [categoryManageMode, setCategoryManageMode] = useState<"fund" | "create" | "edit" | null>(null);
   const [categoryManageCategory, setCategoryManageCategory] = useState<Category | null>(null);
@@ -348,10 +363,10 @@ export default function App() {
 
   const fetchMonthlySummary = async (month?: string) => {
     const request = ++monthRequest.current;
-    setMonthLoading(true);
+    const target = month ?? formatMonthInput(today());
+    if (shownMonth.current !== target) setMonthLoading(true);
     setMonthError(false);
     try {
-      const target = month ?? formatMonthInput(today());
       const { start, end } = monthBounds(`${target}-01`);
       const activityUrl = spendingActivityUrl();
       const [data, activity] = await Promise.all([
@@ -363,6 +378,7 @@ export default function App() {
       if (request !== monthRequest.current) return;
       monthlySnapshot.current = { month: target, data, expires: Date.now() + 15000 };
       applyMonthlyData(target, data);
+      shownMonth.current = target;
       setBudgetTransactions(activity?.transactions ?? []);
     } catch (error) {
       if (request === monthRequest.current) setMonthError(true);
@@ -1233,7 +1249,7 @@ export default function App() {
     <AppShell
       scopeAttention={scopeAttention}
       tab={tab}
-      onTabChange={(t) => { if (t === "history") setReflectView("spending"); setTab(t); setShowManageScreen(false); }}
+      onTabChange={(t) => switchScreen(() => { if (t === "history") setReflectView("spending"); setTab(t); setShowManageScreen(false); })}
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setTransactionType("Expense");
@@ -1266,8 +1282,11 @@ export default function App() {
         <ManageScreen
           accounts={displayAccounts}
           budgetScope={budgetScope}
-          onClose={() => setShowManageScreen(false)}
+          onClose={() => { setShowManageScreen(false); if (accountsWide) { setDetailsAccount(null); setStartBalanceCheck(false); } }}
           onOpenDetails={setDetailsAccount}
+          wide={accountsWide}
+          selectedId={detailsAccount?.id ?? null}
+          onDetailPane={setAccountsPane}
         />
       )}
 
@@ -1318,7 +1337,7 @@ export default function App() {
           balanceReviews={balanceChecksToReview(balanceChecks.checks, balanceChecks.reviewCounts, accounts, budgetScope)}
           onReviewBalance={account => { setStartBalanceCheck(true); setDetailsAccount(account); }}
           balanceChecks={<PendingBalanceChecks onRetry={() => void balanceChecks.refresh()} error={balanceChecks.error} paused={balanceChecks.paused} loading={balanceChecks.loading} />}
-          billsSection={<BillsSection data={billsData} loading={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={checkedAccounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
+          billsSection={<BillsSection data={billsData} loading={billsLoading && !billsData} refreshing={billsLoading || refreshState === "updating"} error={billsError} categories={[...categories, ...frozenCategories]} accounts={checkedAccounts} scope={budgetScope} onRetry={() => { void refreshAffectedData().catch(error => showToast(error.message)); }} onChanged={refreshAffectedData} />}
           monthlyLoading={!monthError && (monthLoading || monthlySummary.start !== monthBounds(`${homeMonth}-01`).start)}
           monthlyError={monthError}
           secondaryLoading={secondaryLoading}
@@ -1340,7 +1359,7 @@ export default function App() {
           transactions={scopedTransactions}
           budgetTransactions={budgetTransactions}
           pendingItems={scopedPendingItems}
-          onOpenHistory={() => { setReflectView("activity"); setTab("history"); }}
+          onOpenHistory={() => switchScreen(() => { setReflectView("activity"); setTab("history"); })}
           onClickTransaction={editTransaction}
           jointUnassigned={jointUnassigned}
           onOpenAssign={() => setShowRebalance(true)}
@@ -1365,6 +1384,7 @@ export default function App() {
           onHomeMonthChange={(month) => {
             if (month === homeMonth) return;
             monthRequest.current += 1;
+            shownMonth.current = null;
             setMonthLoading(true);
             setMonthError(false);
             setHomeMonth(month);
@@ -1396,7 +1416,8 @@ export default function App() {
           onOpenNewCategory={openNewCategory}
           planMonth={monthStartPlannerMonth ?? undefined}
           onOpenPlan={openMonthlyPlan}
-          loading={monthLoading || budgetRefreshing || refreshState === "updating"}
+          // A refresh after a save keeps the rows on screen; placeholders only when there's nothing to show yet.
+          loading={monthLoading || ((budgetRefreshing || refreshState === "updating") && categories.length === 0)}
         />
       )}
 
@@ -1679,6 +1700,9 @@ export default function App() {
       <ContributionDetails open={showContributions} month={homeMonth} onMonthChange={setHomeMonth} currentAdvances={currentAdvances} personalScope={mode === "wife" ? "salma" : "anas"} initialPartner={contributionsPartner} status={contribStatus} loading={monthLoading} error={monthError || !!monthlySummary.contributionError} onClose={() => setShowContributions(false)} onRetry={() => { void fetchMonthlySummary(homeMonth).catch(() => {}); }} onChanged={() => { refreshBudgetData(); }} />
 
       {(accountDetailsLoaded || detailsAccount !== null) && <AccountDetailsSheet
+        // Embedded in the Accounts pane, switching accounts starts each one fresh (no half-done check carried over).
+        key={showManageScreen && accountsWide ? detailsAccount?.id : "sheet"}
+        embedIn={showManageScreen && accountsWide ? accountsPane : null}
         contributions={!monthLoading && !monthError && !monthlySummary.contributionError && detailsAccount && !/saving/i.test(detailsAccount.label) && <ContributionEntry status={contribStatus} scope={scopeFromAccountLabel(detailsAccount.label) ?? budgetScope} onOpen={() => { const owner = scopeFromAccountLabel(detailsAccount.label); setDetailsAccount(null); openContributions(owner === "anas" || owner === "salma" ? owner : undefined); }} />}
         open={detailsAccount !== null}
         startBalanceCheck={startBalanceCheck}

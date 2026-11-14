@@ -148,13 +148,13 @@ export function SavingsWithdrawSheet({ savings, destinations, onClose, onSuccess
 const sheetStyle: CSSProperties = { background: "var(--surface)", borderRadius: "var(--radius-sheet)", overflow: "hidden" };
 const innerStyle: CSSProperties = { padding: "18px 18px calc(22px + env(safe-area-inset-bottom, 0px))", display: "grid", gap: 16, width: "100%", boxSizing: "border-box" };
 const headerStyle: CSSProperties = { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 };
-const titleStyle: CSSProperties = { margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 24, lineHeight: 1.1, color: "var(--text)" };
+const titleStyle: CSSProperties = { margin: "4px 0 0", fontSize: 20, lineHeight: 1.2, fontWeight: 600, color: "var(--text)" };
 const closeStyle: CSSProperties = { width: 44, height: 44, border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 const hintStyle: CSSProperties = { minHeight: 42, borderRadius: 14, background: "var(--surface2)", color: "var(--text2)", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 12 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 7 };
 const labelStyle: CSSProperties = { fontSize: 12, fontWeight: 700, color: "var(--text2)" };
 const amountWrapStyle: CSSProperties = { minHeight: 56, borderRadius: "var(--radius-control)", border: "1px solid var(--border)", background: "var(--surface)", display: "flex", alignItems: "center", gap: 10, padding: "0 14px" };
-const amountInputStyle: CSSProperties = { flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--text2)", fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800 };
+const amountInputStyle: CSSProperties = { flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "var(--text2)", fontSize: 28, fontWeight: 500, fontVariantNumeric: "tabular-nums" };
 const errorTextStyle: CSSProperties = { fontSize: 12, color: "var(--danger)" };
 const confirmStyle: CSSProperties = { padding: "12px 14px", borderRadius: "var(--radius-control)", background: "var(--surface2)", color: "var(--text2)" };
 // Neutral, not the accent: taking out of savings shouldn't look like a reward.

@@ -130,7 +130,7 @@ export function AccountIncomeSheet({ open, account, onClose, onSuccess }: Accoun
 
             <label style={fieldStyle}>
               <span style={labelStyle}>Date</span>
-              <DatePicker value={date} onChange={(event) => setDate(event.target.value)} style={inputStyle} />
+              <DatePicker value={date} onChange={(event) => setDate(event.target.value)} />
             </label>
           </> : (
             <button type="button" aria-expanded={false} aria-label={`Edit description and date: ${name.trim()}, ${dateLabel}`} onClick={() => setDetailsOpen(true)} style={summaryRowStyle}>
@@ -223,9 +223,9 @@ const eyebrowStyle: CSSProperties = {
 
 const titleStyle: CSSProperties = {
   margin: "4px 0 0",
-  fontFamily: "var(--font-display)",
-  fontSize: 26,
-  lineHeight: 1,
+  fontSize: 20,
+  lineHeight: 1.2,
+  fontWeight: 600,
   color: "var(--text)",
 };
 
@@ -302,9 +302,9 @@ const amountInputStyle: CSSProperties = {
   outline: "none",
   background: "transparent",
   color: "var(--text2)",
-  fontFamily: "var(--font-display)",
   fontSize: 28,
-  fontWeight: 800,
+  fontWeight: 500,
+  fontVariantNumeric: "tabular-nums",
 };
 
 

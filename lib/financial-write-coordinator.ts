@@ -55,11 +55,14 @@ export function withDatabaseFinancialWrite<T>(action: () => Promise<T>) {
     if (!store || !token) return action();
     const scope = mirrorScope(token);
     const fence = await store.beginWrite(scope);
-    try { return await action(); }
+    const { captureWrites, closeWriteFence, newWriteCapture } = await import("./mirror/write-capture");
+    const capture = newWriteCapture();
+    let completed = false;
+    try { const result = await captureWrites(capture, action); completed = true; return result; }
     finally {
-      await store.finishWrite(scope, fence);
-      const { scheduleMirrorSync } = await import("./mirror/sync");
-      scheduleMirrorSync(token, true);
+      // Patches the written pages into the snapshot so the reads that follow
+      // stay on the mirror; schedules the settled full import either way.
+      await closeWriteFence(token, store, scope, fence, completed ? capture : null);
     }
   });
 }

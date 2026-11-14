@@ -1,7 +1,7 @@
 "use client";
 import { accountIconSource, categoryIconSource } from "../../lib/category-icons";
 
-import { SheetBody, SheetHeader } from "./ui/SheetLayout";
+import { SheetHeader } from "./ui/SheetLayout";
 
 import { changeBalanceCheck } from "../../lib/balance-check-actions";
 import { money, type BalanceCheckView } from "../../lib/balance-checks";
@@ -9,8 +9,9 @@ import { Skeleton, SkeletonRegion } from "./ui/Skeleton";
 import { DatePicker } from "./DatePicker";
 import { ChoicePicker } from "./ChoicePicker";
 
-import { useState, useMemo, useEffect, type CSSProperties, type ReactNode } from "react";
-import { useReducedMotion } from "motion/react";
+import { useState, useMemo, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { createPortal } from "react-dom";
 import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { BottomSheet } from "./ui/BottomSheet";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -30,6 +31,7 @@ import {
   ArrowUpIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  PlusIcon,
   TrendingUpIcon,
 } from "./ui/icons";
 
@@ -50,6 +52,8 @@ type AccountDetailsSheetProps = {
   onIncome: (account: Account) => void;
   onReconcileSuccess: (message: string) => void;
   onTransactionsChanged?: () => void;
+  /** Desktop Accounts panel: render into this pane instead of opening a dialog. */
+  embedIn?: HTMLElement | null;
 };
 
 type ReconcileStatus = "idle" | "saving" | "success" | "error";
@@ -86,6 +90,7 @@ export function AccountDetailsSheet({
   onIncome,
   onReconcileSuccess,
   onTransactionsChanged,
+  embedIn,
 }: AccountDetailsSheetProps) {
   const reducedMotion = useReducedMotion();
   const [showReconcile, setShowReconcile] = useState(false);
@@ -223,6 +228,9 @@ export function AccountDetailsSheet({
     onClose();
   };
 
+  const reconcileBackRef = useRef<HTMLButtonElement>(null);
+  const checkButtonRef = useRef<HTMLButtonElement>(null);
+  const reconcileBusy = checkSaving || txnSaving || reconcileStatus === "saving";
   const closeReconcile = () => {
     if (checkSaving || txnSaving || reconcileStatus === "saving") return;
     setShowReconcile(false);
@@ -232,6 +240,8 @@ export function AccountDetailsSheet({
     setShowAddTxn(false);
     setAddedTxns([]);
     setTxnError("");
+    // Back to the account: focus returns to the action that opened the step.
+    requestAnimationFrame(() => checkButtonRef.current?.focus({ preventScroll: true }));
   };
 
   // homeMonth transactions involving this account — expenses/income by accountId,
@@ -426,21 +436,8 @@ export function AccountDetailsSheet({
 
   const isNegative = liveBalance < 0;
 
-  return (
-    <BottomSheet
-      open={open}
-      onClose={handleClose}
-      label={`${account.label} details`}
-      detent="content"
-      size="account"
-      desktopViewportCentered
-      snapPoints={[0, 0.88]}
-      initialSnap={1}
-      maxHeight="calc(100dvh - 20px)"
-      panelStyle={panelStyle}
-      contentStyle={{ paddingTop: 0 }}
-    >
-      <div className="account-desktop-layout" style={innerStyle}>
+  const body = (
+      <div className="account-desktop-layout" data-embedded={embedIn ? "" : undefined} style={innerStyle}>
 
         {/* Header */}
         <SheetHeader className="account-desktop-header" style={headerStyle}>
@@ -451,12 +448,228 @@ export function AccountDetailsSheet({
               {account.type && <p style={acctTypeStyle}>{account.type}</p>}
             </div>
           </div>
-          <button onClick={handleClose} aria-label="Close" style={closeStyle}>
+          {!embedIn && <button onClick={handleClose} aria-label="Close" style={closeStyle}>
             <XIcon strokeWidth={2.2} />
-          </button>
+          </button>}
         </SheetHeader>
 
         <div className="account-desktop-overview">
+        {showReconcile ? (
+          // Check balance is a step inside this sheet, not a second dialog: it takes the balance panel's place,
+          // so the month's activity stays in view to spot a missing transaction.
+          <motion.section key="check" aria-label="Check balance" style={reconcilePanelStyle}
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 16 }} animate={reducedMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}>
+            <div style={reconcileHeaderStyle}>
+              <button type="button" ref={reconcileBackRef} onClick={closeReconcile} disabled={reconcileBusy} aria-label={`Back to ${account.label}`} style={reconcileBackStyle}><ChevronLeftIcon size={20} strokeWidth={2.2} /></button>
+              <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                <h3 style={reconcileTitleStyle}>Check balance</h3>
+                {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
+              </div>
+            </div>
+            {/* While a save runs, the whole form is read-only: a changed number would no longer match what is being saved. */}
+            <fieldset disabled={reconcileBusy} aria-busy={reconcileBusy || undefined} style={reconcileLockStyle}>
+            <div style={reconcileRowStyle}>
+              <label style={reconcileFieldStyle}>
+                <span style={reconcileLabelStyle}>App balance</span>
+                <div style={reconcileReadonlyStyle}>
+                  <Money value={liveBalance} />
+                </div>
+              </label>
+              <label style={reconcileFieldStyle}>
+                <span style={reconcileLabelStyle}>Actual balance</span>
+                <div style={reconcileInputWrapStyle}>
+                  <input
+                    type="text"
+                    value={actualBalance}
+                    onChange={e => setActualBalance(e.target.value)}
+                    placeholder="0"
+                    aria-label="Actual balance"
+                    inputMode="decimal"
+                    style={reconcileInputStyle}
+                    autoFocus
+                  />
+                  <Currency style={reconcileCurrencyStyle} />
+                </div>
+              </label>
+            </div>
+
+            {difference !== null && (
+              <div style={differenceBandStyle(difference)}>
+                <span style={differenceLabelStyle}>Difference</span>
+                <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {difference > 0 ? "+" : ""}{fmt(Math.round(difference * 100) / 100)}
+                </strong>
+              </div>
+            )}
+
+            {/* Add missed transaction — shrinks the difference above instead of reconciling it away */}
+            {((difference !== null && difference !== 0) || showAddTxn || addedTxns.length > 0) && <div style={addTxnSectionStyle}>
+              <div style={addTxnHeaderRowStyle}>
+                <p style={addTxnHintStyle}>Missing a transaction before this count?</p>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }}
+                  style={addTxnToggleStyle}
+                >
+                  {showAddTxn ? "Cancel" : <><PlusIcon size={16} strokeWidth={2.2} aria-hidden="true" />Add</>}
+                </button>
+              </div>
+
+              {showAddTxn && (
+                <div style={addTxnFormStyle}>
+                  <div style={txnTypeToggleStyle}>
+                    <button
+                      type="button"
+                      onClick={() => setTxnType("Expense")}
+                      style={txnTypePillStyle(txnType === "Expense")}
+                    >
+                      Expense
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTxnType("Income")}
+                      style={txnTypePillStyle(txnType === "Income")}
+                    >
+                      Income
+                    </button>
+                  </div>
+
+                  <div style={reconcileInputWrapStyle}>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={txnAmount}
+                      onChange={e => setTxnAmount(e.target.value)}
+                      placeholder="Amount"
+                      style={reconcileInputStyle}
+                    />
+                    <Currency style={reconcileCurrencyStyle} />
+                  </div>
+
+                  <input
+                    type="text"
+                    value={txnName}
+                    onChange={e => setTxnName(e.target.value)}
+                    placeholder={txnType === "Expense" ? "What was it? (optional)" : "Source (optional)"}
+                    style={txnTextInputStyle}
+                  />
+
+                  {txnType === "Expense" && (
+                    <ChoicePicker aria-label="Category"
+                      value={txnCategoryId}
+                      onChange={e => setTxnCategoryId(e.target.value)}
+                      style={txnSelectStyle}
+                    >
+                      <option value="">Category…</option>
+                      {activeCategories.map(c => (
+                        <option key={c.id} value={c.id} data-icon={categoryIconSource(c.icon, c.name)}>{c.name}</option>
+                      ))}
+                    </ChoicePicker>
+                  )}
+
+                  <DatePicker
+                    value={txnDate}
+                    onChange={e => setTxnDate(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                  />
+
+                  {txnBelowZero > 0 && txnCategory && <Banner tone="warning" compact><strong>{txnCategory.name}</strong> goes <strong>{fmt(Math.round(txnBelowZero))}</strong> below zero.</Banner>}
+                  {txnError && <Banner role="alert" tone="danger" compact>{txnError}</Banner>}
+
+                  <button
+                    type="button"
+                    onClick={submitAddTxn}
+                    disabled={txnSaving || reconcileStatus === "saving" || reconcileStatus === "success"}
+                    style={{ ...txnAddBtnStyle, opacity: txnSaving ? 0.7 : 1 }}
+                  >
+                    {txnSaving && <span style={spinnerStyle} />}
+                    {txnSaving ? "Adding…" : txnBelowZero > 0 ? "Save anyway" : `Add ${txnType.toLowerCase()}`}
+                  </button>
+                </div>
+              )}
+
+              {addedTxns.length > 0 && (
+                <div style={addedListStyle}>
+                  {addedTxns.map(t => (
+                    <div key={t.id} style={addedRowStyle}>
+                      <span style={addedNameStyle}>{t.name}</span>
+                      <span style={{
+                        ...addedAmtStyle,
+                        color: "var(--text2)",
+                      }}>
+                        {t.type === "Income" ? "+" : "−"}{fmt(t.amount)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => undoAddedTxn(t.id)}
+                        aria-label={`Remove ${t.name}`}
+                        style={undoBtnStyle}
+                      >
+                        <XIcon size={13} strokeWidth={2.2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>}
+
+            {checkMessage && <Banner tone="success" compact role="status">{checkMessage}</Banner>}
+            {reconcileError && (
+              <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
+            )}
+            {(() => {
+              // One main button that follows the difference; saving the count for later stays a quiet link.
+              const busy = checkSaving || txnSaving || reconcileStatus === "saving";
+              const canResolve = Boolean(checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0);
+              const showSaveLink = Number.isFinite(parsedActual) && !isFullyReconciled && reconcileStatus !== "success";
+              return <>
+                {canResolve ? (
+                  <button type="button" onClick={() => void changeCheck("close")} disabled={busy}
+                    style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)" }}>
+                    {checkSaving ? "Saving…" : "Mark resolved"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={submitReconcile}
+                    disabled={!Number.isFinite(parsedActual) || busy || reconcileStatus === "success"}
+                    style={{
+                      ...reconcileSubmitStyle,
+                      opacity: !Number.isFinite(parsedActual) ? 0.42 : 1,
+                      background: reconcileStatus === "success"
+                        ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
+                        : reconcileStatus === "error"
+                        ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
+                        : "var(--accent)",
+                      color: reconcileStatus === "success"
+                        ? "var(--success)"
+                        : reconcileStatus === "error"
+                        ? "var(--danger)"
+                        : "var(--accent-ink)",
+                    }}
+                  >
+                    {reconcileStatus === "saving" && (
+                      <span style={spinnerStyle} />
+                    )}
+                    {reconcileStatus === "success" && <CheckIcon size={15} />}
+                    {reconcileStatus === "saving" ? "Saving..." :
+                     reconcileStatus === "success" ? "Reconciled" :
+                     reconcileStatus === "error" ? "Retry" :
+                     isFullyReconciled ? "Mark as reconciled" :
+                     "Reconcile difference"}
+                  </button>
+                )}
+                {showSaveLink && (
+                  <button type="button" onClick={() => void changeCheck("save")} disabled={busy} style={saveForLaterLinkStyle}>
+                    {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : savedCountForReview != null ? "Confirm balance" : "Save for later"}
+                  </button>
+                )}
+              </>;
+            })()}
+            </fieldset>
+          </motion.section>
+        ) : (<>
         {/* Balance hero */}
         <div style={heroStyle}>
           <div style={heroTopRowStyle}>
@@ -650,224 +863,13 @@ export function AccountDetailsSheet({
             icon={<ScaleIcon size={18} strokeWidth={2.2} />}
             label="Check balance"
             ariaLabel="Check balance"
+            buttonRef={checkButtonRef}
             onClick={() => { setCheckVersion(balanceCheck?.version ?? null); setActualBalance(balanceCheck ? String(balanceCheck.estimatedActual) : savedCountForReview != null ? String(savedCountForReview) : ""); setCheckMessage(null); setShowReconcile(true); }}
           />
         </div>
 
-        {/* Reconcile form */}
-        {showReconcile && (
-          <BottomSheet open onClose={closeReconcile} label="Check balance" detent="content" layered size="standard" zIndex={140} panelStyle={{ background: "var(--surface)", borderRadius: "var(--radius-sheet)" }}>
-          <SheetBody style={reconcilePanelStyle}>
-            <SheetHeader style={reconcileHeaderStyle}>
-              <div style={{ display: "grid", gap: 5, minWidth: 0 }}>
-                <h2 style={reconcileTitleStyle}>Check {account.label}</h2>
-                {balanceCheck && <p style={reconcileHintStyle}>Checked {new Date(balanceCheck.checkedAt).toLocaleDateString("en-GB", { timeZone: "Africa/Casablanca", day: "numeric", month: "short" })}</p>}
-              </div>
-              <button type="button" className="sheet-close-button" onClick={closeReconcile} aria-label="Close balance check"><XIcon size={18} /></button>
-            </SheetHeader>
-            <div style={reconcileRowStyle}>
-              <label style={reconcileFieldStyle}>
-                <span style={reconcileLabelStyle}>App balance</span>
-                <div style={reconcileReadonlyStyle}>
-                  <Money value={liveBalance} />
-                </div>
-              </label>
-              <label style={reconcileFieldStyle}>
-                <span style={reconcileLabelStyle}>Actual balance</span>
-                <div style={reconcileInputWrapStyle}>
-                  <input
-                    type="text"
-                    value={actualBalance}
-                    onChange={e => setActualBalance(e.target.value)}
-                    placeholder="0"
-                    aria-label="Actual balance"
-                    inputMode="decimal"
-                    style={reconcileInputStyle}
-                    autoFocus
-                  />
-                  <Currency style={reconcileCurrencyStyle} />
-                </div>
-              </label>
-            </div>
 
-            {difference !== null && (
-              <div style={differenceBandStyle(difference)}>
-                <span style={differenceLabelStyle}>Difference</span>
-                <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {difference > 0 ? "+" : ""}{fmt(Math.round(difference * 100) / 100)}
-                </strong>
-              </div>
-            )}
-
-            {/* Add missed transaction — shrinks the difference above instead of reconciling it away */}
-            {((difference !== null && difference !== 0) || showAddTxn || addedTxns.length > 0) && <div style={addTxnSectionStyle}>
-              <div style={addTxnHeaderRowStyle}>
-                <p style={addTxnHintStyle}>Missing a transaction before this count?</p>
-                <button
-                  type="button"
-                  onClick={() => { setShowAddTxn(v => !v); setTxnError(""); }}
-                  style={addTxnToggleStyle}
-                >
-                  {showAddTxn ? "Cancel" : "+ Add"}
-                </button>
-              </div>
-
-              {showAddTxn && (
-                <div style={addTxnFormStyle}>
-                  <div style={txnTypeToggleStyle}>
-                    <button
-                      type="button"
-                      onClick={() => setTxnType("Expense")}
-                      style={txnTypePillStyle(txnType === "Expense")}
-                    >
-                      Expense
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTxnType("Income")}
-                      style={txnTypePillStyle(txnType === "Income")}
-                    >
-                      Income
-                    </button>
-                  </div>
-
-                  <div style={reconcileInputWrapStyle}>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={txnAmount}
-                      onChange={e => setTxnAmount(e.target.value)}
-                      placeholder="Amount"
-                      style={reconcileInputStyle}
-                    />
-                    <Currency style={reconcileCurrencyStyle} />
-                  </div>
-
-                  <input
-                    type="text"
-                    value={txnName}
-                    onChange={e => setTxnName(e.target.value)}
-                    placeholder={txnType === "Expense" ? "What was it? (optional)" : "Source (optional)"}
-                    style={txnTextInputStyle}
-                  />
-
-                  {txnType === "Expense" && (
-                    <ChoicePicker aria-label="Category"
-                      value={txnCategoryId}
-                      onChange={e => setTxnCategoryId(e.target.value)}
-                      style={txnSelectStyle}
-                    >
-                      <option value="">Category…</option>
-                      {activeCategories.map(c => (
-                        <option key={c.id} value={c.id} data-icon={categoryIconSource(c.icon, c.name)}>{c.name}</option>
-                      ))}
-                    </ChoicePicker>
-                  )}
-
-                  <DatePicker
-                    value={txnDate}
-                    onChange={e => setTxnDate(e.target.value)}
-                    max={new Date().toISOString().slice(0, 10)}
-                    style={txnSelectStyle}
-                  />
-
-                  {txnBelowZero > 0 && txnCategory && <Banner tone="warning" compact><strong>{txnCategory.name}</strong> goes <strong>{fmt(Math.round(txnBelowZero))}</strong> below zero.</Banner>}
-                  {txnError && <Banner role="alert" tone="danger" compact>{txnError}</Banner>}
-
-                  <button
-                    type="button"
-                    onClick={submitAddTxn}
-                    disabled={txnSaving || reconcileStatus === "saving" || reconcileStatus === "success"}
-                    style={{ ...txnAddBtnStyle, opacity: txnSaving ? 0.7 : 1 }}
-                  >
-                    {txnSaving && <span style={spinnerStyle} />}
-                    {txnSaving ? "Adding…" : txnBelowZero > 0 ? "Save anyway" : `Add ${txnType.toLowerCase()}`}
-                  </button>
-                </div>
-              )}
-
-              {addedTxns.length > 0 && (
-                <div style={addedListStyle}>
-                  {addedTxns.map(t => (
-                    <div key={t.id} style={addedRowStyle}>
-                      <span style={addedNameStyle}>{t.name}</span>
-                      <span style={{
-                        ...addedAmtStyle,
-                        color: "var(--text2)",
-                      }}>
-                        {t.type === "Income" ? "+" : "−"}{fmt(t.amount)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => undoAddedTxn(t.id)}
-                        aria-label={`Remove ${t.name}`}
-                        style={undoBtnStyle}
-                      >
-                        <XIcon size={13} strokeWidth={2.2} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>}
-
-            {checkMessage && <Banner tone="success" compact role="status">{checkMessage}</Banner>}
-            {reconcileError && (
-              <Banner role="alert" tone="danger" compact>{reconcileError}</Banner>
-            )}
-            {(() => {
-              // One main button that follows the difference; saving the count for later stays a quiet link.
-              const busy = checkSaving || txnSaving || reconcileStatus === "saving";
-              const canResolve = Boolean(checkVersion && isFullyReconciled && balanceCheck && money(parsedActual - balanceCheck.estimatedActual) === 0);
-              const showSaveLink = Number.isFinite(parsedActual) && !isFullyReconciled && reconcileStatus !== "success";
-              return <>
-                {canResolve ? (
-                  <button type="button" onClick={() => void changeCheck("close")} disabled={busy}
-                    style={{ ...reconcileSubmitStyle, background: "var(--accent)", color: "var(--accent-ink)" }}>
-                    {checkSaving ? "Saving…" : "Mark resolved"}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={submitReconcile}
-                    disabled={!Number.isFinite(parsedActual) || busy || reconcileStatus === "success"}
-                    style={{
-                      ...reconcileSubmitStyle,
-                      opacity: !Number.isFinite(parsedActual) ? 0.42 : 1,
-                      background: reconcileStatus === "success"
-                        ? "color-mix(in srgb, var(--success) 12%, var(--surface))"
-                        : reconcileStatus === "error"
-                        ? "color-mix(in srgb, var(--danger) 10%, var(--surface))"
-                        : "var(--accent)",
-                      color: reconcileStatus === "success"
-                        ? "var(--success)"
-                        : reconcileStatus === "error"
-                        ? "var(--danger)"
-                        : "var(--accent-ink)",
-                    }}
-                  >
-                    {reconcileStatus === "saving" && (
-                      <span style={spinnerStyle} />
-                    )}
-                    {reconcileStatus === "success" && <CheckIcon size={15} />}
-                    {reconcileStatus === "saving" ? "Saving..." :
-                     reconcileStatus === "success" ? "Reconciled" :
-                     reconcileStatus === "error" ? "Retry" :
-                     isFullyReconciled ? "Mark as reconciled" :
-                     "Reconcile difference"}
-                  </button>
-                )}
-                {showSaveLink && (
-                  <button type="button" onClick={() => void changeCheck("save")} disabled={busy} style={saveForLaterLinkStyle}>
-                    {checkSaving ? "Saving…" : checkVersion ? "Update actual balance" : savedCountForReview != null ? "Confirm balance" : "Save for later"}
-                  </button>
-                )}
-              </>;
-            })()}
-          </SheetBody>
-          </BottomSheet>
-        )}
-
+        </>)}
         </div>
         <div className="account-desktop-activity">
         {/* Activity list */}
@@ -912,6 +914,26 @@ export function AccountDetailsSheet({
         </div>
 
       </div>
+  );
+
+  // On desktop the Accounts panel shows this account beside the list: same content, no dialog of its own.
+  if (embedIn) return createPortal(body, embedIn);
+
+  return (
+    <BottomSheet
+      open={open}
+      onClose={handleClose}
+      label={`${account.label} details`}
+      detent="content"
+      size="account"
+      desktopViewportCentered
+      snapPoints={[0, 0.88]}
+      initialSnap={1}
+      maxHeight="calc(100dvh - 20px)"
+      panelStyle={panelStyle}
+      contentStyle={{ paddingTop: 0 }}
+    >
+      {body}
     </BottomSheet>
   );
 }
@@ -923,7 +945,9 @@ function ActionBtn({
   onClick,
   bg = "color-mix(in srgb, var(--surface2) 54%, var(--surface))",
   ink = "var(--text2)",
+  buttonRef,
 }: {
+  buttonRef?: React.Ref<HTMLButtonElement>;
   icon: React.ReactNode;
   label: string;
   ariaLabel: string;
@@ -933,6 +957,7 @@ function ActionBtn({
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
@@ -1095,13 +1120,14 @@ const heroLabelStyle: CSSProperties = {
   color: "var(--muted)",
 };
 
+/** The sheet's main number, set like every sheet's (category Available, bill amount): 34px, medium weight, body font. */
 const heroValueStyle: CSSProperties = {
-  fontFamily: "var(--font-display)",
-  fontSize: "clamp(2.4rem, 12vw, 3.6rem)",
-  fontWeight: 800,
-  lineHeight: 0.92,
-  letterSpacing: -1,
+  margin: 0,
+  fontSize: 34,
+  fontWeight: 500,
+  lineHeight: 1,
   color: "var(--text)",
+  fontVariantNumeric: "tabular-nums",
 };
 
 const heroSubStyle: CSSProperties = {
@@ -1171,25 +1197,38 @@ const actionIconStyle: CSSProperties = {
 
 // Reconcile panel
 const reconcilePanelStyle: CSSProperties = {
-  padding: "8px 20px 24px",
   display: "flex",
   flexDirection: "column",
   gap: 14,
+  minWidth: 0,
 };
 
 const reconcileHeaderStyle: CSSProperties = {
   display: "flex",
-  alignItems: "start",
-  justifyContent: "space-between",
-  gap: 16,
-  marginBottom: 4,
+  alignItems: "center",
+  gap: 4,
+  marginLeft: -12,
+};
+
+const reconcileBackStyle: CSSProperties = {
+  width: 44,
+  height: 44,
+  flexShrink: 0,
+  border: "none",
+  background: "transparent",
+  color: "var(--text2)",
+  borderRadius: "50%",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
 };
 
 const reconcileTitleStyle: CSSProperties = {
   margin: 0,
-  fontSize: 20,
-  lineHeight: 1.2,
-  fontWeight: 750,
+  fontSize: 17,
+  lineHeight: 1.25,
+  fontWeight: 650,
   color: "var(--text)",
   overflowWrap: "anywhere",
 };
@@ -1221,15 +1260,13 @@ const reconcileLabelStyle: CSSProperties = {
   
 };
 
+/** A read-only figure: plain text on the sheet, never boxed like an input it isn't. Same height as the input beside it. */
 const reconcileReadonlyStyle: CSSProperties = {
   minWidth: 0,
   overflowWrap: "anywhere",
   minHeight: 48,
-  borderRadius: 12,
-  background: "color-mix(in srgb, var(--surface2) 50%, var(--surface))",
   display: "flex",
   alignItems: "center",
-  padding: "0 13px",
   fontSize: 15,
   fontWeight: 600,
   color: "var(--text2)",
@@ -1264,17 +1301,14 @@ const reconcileInputStyle: CSSProperties = {
 
 const reconcileCurrencyStyle: CSSProperties = { flexShrink: 0 };
 
+/** Flat on the sheet like any notice: the colour of the number carries the state, not a tinted band. */
 const differenceBandStyle = (diff: number): CSSProperties => ({
   minHeight: 40,
-  borderRadius: 999,
-  background: diff < 0
-    ? "color-mix(in srgb, var(--danger) 8%, var(--surface))"
-    : "var(--surface2)",
   color: diff < 0 ? "var(--danger)" : "var(--text2)",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "0 12px",
+  borderTop: "1px solid color-mix(in srgb, var(--border) 28%, transparent)",
   fontSize: 13,
   fontWeight: 600,
 });
@@ -1305,18 +1339,21 @@ const addTxnHintStyle: CSSProperties = {
   lineHeight: 1.4,
 };
 
+/** A quiet text action, like the other secondary actions in sheets. */
 const addTxnToggleStyle: CSSProperties = {
   minHeight: 44,
-  padding: "0 12px",
-  borderRadius: 10,
-  border: "1px solid color-mix(in srgb, var(--border2) 60%, transparent)",
-  background: "var(--surface)",
-  color: "var(--text2)",
-  fontSize: 12,
-  fontWeight: 700,
+  padding: "0 4px 0 8px",
+  border: "none",
+  background: "transparent",
+  color: "var(--text)",
+  fontSize: 14,
+  fontWeight: 600,
   cursor: "pointer",
   flexShrink: 0,
   whiteSpace: "nowrap",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
 };
 
 const addTxnFormStyle: CSSProperties = {
@@ -1465,6 +1502,8 @@ const sectionHeaderStyle: CSSProperties = {
   justifyContent: "space-between",
 };
 
+/** A plain wrapper (no border or inset) whose only job is disabling every control inside while saving. Keeps the panel's gap. */
+const reconcileLockStyle: CSSProperties = { display: "contents", border: 0, margin: 0, padding: 0, minWidth: 0 };
 const saveForLaterLinkStyle: CSSProperties = {
   justifySelf: "center",
   border: "none",

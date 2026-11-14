@@ -18,7 +18,6 @@ import { MASCOT_HERO_SIZE, MascotHero } from "./mascot/MascotHero";
 import { GrainGlow } from "./grain/GrainGlow";
 import { PALETTES } from "./grain/palettes";
 import { motion, useReducedMotion } from "motion/react";
-import { MascotTap } from "./mascot/MascotTap";
 import { spendingJarItems } from "./mascot/budgetJar";
 
 import { BottomSheet } from "./ui/BottomSheet";
@@ -139,7 +138,7 @@ export function ReflectScreen(props: Props) {
   };
 
   const periodControls = <ScreenToolbar label="Reflect period and filters" className="reflect-period-toolbar">
-    <DatePickerTrigger label={label} open={showPeriod} className="composer-picker-chip" showChevron={false}
+    <DatePickerTrigger label={label} open={showPeriod} variant="chip"
       ariaLabel={`Time period: ${label}`} onClick={() => { setCustomPeriod(props.period.start ? props.period : reflectPreset("month")); setShowCustomRange(!!props.period.start && !PERIOD_PRESETS.some(([key]) => { const preset = reflectPreset(key); return preset.start === props.period.start && preset.end === props.period.end; })); setShowPeriod(true); }} />
     {props.view === "spending" && <LiquidButton type="button" title="Filter spending" aria-label={`Filter spending${filterCount ? `, ${filterCount} exclusions` : ""}`} aria-haspopup="dialog" aria-expanded={showFilters}
       onClick={() => setShowFilters(true)} style={{ ...quietButtonStyle, width: 44, height: 44, padding: 0, flexShrink: 0, borderRadius: "50%", border: 0, ...(filterCount ? { background: "var(--select-wash)" } : {}), color: filterCount ? "var(--select-ink)" : "var(--text2)" }}>
@@ -166,10 +165,10 @@ export function ReflectScreen(props: Props) {
         ? <SkeletonRegion label="Loading activity chart" style={{ height: SCREEN_HERO_CHART_HEIGHT, display: "grid", gridTemplateRows: "16px 1fr", gap: 16 }}><Skeleton style={{ width: "60%", height: 16, marginInline: "auto" }} /><Skeleton style={{ height: "100%", borderRadius: 8 }} /></SkeletonRegion>
         : <ReflectFlowChart points={flow} height={SCREEN_HERO_CHART_HEIGHT} />}</section>
       // Loading shows the light itself (no glass skeleton blob in the light look), so nothing swaps when data arrives.
-      : <MascotTap label="React to spending" style={jarButtonStyle}>
+      : <div style={jarFrameStyle}>
         <MascotHero look="light" variant="split" scope={props.budgetScope} items={props.transactionsLoading ? NO_JAR_ITEMS : jarItems} spentPct={null} size={MASCOT_HERO_SIZE} glow={props.transactionsLoading ? null : planMood}
           signal={!props.transactionsLoading && !props.error && breakdown.total === 0 ? { kind: "sleep", label: "No spending this period" } : null} />
-      </MascotTap>}
+      </div>}
     </motion.div>
   </div>;
 
@@ -245,7 +244,7 @@ function OverviewMoney({ value, currency = false }: { value: number; currency?: 
 function SheetHeader({ title, onClose }: { title: string; onClose: () => void }) { return <header className="sheet-header" style={{ display: "flex", flexShrink: 0, alignItems: "center", justifyContent: "space-between", gap: 16 }}><h2 style={{ fontSize: 20, fontWeight: 600, margin: 0, overflowWrap: "anywhere" }}>{title}</h2><button type="button" aria-label="Close" onClick={onClose} style={{ ...quietButtonStyle, padding: 0, width: 44, flexShrink: 0 }}><XIcon size={20} /></button></header>; }
 function FilterGroup({ title, items, excluded, onToggle, onAll, onNone }: { title: string; items: { id: string; name: string }[]; excluded: string[]; onToggle: (id: string) => void; onAll: () => void; onNone: () => void }) { return <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}><legend style={sectionTitleStyle}>{title}</legend><div style={{ display: "flex", gap: 8, marginBottom: 4 }}><button onClick={onAll} style={quietButtonStyle}>All</button><button onClick={onNone} style={quietButtonStyle}>None</button></div>{items.map(item => <label key={item.id} style={{ minHeight: 48, display: "flex", gap: 12, alignItems: "center", fontSize: 15, color: "var(--text2)", cursor: "pointer" }}><input type="checkbox" checked={!excluded.includes(item.id)} onChange={() => onToggle(item.id)} style={{ width: 20, height: 20, accentColor: "var(--select-ink)", flexShrink: 0 }} /><span style={{ overflowWrap: "anywhere" }}>{item.name}</span></label>)}{!items.length && <p style={mutedStyle}>No {title.toLowerCase()} in this period.</p>}</fieldset>; }
 /** A flat selected fill: Joint's --select-wash is a gradient. */
-const jarButtonStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: MASCOT_HERO_SIZE, border: 0, padding: 0, background: "transparent", font: "inherit", cursor: "pointer", WebkitTapHighlightColor: "transparent" };
+const jarFrameStyle: CSSProperties = { display: "grid", placeItems: "center", width: "100%", minHeight: MASCOT_HERO_SIZE };
 const PERIOD_PRESETS = [["month", "This month"], ["last-month", "Last month"], ["3", "Last 3 months"], ["6", "Last 6 months"], ["12", "Last 12 months"], ["year", "This year"], ["last-year", "Last year"], ["all", "All time"]] as const;
 const mutedStyle: CSSProperties = { fontSize: 13, color: "var(--muted)", lineHeight: 1.5 };
 const sectionTitleStyle: CSSProperties = { fontSize: 16, fontWeight: 600, margin: 0, color: "var(--text2)" };

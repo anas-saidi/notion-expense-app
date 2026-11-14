@@ -917,12 +917,6 @@ html { scrollbar-gutter: stable; }
   outline-offset: -3px;
 }
 
-.mascot-tap:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -3px;
-  border-radius: var(--radius-control);
-}
-
 .appearance-theme-button,
 .appearance-system-button {
   min-width: 44px;
@@ -1685,6 +1679,14 @@ textarea.typed-entry-line::placeholder { color: var(--muted); opacity: 1; }
   .account-desktop-overview { background:var(--surface2); border-radius:16px; padding:20px; }
   .account-desktop-activity { padding:8px 0; }
 }
+
+/* Accounts on wide screens: list and detail in one panel, the selected account open beside the list. */
+.manage-list-pane { display:grid; align-content:start; gap:32px; min-width:0; }
+.manage-screen[data-wide] { grid-template-columns:300px minmax(0, 1fr); align-items:stretch; gap:0 !important; padding:0 !important; min-height:min(720px, calc(100dvh - 40px)); }
+.manage-screen[data-wide] .manage-list-pane { gap:24px; padding:20px 16px 24px 20px; border-right:1px solid var(--border); }
+.manage-screen[data-wide] .manage-account-row { padding-inline:10px !important; border-radius:12px; }
+.manage-screen[data-wide] .manage-account-row[aria-current="true"] { background:var(--surface2) !important; }
+.manage-detail-pane { min-width:0; }
 
 .desktop-nav-actions { display:none; }
 @media (min-width:900px) {

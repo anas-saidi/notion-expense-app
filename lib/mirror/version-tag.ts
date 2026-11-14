@@ -8,7 +8,7 @@ export type MirrorVersionTag = { etag: string; syncedAt: string };
 
 /**
  * A validator for a read built only from the stored Notion copy. It changes when
- * the copy's content changes (new generation), on every deploy, every hour (so
+ * the copy's content changes (new generation, or a write patching pages in), on every deploy, every hour (so
  * date-based labels such as "due today" roll over), and per signed-in session.
  * Only when every financial record lives in Notion (Finance Records configured):
  * then a save always changes the copy, and the copy is the only data source.
@@ -23,13 +23,13 @@ export async function mirrorVersionTag(request: Request, now = Date.now()): Prom
   if (!token || notionOnlyMode() || !notionLedgerConfigured()) return null;
   const store = mirrorStore();
   if (!store) return null;
-  let version: { generation: string; syncedAt: string } | null;
+  let version: { generation: string; revision?: string; syncedAt: string } | null;
   try { version = await store.version(mirrorScope(token), mirrorMaxAgeMs()); }
   catch { return null; }
   if (!version) return null;
   const session = /(?:^|;\s*)session=([^;]*)/.exec(cookie)?.[1] ?? "";
   const hash = createHash("sha256")
-    .update([version.generation, url.pathname + url.search, Math.floor(now / 3_600_000), process.env.VERCEL_GIT_COMMIT_SHA ?? "", session].join("\n"))
+    .update([version.generation, version.revision ?? "", url.pathname + url.search, Math.floor(now / 3_600_000), process.env.VERCEL_GIT_COMMIT_SHA ?? "", session].join("\n"))
     .digest("hex").slice(0, 32);
   return { etag: `W/"${hash}"`, syncedAt: version.syncedAt };
 }

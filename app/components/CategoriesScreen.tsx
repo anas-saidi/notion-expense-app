@@ -274,9 +274,7 @@ export function CategoriesScreen({
               <MonthPicker
                 value={homeMonth}
                 aria-label="Filter planned and spent by month"
-                onChange={(event) => event.target.value && onHomeMonthChange(event.target.value)}
-                triggerClassName="composer-picker-chip"
-                showChevron={false}
+                onChange={(event) => event.target.value && onHomeMonthChange(event.target.value)} variant="chip"
               />
               {/* Next month's plan sits with the month it follows, and only appears in the month's last week. */}
               {planMonth && onOpenPlan && !past && (planMonth === homeMonth || nextMonthPlanningOpen()) && (

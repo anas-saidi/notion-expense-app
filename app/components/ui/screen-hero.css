@@ -84,3 +84,17 @@
   .screen-hero-mascot button:hover:not(:disabled) { transform: none; }
 }
 .screen-hero-mascot button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: var(--radius-control); }
+
+/* Screen switch (screen-switch.ts): only the hero light crossfades between screens; the page swaps instantly.
+   A soft blur blends the two lights into one change instead of two blobs overlapping. */
+html[data-screen-switch] .app-shell-root .screen-hero-mascot { view-transition-name: hero-light; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition-group(hero-light) { animation-duration: 240ms; animation-timing-function: var(--ease-standard); }
+::view-transition-old(hero-light) { animation: hero-light-out 240ms var(--ease-standard) both; }
+::view-transition-new(hero-light) { animation: hero-light-in 240ms var(--ease-standard) both; }
+@keyframes hero-light-out { to { opacity: 0; transform: scale(0.97); filter: blur(4px); } }
+@keyframes hero-light-in { from { opacity: 0; transform: scale(0.97); filter: blur(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  @keyframes hero-light-out { to { opacity: 0; } }
+  @keyframes hero-light-in { from { opacity: 0; } }
+}

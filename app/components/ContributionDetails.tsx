@@ -162,7 +162,7 @@ export function ContributionDetails({ open, month, personalScope, initialPartner
       <SheetHeader className="contribution-header"><h2>Contributions</h2>
         <button type="button" className="contribution-close" aria-label="Close contributions" disabled={saving} onClick={onClose}><XIcon size={20} /></button></SheetHeader>
       {/* The same month chip as the Budget screen: past months stay reviewable for advances and repayments. */}
-      <div className="contribution-toolbar"><MonthPicker value={month} max={today().slice(0, 7)} onChange={event => event.target.value && onMonthChange(event.target.value)} aria-label="Contribution month" triggerClassName="composer-picker-chip" showChevron={false} /></div>
+      <div className="contribution-toolbar"><MonthPicker value={month} max={today().slice(0, 7)} onChange={event => event.target.value && onMonthChange(event.target.value)} aria-label="Contribution month" variant="chip" /></div>
       {loading ? <SkeletonRows label="Loading contributions" count={4} /> : error || !status ? <Banner tone="danger" role="alert" title="Contributions unavailable" action={<button className="contribution-text" type="button" onClick={onRetry}>Retry</button>} /> : <>
         {(() => {
           // Both jars; the one in front is whose answers show (the partner tapped to get here, else you).

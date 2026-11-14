@@ -7,7 +7,7 @@ import { SkeletonRows } from "./ui/Skeleton";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BottomSheet } from "./ui/BottomSheet";
-import { FundIcon, FreezeIcon, XIcon, TransferIcon, CalendarRangeIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
+import { FundIcon, FreezeIcon, XIcon, TransferIcon, ScaleIcon, EditIcon, MoreIcon, ReceiptIcon, WalletIcon, ReviveIcon } from "./ui/icons";
 import type { Account, Category } from "./app-types";
 import { Money } from "./Money";
 import { CategoryIcon } from "./ui/CategoryIcon";
@@ -311,7 +311,7 @@ export function CategoryDetailsSheet({
         <section style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={sectionLabelStyle}>Activity</span>
-            <MonthPicker value={activeMonth} max={currentMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} align="right" triggerIcon={<CalendarRangeIcon size={16} aria-hidden="true" />} triggerClassName="composer-picker-chip" showChevron={false} />
+            <MonthPicker value={activeMonth} max={currentMonth()} aria-label="Filter activity by month" onChange={(event) => event.target.value && setActiveMonth(event.target.value)} align="right" variant="chip" />
           </div>
 
           {loading && <SkeletonRows label="Loading category activity" />}

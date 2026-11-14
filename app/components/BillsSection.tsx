@@ -23,9 +23,9 @@ import { useAppHaptics } from "./ui/useAppHaptics";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
 import "./bills.css";
 
-type Props = { data: BillsData | null; loading: boolean; error: string | null; categories: Category[]; accounts: Account[]; scope: BudgetScope; onRetry: () => void; onChanged: () => Promise<void> };
+type Props = { data: BillsData | null; loading: boolean; /** Balances are refreshing after a save: rows stay, actions wait. */ refreshing?: boolean; error: string | null; categories: Category[]; accounts: Account[]; scope: BudgetScope; onRetry: () => void; onChanged: () => Promise<void> };
 type View = "list" | "add" | "detail" | "pay" | "edit";
-export function BillsSection({ data, loading, error, categories, accounts, scope, onRetry, onChanged }: Props) {
+export function BillsSection({ data, loading, refreshing = false, error, categories, accounts, scope, onRetry, onChanged }: Props) {
   const { haptic } = useAppHaptics();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("list");
@@ -76,7 +76,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
     const available = categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))?.available;
     return (bill.state === "Due" || bill.state === "Overdue") && bill.dueDate <= currentCutoff && available != null && available < (reservations[normalizedId(bill.categoryId)] ?? 0);
   };
-  const enabled = !saving && !savedPendingRefresh && !loading && !error;
+  const enabled = !saving && !savedPendingRefresh && !loading && !refreshing && !error;
   const categoryOf = (bill: BillOccurrence) => categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId));
   // Current month only, and only totals: the month picker names the month, and the calendar and list already show each bill and its date.
   const dueTotal = Math.round(currentDue.reduce((sum, o) => sum + o.amount, 0));
@@ -143,7 +143,7 @@ export function BillsSection({ data, loading, error, categories, accounts, scope
         {saveError && <Banner role="alert" tone="danger" compact>{saveError}{savedPendingRefresh && <button type="button" className="bills-quiet-action" disabled={saving} onClick={retrySaved}>Refresh balances</button>}</Banner>}
         {loading ? <SkeletonRows /> : error ? <Banner role="alert" tone="danger" compact action={<button type="button" onClick={onRetry}>Retry</button>}>{error}</Banner> : <>
         {view === "list" && <>
-          <div className="bills-list-controls"><MonthPicker triggerClassName="composer-picker-chip" value={activeMonth} onChange={e => { setMonth(e.target.value); setDay(null); }} aria-label="Bill month" /><div className="bills-list-actions"><button type="button" className="bills-quiet-action" aria-pressed={showCalendar} onClick={() => { setShowCalendar(!showCalendar); setDay(null); haptic("selection"); }}><CalendarIcon size={16} /> {showCalendar ? "Hide calendar" : "Calendar"}</button><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div></div>
+          <div className="bills-list-controls"><MonthPicker variant="chip" value={activeMonth} onChange={e => { setMonth(e.target.value); setDay(null); }} aria-label="Bill month" /><div className="bills-list-actions"><button type="button" className="bills-quiet-action" aria-pressed={showCalendar} onClick={() => { setShowCalendar(!showCalendar); setDay(null); haptic("selection"); }}><CalendarIcon size={16} /> {showCalendar ? "Hide calendar" : "Calendar"}</button><button type="button" className="bills-quiet-action" onClick={add}><PlusIcon size={16} /> Add bill</button></div></div>
           {billsSummary.length > 0 && <Summary>{joinClauses(billsSummary)}.</Summary>}
           {activeMonth && showCalendar && <BillsCalendar month={activeMonth} today={data?.today ?? ""} bills={monthBills} categoryOf={categoryOf} selectedDay={day} onSelectDay={value => { setDay(day === value ? null : value); haptic("selection"); }} onOpenBill={details} />}
           {day ? <div className="bills-day-heading"><span>{new Date(`${day}T12:00:00`).toLocaleDateString("en", { weekday: "long", day: "numeric", month: "long" })}</span><button type="button" className="bills-quiet-action" onClick={() => setDay(null)}>Show all</button></div>

@@ -5,6 +5,7 @@ import { mirrorReadContext } from "./context";
 import { mirrorScope, mirrorStore } from "./store";
 import { scheduleMirrorSync } from "./sync";
 import { etagMatches, mirrorVersionTag } from "./version-tag";
+import { captureWrites, closeWriteFence, newWriteCapture } from "./write-capture";
 
 type Handler = (...args: any[]) => Promise<Response>;
 /** Opt in only display reads. Write validation always uses live Notion data. */
@@ -51,12 +52,15 @@ export function withMirrorMutation<T extends Handler>(handler: T): T {
     let writeId: string;
     try { writeId = await store.beginWrite(scope); }
     catch { return NextResponse.json({ error: "Could not verify balances before saving. Try again." }, { status: 503 }); }
+    const capture = newWriteCapture();
+    let completed = false;
     try {
-      return await mirrorReadContext.run({ enabled: false, sources: new Set(), syncedAt: [], databases: new Map() }, () => handler(...args));
+      const response = await mirrorReadContext.run({ enabled: false, sources: new Set(), syncedAt: [], databases: new Map() }, () => captureWrites(capture, () => handler(...args)));
+      completed = true;
+      return response;
     } finally {
-      try { await store.finishWrite(scope, writeId); }
+      try { await closeWriteFence(token, store, scope, writeId, completed ? capture : null); }
       catch { console.error("Financial sync write fence could not close; snapshot stays invalid"); }
-      scheduleMirrorSync(token, true);
     }
   }) as T;
 }

@@ -18,8 +18,8 @@ import { AnimatedCounter } from "./ui/AnimatedCounter";
 import { Banner } from "./ui/Banner";
 import { SteppedAmountSlider } from "./ui/SteppedAmountSlider";
 import type { Account, BudgetScope, MonthlyPlanningSnapshot, PlanningAllocationItem } from "./app-types";
+import { MascotFrame } from "./mascot/MascotFrame";
 import { MascotHero, type JarSignal } from "./mascot/MascotHero";
-import { MascotTap } from "./mascot/MascotTap";
 import { allocationJarItems } from "./mascot/budgetJar";
 import { fmt, getLeftToAssignByScope } from "./app-utils";
 
@@ -276,12 +276,12 @@ export function AllocationFlow({
             const jarSize = heroPool && !readOnly ? 176 : undefined;
             if (jarShowsAssigned) {
               const assignedShare = availablePool > 0 ? Math.max(0, Math.min(1, (availablePool - Math.max(0, leftToAssign)) / availablePool)) : 1;
-              return <MascotTap label="Allocation details"><MascotHero look="light" variant="pool" scope={jarScope} level={workspace ? mood?.level ?? assignedShare : assignedShare} warn={workspace ? mood?.warn ?? null : undefined} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>;
+              return <MascotFrame><MascotHero look="light" variant="pool" scope={jarScope} level={workspace ? mood?.level ?? assignedShare : assignedShare} warn={workspace ? mood?.warn ?? null : undefined} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotFrame>;
             }
             return jarLevel !== undefined ? (
-              <MascotTap label="Allocation details"><MascotHero look="light" variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>
+              <MascotFrame><MascotHero look="light" variant="pool" scope={jarScope} level={jarLevel} items={jarItems} spentPct={null} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotFrame>
             ) : (
-              <MascotTap label="Allocation details"><MascotHero look="light" variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotTap>
+              <MascotFrame><MascotHero look="light" variant="split" scope={jarScope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={jarSize} style={jarStyle} signal={jarSignal} /></MascotFrame>
             );
           })()}
           {heroPool && readOnly ? (

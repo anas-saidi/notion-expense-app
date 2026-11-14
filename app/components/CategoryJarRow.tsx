@@ -12,7 +12,7 @@ import { CategoryIcon } from "./ui/CategoryIcon";
 
 /**
  * One category on the Budget tab: its artwork (fading with remaining funds),
- * the name, one quiet line only when it says something, and the one number.
+ * the name, one quiet line only when it says something ("spent / held", the held part dimmed), and the one number.
  * Rows sit flat on a shared section surface; tapping opens the category.
  * On desktop the row becomes a table row: Budgeted and Spent columns appear (CSS).
  */
@@ -28,10 +28,12 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, b
   onOpen: () => void;
 }) {
   const { state, low, amount, level } = status;
+  // What the category held this month: spent plus what's left (carry-over included), so "spent / held" adds up.
+  const held = Math.max(0, spent) + Math.max(0, amount);
   const line = billShort ? { text: `${billShort.name} due ${fmtDate(billShort.dueDate)}, ${fmt(Math.ceil(billShort.short - 0.005))} short`, color: "var(--danger)", strong: true }
     : state === "over" ? { text: "Overspent", color: "var(--status-over)", strong: true }
     : low ? { text: runwayDays == null ? "Running low" : runwayLabel(runwayDays), color: "var(--status-low)", strong: false }
-    : state === "normal" && Math.round(spent) > 0 ? { text: `${fmt(Math.round(spent))} spent`, color: "var(--muted)", strong: false, spentOnly: true }
+    : state === "normal" && Math.round(spent) > 0 ? { text: `${fmt(Math.round(spent))} spent of ${fmt(Math.round(held))}`, color: "var(--text2)", strong: false, spentOnly: true }
     : null;
   const amountColor = state === "over" ? "var(--status-over)" : low ? "var(--status-low)" : state === "normal" ? "var(--text2)" : "var(--muted)";
   return (
@@ -40,7 +42,9 @@ export function BudgetJarRow({ cat, scope, status, runwayDays, planned, spent, b
       <span style={textStyle}>
         <span style={nameStyle}>{cat.name}</span>
         {/* "X spent" repeats the desktop Spent column, so it hides there. */}
-        {line && <span className={"spentOnly" in line ? "budget-row-spent-line" : undefined} style={{ ...lineStyle, color: line.color, fontWeight: line.strong ? 600 : 500 }}>{line.text}</span>}
+        {line && <span className={"spentOnly" in line ? "budget-row-spent-line" : undefined} style={{ ...lineStyle, color: line.color, fontWeight: line.strong ? 600 : 500 }}>{"spentOnly" in line
+          ? <>{fmt(Math.round(spent))}<span style={{ color: "var(--muted)" }}> / {fmt(Math.round(held))} MAD</span></>
+          : line.text}</span>}
       </span>
       <TableCols planned={planned} spent={spent} />
       <span style={{ ...amountStyle, color: amountColor }}>{Math.round(amount) < 0 ? "−" : ""}{fmt(Math.abs(Math.round(amount)))}</span>

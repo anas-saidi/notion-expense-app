@@ -18,7 +18,7 @@ import { isSavingsCategory } from "./wallet-utils";
 import { calculateMonthPlanCapacity, getPlanningSplit, planCost, type PlanAmounts } from "./month-plan-capacity";
 import { Money } from "./Money";
 import { MascotHero } from "./mascot/MascotHero";
-import { MascotTap } from "./mascot/MascotTap";
+import { MascotFrame } from "./mascot/MascotFrame";
 import { allocationJarItems } from "./mascot/budgetJar";
 import type { Mood } from "./mascot/poses";
 import { BottomSheet } from "./ui/BottomSheet";
@@ -694,7 +694,7 @@ export function MonthPlanSheet({
               pointerEvents: heroHidden ? "auto" : "none",
             }}
           >
-            <MascotTap label="Planning categories" tabIndex={heroHidden ? 0 : -1} style={{ margin: 0 }}><MascotHero look="light" variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} /></MascotTap>
+            <MascotFrame style={{ margin: 0 }}><MascotHero look="light" variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} size={52} style={{ margin: 0, flexShrink: 0 }} /></MascotFrame>
             <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
               <span style={stickyLabelStyle}>{capacityLabel}</span>
               <span style={{ ...stickyAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
@@ -717,7 +717,7 @@ export function MonthPlanSheet({
           </SkeletonRegion> : loadError ? <Banner role="alert" tone="danger" compact title={loadError} action={<button type="button" onClick={() => void loadPlan()} style={textButtonStyle}>Retry</button>} /> : <>
           {/* Hero: the jar fills with the categories you plan; the number is what's still unassigned. */}
           <section aria-label={capacityLabel} style={heroStyle}>
-            <MascotTap label="Planning categories"><MascotHero look="light" variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotTap>
+            <MascotFrame><MascotHero look="light" variant="split" scope={scope} items={jarItems} spentPct={null} remember={false} mood={jarMood} style={{ marginBottom: -4 }} /></MascotFrame>
             <span style={heroLabelStyle}>{capacityLabel}</span>
             <span ref={setHeroTarget} style={{ ...heroAmountStyle, color: left < 0 ? "var(--danger)" : "var(--text)" }}>
               {left < 0 ? "−" : ""}

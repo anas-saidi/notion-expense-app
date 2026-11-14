@@ -3,7 +3,7 @@
 import { LiquidButton } from "./ui/LiquidGlass";
 import { SheetHeader } from "./ui/SheetLayout";
 
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import type { Account, BudgetScope } from "./app-types";
 import { assignableOf, scopeFromAccountLabel } from "./app-utils";
 import { Money } from "./Money";
@@ -17,9 +17,13 @@ type ManageScreenProps = {
   budgetScope: BudgetScope;
   onClose: () => void;
   onOpenDetails: (account: Account) => void;
+  /** Desktop: list on the left, the selected account in a pane on the right (`onDetailPane` receives it). */
+  wide?: boolean;
+  selectedId?: string | null;
+  onDetailPane?: (pane: HTMLElement | null) => void;
 };
 
-export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: ManageScreenProps) {
+export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails, wide = false, selectedId = null, onDetailPane }: ManageScreenProps) {
   const scopedAccounts = useMemo(
     () => accounts.filter((account) => {
       const scope = scopeFromAccountLabel(account.label);
@@ -32,16 +36,26 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
     ready: scopedAccounts.reduce((sum, account) => sum + (assignableOf(account) ?? 0), 0),
   }), [scopedAccounts]);
 
+  // Wide: an account is always open beside the list. Keep the last one when a Move or Add income sheet
+  // clears the selection, so returning lands where the user was.
+  const lastSelected = useRef<string | null>(null);
+  if (selectedId) lastSelected.current = selectedId;
+  useEffect(() => {
+    if (!wide || scopedAccounts.length === 0 || scopedAccounts.some(a => a.id === selectedId)) return;
+    onOpenDetails(scopedAccounts.find(a => a.id === lastSelected.current) ?? scopedAccounts[0]);
+  }, [wide, selectedId, scopedAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <BottomSheet
       open
       onClose={onClose}
       label="Accounts"
-      size="standard"
+      size={wide ? "planning" : "standard"}
       panelStyle={sheetStyle}
       contentStyle={sheetContentStyle}
     >
-    <main className="manage-screen sheet-body" style={screenStyle}>
+    <main className="manage-screen sheet-body" data-wide={wide || undefined} style={screenStyle}>
+      <div className="manage-list-pane">
       <SheetHeader style={headerStyle}>
         <h1 style={titleStyle}>Accounts</h1>
         <LiquidButton className="sheet-close-button" type="button" onClick={onClose} aria-label="Close accounts" style={closeStyle}>
@@ -71,6 +85,7 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
                 type="button"
                 onClick={() => onOpenDetails(account)}
                 aria-label={`View ${account.label} details`}
+                aria-current={wide && account.id === selectedId ? "true" : undefined}
                 className="tx-row transaction-row manage-account-row"
                 style={accountRowStyle}
               >
@@ -94,6 +109,8 @@ export function ManageScreen({ accounts, budgetScope, onClose, onOpenDetails }: 
           <div style={emptyStyle}>No accounts in this wallet.</div>
         )}
       </section>
+      </div>
+      {wide && <section ref={onDetailPane} className="manage-detail-pane" aria-label="Selected account" />}
     </main>
     </BottomSheet>
   );
