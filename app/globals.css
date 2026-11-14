@@ -1584,6 +1584,9 @@ button[aria-label^="Close" i]:focus-visible {
 .picker-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 15px; }
 .picker-heading button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text2); font-size: var(--type-title); cursor: pointer; }
 .picker-body { max-height: min(440px, calc(100dvh - 104px)); overflow: auto; overscroll-behavior: contain; }
+/* Pinned above the phone keyboard: the panel owns the height (from the visual viewport), the list scrolls inside it. */
+[data-picker-popover][data-pinned] { display: flex; flex-direction: column; }
+[data-picker-popover][data-pinned] .picker-body { flex: 1 1 auto; min-height: 0; max-height: none; }
 .picker-options { padding: 8px; max-height: 320px; overflow: auto; }
 .picker-option { width: 100%; min-height: 48px !important; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px !important; border: 0; border-radius: var(--radius-control); background: transparent !important; box-shadow: none !important; color: var(--text); text-align: left; font-size: 15px; cursor: pointer; }
 .picker-option[aria-pressed="true"] { background: var(--select-wash) !important; color: var(--select-ink); }

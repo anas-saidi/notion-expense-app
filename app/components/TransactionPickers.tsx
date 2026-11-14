@@ -90,7 +90,7 @@ export function CategoryOptionList({ id, categories, selectedId, lastUsedId, onS
       {/* The shared picker search (.picker-search, as in ChoicePicker) with a leading search icon. */}
       <div style={{ position: "relative" }}>
         <SearchIcon size={16} aria-hidden="true" style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none" }} />
-        <input type="text" className="picker-search composer-picker-search" aria-label="Search categories" value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search categories" autoFocus />
+        <input type="text" className="picker-search composer-picker-search" aria-label="Search categories" value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search categories" />
       </div>
     </div>
   );

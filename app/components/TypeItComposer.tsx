@@ -259,8 +259,16 @@ export function TypeItComposer(props: Props) {
   };
 
   const lines = text.split(/\r?\n/);
-  // Only lines nothing has read yet: the phone couldn't parse them and no AI draft is attached.
-  const unread = lines.flatMap((source, index) => source.trim() && !rows.find(row => row.line === index + 1)?.transaction ? [source] : []);
+  // Lines Gemini should read: ones the phone couldn't parse, and spending the phone parsed but couldn't place
+  // (no category picked or learned). Each goes to Gemini once; after that a missing category waits for a pick.
+  const unread = lines.flatMap((source, index) => {
+    if (!source.trim()) return [];
+    const line = index + 1;
+    const row = rows.find(item => item.line === line);
+    if (!row?.transaction) return [source];
+    const readByGemini = !!choices[line]?.transaction;
+    return !readByGemini && row.transaction.type !== "Income" && !row.category ? [source] : [];
+  });
   const unreadCount = unread.length + receipts.length;
   const readLine = async (source: string, signal: AbortSignal) => {
     const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, signal,

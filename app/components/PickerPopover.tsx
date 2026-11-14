@@ -38,6 +38,7 @@ export function PickerPopover({
   // Placement direction is locked on first open so the popover doesn't jump
   // while the list re-renders (filtering changes popover height).
   const lockedPlacementRef = useRef<"top" | "bottom" | null>(null);
+  const focusedRef = useRef(false);
   const [positionStyle, setPositionStyle] = useState<CSSProperties>({ visibility: "hidden" });
   const [mounted, setMounted] = useState(false);
 
@@ -49,13 +50,27 @@ export function PickerPopover({
   useLayoutEffect(() => {
     if (!open) {
       lockedPlacementRef.current = null;
+      focusedRef.current = false;
       return;
     }
     if (!anchorRef?.current || !popoverRef.current) return;
 
+    // On a touch phone, a picker you can type into is a panel resting on the keyboard instead of a menu beside
+    // its trigger: following the trigger while iOS scrolls for the keyboard made it chase around the screen.
+    const touchPhone = window.matchMedia("(pointer: coarse) and (max-width: 767px)").matches;
+    const pinned = touchPhone && !!popoverRef.current.querySelector("input.picker-search");
+
     let frameId: number | null = null;
     const updatePosition = () => {
       if (!anchorRef.current || !popoverRef.current) return;
+      if (pinned) {
+        const vv = window.visualViewport;
+        const visibleHeight = vv?.height ?? window.innerHeight;
+        // Fixed elements sit in the layout viewport; the keyboard covers its bottom, so lift the panel by that much.
+        const keyboard = Math.max(0, window.innerHeight - ((vv?.offsetTop ?? 0) + visibleHeight));
+        setPositionStyle({ position: "fixed", left: 8, right: 8, bottom: keyboard + 8, maxHeight: Math.max(200, visibleHeight - 72), visibility: "visible" });
+        return;
+      }
 
       const anchorRect = anchorRef.current.getBoundingClientRect();
       const popoverRect = popoverRef.current.getBoundingClientRect();
@@ -107,6 +122,12 @@ export function PickerPopover({
         maxHeight: availableHeight,
         visibility: "visible",
       });
+      // Desktop: ready to type once it's in place (preventScroll, so focusing never moves the page).
+      // Touch: no automatic keyboard; tapping the search field opens it, and the pinned panel rides above it.
+      if (!focusedRef.current && !touchPhone) {
+        focusedRef.current = true;
+        popoverRef.current.querySelector<HTMLInputElement>("input.picker-search")?.focus({ preventScroll: true });
+      }
     };
 
     const scheduleUpdate = () => {
@@ -120,7 +141,7 @@ export function PickerPopover({
     ro.observe(popoverRef.current);
     ro.observe(anchorRef.current);
     window.addEventListener("resize", scheduleUpdate);
-    window.addEventListener("scroll", scheduleUpdate, true);
+    if (!pinned) window.addEventListener("scroll", scheduleUpdate, true);
     // visualViewport fires when the virtual keyboard opens/closes on mobile
     const vv = window.visualViewport;
     vv?.addEventListener("resize", scheduleUpdate);
@@ -166,6 +187,7 @@ export function PickerPopover({
       className="picker-glass-surface"
       ref={popoverRef}
       data-picker-popover="true"
+      data-pinned={isMobilePinned || undefined}
       role="dialog"
       aria-label={title}
       style={{
