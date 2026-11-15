@@ -11,6 +11,7 @@ import type { CategoryJarState } from "./mascot/CategoryJar";
 import { CategoryIcon } from "./ui/CategoryIcon";
 import { Currency } from "./Money";
 import "./screen-components.css";
+import { useScreenActive } from "./ui/KeptScreen";
 
 /**
  * One category on the Budget tab: its artwork (fading with remaining funds),
@@ -89,7 +90,9 @@ export function SavingsJarRow({ cat, scope, available, planned, spent, onOpen }:
   // A goal that missed its date gets its own line, in the colour for money that's short.
   const pastDue = goal > 0 && !reached && when?.past ? `Past due since ${when.label}` : null;
   // Reaching a goal bursts once on this device (per goal amount), the next time the row is seen.
-  const burst = useOnceSignal(`goal:${cat.id}:${Math.round(goal)}`, reached, "burst");
+  // A hidden (kept) Budget screen waits, so the burst isn't spent where nobody sees it.
+  const screenActive = useScreenActive();
+  const burst = useOnceSignal(`goal:${cat.id}:${Math.round(goal)}`, reached && screenActive, "burst");
   const line = goal > 0
     ? reached ? "Goal reached" : `${Math.floor(pct * 100)}% of ${fmt(Math.round(goal))}${when && !when.past ? ` by ${when.label}` : ""}`
     : Math.round(planned) > 0 ? `+${fmt(Math.round(planned))} this month`

@@ -19,7 +19,8 @@ let running = 0;
  */
 export function switchScreen(update: () => void) {
   const doc = document as ViewTransitionDocument;
-  const hero = document.querySelector<HTMLElement>(".app-shell-root .screen-hero-mascot");
+  // Kept screens stay in the page while hidden; only the showing screen's hero has a box.
+  const hero = [...document.querySelectorAll<HTMLElement>(".app-shell-root .screen-hero-mascot")].find(el => el.getClientRects().length > 0);
   const rect = hero?.getBoundingClientRect();
   const heroVisible = !!rect && rect.bottom > 0 && rect.top < window.innerHeight;
   if (!doc.startViewTransition || !heroVisible) { update(); return; }

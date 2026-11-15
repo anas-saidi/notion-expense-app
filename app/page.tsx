@@ -12,6 +12,7 @@ import { Button } from "./components/ui/Button";
 import "./components/screen-components.css";
 import { toastDuration, type ToastMessage, type ToastOptions } from "./components/ui/Toast";
 import { switchScreen } from "./components/ui/screen-switch";
+import { KeptScreen } from "./components/ui/KeptScreen";
 import { BillsSection } from "./components/BillsSection";
 import { billRemaining, deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
 import { billShortfalls, habitSuggestions, type DueBill } from "@/lib/suggestions";
@@ -164,6 +165,11 @@ export default function App() {
   const [budgetRefreshing, setBudgetRefreshing] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [tab, setTab] = useState<AppTab>("home");
+  // Screens stay mounted once visited (KeptScreen), so a tab switch shows them instead of rebuilding them.
+  // Recorded during render so the first visit mounts in the same update as the switch (view transitions need that).
+  const visitedTabsRef = useRef(new Set<AppTab>([tab]));
+  visitedTabsRef.current.add(tab);
+  const visitedTabs = visitedTabsRef.current;
   // Fetch Reflect's code once the app is idle, so its first visit swaps lights instead of blanking while it loads.
   useEffect(() => { const timer = window.setTimeout(() => { void import("./components/ReflectScreen"); }, 2500); return () => window.clearTimeout(timer); }, []);
   const [budgetScope, setBudgetScope] = useState<BudgetScope>("joint");
@@ -1374,7 +1380,7 @@ export default function App() {
         planningCapacity={currentPlanCapacity ?? { joint: jointUnassigned, anas: assignBalanceByScope.anas, salma: assignBalanceByScope.salma }}
       /></DeferredMount>
 
-      {tab === "home" && (
+      {visitedTabs.has("home") && (<KeptScreen active={tab === "home"}>
         <HomeScreen
           personalScope={mode === "wife" ? "salma" : "anas"}
           savedWink={savedWink}
@@ -1414,10 +1420,10 @@ export default function App() {
           jointUnassigned={jointUnassigned}
           onOpenAssign={() => setShowRebalance(true)}
         />
-      )}
+      </KeptScreen>)}
 
 
-      {tab === "budget" && (
+      {visitedTabs.has("budget") && (<KeptScreen active={tab === "budget"}>
         <CategoriesScreen
           dueBills={dueBills}
           moneyMoved={moneyMoved}
@@ -1471,9 +1477,9 @@ export default function App() {
           // A refresh after a save keeps the rows on screen; placeholders only when there's nothing to show yet.
           loading={monthLoading || ((budgetRefreshing || refreshState === "updating") && categories.length === 0)}
         />
-      )}
+      </KeptScreen>)}
 
-      {tab === "history" && (
+      {visitedTabs.has("history") && (<KeptScreen active={tab === "history"}>
         <ReflectScreen
           transactions={historyTransactions}
           monthlySummary={historySummary}
@@ -1503,7 +1509,7 @@ export default function App() {
             setShowAddModal(true);
           }}
         />
-      )}
+      </KeptScreen>)}
 
       <DeferredMount active={showAddModal}>      <AddTransactionSheet
         open={showAddModal}
