@@ -57,40 +57,43 @@
   .home-balance-panel .contribution-entry { margin-top:auto; padding:16px 0 0; }
   .home-balance-panel .contribution-entry-title { font-size:13px; }
   .home-budget-context { display:flex; flex-direction:column; min-width:0; padding:var(--desktop-panel-padding); border-radius:var(--radius-card); background:var(--surface); box-shadow:var(--elevation-card); }
-  .desktop-month-budget { padding:0; background:transparent; box-shadow:none; justify-content:flex-start; gap:16px; flex:1 1 auto; }
-  .desktop-budget-spent { display:grid; gap:8px; }
-  .desktop-budget-spent > span { color:var(--text2); font-size:var(--type-label); line-height:20px; }
-  .desktop-budget-spent > span b { color:var(--text); font-weight:600; }
-  .desktop-budget-spent > strong { color:var(--text); font-size:clamp(28px,3vw,40px); line-height:1.1; font-weight:500; letter-spacing:-.02em; }
-  .desktop-budget-spent[data-over] { --money-decimal-color:var(--danger); }
-  .desktop-budget-spent[data-over] > strong { color:var(--danger); }
+  /* Gauge on the left, Most spent on the right: the card stays as tall as the cash card beside it. */
+  .desktop-month-budget { padding:0; background:transparent; box-shadow:none; flex:1 1 auto; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); grid-template-rows:auto 1fr; gap:16px 32px; align-items:start; }
+  .desktop-month-budget > :not(.desktop-spend-side):not(.desktop-budget-where) { grid-column:1 / -1; align-self:start; }
   .desktop-spending-track { display:block; overflow:hidden; background:var(--track); border-radius:999px; height:4px; }
   .desktop-spending-track > span { display:block; height:100%; border-radius:inherit; background:var(--select-color); }
-  .desktop-budget-comparison { display:grid; gap:8px; }
-  .desktop-budget-comparison-track { position:relative; display:flex; height:12px; overflow:hidden; background:var(--track); border-radius:999px; }
-  /* Bars are one solid colour, never a gradient: the scope's core colour (ink for Couple). */
-  .desktop-budget-within { background:var(--budget-fill, var(--text2)); }
-  /* Ink with a thin surface outline, so it reads on the filled bar and on the empty track alike. */
-  .desktop-budget-pace { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:var(--text); box-shadow:0 0 0 1.5px var(--surface); }
-  .desktop-budget-pace-label { color:var(--text2); font-size:12px; line-height:16px; }
-  .desktop-budget-where { margin-top:auto; display:grid; gap:12px; padding-top:24px; }
-  .desktop-budget-where-title { margin:0; color:var(--text2); font-size:13px; line-height:20px; font-weight:600; }
-  .desktop-budget-where-list { display:grid; gap:12px; margin:0; padding:0; list-style:none; }
-  .desktop-budget-where-list li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; align-items:center; }
-  .desktop-budget-where-name { display:flex; align-items:center; gap:8px; min-width:0; color:var(--text); font-size:var(--type-label); line-height:20px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .desktop-budget-where-list strong { color:var(--text); font-size:var(--type-label); font-weight:600; font-variant-numeric:tabular-nums; }
-  .desktop-budget-where-track { grid-column:1 / -1; display:block; height:4px; overflow:hidden; border-radius:999px; background:var(--track); }
-  .desktop-budget-where-track > span { display:block; height:100%; border-radius:inherit; background:var(--budget-fill, var(--text2)); }
-  .desktop-budget-excess { background:var(--danger); box-shadow:inset 2px 0 var(--surface); }
-  .desktop-budget-comparison-labels { display:grid; grid-template-columns:1fr; gap:12px; margin:0; }
-  .desktop-budget-comparison-labels > div { min-width:0; }
-  .desktop-budget-comparison-labels > div:has(+ div) dd, .desktop-budget-comparison-labels > div:last-child:not(:first-child) dd { justify-content:flex-end; }
-  .desktop-budget-comparison-labels dt { color:var(--text2); font-size:12px; }
-  .desktop-budget-comparison-labels dd { margin:0; color:var(--text); font-size:15px; font-weight:500; font-variant-numeric:tabular-nums; display:flex; align-items:baseline; flex-wrap:wrap; column-gap:4px; }
-  .desktop-budget-assigned-label { color:var(--text2); font-size:12px; font-weight:400; }
-  .desktop-budget-comparison-labels .desktop-budget-over dt,
-  .desktop-budget-comparison-labels .desktop-budget-over dd { color:var(--danger); }
-  .desktop-budget-over { --money-decimal-color:var(--danger); }
+  /* November spending as a gauge (desktop): the arc is what's left, the number in the middle says it. */
+  .desktop-spend-gauge { position:relative; display:grid; gap:12px; width:100%; }
+  /* Capped, so a wider screen doesn't grow the gauge and push the card taller than the cash card beside it. */
+  .desktop-spend-gauge svg { display:block; width:100%; max-width:300px; height:auto; justify-self:center; overflow:visible; }
+  .desktop-spend-gauge-track, .desktop-spend-gauge-fill { fill:none; stroke-width:18; stroke-linecap:round; }
+  .desktop-spend-gauge-track { stroke:var(--track); }
+  /* One solid colour (the wallet's), never a gradient; the danger colour once the month is above assigned. */
+  .desktop-spend-gauge-fill { stroke:var(--budget-fill, var(--text)); transition:stroke-dasharray var(--motion-slow) var(--ease-standard); }
+  .desktop-spend-gauge[data-over] .desktop-spend-gauge-fill { stroke:var(--danger); }
+  .desktop-spend-gauge-center { position:absolute; left:0; right:0; top:48%; display:grid; justify-items:center; gap:4px; text-align:center; }
+  .desktop-spend-gauge-center strong { color:var(--text); font-size:clamp(32px,3.4vw,44px); line-height:1.05; font-weight:500; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .desktop-spend-gauge-center > span { color:var(--text2); font-size:var(--type-body); line-height:20px; }
+  .desktop-spend-gauge[data-over] .desktop-spend-gauge-center strong { color:var(--danger); }
+  .desktop-spend-gauge-ends { display:flex; justify-content:space-between; width:100%; max-width:300px; justify-self:center; padding:0 4%; margin-top:-4px; color:var(--text2); font-size:var(--type-label); line-height:16px; font-variant-numeric:tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { .desktop-spend-gauge-fill { transition:none; } }
+  .desktop-spend-side { display:grid; gap:16px; align-self:stretch; align-content:space-between; }
+  .desktop-spend-facts { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0; }
+  .desktop-spend-facts > div { display:grid; gap:2px; padding:12px 16px; border-radius:var(--radius-card); background:var(--surface2); }
+  .desktop-spend-facts dt { color:var(--text2); font-size:var(--type-label); line-height:16px; }
+  .desktop-spend-facts dd { margin:0; color:var(--text); font-size:var(--type-title); line-height:24px; font-weight:500; font-variant-numeric:tabular-nums; }
+  /* Most spent fills the right half of the card on desktop, so it uses the body and title sizes rather than labels. */
+  .desktop-budget-where { display:grid; grid-template-rows:auto 1fr; gap:12px; align-self:stretch; }
+  .desktop-budget-where-title { margin:0; color:var(--text2); font-size:var(--type-body); line-height:20px; font-weight:600; }
+  .desktop-budget-where-list { display:grid; gap:8px; align-content:space-between; margin:0; padding:0; list-style:none; }
+  .desktop-budget-where-list li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; padding:12px 16px; border-radius:var(--radius-card); background:var(--surface2); }
+  .desktop-budget-where-icon { display:grid; place-items:center; width:40px; height:40px; border-radius:12px; background:var(--surface); }
+  .desktop-budget-where-text { display:grid; gap:2px; min-width:0; }
+  .desktop-budget-where-share { color:var(--text2); font-size:var(--type-label); line-height:16px; font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Narrow desktops keep the share to its number, so the row stays on one line. */
+  @media (max-width:1320px) { .desktop-budget-where-share-rest { display:none; } }
+  .desktop-budget-where-name { display:block; min-width:0; color:var(--text); font-size:var(--type-body); line-height:24px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .desktop-budget-where-list strong { white-space:nowrap; color:var(--text); font-size:var(--type-title); line-height:24px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
   .home-bills-panel, .home-desktop-panels .home-content { display:grid; gap:24px !important; min-width:0; }
   .home-bills-panel > .bills-section, .home-content > section, .desktop-top-spending { min-width:0; margin:0; padding:var(--desktop-panel-padding); background:var(--surface); border-radius:var(--radius-card); box-shadow:var(--elevation-card); }
   .home-bills-panel > .bills-section { --bill-row-surface:var(--surface); }

@@ -49,6 +49,9 @@ export function Currency({ style }: { style?: CSSProperties }) {
   return <span className="currency-mark" style={{ ...currencyStyle, ...style }}>{MONEY_CURRENCY}</span>;
 }
 
+/** The mark after an x / y ratio (category rows, the month's left / assigned): smaller than a number's own mark. */
+export const ratioCurrencyStyle: CSSProperties = { fontSize: 10, marginLeft: 4 };
+
 export const currencyStyle: CSSProperties = {
   fontFamily: "var(--font-body)",
   fontSize: "min(0.7em, 12px)",

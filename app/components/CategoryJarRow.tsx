@@ -9,7 +9,7 @@ import { runwayLabel } from "./category-runway";
 import type { BudgetStatus } from "./category-status";
 import type { CategoryJarState } from "./mascot/CategoryJar";
 import { CategoryIcon } from "./ui/CategoryIcon";
-import { Currency } from "./Money";
+import { Currency, ratioCurrencyStyle } from "./Money";
 import "./screen-components.css";
 import { useScreenActive } from "./ui/KeptScreen";
 
@@ -155,6 +155,5 @@ function goalLabel(date: string | null | undefined): { label: string; past: bool
 const textStyle: CSSProperties = { display: "grid", gap: 2, flex: 1, minWidth: 0 };
 const nameStyle: CSSProperties = { fontSize: 15, fontWeight: 500, color: "var(--text)", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" };
 /** "spent / held MAD": the shared muted mark, small and set just after the second number. */
-const ratioCurrencyStyle: CSSProperties = { fontSize: 10, marginLeft: 4 };
 const lineStyle: CSSProperties = { fontSize: 12, lineHeight: "16px", fontVariantNumeric: "tabular-nums" };
 const amountStyle: CSSProperties = { fontSize: 15, fontWeight: 600, lineHeight: "22px", fontVariantNumeric: "tabular-nums", flexShrink: 0 };

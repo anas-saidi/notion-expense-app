@@ -173,7 +173,7 @@ const EXCEPTIONS = [
   { rule: "radius", file: /grain-glow\.css$/, value: /\b28px\b/, why: "Light: content sheet has rounded 28px top corners" },
   { rule: "space", file: /grain-glow\.css$/, value: /\b96px\b/, why: "Light: the room fades out 96px below the hero" },
   { rule: "color", file: /liquid-glass\.css$/, value: /inset/, why: "Liquid glass controls: keep Glisse's specular rim" },
-  { rule: "type", file: /CategoryJarRow\.tsx$/, value: /^10px$/, why: "Typography: a spent / held ratio ends with a 10px currency mark" },
+  { rule: "type", file: /Money\.tsx$/, value: /^10px$/, why: "Typography: an x / y ratio ends with a 10px currency mark (ratioCurrencyStyle)" },
 ];
 const excepted = (id, d) => EXCEPTIONS.some(e => e.rule === id && e.file.test(d.f) && (!e.selector || e.selector.test(d.selector || "")) && e.value.test(d.value));
 const pxValues = v => [...v.replace(/var\([^)]*\)/g, "").matchAll(/(-?\d*\.?\d+)px/g)].map(x => Math.abs(parseFloat(x[1])));
