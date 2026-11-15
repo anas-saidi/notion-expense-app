@@ -1,5 +1,6 @@
 import type { ContributionAgreement, PartnerAmounts } from "./contribution-agreements";
 
+/** A plan change after contributions were agreed: a positive amount was added (dues rose), a negative one released (dues fell). */
 export type PlanAddition = { categoryId: string; amount: number; shares: PartnerAmounts; state: "funding" | "completed" };
 export type PlanAdditionInput = { operationId: string; month: string; categoryId: string; amount: number; expectedVersion: string };
 const fail = (message: string, status = 409): never => { throw Object.assign(new Error(message), { status }); };
@@ -54,4 +55,29 @@ export async function addToPlan(input: PlanAdditionInput, deps: PlanAdditionDepe
     if (!saved) fail("The allocation is saved but contributions changed. Retry to finish the same addition.");
     return saved!;
   } catch (error) { throw Object.assign(error instanceof Error ? error : new Error("Could not finish the plan addition."), { pending: true }); }
+}
+
+export type PlanReleaseInput = { fundId: string; month: string; categoryId: string; amount: number };
+export interface PlanReleaseDependencies {
+  load(): Promise<ContributionAgreement | undefined>;
+  save(current: ContributionAgreement, targets: PartnerAmounts, additions: Record<string, PlanAddition>): Promise<ContributionAgreement | null>;
+}
+/**
+ * The other half of addToPlan: money a Rebalance releases from a Joint category leaves the agreed plan,
+ * so each partner's agreed amount drops by their share of it (never below zero). Keyed by the release's
+ * fund record, so a retry never lowers the dues twice. With no agreement for the month there is nothing to change.
+ */
+export async function releaseFromPlan(input: PlanReleaseInput, deps: PlanReleaseDependencies, attempts = 3): Promise<ContributionAgreement | null> {
+  const key = `release:${input.fundId}`;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const current = await deps.load();
+    if (!current) return null;
+    if (current.planAdditions?.[key]) return current;
+    const cut = planAdditionAmounts(input.amount, current.shares);
+    const targets = { anas: Math.max(0, Math.round((current.targets.anas - cut.anas) * 100) / 100), salma: Math.max(0, Math.round((current.targets.salma - cut.salma) * 100) / 100) };
+    const release: PlanAddition = { categoryId: input.categoryId, amount: -input.amount, shares: current.shares, state: "completed" };
+    const saved = await deps.save(current, targets, { ...current.planAdditions, [key]: release });
+    if (saved) return saved;
+  }
+  return fail("The money is released, but the agreed contributions changed at the same time and weren't lowered. Lower them in Contributions with Change agreed amounts.");
 }

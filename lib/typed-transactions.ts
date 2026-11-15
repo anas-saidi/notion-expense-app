@@ -8,7 +8,14 @@ export type ParsedTransactionLine = { line: number; source: string } & (
 const dateString = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
-export function parseTransactionLines(text: string, reference = new Date(), defaultDate?: string): ParsedTransactionLine[] {
+/** Income words that mark a line as income wherever they sit ("axa refund 800", "cnss remboursement 640"). */
+const INCOME_ANYWHERE = /\b(?:salary|salaire|paycheck|wages|refund|refunded|rembours\w*|cnss|cashback)\b/i;
+/** Words that mark income only when they lead the line, since they also appear in expense names. */
+const INCOME_LEADING = /^(?:income|received|re[cç]u|earned|got paid|bonus|prime|dividend|sold|virement re[cç]u)\b/i;
+
+export type ParseOptions = { isIncomeName?: (name: string) => boolean };
+
+export function parseTransactionLines(text: string, reference = new Date(), defaultDate?: string, options: ParseOptions = {}): ParsedTransactionLine[] {
   return text.split(/\r?\n/).flatMap((source, index) => {
     if (!source.trim()) return [];
     const base = { line: index + 1, source };
@@ -57,16 +64,40 @@ export function parseTransactionLines(text: string, reference = new Date(), defa
     const amount = Math.abs(Number(raw.includes(".") ? raw.replace(/,/g, "") : raw.replace(",", ".")));
     if (!Number.isFinite(amount) || amount <= 0 || amount > 999999999) return fail("Enter an amount between 0.01 and 999,999,999 MAD.");
     let name = `${remaining.slice(0, match.index)} ${remaining.slice(match.index! + match[0].length)}`.replace(/\s+/g, " ").trim();
-    const incomeWords = /^(?:income|received|earned|got paid|salary|paycheck|wages|refund|cashback|bonus|dividend|sold)\b/i.test(name);
+    const incomeWords = INCOME_LEADING.test(name) || INCOME_ANYWHERE.test(name);
     const expenseWords = /^(?:expense|spent|paid|bought)\b/i.test(name);
     if ((raw.startsWith("-") && incomeWords) || (raw.startsWith("+") && expenseWords)) return fail("The sign and wording disagree. Use + for income or − for expenses.");
-    const type = raw.startsWith("+") || incomeWords ? "Income" as const : "Expense" as const;
+    // No sign and no wording: a description that was income before stays income ("axa 800").
+    const learnedIncome = !raw.startsWith("-") && !expenseWords && !incomeWords && !!options.isIncomeName?.(name);
+    const type = raw.startsWith("+") || incomeWords || learnedIncome ? "Income" as const : "Expense" as const;
     name = name.replace(/^(?:income|expense|received|earned|got paid|spent|paid)\s+/i, "");
     if (!name) return fail("Add a description, like pizza 19.");
     if (/\d/.test(name)) return fail("Keep only one number per line: the amount. Spell out numbers in descriptions.");
     if (name.length > 200) return fail("Keep the description under 200 characters.");
     return [{ ...base, transaction: { name, amount, date: dates.length ? dateString(date) : defaultDate ?? dateString(date), type } }];
   });
+}
+
+const normalizeName = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+const firstWord = (value: string) => normalizeName(value).split(/[^\p{L}\p{N}]+/u).find(word => word.length >= 3) ?? "";
+
+/**
+ * Learns income from past transactions: a description matches when it equals a past income name,
+ * or shares its first word ("cnss" after "CNSS remboursement"). A name also used for expenses
+ * (exactly, or by first word) stays an expense, so "axa insurance" isn't read as an AXA refund.
+ */
+export function createIncomeMatcher(incomeNames: string[], expenseNames: string[]) {
+  const income = new Set(incomeNames.map(normalizeName));
+  const expense = new Set(expenseNames.map(normalizeName));
+  const incomeFirst = new Set(incomeNames.map(firstWord).filter(Boolean));
+  const expenseFirst = new Set(expenseNames.map(firstWord).filter(Boolean));
+  return (name: string) => {
+    const key = normalizeName(name);
+    if (expense.has(key)) return false;
+    if (income.has(key)) return true;
+    const word = firstWord(name);
+    return !!word && incomeFirst.has(word) && !expenseFirst.has(word);
+  };
 }
 
 export type TypedTransactionDraft = TypedTransaction & { accountId: string; categoryId: string; type: "Expense" | "Income" };

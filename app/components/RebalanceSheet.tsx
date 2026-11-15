@@ -260,10 +260,11 @@ export function RebalanceSheet({
     for (const release of liveReleases) {
       const from = catById.get(release.id);
       if (!from) continue;
-      rows.push({ key: `r-${release.id}`, fromLabel: from.name, fromIcon: from.icon, toLabel: "Unassigned", toIcon: null, amount: release.amount });
+      // Joint money released from the plan lowers what partners still owe this month, so it doesn't sit as unassigned.
+      rows.push({ key: `r-${release.id}`, fromLabel: from.name, fromIcon: from.icon, toLabel: budgetScope === "joint" ? "Lower contributions" : "Unassigned", toIcon: null, amount: release.amount });
     }
     return rows;
-  }, [liveTransfers, liveTopUps, liveReleases, catById]);
+  }, [liveTransfers, liveTopUps, liveReleases, catById, budgetScope]);
 
   // The hero already shows what is unassigned, so the preview only lists the moves.
   const flowPreview = flowRows.length === 0 ? undefined : (
@@ -403,10 +404,9 @@ export function RebalanceSheet({
                 mode: "release",
               }),
             }).then(async (r) => {
-              if (!r.ok) {
-                const d = await r.json();
-                throw new Error(d.error ?? "Could not release category funds");
-              }
+              const d = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(d.error ?? "Could not release category funds");
+              if (d.duesError) throw new Error(d.duesError);
             });
           }),
         ];

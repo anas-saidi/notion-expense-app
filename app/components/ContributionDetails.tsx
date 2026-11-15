@@ -240,7 +240,14 @@ function ContributionSummary({ partner, target, agreed, contributed, sent, left,
         }}>
       <MascotHero look="light" variant="pool" scope="joint" size={MASCOT_SIZE} spentPct={null} level={level} warn={null} levels={levels} front={partner} style={{ marginBottom: -8 }} winkId={winkId} once={burst}
         wrapJar={(jarPartner, jar) => <button type="button" className="contribution-jar" data-front={jarPartner === partner || undefined} aria-pressed={jarPartner === partner}
-          aria-label={jarPartner === partner ? `Showing ${person(jarPartner)}` : `Show ${person(jarPartner)}`} onClick={() => jarPartner !== partner && onShow(jarPartner)}>{jar}</button>} />
+          aria-label={jarPartner === partner ? `Showing ${person(jarPartner)}` : `Show ${person(jarPartner)}`} onClick={event => {
+            // The jars overlap, so a tap on the back jar's visible half can land on the front button.
+            // A pointer tap picks the side it landed on (Anas left, Salma right); a keyboard press uses the button.
+            const pair = event.currentTarget.closest(".mascot-pair");
+            let picked: Partner = jarPartner;
+            if (event.detail > 0 && pair) { const box = pair.getBoundingClientRect(); picked = event.clientX < box.left + box.width / 2 ? "anas" : "salma"; }
+            if (picked !== partner) onShow(picked);
+          }}>{jar}</button>} />
       </motion.div>
       <span className="contribution-who">{person(partner)}</span>
       <span>Left to cover</span>

@@ -265,6 +265,13 @@ body {
   transition: background-color var(--motion-slow) var(--ease-standard), color var(--motion-slow) var(--ease-standard);
 }
 
+/* Touch phones: a long press or a tap that drifts while navigating must not select app text or
+   open the callout, as in a native app. Fields stay selectable; desktop keeps normal selection. */
+@media (pointer: coarse) {
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+}
+
 .app-shell-root {
   background: var(--bg);
   color: var(--text);

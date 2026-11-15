@@ -143,7 +143,6 @@ async function handleGET(
             { property: "Category", relation: { contains: id } },
             { property: "Date", date: { on_or_after: start } },
             { property: "Date", date: { on_or_before: end } },
-            { property: "Reverse", checkbox: { equals: false } },
           ],
         },
         sorts: [{ property: "Date", direction: "descending" }],
@@ -197,10 +196,13 @@ async function handleGET(
       name: titleText(categoryPage, "Category") || "Unnamed",
       icon: categoryPage.icon?.emoji ?? null,
     };
-    const fundedTotal = (fundsData.results ?? []).reduce(
-      (sum: number, page: NotionPage) => sum + Number(page.properties.Planned?.number ?? 0),
-      0,
-    );
+    // Reverse rows are money released back to unassigned (a Rebalance cut with nowhere to go).
+    // They lower Planned and show in the timeline, so the detail adds up to Available.
+    const allFunds: NotionPage[] = fundsData.results ?? [];
+    const releases = allFunds.filter(page => page.properties.Reverse?.checkbox);
+    const funds = allFunds.filter(page => !page.properties.Reverse?.checkbox);
+    const sumPlanned = (pages: NotionPage[]) => pages.reduce((sum, page) => sum + Number(page.properties.Planned?.number ?? 0), 0);
+    const fundedTotal = sumPlanned(funds) - sumPlanned(releases);
 
     const summaryCategory = {
       id: category.id,
@@ -217,7 +219,25 @@ async function handleGET(
         ?? null,
     };
 
-    const fundedEvents: TimelineEvent[] = (fundsData.results ?? []).filter((page: NotionPage) => !page.properties[SAVINGS_UNDONE]?.checkbox).map((page: NotionPage) => {
+    const releaseEvents: TimelineEvent[] = releases.map(page => {
+      const accountId = page.properties[PROP_ACCOUNTS]?.relation?.[0]?.id ?? null;
+      const account = accountId ? accountLookup.get(normalizeId(accountId)) : null;
+      return {
+        id: page.id,
+        date: page.properties.Date?.date?.start ?? "",
+        kind: "moved_out",
+        readOnly: true,
+        amount: page.properties.Planned?.number ?? 0,
+        direction: "out",
+        title: "Released to unassigned",
+        subtitle: account?.name ? `Back to ${account.name}` : undefined,
+        accountId,
+        accountName: account?.name ?? null,
+        sourceDb: "funds",
+      };
+    });
+
+    const fundedEvents: TimelineEvent[] = funds.filter((page: NotionPage) => !page.properties[SAVINGS_UNDONE]?.checkbox).map((page: NotionPage) => {
       const accountId = page.properties[PROP_ACCOUNTS]?.relation?.[0]?.id ?? null;
       const account = accountId ? accountLookup.get(normalizeId(accountId)) : null;
       const amount = page.properties.Planned?.number ?? 0;
@@ -304,7 +324,7 @@ async function handleGET(
       };
     });
 
-    const timeline = [...fundedEvents, ...transferInEvents, ...transferOutEvents, ...expenseEvents]
+    const timeline = [...fundedEvents, ...releaseEvents, ...transferInEvents, ...transferOutEvents, ...expenseEvents]
       .sort((a, b) => {
         const dateDiff = (b.date || "").localeCompare(a.date || "");
         return dateDiff !== 0 ? dateDiff : a.title.localeCompare(b.title);

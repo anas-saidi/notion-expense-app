@@ -101,6 +101,7 @@ type AddTransactionSheetProps = {
   onDelete?: () => Promise<boolean>;
   typedCategories?: Category[];
   typedHistory?: { description: string; categoryId: string }[];
+  typedTypeHistory?: { income: string[]; expense: string[] };
   /** Habit pills for an empty writing view (lib/suggestions.ts). */
   typedSuggestions?: string[];
   typedDraftKey?: string;
@@ -319,6 +320,7 @@ export function AddTransactionSheet(props: AddTransactionSheetProps) {
           categories={props.typedCategories ?? props.allCategories ?? []}
           accounts={props.filteredAccounts}
           history={props.typedHistory ?? []}
+          typeHistory={props.typedTypeHistory}
           defaultAccountId={props.selectedAccount?.id ?? ""}
           defaultDate={props.date}
           onSave={props.onSaveTyped}

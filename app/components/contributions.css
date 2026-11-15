@@ -61,8 +61,9 @@
 }
 
 /* The partner whose figures show sits closer; the other steps back. State indication, so transform + opacity only.
+   will-change keeps each jar on its own layer: the switch scales the drawn light instead of re-running its blur filters every frame.
    Selectors repeat button and :hover/:active so the app-wide button lift (translateY on hover) can't replace the depth. */
-button.contribution-jar { display:grid; place-items:center; padding:0; border:0; background:transparent; color:inherit; cursor:pointer; border-radius:24px; transform-origin:50% 90%;
+button.contribution-jar { display:grid; place-items:center; padding:0; border:0; background:transparent; color:inherit; cursor:pointer; border-radius:24px; transform-origin:50% 90%; -webkit-tap-highlight-color:transparent; outline:none; will-change:transform;
   transition:transform var(--motion-standard) var(--ease-standard), opacity var(--motion-standard) var(--ease-standard); }
 button.contribution-jar, button.contribution-jar:not(:disabled):hover, button.contribution-jar:not(:disabled):active { transform:scale(.84) translateY(6px); opacity:.6; }
 button.contribution-jar[data-front], button.contribution-jar[data-front]:not(:disabled):hover, button.contribution-jar[data-front]:not(:disabled):active { transform:scale(1.06); opacity:1; cursor:default; }

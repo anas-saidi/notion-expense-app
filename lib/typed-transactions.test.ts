@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseTransactionLines, reconcileTypedChoices, saveTypedBatch } from "./typed-transactions";
+import { createIncomeMatcher, parseTransactionLines, reconcileTypedChoices, saveTypedBatch } from "./typed-transactions";
 const reference = new Date(2026, 8, 27, 0, 30);
 const parse = (text: string) => parseTransactionLines(text, reference);
 describe("typed transactions", () => {
@@ -56,4 +56,22 @@ it("reads a plain weekday as the most recent past one, so dates written as weekd
   const friday = new Date(2026, 10, 13, 12);
   const [row] = parseTransactionLines("pizza 14 wednesday", friday);
   expect(row.transaction?.date).toBe("2026-11-11");
+});
+
+describe("income detection", () => {
+  const type = (line: string, options = {}) => parseTransactionLines(line, new Date(2026, 10, 15), undefined, options)[0].transaction?.type;
+  it("reads income words anywhere in the line", () => {
+    expect(type("axa refund 800")).toBe("Income");
+    expect(type("cnss remboursement 640")).toBe("Income");
+    expect(type("salaire 15000")).toBe("Income");
+    expect(type("coffee 20")).toBe("Expense");
+  });
+  it("learns income from past descriptions, unless the name is also an expense", () => {
+    const isIncomeName = createIncomeMatcher(["AXA remboursement", "Prime"], ["axa insurance"]);
+    expect(type("axa remboursement 300", { isIncomeName })).toBe("Income");
+    expect(type("prime 2000", { isIncomeName })).toBe("Income");
+    expect(type("axa 300", { isIncomeName })).toBe("Expense");
+    expect(type("bonus snacks 50", { isIncomeName })).toBe("Income");
+    expect(type("cnss 640", { isIncomeName: createIncomeMatcher([], []) })).toBe("Income");
+  });
 });

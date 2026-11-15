@@ -4,7 +4,7 @@ import "./finance-ai.css";
 import "./ui/prompt-input.css";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { parseTransactionLines, reconcileTypedChoices, saveTypedBatch, type TypedTransactionDraft } from "@/lib/typed-transactions";
+import { createIncomeMatcher, parseTransactionLines, reconcileTypedChoices, saveTypedBatch, type TypedTransactionDraft } from "@/lib/typed-transactions";
 import { createCategorySuggester } from "@/lib/category-suggest";
 import type { Account, Category } from "./app-types";
 import { expenseBudgetGate, fmt, fmtDate, shiftDate, today } from "./app-utils";
@@ -26,6 +26,8 @@ type Props = {
   categories: Category[];
   accounts: Account[];
   history: { description: string; categoryId: string }[];
+  /** Past income and expense descriptions, so a line like "axa 800" is read as income after the first one. */
+  typeHistory?: { income: string[]; expense: string[] };
   defaultAccountId: string;
   defaultDate: string;
   onSave: (transaction: TypedTransactionDraft) => Promise<void>;
@@ -156,7 +158,8 @@ export function TypeItComposer(props: Props) {
   }, []);
 
   const suggest = useMemo(() => createCategorySuggester(props.history), [props.history]);
-  const parsed = parseTransactionLines(text, new Date(), props.defaultDate);
+  const isIncomeName = useMemo(() => createIncomeMatcher(props.typeHistory?.income ?? [], props.typeHistory?.expense ?? []), [props.typeHistory]);
+  const parsed = parseTransactionLines(text, new Date(), props.defaultDate, { isIncomeName });
   const rows = parsed.map(localRow => {
     let row = localRow;
     const draft = choices[row.line]?.transaction;
@@ -387,7 +390,7 @@ export function TypeItComposer(props: Props) {
 
   const settled = (row: (typeof rows)[number] | undefined) => !!row?.transaction && !!row.account && (row.transaction.type === "Income" || !!row.category);
   return <div className="typed composer-pane" style={{ display: props.active ? "flex" : "none" }}>
-    <p id="typed-help" className="sr-only">Write in MAD, one transaction per line, then choose Read. Use salary, received, or + for income. Use today, yesterday, a weekday, or YYYY-MM-DD for dates. Review categories and accounts before saving.</p>
+    <p id="typed-help" className="sr-only">Write in MAD, one transaction per line, then choose Read. Use salary, refund, CNSS, received, or + for income; a description saved as income before is read as income again. Use today, yesterday, a weekday, or YYYY-MM-DD for dates. Review categories and accounts before saving.</p>
     <div className="typed-scroll">
       {/* Outside the writing lines, like prompt-kit: only while nothing is written. */}
       {!text.trim() && (props.suggestions?.length ?? 0) > 0 && <div className="prompt-suggestions typed-suggestions" role="group" aria-label="Suggestions">

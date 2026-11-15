@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { BudgetScope } from "../app-types";
 import { MascotEngine, VIEWBOX_HALF, type MascotFrame, type MascotTarget } from "../mascot/engine";
 import { deriveTarget, type ReactionToken } from "../mascot/mood";
@@ -116,8 +116,17 @@ export function LightMascot({ scope, level, size, spentPct, edge = "wavy", level
   // Eyes never change with the level: the page's text colour (ink in light, near-white in dark)
   // reads on both a dim and a bright light, where white vanished on a pale jar.
   const eyeFill = "var(--text)";
+  // GPU drawing: every soft layer is its own small SVG blurred with a CSS filter, which phones run on the
+  // GPU (Safari draws SVG <filter> blurs on the CPU, and redrew them on every screen change). Layers are
+  // drawn on a box PAD larger on each side, so a blur never meets the layer's edge.
+  const unit = size / (v * 2);
+  const blur = (deviation: number) => `blur(${(deviation * unit).toFixed(2)}px)`;
+  const box = v * (1 + 2 * PAD);
+  const grainTile = useGrainTile(mixHex(a, "#000000", 0.28));
+  const auraScale = wavy ? 1.12 : 1.2;
   return <div aria-hidden="true" style={{ position: "relative", width: size, height: size, flexShrink: 0, ...style }}>
-    <svg viewBox={`${-v} ${-v} ${v * 2} ${v * 2}`} width={size} height={size} style={{ display: "block", overflow: "visible" }}>
+    {/* Shared paint: gradients, clip and the grain pattern, referenced by the layers below. */}
+    <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true" focusable="false">
       <defs>
         <linearGradient id={`${ids}-hue`} gradientUnits="userSpaceOnUse" x1={-80} y1={0} x2={80} y2={0}>
           <stop offset="0" stopColor={a} /><stop offset="1" stopColor={b} />
@@ -136,64 +145,104 @@ export function LightMascot({ scope, level, size, spentPct, edge = "wavy", level
           <stop offset="0.78" stopColor={a} stopOpacity={0.45} />
           <stop offset="1" stopColor={a} stopOpacity={0} />
         </radialGradient>
-        <filter id={`${ids}-aura`} filterUnits="userSpaceOnUse" x={-v} y={-v} width={v * 2} height={v * 2}>
-          {wavy && <>
-            <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="1" seed="4" result="wobble" />
-            <feDisplacementMap in="SourceGraphic" in2="wobble" scale="14" xChannelSelector="R" yChannelSelector="G" result="bent" />
-          </>}
-          <feGaussianBlur in={wavy ? "bent" : "SourceGraphic"} stdDeviation={wavy ? 3.5 : 18} />
-        </filter>
-        <filter id={`${ids}-soft`} filterUnits="userSpaceOnUse" x={-v} y={-v} width={v * 2} height={v * 2}>
-          <feGaussianBlur stdDeviation={wavy ? 3 : 8} />
-        </filter>
-        <filter id={`${ids}-glow`} filterUnits="userSpaceOnUse" x={-v} y={-v} width={v * 2} height={v * 2}>
-          <feGaussianBlur stdDeviation={10} />
-        </filter>
-        {/* Grain as speckles of the light's own deeper colour (never grey): noise becomes
-            alpha, so where the light fades out the speckles fade with it and the edge dithers. */}
-        <filter id={`${ids}-noise`} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="1" seed="2" stitchTiles="stitch" result="n" />
-          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  3.2 0 0 0 -1.55" result="dots" />
-          <feFlood floodColor={mixHex(a, "#000000", 0.28)} />
-          <feComposite in2="dots" operator="in" />
-        </filter>
+        {/* The wavy edge (dev lab only) still bends with SVG noise; the blur itself is CSS. */}
+        {wavy && <filter id={`${ids}-bend`} filterUnits="userSpaceOnUse" x={-box} y={-box} width={box * 2} height={box * 2}>
+          <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="1" seed="4" result="wobble" />
+          <feDisplacementMap in="SourceGraphic" in2="wobble" scale="14" xChannelSelector="R" yChannelSelector="G" />
+        </filter>}
         <clipPath id={`${ids}-clip`}><path d={frame.body} /></clipPath>
-        {/* Where the light is, for the grain. */}
-        <mask id={`${ids}-lit`} maskUnits="userSpaceOnUse" x={-v} y={-v} width={v * 2} height={v * 2}>
-          <path d={frame.body} fill="#fff" transform={`scale(${wavy ? 1.12 : 1.2})`} filter={`url(#${ids}-aura)`} />
-        </mask>
+        {GRAIN_RINGS.map(ring => <clipPath key={ring} id={`${ids}-lit-${ring}`}><path d={frame.body} transform={`scale(${ring})`} /></clipPath>)}
+        {/* Grain: a static tile of speckles in the light's own deeper colour (never grey), drawn once per colour. */}
+        {grainTile && <pattern id={`${ids}-grain`} patternUnits="userSpaceOnUse" width={GRAIN_TILE} height={GRAIN_TILE}>
+          <image href={grainTile} width={GRAIN_TILE} height={GRAIN_TILE} />
+        </pattern>}
       </defs>
+    </svg>
 
-      {/* Aura: the wavy soft border. */}
-      <g style={{ opacity: Math.min(1, 0.4 * k * density), transition: FADE }}><path d={frame.body} transform={`scale(${wavy ? 1.12 : 1.2})`} fill={`url(#${ids}-hue)`} filter={`url(#${ids}-aura)`} /></g>
-      {/* Body: the outline itself, a little brighter, softly edged. */}
-      <path d={frame.body} fill={`url(#${ids}-hue)`} style={{ opacity: Math.min(1, 0.5 * k * density), transition: FADE }} filter={`url(#${ids}-soft)`} />
-      {/* Level: the liquid as a bright glow, clipped to the body then blurred so it never shows a hard waterline. */}
-      {bright && !split && <g filter={`url(#${ids}-glow)`} style={{ opacity: shown, transition: FADE }}>
-        <g clipPath={`url(#${ids}-clip)`}>
-          <path d={frame.body} fill={`url(#${ids}-hue)`} opacity={0.6} />
-          <path d={frame.body} fill={`url(#${ids}-core)`} />
-        </g>
-      </g>}
-      {core && <g filter={`url(#${ids}-glow)`}>
-        <g clipPath={`url(#${ids}-clip)`}>
-          <ellipse cx={0} cy={22} rx={108} ry={98} fill={`url(#${ids}-heart)`}
-            style={{ transform: `scale(${coreScale})`, transformBox: "fill-box", transformOrigin: "50% 50%", opacity: 0.7 + 0.3 * shown, transition: `transform ${EASE}, opacity ${EASE}` }} />
-        </g>
-      </g>}
-      {levelMode === "height" && !split && frame.liquid && <g filter={`url(#${ids}-glow)`}>
-        <g clipPath={`url(#${ids}-clip)`}>
-          <path d={frame.liquid} fill={`url(#${ids}-hue)`} opacity={0.95} />
-          <path d={frame.liquid} fill={`url(#${ids}-core)`} />
-        </g>
-      </g>}
-      {/* Grain over the light only. */}
-      <rect x={-v} y={-v} width={v * 2} height={v * 2} filter={`url(#${ids}-noise)`} mask={`url(#${ids}-lit)`} style={{ opacity: 0.35 * k, transition: FADE }} />
+    {/* Aura: the soft border. */}
+    <BlurLayer box={box} size={size} filter={blur(wavy ? 3.5 : 18)} style={{ opacity: Math.min(1, 0.4 * k * density), transition: FADE }}>
+      <path d={frame.body} transform={`scale(${auraScale})`} fill={`url(#${ids}-hue)`} filter={wavy ? `url(#${ids}-bend)` : undefined} />
+    </BlurLayer>
+    {/* Body: the outline itself, a little brighter, softly edged. */}
+    <BlurLayer box={box} size={size} filter={blur(wavy ? 3 : 8)} style={{ opacity: Math.min(1, 0.5 * k * density), transition: FADE }}>
+      <path d={frame.body} fill={`url(#${ids}-hue)`} />
+    </BlurLayer>
+    {/* Level: the liquid as a bright glow, clipped to the body then blurred so it never shows a hard waterline. */}
+    {bright && !split && <BlurLayer box={box} size={size} filter={blur(10)} style={{ opacity: shown, transition: FADE }}>
+      <g clipPath={`url(#${ids}-clip)`}>
+        <path d={frame.body} fill={`url(#${ids}-hue)`} opacity={0.6} />
+        <path d={frame.body} fill={`url(#${ids}-core)`} />
+      </g>
+    </BlurLayer>}
+    {core && <BlurLayer box={box} size={size} filter={blur(10)}>
+      <g clipPath={`url(#${ids}-clip)`}>
+        <ellipse cx={0} cy={22} rx={108} ry={98} fill={`url(#${ids}-heart)`}
+          style={{ transform: `scale(${coreScale})`, transformBox: "fill-box", transformOrigin: "50% 50%", opacity: 0.7 + 0.3 * shown, transition: `transform ${EASE}, opacity ${EASE}` }} />
+      </g>
+    </BlurLayer>}
+    {levelMode === "height" && !split && frame.liquid && <BlurLayer box={box} size={size} filter={blur(10)}>
+      <g clipPath={`url(#${ids}-clip)`}>
+        <path d={frame.liquid} fill={`url(#${ids}-hue)`} opacity={0.95} />
+        <path d={frame.liquid} fill={`url(#${ids}-core)`} />
+      </g>
+    </BlurLayer>}
 
+    <svg viewBox={`${-v} ${-v} ${v * 2} ${v * 2}`} width={size} height={size} style={{ position: "relative", display: "block", overflow: "visible" }} aria-hidden="true" focusable="false">
+      {/* Grain over the light only: nested rings stack, so the speckles thin out toward the soft edge. */}
+      {grainTile && <g style={{ opacity: 0.35 * k, transition: FADE }}>
+        {GRAIN_RINGS.map((ring, i) => <rect key={ring} x={-v} y={-v} width={v * 2} height={v * 2} fill={`url(#${ids}-grain)`} clipPath={`url(#${ids}-lit-${ring})`} opacity={GRAIN_WEIGHTS[i]} />)}
+      </g>}
       {/* Eyes: one colour at every level (theme text colour). */}
       <g style={{ fill: eyeFill }}>{frame.eyes.map((eye, i) => <path key={i} d={eye.d} transform={eye.transform} />)}</g>
     </svg>
   </div>;
+}
+
+/** One soft layer: its own SVG, blurred by a CSS filter (GPU), on a box PAD larger than the mascot. */
+function BlurLayer({ box, size, filter, style, children }: { box: number; size: number; filter: string; style?: CSSProperties; children: ReactNode }) {
+  const span = size * (1 + 2 * PAD);
+  return <svg viewBox={`${-box} ${-box} ${box * 2} ${box * 2}`} aria-hidden="true" focusable="false"
+    style={{ position: "absolute", left: -PAD * size, top: -PAD * size, width: span, height: span, overflow: "visible", pointerEvents: "none", filter, ...style }}>{children}</svg>;
+}
+
+/** Margin each blurred layer gets beyond the mascot's box, as a share of its size. */
+const PAD = 0.25;
+/** Grain tile size, in viewBox units (one speckle is about one unit). */
+const GRAIN_TILE = 128;
+/** The light's extent in steps: grain is densest in the body and fades over the aura. */
+const GRAIN_RINGS = [0.96, 1.06, 1.14, 1.2];
+/** Share of the grain each ring adds; the outer rings add little, so the speckles fade out like the old blurred mask. */
+const GRAIN_WEIGHTS = [0.5, 0.25, 0.15, 0.1];
+
+const grainTiles = new Map<string, string>();
+/**
+ * A tile of speckles in one colour, drawn once on a canvas and cached for the session (the old
+ * SVG turbulence noise was regenerated on every mount). Null until the client draws it.
+ */
+function useGrainTile(color: string) {
+  const [tile, setTile] = useState<string | null>(() => grainTiles.get(color) ?? null);
+  useEffect(() => {
+    const cached = grainTiles.get(color);
+    if (cached) { setTile(cached); return; }
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = GRAIN_TILE;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const image = context.createImageData(GRAIN_TILE, GRAIN_TILE);
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+    // Same curve as the old colour matrix (alpha = 3.2 × noise − 1.55): about half the pixels speckle, a few fully.
+    let seed = 2;
+    const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < image.data.length; i += 4) {
+      image.data[i] = r; image.data[i + 1] = g; image.data[i + 2] = b;
+      image.data[i + 3] = Math.round(255 * Math.max(0, Math.min(1, 3.2 * random() - 1.55)));
+    }
+    context.putImageData(image, 0, 0);
+    const url = canvas.toDataURL("image/png");
+    grainTiles.set(color, url);
+    setTile(url);
+  }, [color]);
+  return tile;
 }
 
 /** Couple: both lights side by side, overlapping like the real pair, Anas left and Salma right. */

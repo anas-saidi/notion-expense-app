@@ -28,8 +28,11 @@ export function HeartTip({ size, jar, overlap, level }: { size: number; jar: num
     "Z",
   ].join(" ");
   const strength = 0.35 + 0.65 * Math.max(0, Math.min(1, level));
-  const style: CSSProperties = { position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none", zIndex: 0, opacity: 0.4 * strength, transition: "opacity 700ms cubic-bezier(0.33, 0, 0.2, 1)" };
-  return <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={style} aria-hidden="true" focusable="false">
+  // Blurred by a CSS filter (GPU) rather than an SVG filter; the box is padded so the blur never meets its edge.
+  const pad = Math.round(size * 0.15);
+  const style: CSSProperties = { position: "absolute", left: -pad, top: -pad, overflow: "visible", pointerEvents: "none", zIndex: 0, opacity: 0.4 * strength,
+    filter: `blur(${(jar * 0.07).toFixed(2)}px)`, transition: "opacity 700ms cubic-bezier(0.33, 0, 0.2, 1)" };
+  return <svg width={size + pad * 2} height={size + pad * 2} viewBox={`${-pad} ${-pad} ${size + pad * 2} ${size + pad * 2}`} style={style} aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id={`${ids}-hue`} x1="0" y1="0" x2="1" y2="0">
         {/* Mostly halo, so the point reads as the lights' own glow, not a new colour. */}
@@ -38,10 +41,7 @@ export function HeartTip({ size, jar, overlap, level }: { size: number; jar: num
         <stop offset="0.5" stopColor={mixHex(salma.halo, salma.core, 0.1)} />
         <stop offset="0.8" stopColor={mixHex(salma.halo, salma.core, 0.25)} />
       </linearGradient>
-      <filter id={`${ids}-blur`} x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur stdDeviation={jar * 0.07} />
-      </filter>
     </defs>
-    <path d={d} fill={`url(#${ids}-hue)`} filter={`url(#${ids}-blur)`} />
+    <path d={d} fill={`url(#${ids}-hue)`} />
   </svg>;
 }

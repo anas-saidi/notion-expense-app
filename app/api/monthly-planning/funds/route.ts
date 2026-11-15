@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryDatabaseAll } from "@/lib/notion-api";
 import { monthBounds } from "@/app/components/app-utils";
 import { assertAdvanceReservation } from "../../../../lib/contribution-service";
+import { contributionStore } from "../../../../lib/contribution-store";
+import { contributionScope } from "../../../../lib/contribution-scope";
+import { releaseFromPlan } from "../../../../lib/plan-addition";
+import { withSavingsFundingLock } from "../../../../lib/savings-funding-lock";
+import { scopeFromAccountLabel } from "@/app/components/app-utils";
 
 const NOTION_VERSION = "2022-06-28";
 const FUNDS_DB = process.env.NOTION_FUNDS_DB ?? "1936a2be89228058990dc549172f1d45";
@@ -54,6 +59,16 @@ async function resolveFundAccount(token: string, categoryId: string, accountId: 
   const fallback = data.properties?.Default?.relation?.[0]?.id;
   if (!fallback) throw Object.assign(new Error("Choose the account this money comes from"), { status: 400 });
   return fallback as string;
+}
+
+/** Whether a fund's holding account is the Joined account (its title names it). */
+async function isJointAccount(token: string, accountId: string) {
+  const response = await fetch(`https://api.notion.com/v1/pages/${accountId}`, { headers: notionHeaders(token), cache: "no-store" });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || "Could not read the account");
+  const title: any = Object.values(data.properties ?? {}).find((p: any) => p.type === "title");
+  const label = (title?.title ?? []).map((p: any) => p.plain_text ?? "").join("");
+  return !/saving/i.test(label) && scopeFromAccountLabel(label) === "joint";
 }
 
 async function assertFundReductionIsAvailable(token: string, page: any, nextPlanned: number) {
@@ -183,7 +198,18 @@ async function handlePOST(req: NextRequest) {
       if (!createRes.ok) {
         return NextResponse.json({ error: createData.message || "Failed to release available funds" }, { status: createRes.status });
       }
-      return NextResponse.json({ fund: { id: createData.id, categoryId, planned, reverse: true }, mode: "released" });
+      // Joint money released from the plan lowers this month's agreed contributions by the same amount.
+      let agreement = null, duesError: string | null = null;
+      try {
+        if (await isJointAccount(token, accountId!)) {
+          const scope = contributionScope(token), store = contributionStore();
+          agreement = await withSavingsFundingLock(`plan-addition:${scope}:${body.month}`, () => releaseFromPlan(
+            { fundId: createData.id, month: body.month, categoryId, amount: planned },
+            { load: async () => (await store.list(scope)).find(a => a.month === body.month), save: (current, targets, additions) => store.save(scope, body.month, targets, current.shares, current.version, additions) },
+          ));
+        }
+      } catch (error: any) { duesError = error?.message ?? "The money is released, but the agreed contributions weren't lowered."; }
+      return NextResponse.json({ fund: { id: createData.id, categoryId, planned, reverse: true }, mode: "released", agreement, duesError });
     }
 
     // "add" mode: always create a fresh Additional record, never touch the Monthly one

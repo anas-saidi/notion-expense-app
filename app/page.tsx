@@ -606,6 +606,11 @@ export default function App() {
   }, []);
 
   const suggestFromHistory = useMemo(() => createCategorySuggester(corpus), [corpus]);
+  // Descriptions by type for the Type it composer: a name saved as income before is read as income.
+  const typedTypeHistory = useMemo(() => ({
+    income: transactions.filter(t => t.type === "Income").map(t => t.name),
+    expense: transactions.filter(t => t.type === "Expense").map(t => t.name),
+  }), [transactions]);
 
   useEffect(() => {
     const acct = accounts.find((a) => a.id === accountId);
@@ -1508,6 +1513,7 @@ export default function App() {
         typedDraftKey={`typedDraft:v2:${mode}:${budgetScope}`}
         typedCategories={categories.filter(c => !isSavingsCategory(c) && !c.archived)}
         typedHistory={corpus}
+        typedTypeHistory={typedTypeHistory}
         typedSuggestions={typedSuggestions}
         onSaveTyped={async (transaction) => {
           const response = await fetch(transaction.type === "Income" ? "/api/monthly-income" : "/api/expense", {
