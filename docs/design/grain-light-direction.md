@@ -229,7 +229,7 @@ Guidelines:
 
 - **No idle loop.** The light changes only when its state changes, then stops. No pulsing, breathing or drifting.
 - **One curve for every light change:** 700ms `cubic-bezier(0.33, 0, 0.2, 1)` on strength and grain opacity together, so source and room move as one.
-- **Screen switches:** crossfade only the light (about 240ms, scale 0.97 and a 4px blur via a View Transition) and swap the rest of the screen instantly. Blur makes two lights read as one change.
+- **Screen switches:** swap instantly. Every screen keeps the same light in the same box, so a crossfade adds nothing, and a View Transition snapshot of the blurred light drifted on iPhone.
 - **Grain never animates.** Animated grain looks like video noise and costs every frame.
 - **Reduce Motion:** strength changes jump; crossfades keep opacity only.
 
@@ -271,4 +271,4 @@ Guidelines:
 
 ## Reference implementation
 
-In this repository: `app/components/grain/grain-glow.css` and `GrainGlow.tsx` (the room, grain, sheet edge and accessibility settings), `app/components/grain/palettes.ts` (tone pairs), `app/components/ui/screen-switch.ts` with the "Screen switch" block in `screen-hero.css` (the crossfade), and the **Light** section of `design.md` (how the app maps the light to money).
+In this repository: `app/components/grain/grain-glow.css` and `GrainGlow.tsx` (the room, grain, sheet edge and accessibility settings), `app/components/grain/palettes.ts` (tone pairs), and the **Light** section of `design.md` (how the app maps the light to money).

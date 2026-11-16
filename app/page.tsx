@@ -11,7 +11,6 @@ import { AppShell } from "./components/AppShell";
 import { Button } from "./components/ui/Button";
 import "./components/screen-components.css";
 import { toastDuration, type ToastMessage, type ToastOptions } from "./components/ui/Toast";
-import { switchScreen } from "./components/ui/screen-switch";
 import { KeptScreen } from "./components/ui/KeptScreen";
 import { BillsSection } from "./components/BillsSection";
 import { billRemaining, deriveOccurrences, earmarkedByCategory, normalizedId, type BillsData } from "@/lib/bills";
@@ -1304,7 +1303,7 @@ export default function App() {
     <AppShell
       scopeAttention={scopeAttention}
       tab={tab}
-      onTabChange={(t) => switchScreen(() => { if (t === "history") setReflectView("spending"); setTab(t); setShowManageScreen(false); })}
+      onTabChange={(t) => { if (t === "history") setReflectView("spending"); setTab(t); setShowManageScreen(false); }}
       onOpenAdd={() => {
         setEditingTransactionId(null);
         setTransactionType("Expense");
@@ -1415,7 +1414,7 @@ export default function App() {
           transactions={scopedTransactions}
           budgetTransactions={budgetTransactions}
           pendingItems={scopedPendingItems}
-          onOpenHistory={() => switchScreen(() => { setReflectView("activity"); setTab("history"); })}
+          onOpenHistory={() => { setReflectView("activity"); setTab("history"); }}
           onClickTransaction={editTransaction}
           jointUnassigned={jointUnassigned}
           onOpenAssign={() => setShowRebalance(true)}
