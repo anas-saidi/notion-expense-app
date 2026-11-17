@@ -5,6 +5,8 @@ import { BottomNav } from "./BottomNav";
 import { PlusIcon, SearchIcon, SettingsIcon, ShuffleIcon } from "./ui/icons";
 import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import { SettingsSheet } from "./SettingsSheet";
+import { ZakatSheet, type ZakatPaymentDraft } from "./ZakatSheet";
+import { ZakatReminder } from "./ZakatReminder";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { BUDGET_SCOPE_LABELS } from "./app-utils";
@@ -29,6 +31,7 @@ export function AppShell({
   syncTimestamp,
   syncing,
   onSync,
+  onRecordZakat,
   showAddButton = true,
   children,
 }: {
@@ -50,11 +53,15 @@ export function AppShell({
   syncTimestamp?: string | null;
   syncing?: boolean;
   onSync?: () => void;
+  /** Opens the expense form prefilled for a zakat payment. */
+  onRecordZakat?: (draft: ZakatPaymentDraft) => void;
   showAddButton?: boolean;
   children?: ReactNode;
 }) {
   const { haptic } = useAppHaptics();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [zakatOpen, setZakatOpen] = useState(false);
+  const [zakatStatusVersion, setZakatStatusVersion] = useState(0);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (!url.searchParams.has("glassLab")) return;
@@ -132,6 +139,7 @@ export function AppShell({
             </LiquidButton>}
           </div>
         </header>
+        {tab === "home" && <ZakatReminder onOpen={() => setZakatOpen(true)} refreshKey={zakatStatusVersion} />}
         {children}
       </div>
 
@@ -194,8 +202,13 @@ export function AppShell({
             setSettingsOpen(false);
             onOpenManage();
           } : undefined}
+          onOpenZakat={() => {
+            setSettingsOpen(false);
+            setZakatOpen(true);
+          }}
         />
       )}
+      <ZakatSheet open={zakatOpen} onClose={() => setZakatOpen(false)} onRecordPayment={onRecordZakat} onStatusChange={() => setZakatStatusVersion(v => v + 1)} />
 
       <Toast toast={toast} />
     </div>

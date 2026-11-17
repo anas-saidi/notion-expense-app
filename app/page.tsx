@@ -42,6 +42,7 @@ import { calculateContributionStatus, contributionDue } from "./components/contr
 import { ContributionDetails, ContributionEntry } from "./components/ContributionDetails";
 import { contributionLedger, money as contributionMoney } from "../lib/contribution-agreements";
 import { fmt, scopeFromAccountLabel, withDisplayNames } from "./components/app-utils";
+import { refreshZakatStatus } from "./components/zakat-status";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
   categoryMatchesScope,
@@ -1219,6 +1220,8 @@ export default function App() {
       // may not reflect the new transaction immediately.
       setTimeout(() => {
         void refreshBudgetData().catch(() => {});
+        // A zakat payment clears the Home reminder now instead of at the next daily check.
+        if (name.toLowerCase().includes("zakat")) void refreshZakatStatus();
       }, 1500);
 
       if (!isEditing) {
@@ -1312,6 +1315,21 @@ export default function App() {
         setShowAddModal(true);
       }}
       onOpenManage={() => setShowManageScreen(true)}
+      onRecordZakat={(draft) => {
+        setEditingTransactionId(null);
+        setTransactionType("Expense");
+        setName("Zakat");
+        setAmount(String(draft.amount));
+        setDate(today());
+        // Switch to the view that owns the category, or the form swaps it for the first category in the current view.
+        const category = categories.find(c => c.id === draft.categoryId);
+        const scope = category && getCategoryScope(category, accounts);
+        if (scope) setBudgetScope(scope);
+        setCategoryId(draft.categoryId);
+        setAccountId(draft.accountId);
+        setAddInForm(true);
+        setShowAddModal(true);
+      }}
       budgetScope={budgetScope}
       onBudgetScopeChange={setBudgetScope}
       personalScope={mode === "wife" ? "salma" : "anas"}

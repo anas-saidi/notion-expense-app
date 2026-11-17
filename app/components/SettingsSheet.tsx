@@ -6,7 +6,7 @@ import { ThemeToggle } from "./ui/ThemeToggle";
 import { BottomSheet } from "./ui/BottomSheet";
 import { ChevronRightIcon, XIcon } from "./ui/icons";
 type Theme = "system" | "light" | "dark";
-export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccounts, syncTimestamp, syncing = false, onSync }: { open: boolean; onClose: () => void; theme: Theme; onSelectTheme: (theme: Theme) => void; onOpenAccounts?: () => void; syncTimestamp?: string | null; syncing?: boolean; onSync?: () => void }) {
+export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccounts, onOpenZakat, syncTimestamp, syncing = false, onSync }: { open: boolean; onClose: () => void; theme: Theme; onSelectTheme: (theme: Theme) => void; onOpenAccounts?: () => void; onOpenZakat?: () => void; syncTimestamp?: string | null; syncing?: boolean; onSync?: () => void }) {
   return <BottomSheet open={open} onClose={onClose} label="Settings" size="standard">
     <div className="sheet-body" style={sheetContentStyle}>
       <SheetHeader style={headerStyle}>
@@ -19,9 +19,12 @@ export function SettingsSheet({ open, onClose, theme, onSelectTheme, onOpenAccou
           <ThemeToggle theme={theme} onSelectTheme={onSelectTheme} />
         </div>
       </section>
-      {onOpenAccounts && <section aria-label="Finances" style={sectionStyle}>
+      {(onOpenAccounts || onOpenZakat) && <section aria-label="Finances" style={sectionStyle}>
         {onOpenAccounts && <button type="button" className="settings-navigation-row" onClick={onOpenAccounts}>
           Accounts <ChevronRightIcon size={20} aria-hidden="true" />
+        </button>}
+        {onOpenZakat && <button type="button" className="settings-navigation-row" onClick={onOpenZakat}>
+          Zakat <ChevronRightIcon size={20} aria-hidden="true" />
         </button>}
 
       </section>}
