@@ -7,6 +7,7 @@ import { GlobalBudgetScopePicker } from "./ui/ScopeChipBar";
 import { SettingsSheet } from "./SettingsSheet";
 import { ZakatSheet, type ZakatPaymentDraft } from "./ZakatSheet";
 import { ZakatReminder } from "./ZakatReminder";
+import { ZAKAT_OPEN_EVENT } from "./zakat-status";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { ProgressiveBlur, useScrollEdges } from "./ui/ProgressiveBlur";
 import { BUDGET_SCOPE_LABELS } from "./app-utils";
@@ -62,6 +63,12 @@ export function AppShell({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [zakatOpen, setZakatOpen] = useState(false);
   const [zakatStatusVersion, setZakatStatusVersion] = useState(0);
+  // The Bills zakat row opens the zakat screen from inside its own sheet.
+  useEffect(() => {
+    const open = () => setZakatOpen(true);
+    window.addEventListener(ZAKAT_OPEN_EVENT, open);
+    return () => window.removeEventListener(ZAKAT_OPEN_EVENT, open);
+  }, []);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (!url.searchParams.has("glassLab")) return;

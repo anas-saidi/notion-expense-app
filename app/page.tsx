@@ -42,7 +42,7 @@ import { calculateContributionStatus, contributionDue } from "./components/contr
 import { ContributionDetails, ContributionEntry } from "./components/ContributionDetails";
 import { contributionLedger, money as contributionMoney } from "../lib/contribution-agreements";
 import { fmt, scopeFromAccountLabel, withDisplayNames } from "./components/app-utils";
-import { refreshZakatStatus } from "./components/zakat-status";
+import { refreshZakatAfterPayment } from "./components/zakat-status";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
 import {
   categoryMatchesScope,
@@ -1220,8 +1220,8 @@ export default function App() {
       // may not reflect the new transaction immediately.
       setTimeout(() => {
         void refreshBudgetData().catch(() => {});
-        // A zakat payment clears the Home reminder now instead of at the next daily check.
-        if (name.toLowerCase().includes("zakat")) void refreshZakatStatus();
+        // A zakat payment clears the Home reminder as soon as Notion lists it, not at the next daily check.
+        if (name.toLowerCase().includes("zakat")) void refreshZakatAfterPayment();
       }, 1500);
 
       if (!isEditing) {

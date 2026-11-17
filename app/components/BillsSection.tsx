@@ -28,6 +28,8 @@ import { SheetFooter } from "./ui/SheetLayout";
 import { useAppHaptics } from "./ui/useAppHaptics";
 import { Fact, Summary, joinClauses } from "./ui/Summary";
 import "./bills.css";
+import { useZakatStatus } from "./ZakatReminder";
+import { openZakat, zakatBillFor, type ZakatBill } from "./zakat-status";
 
 type Props = { data: BillsData | null; loading: boolean; /** Balances are refreshing after a save: rows stay, actions wait. */ refreshing?: boolean; error: string | null; categories: Category[]; accounts: Account[]; scope: BudgetScope; onRetry: () => void; onChanged: () => Promise<void> };
 type View = "list" | "add" | "detail" | "pay" | "edit" | "link";
@@ -82,6 +84,11 @@ export function BillsSection({ data, loading, refreshing = false, error, categor
     : filter === "Overdue" ? o.state === "Overdue" && o.dueDate <= cutoff
     : filter === "Skipped" ? o.state === "Skipped" && o.period === activeMonth
     : (o.state === "Due" || o.state === "Overdue") && (activeMonth === currentMonth ? o.dueDate <= cutoff : o.dueDate.slice(0, 7) === activeMonth));
+  // Zakat is the owner's own: it shows in his view as a computed row, never stored and never reserving budget.
+  const zakatStatus = useZakatStatus({ enabled: scope === "anas" });
+  const zakatNow = zakatBillFor(zakatStatus, { month: currentMonth, currentMonth, cutoff: currentCutoff });
+  const zakatListed = day || filter === "Paid" || filter === "Skipped" ? null : zakatBillFor(zakatStatus, { month: activeMonth, currentMonth, cutoff });
+  const zakatShown = zakatListed && (filter !== "Overdue" || zakatListed.state === "Overdue") ? zakatListed : null;
   const reservations = earmarkedByCategory(scoped, currentCutoff);
   const category = categories.find(c => normalizedId(c.id) === normalizedId(categoryId));
   const selectedCategory = categories.find(c => selected && normalizedId(c.id) === normalizedId(selected.categoryId));
@@ -94,8 +101,8 @@ export function BillsSection({ data, loading, refreshing = false, error, categor
   const enabled = !saving && !savedPendingRefresh && !loading && !refreshing && !error;
   const categoryOf = (bill: BillOccurrence) => categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId));
   // Current month only, and only totals: the month picker names the month, and the calendar and list already show each bill and its date.
-  const dueTotal = Math.round(currentDue.reduce((sum, o) => sum + o.amount, 0));
-  const overdueTotal = Math.round(currentDue.filter(o => o.state === "Overdue").reduce((sum, o) => sum + o.amount, 0));
+  const dueTotal = Math.round(currentDue.reduce((sum, o) => sum + o.amount, 0) + (zakatNow?.amount ?? 0));
+  const overdueTotal = Math.round(currentDue.filter(o => o.state === "Overdue").reduce((sum, o) => sum + o.amount, 0) + (zakatNow?.state === "Overdue" ? zakatNow.amount : 0));
   const billsSummary = activeMonth !== currentMonth || dueTotal <= 0 ? [] : [
     <span key="due"><Fact onClick={() => { setDay(null); setSearch(""); setFilter("Due"); }} label="Show all due bills">{fmt(dueTotal)}</Fact> is still due{overdueTotal > 0 && <>, <Fact>{fmt(overdueTotal)}</Fact> of it <Fact tone="danger" onClick={() => { setDay(null); setSearch(""); setFilter("Overdue"); }} label="Show overdue bills">overdue</Fact></>}</span>,
   ];
@@ -168,8 +175,8 @@ export function BillsSection({ data, loading, refreshing = false, error, categor
     <CardHeader className="bills-section-heading" title="Due bills" titleClassName="section-label" action={<CardHeaderAction disabled={!enabled} onClick={() => { setOpen(true); move("list"); }}>All bills</CardHeaderAction>} />
     {loading ? <SkeletonRows count={2} /> : error ? <Banner role="alert" tone="danger" compact action={retryAction}>{error}</Banner>
       : <>
-        {currentDue.length ? <>
-          <div className="row-list">{currentDue.slice(0, 3).map(bill => <BillRow key={bill.id} bill={bill} needsFunding={needsFunding(bill)} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}</div>
+        {currentDue.length || zakatNow ? <>
+          <div className="row-list">{zakatNow && <ZakatBillRow zakat={zakatNow} onClick={openZakat} disabled={!enabled} />}{currentDue.slice(0, zakatNow ? 2 : 3).map(bill => <BillRow key={bill.id} bill={bill} needsFunding={needsFunding(bill)} category={categories.find(c => normalizedId(c.id) === normalizedId(bill.categoryId))} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} compact />)}</div>
         </> : <EmptyState>No bills due.</EmptyState>}
       </>}
     <BottomSheet open={open} onClose={closeSheet} label={view === "list" ? "Bills" : view === "add" ? "Add bill" : view === "pay" ? "Record payment" : view === "edit" ? "Edit bill" : view === "link" ? "Count an expense" : selected?.name ?? "Bill"} size="standard" contentStyle={{ paddingTop: 0 }}>
@@ -187,7 +194,7 @@ export function BillsSection({ data, loading, refreshing = false, error, categor
           {activeMonth && showCalendar && <BillsCalendar month={activeMonth} today={data?.today ?? ""} bills={monthBills} categoryOf={categoryOf} selectedDay={day} onSelectDay={value => { setDay(day === value ? null : value); haptic("selection"); }} onOpenBill={details} />}
           {day ? <div className="bills-day-heading"><span>{new Date(`${day}T12:00:00`).toLocaleDateString("en", { weekday: "long", day: "numeric", month: "long" })}</span><Button variant="quiet" size="compact" onClick={() => setDay(null)}>Show all</Button></div>
             : <div className="bills-filters" role="group" aria-label="Bill state">{(["Due", ...(filter === "Overdue" ? ["Overdue" as const] : []), "Paid", "Skipped"] as const).map(value => <ScreenChip key={value} selected={filter === value} minHeight={44} onClick={() => { setFilter(value); haptic("selection"); }}>{value}</ScreenChip>)}</div>}
-          {shown.length ? <div className="row-list">{shown.map(bill => <BillRow key={bill.id} bill={bill} category={categoryOf(bill)} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={!day && filter === "Paid" ? activeMonth : undefined} hideDate={!!day} />)}</div> : <EmptyState announce>{day ? `No bills on ${new Date(`${day}T12:00:00`).toLocaleDateString("en", { day: "numeric", month: "long" })}.` : `No ${filter.toLowerCase()} bills in ${activeMonth ? new Date(`${activeMonth}-01T12:00:00`).toLocaleDateString("en", { month: "long", year: "numeric" }) : "this month"}.`}</EmptyState>}
+          {shown.length || zakatShown ? <div className="row-list">{zakatShown && <ZakatBillRow zakat={zakatShown} onClick={() => { setOpen(false); openZakat(); }} disabled={!enabled} />}{shown.map(bill => <BillRow key={bill.id} bill={bill} category={categoryOf(bill)} onClick={() => details(bill)} onPay={() => prepare("pay", bill)} onEdit={() => prepare("edit", bill)} disabled={!enabled} needsFunding={activeMonth === currentMonth && needsFunding(bill)} paidMonth={!day && filter === "Paid" ? activeMonth : undefined} hideDate={!!day} />)}</div> : <EmptyState announce>{day ? `No bills on ${new Date(`${day}T12:00:00`).toLocaleDateString("en", { day: "numeric", month: "long" })}.` : `No ${filter.toLowerCase()} bills in ${activeMonth ? new Date(`${activeMonth}-01T12:00:00`).toLocaleDateString("en", { month: "long", year: "numeric" }) : "this month"}.`}</EmptyState>}
         </>}
         {view === "detail" && selected && <>
           <section className="bills-detail-summary"><div className="bills-detail-amount"><Money value={remaining > 0 && selected.paid > 0 ? remaining : selected.amount} currency /></div>
@@ -285,6 +292,18 @@ function BillRow({ bill, category, onClick, onPay, onEdit, disabled, paidMonth, 
   </button>;
   if (bill.state !== "Due" && bill.state !== "Overdue") return row;
   return <SwipeToDelete flat surface={compact ? "var(--bill-row-surface, var(--bg))" : "var(--surface)"} disabled={disabled} actions={[{ label: "Pay due", icon: <ReceiptIcon size={20} />, onSelect: onPay }, { label: "Edit", icon: <EditIcon size={20} />, onSelect: onEdit }]}>{row}</SwipeToDelete>;
+}
+
+/** Zakat in a Bills list: looks like a bill row, opens the zakat screen, where the payment is recorded. */
+function ZakatBillRow({ zakat, onClick, disabled }: { zakat: ZakatBill; onClick: () => void; disabled: boolean }) {
+  const date = new Date(`${zakat.dueDate}T12:00:00`);
+  const overdue = zakat.state === "Overdue";
+  const status = overdue ? "Overdue" : zakat.estimated ? "Estimate" : null;
+  return <button type="button" className="bill-date-row" onClick={onClick} disabled={disabled} aria-label={`Zakat, ${overdue ? "overdue since" : "due"} ${date.toLocaleDateString("en", { day: "numeric", month: "long", year: "numeric" })}, ${zakat.estimated ? "about " : ""}${zakat.amount} MAD${status ? `, ${status}` : ""}, open zakat`}>
+    <span className={`bill-date-tile${overdue ? " bill-date-overdue" : ""}`} aria-hidden="true"><span>{date.toLocaleDateString("en", { weekday: "short" })}</span><strong>{date.getDate()}</strong></span>
+    <span className="bill-date-copy"><span className="bill-date-title">Zakat</span>{status && <span className="bill-date-context bill-date-metadata"><span className={overdue ? "bill-date-alert" : undefined}>{status}</span></span>}</span>
+    <span className="bill-date-amount"><Money value={zakat.amount} /></span>
+  </button>;
 }
 
 /** Month grid with each bill's category artwork on its due day (design.md, "Bills calendar"). Only inside All bills. */
