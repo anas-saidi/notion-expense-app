@@ -1,6 +1,9 @@
 import { withMirrorMutation } from "../../../lib/mirror/routes";
 import { NextRequest, NextResponse } from "next/server";
 import { notionFetchJson } from "@/lib/notion-api";
+import { accountKey as checkAccountKey } from "../../../lib/balance-checks";
+import { balanceCheckStore } from "../../../lib/balance-check-store";
+import { mirrorScope } from "../../../lib/mirror/store";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +83,20 @@ async function handlePOST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, id: data.id });
+    // A reconciliation sets the real balance, so an older open count is superseded. Left open, it keeps
+    // prefilling its stale estimate and a second reconcile silently reverses this one.
+    let balanceCheckClosed = true;
+    try {
+      const store = balanceCheckStore();
+      const scope = mirrorScope(token);
+      const open = (await store.list(scope)).find(check => check.accountId === checkAccountKey(accountId));
+      if (open) balanceCheckClosed = await store.close(scope, open.accountId, open.version);
+    } catch (error) {
+      balanceCheckClosed = false;
+      console.error("Reconciliation saved but its open balance check could not be closed", error);
+    }
+
+    return NextResponse.json({ success: true, id: data.id, balanceCheckClosed });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to create reconciliation";
     return NextResponse.json({ error: message }, { status: 500 });
