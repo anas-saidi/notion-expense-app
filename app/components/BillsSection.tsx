@@ -214,7 +214,7 @@ export function BillsSection({ data, loading, refreshing = false, error, categor
           {candidateError ? <Banner role="alert" tone="danger" compact>{candidateError}</Banner>
             : !candidates ? <SkeletonRows count={3} />
             : candidates.length === 0 ? <EmptyState>No expenses in this category to count.</EmptyState>
-            : <div className="row-list" role="radiogroup" aria-label="Expense to count">{candidates.slice(0, 6).map(c => <button key={c.id} type="button" role="radio" aria-checked={linkId === c.id} className="bill-date-row bills-link-option" disabled={!enabled} onClick={() => { setLinkId(c.id); setPartial(c.amount < remaining - 0.5); }}>
+            : <div className="row-list" role="radiogroup" aria-label="Expense to count">{candidates.slice(0, 6).map(c => <button key={c.id} type="button" role="radio" aria-checked={linkId === c.id} className="bill-date-row bills-link-option" disabled={!enabled} onClick={() => { setLinkId(c.id); setPartial(false); }}>
                 <span className="bill-date-copy"><span className="bill-date-title">{c.name}</span><span className="bill-date-context">{fmtDate(c.date)}</span></span>
                 <span className="bill-date-amount"><Money value={c.amount} /></span></button>)}</div>}
           {linkPartial && linkCandidate && <Switch checked={partial} onChange={setPartial}>Part payment: <Money value={remaining - linkCandidate.amount} /> still due</Switch>}

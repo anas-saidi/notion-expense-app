@@ -30,6 +30,12 @@ describe("Notion bills contract", () => {
     expect((call[2]!.body as any).properties).toMatchObject({ Type: { select: { name: "Due" } }, Date: { date: null }, Account: { relation: [] }, "Due Date": { date: { start: "2026-10-05" } } });
     expect(assertExpenseFitsBudget).not.toHaveBeenCalled();
   });
+  it("refuses bills while Bill is limited to one page, since each new payment would unlink the last", async () => {
+    vi.mocked(readDatabaseSchema).mockResolvedValue({ properties: { ...properties, Bill: { type: "relation", relation: { database_id: db, limit: 1 } } } });
+    await expect(readBills("token")).rejects.toThrow(/No limit/);
+    await expect(payBill("token", { billId, period: "2026-10", amount: 550, date: "2026-10-06", accountId })).rejects.toThrow(/No limit/);
+    expect(vi.mocked(notionFetchJson).mock.calls.some(c => c[1] === "/pages")).toBe(false);
+  });
   it("creates linked expenses without updating the schedule's expected amount", async () => {
     await payBill("token", { billId, period: "2026-10", amount: 550, date: "2026-10-06", accountId });
     expect(assertExpenseFitsBudget).toHaveBeenCalledWith("token", { categoryId: catId, amount: 550, overspend: false });

@@ -21,6 +21,8 @@ export async function billSchema(token: string) {
       !props.Type?.select?.options?.some((o: any) => o.name === "Due") || normalizedId(props.Bill.relation?.database_id ?? "") !== normalizedId(TRANSACTIONS_DB)) {
     throw billError("Transactions needs Type: Due, Due Date, Repeat, Bill (relation to Transactions), Bill period, and Bill metadata", 409);
   }
+  // Notion keeps this self-relation on the bill too. Limited to one page, each new payment silently unlinks the last.
+  if (props.Bill.relation?.limit != null) throw billError("In Notion, set the Transactions Bill property's limit to No limit. Otherwise each new payment unlinks the previous one.", 409);
   return { dueDate };
 }
 export function mapBillSchedule(page: any, dueDate: string): BillSchedule {
