@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contributionLedger, type ContributionAgreement } from "./contribution-agreements";
+import { contributionLedger, contributionLeft, type ContributionAgreement, type ContributionMonth } from "./contribution-agreements";
 import { calculateContributionStatus, contributionDue } from "../app/components/contribution-utils";
 import { calculateMonthPlanCapacity } from "../app/components/month-plan-capacity";
 import type { Account, Category, MonthlySummary, Transaction } from "../app/components/app-types";
@@ -96,5 +96,25 @@ describe("confirmed monthly contributions and advances", () => {
     const capacity = calculateMonthPlanCapacity({ joint: 252.35 - 1135, anas: 5000, salma: 5000 }, { joint: 1000, anas: 0, salma: 0 }, { anas: .65, salma: .35 });
     expect(capacity.due).toEqual({ anas: 1223.72, salma: 658.93 });
     expect(capacity.due.anas + capacity.due.salma).toBeCloseTo(1882.65);
+  });
+});
+
+describe("contribution left on Home", () => {
+  const november = (outstanding: number, contributed = 11915.25): ContributionMonth => ({
+    month: "2026-11",
+    agreement: { month: "2026-11", original: { anas: 14629.23, salma: 7877.27 }, targets: { anas: 15058.88, salma: 8108.62 }, shares: { anas: .65, salma: .35 } } as ContributionAgreement,
+    contributed: { anas: 15058.75, salma: contributed },
+    aboveOriginal: { anas: 0, salma: 0 }, aboveAgreed: { anas: 0, salma: 3806.63 },
+    repaid: { anas: 0, salma: 3806.63 - outstanding }, outstanding: { anas: 0, salma: outstanding },
+  });
+  it("shows no extra once Joint has repaid the advance, as in November 2026", () => {
+    expect(contributionLeft(november(0), "salma")).toBe(-0);
+    expect(Math.round(contributionLeft(november(0), "anas"))).toBe(0);
+  });
+  it("shows only the part of the advance Joint still owes", () => {
+    expect(contributionLeft(november(3406.63), "salma")).toBe(-3406.63);
+  });
+  it("still shows what is due when a partner is below the agreement", () => {
+    expect(contributionLeft(november(0, 8000), "salma")).toBe(108.62);
   });
 });

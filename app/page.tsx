@@ -40,7 +40,7 @@ import { getCategoryAllocatedByScope, isSavingsCategory, scopeMonthlySummary } f
 import { isJointIncomeAccount, type IncomeUse } from "@/lib/joint-income";
 import { calculateContributionStatus, contributionDue } from "./components/contribution-utils";
 import { ContributionDetails, ContributionEntry } from "./components/ContributionDetails";
-import { contributionLedger, money as contributionMoney } from "../lib/contribution-agreements";
+import { contributionLedger, contributionLeft as contributionLeftFor, money as contributionMoney } from "../lib/contribution-agreements";
 import { fmt, scopeFromAccountLabel, withDisplayNames } from "./components/app-utils";
 import { refreshZakatAfterPayment } from "./components/zakat-status";
 import type { Account, AppTab, BudgetScope, Category, MonthlySummary, PendingItem, Transaction } from "./components/app-types";
@@ -897,8 +897,8 @@ export default function App() {
     if (!month) return [];
     const partners = budgetScope === "joint" ? (["anas", "salma"] as const) : [budgetScope] as const;
     return partners.flatMap(partner => {
-      // Positive: still to put in. Negative: put in beyond the agreement (an advance).
-      const left = Math.round(month.agreement.targets[partner] - month.contributed[partner]);
+      // Positive: still to put in. Negative: an advance Joint still owes back (repaid advances are settled).
+      const left = Math.round(contributionLeftFor(month, partner));
       return Math.abs(left) >= 1 ? [{ partner, left }] : [];
     });
   })();

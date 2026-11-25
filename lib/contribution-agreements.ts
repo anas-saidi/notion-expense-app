@@ -32,6 +32,12 @@ export type ContributionLedger = {
   repaymentCredit: PartnerAmounts;
   unappliedRepayments: PartnerAmounts;
 };
+/** What a partner still has to put in this month (positive), or the advance Joint
+ *  still owes them (negative). Repaid advances are settled, so they don't read as extra. */
+export function contributionLeft(month: ContributionMonth, partner: Partner) {
+  const due = money(month.agreement.targets[partner] - month.contributed[partner]);
+  return due > 0 ? due : -month.outstanding[partner];
+}
 export const REPAYMENT_PROPERTY = "Contribution repayment";
 /** The contribution half of an applied advance carries "offset:<request id>": it counts as that month's contribution,
  *  while the repayment half (the plain request id) repays the advance. Together they move no cash. */
