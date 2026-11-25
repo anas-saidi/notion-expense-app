@@ -119,6 +119,28 @@ describe("Reflect money flow", () => {
     expect(points[11]).toMatchObject({ spent: 90, moneyIn: 1200 });
   });
 
+  it("nets advance repayments out of Joint and ignores applied advances, as in November 2026", () => {
+    const withSalma: Account[] = [...accounts, { id: "salma", label: "Wife Account", icon: "", type: null, balance: 0, readyToAssign: 0 }];
+    const move = (id: string, amount: number, from: string, to: string, date: string, contributionRepaymentId?: string) =>
+      transaction(id, amount, { type: "Transfer", category: null, accountId: null, fromAccountId: from, toAccountId: to, date, contributionRepaymentId });
+    const november = [
+      // Apply advance: contribution leg plus repayment leg, no cash.
+      move("anas-offset", 820.75, "anas", "joint", "2026-11-01", "offset:a"),
+      move("anas-applied", 820.75, "joint", "anas", "2026-11-01", "a"),
+      move("salma-offset", 971.25, "salma", "joint", "2026-11-01", "offset:s"),
+      move("salma-applied", 971.25, "joint", "salma", "2026-11-01", "s"),
+      // Cash repayments of Salma's extra, and Anas funding Joint.
+      move("repay-1", 400, "joint", "salma", "2026-11-15", "r1"),
+      move("anas-in", 3407, "anas", "joint", "2026-11-23"),
+      move("repay-2", 3406.63, "joint", "salma", "2026-11-23", "r2"),
+      move("anas-regular", 1686, "anas", "joint", "2026-11-23"),
+    ];
+    const points = buildMoneyFlow([], november, categories, withSalma, "joint", { start: "2026-11", end: "2026-11" }, [], new Date(2026, 10, 25));
+    expect(points[0].moneyIn).toBe(0);
+    expect(points[14].moneyIn).toBe(-400);
+    expect(points.at(-1)!.moneyIn).toBe(1286.37);
+  });
+
   it("buckets by month across a longer period and ignores transfers within Joint", () => {
     const points = flow([
       transaction("july", 50, { date: "2026-07-03" }),

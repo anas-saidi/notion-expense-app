@@ -1,6 +1,7 @@
 import type { Account, BudgetScope, Category, MonthlyCategoryTotal, Transaction } from "./app-types";
 import { isExpenseTransaction, scopeFromAccountLabel, transactionMatchesScope } from "./app-utils";
 import { isSavingsCategory } from "./wallet-utils";
+import { OFFSET_PREFIX } from "../../lib/contribution-agreements";
 
 export type ReflectPeriod = { start: string; end: string };
 export type ReflectCategory = { id: string; name: string; icon: string | null; spent: number; inflow: number; net: number; share: number; transactions: Transaction[] };
@@ -32,7 +33,7 @@ const accountScopeOf = (id: string | null | undefined, accounts: Account[]) => {
 
 /**
  * Whether a transaction belongs in a partner's "To Joint" row. Joint's own view
- * counts this money as its money in (see isMoneyIn), so each view counts it once.
+ * counts this money as its money in (see moneyInAmount), so each view counts it once.
  * Joint → partner account transfers count too, as inflows that net the row down.
  */
 function isToJoint(transaction: Transaction, categories: Category[], accounts: Account[], scope: BudgetScope) {
@@ -113,22 +114,37 @@ export function reflectMonthCount(period: ReflectPeriod, transactions: Transacti
 
 export type FlowPoint = { key: string; label: string; spent: number; moneyIn: number };
 
+/** Request ids of applied advances: each has a contribution leg ("offset:<id>")
+ * and a repayment leg ("<id>") that cancel out, so no cash moved. */
+export function appliedAdvanceIds(transactions: Transaction[]) {
+  return new Set(transactions.flatMap(t => t.contributionRepaymentId?.startsWith(OFFSET_PREFIX) ? [t.contributionRepaymentId.slice(OFFSET_PREFIX.length)] : []));
+}
+
 /**
- * Money that came into the wallet: Income into its accounts (category-linked
- * inflows are refunds, already netted in spending). Joint is funded by the
- * partners, so for Joint it's their transfers into the joint account plus joint
- * expenses they paid from their own accounts, the same "direct spend" the
- * contribution status counts.
+ * Money that came into the wallet, signed: Income into its accounts
+ * (category-linked inflows are refunds, already netted in spending). Joint is
+ * funded by the partners, so for Joint it's their transfers into the joint
+ * account plus joint expenses they paid from their own accounts, the same
+ * "direct spend" the contribution status counts. Money Joint sends back to a
+ * partner (an advance repayment or refund) counts negative, and both legs of an
+ * applied advance count zero.
  */
-export function isMoneyIn(transaction: Transaction, categories: Category[], accounts: Account[], scope: BudgetScope) {
-  if (transaction.type === "Income") return !transaction.category && transactionMatchesScope(transaction, categories, scope, accounts);
-  if (scope !== "joint") return false;
+export function moneyInAmount(transaction: Transaction, categories: Category[], accounts: Account[], scope: BudgetScope, appliedAdvances: ReadonlySet<string> = new Set()) {
+  const amount = Math.abs(transaction.amount);
+  if (transaction.type === "Income") return !transaction.category && transactionMatchesScope(transaction, categories, scope, accounts) ? amount : 0;
+  if (scope !== "joint") return 0;
   const isPartner = (id: string | null | undefined) => { const owner = accountScopeOf(id, accounts); return owner !== null && owner !== "joint"; };
   if (isExpenseTransaction(transaction)) {
-    return transaction.amount > 0 && isPartner(transaction.accountId) && transactionMatchesScope(transaction, categories, "joint", accounts);
+    return transaction.amount > 0 && isPartner(transaction.accountId) && transactionMatchesScope(transaction, categories, "joint", accounts) ? amount : 0;
   }
-  if (transaction.type !== "Transfer" || transaction.fromCategoryId || transaction.toCategoryId) return false;
-  return accountScopeOf(transaction.toAccountId, accounts) === "joint" && isPartner(transaction.fromAccountId);
+  if (transaction.type !== "Transfer" || transaction.fromCategoryId || transaction.toCategoryId) return 0;
+  const repaymentId = transaction.contributionRepaymentId;
+  if (repaymentId && (repaymentId.startsWith(OFFSET_PREFIX) || appliedAdvances.has(repaymentId))) return 0;
+  const from = accountScopeOf(transaction.fromAccountId, accounts);
+  const to = accountScopeOf(transaction.toAccountId, accounts);
+  if (to === "joint" && isPartner(transaction.fromAccountId)) return amount;
+  if (from === "joint" && isPartner(transaction.toAccountId)) return -amount;
+  return 0;
 }
 
 /**
@@ -169,10 +185,14 @@ export function buildMoneyFlow(
   for (const row of spending) {
     for (const t of row.transactions) add(spentBy, t.date, isReflectInflow(t, accounts) ? -Math.abs(t.amount) : t.amount);
   }
+  const appliedAdvances = appliedAdvanceIds(transactions);
   for (const t of transactions) {
-    if (!Number.isFinite(t.amount) || !isMoneyIn(t, categories, accounts, scope)) continue;
-    if (excludedAccounts.includes(t.toAccountId || t.accountId || UNKNOWN_ACCOUNT)) continue;
-    add(inBy, t.date, Math.abs(t.amount));
+    if (!Number.isFinite(t.amount)) continue;
+    const amount = moneyInAmount(t, categories, accounts, scope, appliedAdvances);
+    if (!amount) continue;
+    const walletAccount = amount < 0 ? t.fromAccountId : t.toAccountId || t.accountId;
+    if (excludedAccounts.includes(walletAccount || UNKNOWN_ACCOUNT)) continue;
+    add(inBy, t.date, amount);
   }
 
   let spent = 0;
